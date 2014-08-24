@@ -640,6 +640,28 @@ class Terminal(object):
         else:
             yield
 
+    @contextlib.contextmanager
+    def keypad(self):
+        """
+        Context manager that enables keypad input (*keyboard_transmit* mode).
+
+        This enables the effect of calling the curses function keypad(3x):
+        display terminfo(5) capability `keypad_xmit` (smkx) upon entering,
+        and terminfo(5) capability `keypad_local` (rmkx) upon exiting.
+
+        On an IBM-PC keypad of ttype *xterm*, with numlock off, the
+        lower-left diagonal key transmits sequence ``\\x1b[F``, ``KEY_END``.
+
+        However, upon entering keypad mode, ``\\x1b[OF`` is transmitted,
+        translating to ``KEY_LL`` (lower-left key), allowing diagonal
+        direction keys to be determined.
+        """
+        try:
+            self.stream.write(self.smkx)
+            yield
+        finally:
+            self.stream.write(self.rmkx)
+
     def inkey(self, timeout=None, esc_delay=0.35, _intr_continue=True):
         """T.inkey(timeout=None, [esc_delay, [_intr_continue]]) -> Keypress()
 

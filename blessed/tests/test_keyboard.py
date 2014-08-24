@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 "Tests for keyboard support."
+import functools
 import tempfile
 import StringIO
 import signal
@@ -269,7 +270,7 @@ def test_inkey_0s_cbreak_noinput():
 
 
 def test_inkey_0s_cbreak_noinput_nokb():
-    "0-second inkey without input or  keyboard."
+    "0-second inkey without data in input stream and no keyboard/tty."
     @as_subprocess
     def child():
         term = TestTerminal(stream=StringIO.StringIO())
@@ -819,3 +820,42 @@ def test_resolve_sequence():
     assert ks.code is 6
     assert ks.is_sequence is True
     assert repr(ks) in (u"KEY_L", "KEY_L")
+
+
+def test_keypad_directional_keys():
+    """ Test PC-Style function key translations when in ``keypad`` mode."""
+    # Key     plain   app     modified
+    # Up      ^[[A    ^[OA    ^[[1;mA
+    # Down    ^[[B    ^[OB    ^[[1;mB
+    # Right   ^[[C    ^[OC    ^[[1;mC
+    # Left    ^[[D    ^[OD    ^[[1;mD
+    # End     ^[[F    ^[OF    ^[[1;mF
+    # Home    ^[[H    ^[OH    ^[[1;mH
+    @as_subprocess
+    def child(kind):
+        term = TestTerminal(kind=kind, force_styling=True)
+        from blessed.keyboard import resolve_sequence
+
+        resolve = functools.partial(resolve_sequence,
+                                    mapper=term._keymap,
+                                    codes=term._keycodes)
+
+        assert resolve(u'\x1b[A').name == "KEY_UP"
+        assert resolve(u'\x1b[B').name == "KEY_DOWN"
+        assert resolve(u'\x1b[C').name == "KEY_RIGHT"
+        assert resolve(u'\x1b[D').name == "KEY_LEFT"
+        assert resolve(u'\x1b[F').name == "KEY_END"
+        assert resolve(u'\x1b[H').name == "KEY_HOME"
+
+        # application keys mode
+        assert resolve('\x1b[OA').name == "KEY_UP"
+        assert resolve('\x1b[OB').name == "KEY_DOWN"
+        assert resolve('\x1b[OC').name == "KEY_RIGHT"
+        assert resolve('\x1b[OD').name == "KEY_LEFT"
+        assert resolve(u"\x1b[OF").name == "KEY_LL"
+        assert resolve(u"\x1b[6~").name == "KEY_LR"
+        assert resolve(u"\x1b[E").name == "KEY_CENTER"
+        assert resolve(u"\x1b[OH").name == "KEY_UL"
+        assert resolve(u"\x1b[5~").name == "KEY_UR"
+
+    child('xterm')

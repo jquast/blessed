@@ -168,6 +168,11 @@ CURSES_KEYCODE_OVERRIDE_MIXIN = (
     ('KEY_ESCAPE', curses.KEY_EXIT),
     ('KEY_SUP', curses.KEY_SR),
     ('KEY_SDOWN', curses.KEY_SF),
+    ('KEY_LL', curses.KEY_C1),
+    ('KEY_LR', curses.KEY_C3),
+    ('KEY_CENTER', curses.KEY_B2),
+    ('KEY_UL', curses.KEY_A1),
+    ('KEY_UR', curses.KEY_A3),
 )
 
 """In a perfect world, terminal emulators would always send exactly what
@@ -186,20 +191,9 @@ DEFAULT_SEQUENCE_MIXIN = (
     (unichr(9), curses.KEY_TAB),
     (unichr(27), curses.KEY_EXIT),
     (unichr(127), curses.KEY_DC),
-    # vt100 application keys are still sent by xterm & friends, even if
-    # their reports otherwise; possibly, for compatibility reasons?
-    (u"\x1bOA", curses.KEY_UP),
-    (u"\x1bOB", curses.KEY_DOWN),
-    (u"\x1bOC", curses.KEY_RIGHT),
-    (u"\x1bOD", curses.KEY_LEFT),
-    (u"\x1bOH", curses.KEY_HOME),
-    (u"\x1bOF", curses.KEY_END),
-    (u"\x1bOP", curses.KEY_F1),
-    (u"\x1bOQ", curses.KEY_F2),
-    (u"\x1bOR", curses.KEY_F3),
-    (u"\x1bOS", curses.KEY_F4),
+
     # typical for vt220-derived terminals, just in case our terminal
-    # database reported something different,
+    # database failed to report them, but detect them anyway.
     (u"\x1b[A", curses.KEY_UP),
     (u"\x1b[B", curses.KEY_DOWN),
     (u"\x1b[C", curses.KEY_RIGHT),
@@ -209,11 +203,19 @@ DEFAULT_SEQUENCE_MIXIN = (
     (u"\x1b[H", curses.KEY_HOME),
     (u"\x1b[F", curses.KEY_END),
     (u"\x1b[K", curses.KEY_END),
-    # atypical,
-    # (u"\x1bA", curses.KEY_UP),
-    # (u"\x1bB", curses.KEY_DOWN),
-    # (u"\x1bC", curses.KEY_RIGHT),
-    # (u"\x1bD", curses.KEY_LEFT),
+
+    # keys sent after term.smkx (keypad_xmit) is emitted, source:
+    # http://www.xfree86.org/current/ctlseqs.html#PC-Style%20Function%20Keys
+    (u"\x1b[OA", curses.KEY_UP),
+    (u"\x1b[OB", curses.KEY_DOWN),
+    (u"\x1b[OC", curses.KEY_RIGHT),
+    (u"\x1b[OD", curses.KEY_LEFT),
+    (u"\x1b[OF", curses.KEY_C1),
+    (u"\x1b[6~", curses.KEY_C3),
+    (u"\x1b[E", curses.KEY_B2),
+    (u"\x1b[OH", curses.KEY_A1),
+    (u"\x1b[5~", curses.KEY_A3),
+
     # rxvt,
     (u"\x1b?r", curses.KEY_DOWN),
     (u"\x1b?x", curses.KEY_UP),

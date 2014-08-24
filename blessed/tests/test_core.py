@@ -59,6 +59,24 @@ def test_flipped_location_move(all_terms):
     child(all_terms)
 
 
+def test_yield_keypad():
+    "Ensure ``keypad()`` writes keyboard_xmit and keyboard_local."
+    @as_subprocess
+    def child(kind):
+        # given,
+        t = TestTerminal(stream=StringIO(), force_styling=True)
+        expected_output = u''.join((t.smkx, t.rmkx))
+
+        # exercise,
+        with t.keypad():
+            pass
+
+        # verify.
+        assert (t.stream.getvalue() == expected_output)
+
+    child(kind='xterm')
+
+
 def test_null_fileno():
     "Make sure ``Terminal`` works when ``fileno`` is ``None``."
     @as_subprocess
