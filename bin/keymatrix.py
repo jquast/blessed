@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import division
 from blessed import Terminal
 import sys
 
@@ -31,11 +32,11 @@ def main():
         sys.stdout.flush()
         if bottom >= (term.height - 5):
             sys.stderr.write(
-                '\n' * (term.height / 2) +
+                ('\n' * (term.height // 2)) +
                 term.center(term.red_underline('cheater!')) + '\n')
             sys.stderr.write(
                 term.center("(use a larger screen)") +
-                '\n' * (term.height / 2))
+                ('\n' * (term.height // 2)))
             sys.exit(1)
         for row, inp in enumerate(inps[(term.height - (bottom + 2)) * -1:]):
             sys.stdout.write(term.move(bottom + row+1))
@@ -72,9 +73,9 @@ def main():
     gb = build_gameboard(term)
     inps = []
 
-    with term.raw(), term.keypad():
+    with term.raw(), term.keypad(), term.location():
         inp = term.inkey(timeout=0)
-        while inp.upper() != 'Q':
+        while inp != chr(3):
             if dirty:
                 refresh(term, gb, level, score, inps)
                 dirty = False
