@@ -72,7 +72,7 @@ def main():
     gb = build_gameboard(term)
     inps = []
 
-    with term.raw():
+    with term.raw(), term.keypad():
         inp = term.inkey(timeout=0)
         while inp.upper() != 'Q':
             if dirty:
