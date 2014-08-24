@@ -3,6 +3,9 @@
 #
 # "Why wont python let me read memory
 #  from screen like assembler? That's dumb." -hellbeard
+#
+# This program makes example how to deal with a keypad for directional
+# movement, with both numlock on and off.
 from __future__ import division, print_function
 import collections
 import functools
@@ -63,32 +66,43 @@ center = lambda csr: Cursor(
 
 
 lookup_move = lambda inp_code, csr, term: {
-    # arrows
-    csr.term.KEY_LEFT: left_of(csr, 1),
-    csr.term.KEY_RIGHT: right_of(csr, 1),
+    # arrows, including angled directionals
+    csr.term.KEY_END: below(left_of(csr, 1), 1),
+    csr.term.KEY_KP_1: below(left_of(csr, 1), 1),
+
     csr.term.KEY_DOWN: below(csr, 1),
-    csr.term.KEY_UP: above(csr, 1),
-    # keypad diagonals
-    csr.term.KEY_LL: below(left_of(csr, 1), 1),
-    csr.term.KEY_UL: above(left_of(csr, 1), 1),
+    csr.term.KEY_KP_2: below(csr, 1),
+
+    csr.term.KEY_PGDOWN: below(right_of(csr, 1), 1),
     csr.term.KEY_LR: below(right_of(csr, 1), 1),
-    csr.term.KEY_UR: above(right_of(csr, 1), 1),
-    # center key == center of screen
+    csr.term.KEY_KP_3: below(right_of(csr, 1), 1),
+
+    csr.term.KEY_LEFT: left_of(csr, 1),
+    csr.term.KEY_KP_4: left_of(csr, 1),
+
     csr.term.KEY_CENTER: center(csr),
+    csr.term.KEY_KP_5: center(csr),
+
+    csr.term.KEY_RIGHT: right_of(csr, 1),
+    csr.term.KEY_KP_6: right_of(csr, 1),
+
+    csr.term.KEY_HOME: above(left_of(csr, 1), 1),
+    csr.term.KEY_KP_7: above(left_of(csr, 1), 1),
+
+    csr.term.KEY_UP: above(csr, 1),
+    csr.term.KEY_KP_8: above(csr, 1),
+
+    csr.term.KEY_PGUP: above(right_of(csr, 1), 1),
+    csr.term.KEY_KP_9: above(right_of(csr, 1), 1),
+
     # shift + arrows
     csr.term.KEY_SLEFT: left_of(csr, 10),
     csr.term.KEY_SRIGHT: right_of(csr, 10),
     csr.term.KEY_SDOWN: below(csr, 10),
     csr.term.KEY_SUP: above(csr, 10),
+
     # carriage return
     csr.term.KEY_ENTER: home(below(csr, 1)),
-    # home, end
-    csr.term.KEY_HOME: home(csr),
-    csr.term.KEY_END: end(csr),
-    # pgup, pgdown
-    csr.term.KEY_PGUP: top(csr),
-    csr.term.KEY_PGDOWN: bottom(csr),
-
 }.get(inp_code, csr)
 
 
