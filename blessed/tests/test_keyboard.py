@@ -550,7 +550,7 @@ def test_esc_delay_cbreak_035():
     assert key_name == u'KEY_ESCAPE'
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
-    assert 35 <= int(duration_ms) <= 45, duration_ms
+    assert 34 <= int(duration_ms) <= 45, duration_ms
 
 
 def test_esc_delay_cbreak_135():
@@ -822,7 +822,7 @@ def test_resolve_sequence():
     assert repr(ks) in (u"KEY_L", "KEY_L")
 
 
-def test_keypad_directional_keys():
+def test_keypad_mixins_and_aliases():
     """ Test PC-Style function key translations when in ``keypad`` mode."""
     # Key     plain   app     modified
     # Up      ^[[A    ^[OA    ^[[1;mA
@@ -840,22 +840,56 @@ def test_keypad_directional_keys():
                                     mapper=term._keymap,
                                     codes=term._keycodes)
 
-        assert resolve(u'\x1b[A').name == "KEY_UP"
-        assert resolve(u'\x1b[B').name == "KEY_DOWN"
-        assert resolve(u'\x1b[C').name == "KEY_RIGHT"
-        assert resolve(u'\x1b[D').name == "KEY_LEFT"
-        assert resolve(u'\x1b[F').name == "KEY_END"
-        assert resolve(u'\x1b[H').name == "KEY_HOME"
-
-        # application keys mode
-        assert resolve('\x1b[OA').name == "KEY_UP"
-        assert resolve('\x1b[OB').name == "KEY_DOWN"
-        assert resolve('\x1b[OC').name == "KEY_RIGHT"
-        assert resolve('\x1b[OD').name == "KEY_LEFT"
-        assert resolve(u"\x1b[OF").name == "KEY_LL"
-        assert resolve(u"\x1b[6~").name == "KEY_LR"
-        assert resolve(u"\x1b[E").name == "KEY_CENTER"
-        assert resolve(u"\x1b[OH").name == "KEY_UL"
-        assert resolve(u"\x1b[5~").name == "KEY_UR"
+        assert resolve(unichr(10)).name == "KEY_ENTER"
+        assert resolve(unichr(13)).name == "KEY_ENTER"
+        assert resolve(unichr(8)).name == "KEY_BACKSPACE"
+        assert resolve(unichr(9)).name == "KEY_TAB"
+        assert resolve(unichr(27)).name == "KEY_ESCAPE"
+        assert resolve(unichr(127)).name == "KEY_DELETE"
+        assert resolve(u"\x1b[A").name == "KEY_UP"
+        assert resolve(u"\x1b[B").name == "KEY_DOWN"
+        assert resolve(u"\x1b[C").name == "KEY_RIGHT"
+        assert resolve(u"\x1b[D").name == "KEY_LEFT"
+        assert resolve(u"\x1b[U").name == "KEY_PGDOWN"
+        assert resolve(u"\x1b[V").name == "KEY_PGUP"
+        assert resolve(u"\x1b[H").name == "KEY_HOME"
+        assert resolve(u"\x1b[F").name == "KEY_END"
+        assert resolve(u"\x1b[K").name == "KEY_END"
+        assert resolve(u"\x1bOM").name == "KEY_ENTER"
+        assert resolve(u"\x1bOj").name == "KEY_KP_MULTIPLY"
+        assert resolve(u"\x1bOk").name == "KEY_KP_ADD"
+        assert resolve(u"\x1bOl").name == "KEY_KP_SEPARATOR"
+        assert resolve(u"\x1bOm").name == "KEY_KP_SUBTRACT"
+        assert resolve(u"\x1bOn").name == "KEY_KP_DECIMAL"
+        assert resolve(u"\x1bOo").name == "KEY_KP_DIVIDE"
+        assert resolve(u"\x1bOX").name == "KEY_KP_EQUAL"
+        assert resolve(u"\x1bOp").name == "KEY_KP_0"
+        assert resolve(u"\x1bOq").name == "KEY_KP_1"
+        assert resolve(u"\x1bOr").name == "KEY_KP_2"
+        assert resolve(u"\x1bOs").name == "KEY_KP_3"
+        assert resolve(u"\x1bOt").name == "KEY_KP_4"
+        assert resolve(u"\x1bOu").name == "KEY_KP_5"
+        assert resolve(u"\x1bOv").name == "KEY_KP_6"
+        assert resolve(u"\x1bOw").name == "KEY_KP_7"
+        assert resolve(u"\x1bOx").name == "KEY_KP_8"
+        assert resolve(u"\x1bOy").name == "KEY_KP_9"
+        assert resolve(u"\x1b[1~").name == "KEY_FIND"
+        assert resolve(u"\x1b[2~").name == "KEY_INSERT"
+        assert resolve(u"\x1b[3~").name == "KEY_DELETE"
+        assert resolve(u"\x1b[4~").name == "KEY_SELECT"
+        assert resolve(u"\x1b[5~").name == "KEY_PGUP"
+        assert resolve(u"\x1b[6~").name == "KEY_PGDOWN"
+        assert resolve(u"\x1b[7~").name == "KEY_HOME"
+        assert resolve(u"\x1b[8~").name == "KEY_END"
+        assert resolve(u"\x1b[OA").name == "KEY_UP"
+        assert resolve(u"\x1b[OB").name == "KEY_DOWN"
+        assert resolve(u"\x1b[OC").name == "KEY_RIGHT"
+        assert resolve(u"\x1b[OD").name == "KEY_LEFT"
+        assert resolve(u"\x1b[OF").name == "KEY_END"
+        assert resolve(u"\x1b[OH").name == "KEY_HOME"
+        assert resolve(u"\x1bOP").name == "KEY_F1"
+        assert resolve(u"\x1bOQ").name == "KEY_F2"
+        assert resolve(u"\x1bOR").name == "KEY_F3"
+        assert resolve(u"\x1bOS").name == "KEY_F4"
 
     child('xterm')

@@ -11,7 +11,7 @@ import collections
 if hasattr(collections, 'OrderedDict'):
     OrderedDict = collections.OrderedDict
 else:
-    # python 2.6
+    # python 2.6 requires 3rd party library
     import ordereddict
     OrderedDict = ordereddict.OrderedDict
 
@@ -21,9 +21,34 @@ get_curses_keycodes = lambda: dict(
      if keyname.startswith('KEY_'))
 )
 
-# Inject missing KEY_TAB
-if not hasattr(curses, 'KEY_TAB'):
-    curses.KEY_TAB = max(get_curses_keycodes().values()) + 1
+# override a few curses constants with easier mnemonics,
+# there may only be a 1:1 mapping, so for those who desire
+# to use 'KEY_DC' from, perhaps, ported code, recommend
+# that they simply compare with curses.KEY_DC.
+CURSES_KEYCODE_OVERRIDE_MIXIN = (
+    ('KEY_DELETE', curses.KEY_DC),
+    ('KEY_INSERT', curses.KEY_IC),
+    ('KEY_PGUP', curses.KEY_PPAGE),
+    ('KEY_PGDOWN', curses.KEY_NPAGE),
+    ('KEY_ESCAPE', curses.KEY_EXIT),
+    ('KEY_SUP', curses.KEY_SR),
+    ('KEY_SDOWN', curses.KEY_SF),
+    ('KEY_UP_LEFT', curses.KEY_A1),
+    ('KEY_UP_RIGHT', curses.KEY_A3),
+    ('KEY_CENTER', curses.KEY_B2),
+    ('KEY_BEGIN', curses.KEY_BEG),
+)
+
+# Inject KEY_{names} that we think would be useful, there are no curses
+# definitions for the keypad keys.  We need keys that generate multibyte
+# sequences, though it is useful to have some aliases for basic control
+# characters such as TAB.
+_lastval = max(get_curses_keycodes().values())
+for key in ('TAB', 'KP_MULTIPLY', 'KP_ADD', 'KP_SEPARATOR', 'KP_SUBTRACT',
+            'KP_DECIMAL', 'KP_DIVIDE', 'KP_EQUAL', 'KP_0', 'KP_1', 'KP_2',
+            'KP_3', 'KP_4', 'KP_5', 'KP_6', 'KP_7', 'KP_8', 'KP_9'):
+    _lastval += 1
+    setattr(curses, 'KEY_{0}'.format(key), _lastval)
 
 
 class Keystroke(unicode):
@@ -156,32 +181,22 @@ def resolve_sequence(text, mapper, codes):
             return Keystroke(ucs=sequence, code=code, name=codes[code])
     return Keystroke(ucs=text and text[0] or u'')
 
-# override a few curses constants with easier mnemonics,
-# there may only be a 1:1 mapping, so for those who desire
-# to use 'KEY_DC' from, perhaps, ported code, recommend
-# that they simply compare with curses.KEY_DC.
-CURSES_KEYCODE_OVERRIDE_MIXIN = (
-    ('KEY_DELETE', curses.KEY_DC),
-    ('KEY_INSERT', curses.KEY_IC),
-    ('KEY_PGUP', curses.KEY_PPAGE),
-    ('KEY_PGDOWN', curses.KEY_NPAGE),
-    ('KEY_ESCAPE', curses.KEY_EXIT),
-    ('KEY_SUP', curses.KEY_SR),
-    ('KEY_SDOWN', curses.KEY_SF),
-    ('KEY_LL', curses.KEY_C1),
-    ('KEY_LR', curses.KEY_C3),
-    ('KEY_CENTER', curses.KEY_B2),
-    ('KEY_UL', curses.KEY_A1),
-    ('KEY_UR', curses.KEY_A3),
-)
-
 """In a perfect world, terminal emulators would always send exactly what
 the terminfo(5) capability database plans for them, accordingly by the
 value of the ``TERM`` name they declare.
 
 But this isn't a perfect world. Many vt220-derived terminals, such as
 those declaring 'xterm', will continue to send vt220 codes instead of
-their native-declared codes. This goes for many: rxvt, putty, iTerm."""
+their native-declared codes, for backwards-compatibility.
+
+This goes for many: rxvt, putty, iTerm.
+
+These "mixins" are used for *all* terminals, regardless of their type.
+
+Furthermore, curses does not provide sequences sent by the keypad,
+at least, it does not provide a way to distinguish between keypad 0
+and numeric 0.
+"""
 DEFAULT_SEQUENCE_MIXIN = (
     # these common control characters (and 127, ctrl+'?') mapped to
     # an application key definition.
@@ -192,34 +207,63 @@ DEFAULT_SEQUENCE_MIXIN = (
     (unichr(27), curses.KEY_EXIT),
     (unichr(127), curses.KEY_DC),
 
-    # typical for vt220-derived terminals, just in case our terminal
-    # database failed to report them, but detect them anyway.
     (u"\x1b[A", curses.KEY_UP),
     (u"\x1b[B", curses.KEY_DOWN),
     (u"\x1b[C", curses.KEY_RIGHT),
     (u"\x1b[D", curses.KEY_LEFT),
+    (u"\x1b[F", curses.KEY_END),
+    (u"\x1b[H", curses.KEY_HOME),
+    # not sure where these are from .. please report
+    (u"\x1b[K", curses.KEY_END),
     (u"\x1b[U", curses.KEY_NPAGE),
     (u"\x1b[V", curses.KEY_PPAGE),
-    (u"\x1b[H", curses.KEY_HOME),
-    (u"\x1b[F", curses.KEY_END),
-    (u"\x1b[K", curses.KEY_END),
 
     # keys sent after term.smkx (keypad_xmit) is emitted, source:
     # http://www.xfree86.org/current/ctlseqs.html#PC-Style%20Function%20Keys
-    (u"\x1b[OA", curses.KEY_UP),
-    (u"\x1b[OB", curses.KEY_DOWN),
-    (u"\x1b[OC", curses.KEY_RIGHT),
-    (u"\x1b[OD", curses.KEY_LEFT),
-    (u"\x1b[OF", curses.KEY_C1),
-    (u"\x1b[6~", curses.KEY_C3),
-    (u"\x1b[E", curses.KEY_B2),
-    (u"\x1b[OH", curses.KEY_A1),
-    (u"\x1b[5~", curses.KEY_A3),
+    # http://fossies.org/linux/rxvt/doc/rxvtRef.html#KeyCodes
+    #
+    # keypad, numlock on
+    (u"\x1bOM", curses.KEY_ENTER),         # return
+    (u"\x1bOj", curses.KEY_KP_MULTIPLY),   # *
+    (u"\x1bOk", curses.KEY_KP_ADD),        # +
+    (u"\x1bOl", curses.KEY_KP_SEPARATOR),  # ,
+    (u"\x1bOm", curses.KEY_KP_SUBTRACT),   # -
+    (u"\x1bOn", curses.KEY_KP_DECIMAL),    # .
+    (u"\x1bOo", curses.KEY_KP_DIVIDE),     # /
+    (u"\x1bOX", curses.KEY_KP_EQUAL),      # =
+    (u"\x1bOp", curses.KEY_KP_0),          # 0
+    (u"\x1bOq", curses.KEY_KP_1),          # 1
+    (u"\x1bOr", curses.KEY_KP_2),          # 2
+    (u"\x1bOs", curses.KEY_KP_3),          # 3
+    (u"\x1bOt", curses.KEY_KP_4),          # 4
+    (u"\x1bOu", curses.KEY_KP_5),          # 5
+    (u"\x1bOv", curses.KEY_KP_6),          # 6
+    (u"\x1bOw", curses.KEY_KP_7),          # 7
+    (u"\x1bOx", curses.KEY_KP_8),          # 8
+    (u"\x1bOy", curses.KEY_KP_9),          # 9
 
-    # rxvt,
-    (u"\x1b?r", curses.KEY_DOWN),
-    (u"\x1b?x", curses.KEY_UP),
-    (u"\x1b?v", curses.KEY_RIGHT),
-    (u"\x1b?t", curses.KEY_LEFT),
-    (u"\x1b[@", curses.KEY_IC),
+    #
+    # keypad, numlock off
+    (u"\x1b[1~", curses.KEY_FIND),         # find
+    (u"\x1b[2~", curses.KEY_IC),           # insert (0)
+    (u"\x1b[3~", curses.KEY_DC),           # delete (.), "Execute"
+    (u"\x1b[4~", curses.KEY_SELECT),       # select
+    (u"\x1b[5~", curses.KEY_PPAGE),        # pgup   (9)
+    (u"\x1b[6~", curses.KEY_NPAGE),        # pgdown (3)
+    (u"\x1b[7~", curses.KEY_HOME),         # home
+    (u"\x1b[8~", curses.KEY_END),          # end
+    (u"\x1b[OA", curses.KEY_UP),           # up     (8)
+    (u"\x1b[OB", curses.KEY_DOWN),         # down   (2)
+    (u"\x1b[OC", curses.KEY_RIGHT),        # right  (6)
+    (u"\x1b[OD", curses.KEY_LEFT),         # left   (4)
+    (u"\x1b[OF", curses.KEY_END),          # end    (1)
+    (u"\x1b[OH", curses.KEY_HOME),         # home   (7)
+
+    # The vt220 placed F1-F4 above the keypad, in place of actual
+    # F1-F4 were local functions (hold screen, print screen,
+    # set up, data/talk, break).
+    (u"\x1bOP", curses.KEY_F1),
+    (u"\x1bOQ", curses.KEY_F2),
+    (u"\x1bOR", curses.KEY_F3),
+    (u"\x1bOS", curses.KEY_F4),
 )

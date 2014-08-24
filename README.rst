@@ -592,41 +592,44 @@ keyboard codes
 ~~~~~~~~~~~~~~
 
 The return value of the *Terminal* method ``inkey`` is an instance of the
-class ``Keystroke``, and may be inspected for its property *is_sequence*.
+class ``Keystroke``, and may be inspected for its property *is_sequence*
+(bool).  When *True*, it means the value is a *multibyte sequence*,
+representing a special non-alphanumeric key of your keyboard.
 
-When *True*, it means the value is a *multibyte sequence*, representing a
-special non-alphanumeric key of your keyboard.
+The *code* property (int) may then be compared with attributes of the
+*Terminal* instance, which are equivalent to the same of those listed
+by `curs_getch(3)`_ or the curses_ module, with the following helpful
+aliases:
 
-The *code* property (int) may then be compared with any of the following
-attributes of the *Terminal* instance, which are equivalent to the same
-available in `curs_getch(3)`_, with the following exceptions:
+* use ``KEY_DELETE`` for ``KEY_DC`` (chr(127)).
+* use ``KEY_TAB`` for chr(9).
+* use ``KEY_INSERT`` for ``KEY_IC``.
+* use ``KEY_PGUP`` for ``KEY_PPAGE``.
+* use ``KEY_PGDOWN`` for ``KEY_NPAGE``.
+* use ``KEY_ESCAPE`` for ``KEY_EXIT``.
+* use ``KEY_SUP`` for ``KEY_SR`` (shift + up).
+* use ``KEY_SDOWN`` for ``KEY_SF`` (shift + down).
+* use ``KEY_DOWN_LEFT`` for ``KEY_C1`` (keypad lower-left).
+* use ``KEY_UP_RIGHT`` for ``KEY_A1`` (keypad upper-left).
+* use ``KEY_DOWN_RIGHT`` for ``KEY_C3`` (keypad lower-left).
+* use ``KEY_UP_RIGHT`` for ``KEY_A3`` (keypad lower-right).
+* use ``KEY_CENTER`` for ``KEY_B2`` (keypad center).
+* use ``KEY_BEGIN`` for ``KEY_BEG``.
 
-* use ``KEY_DELETE`` instead of ``KEY_DC`` (chr(127))
-* use ``KEY_INSERT`` instead of ``KEY_IC``
-* use ``KEY_PGUP`` instead of ``KEY_PPAGE``
-* use ``KEY_PGDOWN`` instead of ``KEY_NPAGE``
-* use ``KEY_ESCAPE`` instead of ``KEY_EXIT``
-* use ``KEY_SUP`` instead of ``KEY_SR`` (shift + up)
-* use ``KEY_SDOWN`` instead of ``KEY_SF`` (shift + down)
-* use ``KEY_LL`` instead of ``KEY_C1`` (keypad lower-left)
-* use ``KEY_LR`` instead of ``KEY_C3`` (keypad lower-right)
-* use ``KEY_UL`` instead of ``KEY_B2`` (keypad upper-left)
-* use ``KEY_LR`` instead of ``KEY_UL`` (keypad lower-left)
-* use ``KEY_CENTER`` instead of ``KEY_UR`` (keypad center)
+The *name* property of the return value of ``inkey()`` will prefer
+these aliases over the built-in curses_ names.
 
-For reference, here are additional common key sequence names:
+The following are not available in the curses_ module, but provided
+for distinguishing a keypress of those keypad keys where num lock is
+enabled and the ``keypad()`` context manager is used:
 
-* ``KEY_BACKSPACE`` (chr(8)).
-* ``KEY_TAB`` (chr(9)).
-* ``KEY_DOWN``, ``KEY_UP``, ``KEY_LEFT``, ``KEY_RIGHT``.
-* ``KEY_SLEFT`` (shift + left).
-* ``KEY_SRIGHT``  (shift + right).
-* ``KEY_HOME``, ``KEY_END``.
-* ``KEY_F1`` through ``KEY_F22``.
-
-You may also use the ``name`` attribute, which is the string
-name of that property.
-
+* ``KEY_KP_MULTIPLY``
+* ``KEY_KP_ADD``
+* ``KEY_KP_SEPARATOR``
+* ``KEY_KP_SUBTRACT``
+* ``KEY_KP_DECIMAL``
+* ``KEY_KP_DIVIDE``
+* ``KEY_KP_0`` through ``KEY_KP_9``
 
 Shopping List
 =============
