@@ -630,6 +630,80 @@ def test_esc_delay_cbreak_timout_0():
     assert 34 <= int(duration_ms) <= 45, int(duration_ms)
 
 
+def test_esc_delay_cbreak_nonprefix_sequence():
+    "ESC a (\\x1ba) will return an ESC immediately"
+    pid, master_fd = pty.fork()
+    if pid is 0:  # child
+        try:
+            cov = __import__('cov_core_init').init()
+        except ImportError:
+            cov = None
+        term = TestTerminal()
+        os.write(sys.__stdout__.fileno(), SEMAPHORE)
+        with term.cbreak():
+            stime = time.time()
+            esc = term.inkey(timeout=5)
+            inp = term.inkey(timeout=5)
+            measured_time = (time.time() - stime) * 100
+            os.write(sys.__stdout__.fileno(), (
+                '%s %s %i' % (esc.name, inp, measured_time,)).encode('ascii'))
+            sys.stdout.flush()
+        if cov is not None:
+            cov.stop()
+            cov.save()
+        os._exit(0)
+
+    with echo_off(master_fd):
+        read_until_semaphore(master_fd)
+        stime = time.time()
+        os.write(master_fd, u'\x1ba'.encode('ascii'))
+        key1_name, key2, duration_ms = read_until_eof(master_fd).split()
+
+    pid, status = os.waitpid(pid, 0)
+    assert key1_name == u'KEY_ESCAPE'
+    assert key2 == u'a'
+    assert os.WEXITSTATUS(status) == 0
+    assert math.floor(time.time() - stime) == 0.0
+    assert -1 <= int(duration_ms) <= 15, duration_ms
+
+
+def test_esc_delay_cbreak_prefix_sequence():
+    "An unfinished multibyte sequence (\\x1b[) will delay an ESC by .35 "
+    pid, master_fd = pty.fork()
+    if pid is 0:  # child
+        try:
+            cov = __import__('cov_core_init').init()
+        except ImportError:
+            cov = None
+        term = TestTerminal()
+        os.write(sys.__stdout__.fileno(), SEMAPHORE)
+        with term.cbreak():
+            stime = time.time()
+            esc = term.inkey(timeout=5)
+            inp = term.inkey(timeout=5)
+            measured_time = (time.time() - stime) * 100
+            os.write(sys.__stdout__.fileno(), (
+                '%s %s %i' % (esc.name, inp, measured_time,)).encode('ascii'))
+            sys.stdout.flush()
+        if cov is not None:
+            cov.stop()
+            cov.save()
+        os._exit(0)
+
+    with echo_off(master_fd):
+        read_until_semaphore(master_fd)
+        stime = time.time()
+        os.write(master_fd, u'\x1b['.encode('ascii'))
+        key1_name, key2, duration_ms = read_until_eof(master_fd).split()
+
+    pid, status = os.waitpid(pid, 0)
+    assert key1_name == u'KEY_ESCAPE'
+    assert key2 == u'['
+    assert os.WEXITSTATUS(status) == 0
+    assert math.floor(time.time() - stime) == 0.0
+    assert 34 <= int(duration_ms) <= 45, duration_ms
+
+
 def test_keystroke_default_args():
     "Test keyboard.Keystroke constructor with default arguments."
     from blessed.keyboard import Keystroke
@@ -827,6 +901,14 @@ def test_resolve_sequence():
     assert ks.code is 6
     assert ks.is_sequence is True
     assert repr(ks) in (u"KEY_L", "KEY_L")
+
+
+def test_prefixes():
+    "Test prefixes"
+    from blessed.keyboard import prefixes
+    keys = {u'abc': '1', u'abdf': '2', u'e': '3'}
+    pfs = prefixes(keys)
+    assert pfs == set([u'a', u'ab', u'abd'])
 
 
 def test_keypad_mixins_and_aliases():

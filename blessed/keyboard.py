@@ -3,7 +3,7 @@
 __author__ = 'Jeff Quast <contact@jeffquast.com>'
 __license__ = 'MIT'
 
-__all__ = ['Keystroke', 'get_keyboard_codes', 'get_keyboard_sequences']
+__all__ = ['Keystroke', 'get_keyboard_codes', 'get_keyboard_sequences', 'prefixes']
 
 import curses.has_key
 import collections
@@ -174,6 +174,12 @@ def get_keyboard_sequences(term):
         (seq, sequence_map[seq]) for seq in sorted(
             sequence_map.keys(), key=len, reverse=True)))
 
+def prefixes(sequences):
+    """prefixes(iterable of strings) -> (set)
+
+    Returns a set of proper prefixes of an iterable of strings
+    """
+    return set(seq[:i] for seq in sequences for i in range(1, len(seq)))
 
 def resolve_sequence(text, mapper, codes):
     """resolve_sequence(text, mapper, codes) -> Keystroke()

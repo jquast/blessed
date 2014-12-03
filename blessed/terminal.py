@@ -60,6 +60,7 @@ from .sequences import (
 from .keyboard import (
     get_keyboard_sequences,
     get_keyboard_codes,
+    prefixes,
     resolve_sequence,
 )
 
@@ -208,6 +209,8 @@ class Terminal(object):
 
         # build database of sequence <=> KEY_NAME
         self._keymap = get_keyboard_sequences(self)
+        # build set of prefixes of sequences
+        self._keymap_prefixes = prefixes(self._keymap)
 
         self._keyboard_buf = collections.deque()
         if self.keyboard_fd is not None:
@@ -736,14 +739,15 @@ class Terminal(object):
             ucs += self.getch()
             ks = resolve(text=ucs)
 
-        # handle escape key (KEY_ESCAPE) vs. escape sequence (which begins
-        # with KEY_ESCAPE, \x1b[, \x1bO, or \x1b?), up to esc_delay when
+        # handle escape key (KEY_ESCAPE) vs. escape sequence (like those
+        # that begin with \x1b[ or \x1bO) up to esc_delay when
         # received. This is not optimal, but causes least delay when
-        # (currently unhandled, and rare) "meta sends escape" is used,
+        # "meta sends escape" is used,
         # or when an unsupported sequence is sent.
         if ks.code is self.KEY_ESCAPE:
             esctime = time.time()
             while (ks.code is self.KEY_ESCAPE and
+                   ucs in self._keymap_prefixes and
                    self.kbhit(_timeleft(esctime, esc_delay))):
                 ucs += self.getch()
                 ks = resolve(text=ucs)
