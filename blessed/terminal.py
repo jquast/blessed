@@ -8,6 +8,7 @@ import platform
 import codecs
 import curses
 import locale
+import re
 import select
 import struct
 import time
@@ -287,6 +288,27 @@ class Terminal(object):
         The width of the terminal in characters.
         """
         return self._height_and_width().ws_col
+
+    @property
+    def cursor_position(self):
+        """T.cursor_position -> (cursor_row, cursor_col)
+
+        The 1-indexed row and column of the cursor in characters.
+        """
+        with self.cbreak():
+            CURSOR_QUERY = '\x1b[6n'
+            self.stream.write(CURSOR_QUERY)
+            self.stream.flush()
+
+            first = 0
+            keystrokes = []
+            while True:
+                keystrokes.append(self.inkey(_intr_continue=True))
+                m = re.search('\x1b[[]([0-9]+);([0-9]+)R', u''.join(keystrokes))
+                if m:
+                    self._keyboard_buf.extendleft(
+                            u''.join(keystrokes)[:m.start()])
+                    return tuple(int(x) for x in m.groups())
 
     @staticmethod
     def _winsize(fd):
