@@ -1,150 +1,86 @@
-#!/usr/bin/env python3
-# Dumb full-screen editor. It doesn't save anything but to the screen.
-#
-# "Why wont python let me read memory
-#  from screen like assembler? That's dumb." -hellbeard
-#
-# This program makes example how to deal with a keypad for directional
-# movement, with both numlock on and off.
+#!/usr/bin/env python
+"""
+A Dumb full-screen editor.
+
+This program demonstrates how to deal with the keypad for directional movement.
+
+It is a very dumb and naive full-screen editor.  It can be saved to a file
+using ^S, which demonstrates using keystroke_input with parameter raw=True.
+"""
+# My favorite quote, from a former assembly programmer learning
+# python with blessings, "Why wont python let me read memory
+# from screen like assembler? That's dumb." -xzip!impure
+
 from __future__ import division, print_function
 import collections
 import functools
-from blessed import Terminal
+import string
 
-echo = lambda text: (
-    functools.partial(print, end='', flush=True)(text))
+from blessings import Terminal
 
-echo_yx = lambda cursor, text: (
-    echo(cursor.term.move(cursor.y, cursor.x) + text))
+# python 2/3 compatibility, provide 'echo' function as an
+# alias for "print without newline and flush"
+try:
+    # pylint: disable=invalid-name
+    #         Invalid constant name "echo"
+    echo = functools.partial(print, end='', flush=True)
+    echo(u'')
+except TypeError:
+    # TypeError: 'flush' is an invalid keyword argument for this function
+    import sys
+
+    def echo(text):
+        """Display ``text`` and flush output."""
+        sys.stdout.write(u'{}'.format(text))
+        sys.stdout.flush()
+
+def echo_yx(cursor, text):
+    """Move to ``cursor`` and display ``text``."""
+    echo(cursor.term.move(cursor.y, cursor.x) + text)
 
 Cursor = collections.namedtuple('Point', ('y', 'x', 'term'))
 
-above = lambda csr, n: (
-    Cursor(y=max(0, csr.y - n),
-           x=csr.x,
-           term=csr.term))
-
-below = lambda csr, n: (
-    Cursor(y=min(csr.term.height - 1, csr.y + n),
-           x=csr.x,
-           term=csr.term))
-
-right_of = lambda csr, n: (
-    Cursor(y=csr.y,
-           x=min(csr.term.width - 1, csr.x + n),
-           term=csr.term))
-
-left_of = lambda csr, n: (
-    Cursor(y=csr.y,
-           x=max(0, csr.x - n),
-           term=csr.term))
-
-home = lambda csr: (
-    Cursor(y=csr.y,
-           x=0,
-           term=csr.term))
-
-end = lambda csr: (
-    Cursor(y=csr.y,
-           x=csr.term.width - 1,
-           term=csr.term))
-
-bottom = lambda csr: (
-    Cursor(y=csr.term.height - 1,
-           x=csr.x,
-           term=csr.term))
-
-top = lambda csr: (
-    Cursor(y=1,
-           x=csr.x,
-           term=csr.term))
-
-center = lambda csr: Cursor(
-    csr.term.height // 2,
-    csr.term.width // 2,
-    csr.term)
-
-
-lookup_move = lambda inp_code, csr, term: {
-    # arrows, including angled directionals
-    csr.term.KEY_END: below(left_of(csr, 1), 1),
-    csr.term.KEY_KP_1: below(left_of(csr, 1), 1),
-
-    csr.term.KEY_DOWN: below(csr, 1),
-    csr.term.KEY_KP_2: below(csr, 1),
-
-    csr.term.KEY_PGDOWN: below(right_of(csr, 1), 1),
-    csr.term.KEY_LR: below(right_of(csr, 1), 1),
-    csr.term.KEY_KP_3: below(right_of(csr, 1), 1),
-
-    csr.term.KEY_LEFT: left_of(csr, 1),
-    csr.term.KEY_KP_4: left_of(csr, 1),
-
-    csr.term.KEY_CENTER: center(csr),
-    csr.term.KEY_KP_5: center(csr),
-
-    csr.term.KEY_RIGHT: right_of(csr, 1),
-    csr.term.KEY_KP_6: right_of(csr, 1),
-
-    csr.term.KEY_HOME: above(left_of(csr, 1), 1),
-    csr.term.KEY_KP_7: above(left_of(csr, 1), 1),
-
-    csr.term.KEY_UP: above(csr, 1),
-    csr.term.KEY_KP_8: above(csr, 1),
-
-    csr.term.KEY_PGUP: above(right_of(csr, 1), 1),
-    csr.term.KEY_KP_9: above(right_of(csr, 1), 1),
-
-    # shift + arrows
-    csr.term.KEY_SLEFT: left_of(csr, 10),
-    csr.term.KEY_SRIGHT: right_of(csr, 10),
-    csr.term.KEY_SDOWN: below(csr, 10),
-    csr.term.KEY_SUP: above(csr, 10),
-
-    # carriage return
-    csr.term.KEY_ENTER: home(below(csr, 1)),
-}.get(inp_code, csr)
-
-
 def readline(term, width=20):
-    # a rudimentary readline function
-    string = u''
+    """A rudimentary readline implementation."""
+    text = u''
     while True:
-        inp = term.inkey()
+        inp = term.keystroke()
         if inp.code == term.KEY_ENTER:
             break
         elif inp.code == term.KEY_ESCAPE or inp == chr(3):
-            string = None
+            text = None
             break
-        elif not inp.is_sequence and len(string) < width:
-            string += inp
+        elif not inp.is_sequence and len(text) < width:
+            text += inp
             echo(inp)
         elif inp.code in (term.KEY_BACKSPACE, term.KEY_DELETE):
-            string = string[:-1]
-            echo('\b \b')
-    return string
+            text = text[:-1]
+            echo(u'\b \b')
+    return text
 
 
 def save(screen, fname):
+    """Save screen contents to file."""
     if not fname:
         return
-    with open(fname, 'w') as fp:
+    with open(fname, 'w') as fout:
         cur_row = cur_col = 0
         for (row, col) in sorted(screen):
             char = screen[(row, col)]
             while row != cur_row:
                 cur_row += 1
                 cur_col = 0
-                fp.write(u'\n')
+                fout.write(u'\n')
             while col > cur_col:
                 cur_col += 1
-                fp.write(u' ')
-            fp.write(char)
+                fout.write(u' ')
+            fout.write(char)
             cur_col += 1
-        fp.write(u'\n')
+        fout.write(u'\n')
 
 
 def redraw(term, screen, start=None, end=None):
+    """Redraw the screen."""
     if start is None and end is None:
         echo(term.clear)
         start, end = (Cursor(y=min([y for (y, x) in screen or [(0, 0)]]),
@@ -167,20 +103,100 @@ def redraw(term, screen, start=None, end=None):
                 # just write past last one
                 echo(screen[row, col])
 
-
 def main():
+    """Program entry point."""
+    above = lambda csr, n: (
+        Cursor(y=max(0, csr.y - n),
+               x=csr.x,
+               term=csr.term))
+
+    below = lambda csr, n: (
+        Cursor(y=min(csr.term.height - 1, csr.y + n),
+               x=csr.x,
+               term=csr.term))
+
+    right_of = lambda csr, n: (
+        Cursor(y=csr.y,
+               x=min(csr.term.width - 1, csr.x + n),
+               term=csr.term))
+
+    left_of = lambda csr, n: (
+        Cursor(y=csr.y,
+               x=max(0, csr.x - n),
+               term=csr.term))
+
+    home = lambda csr: (
+        Cursor(y=csr.y,
+               x=0,
+               term=csr.term))
+
+    end = lambda csr: (
+        Cursor(y=csr.y,
+               x=csr.term.width - 1,
+               term=csr.term))
+
+    bottom = lambda csr: (
+        Cursor(y=csr.term.height - 1,
+               x=csr.x,
+               term=csr.term))
+
+    center = lambda csr: Cursor(
+        csr.term.height // 2,
+        csr.term.width // 2,
+        csr.term)
+
+    lookup_move = lambda inp_code, csr, term: {
+        # arrows, including angled directionals
+        csr.term.KEY_END: below(left_of(csr, 1), 1),
+        csr.term.KEY_KP_1: below(left_of(csr, 1), 1),
+
+        csr.term.KEY_DOWN: below(csr, 1),
+        csr.term.KEY_KP_2: below(csr, 1),
+
+        csr.term.KEY_PGDOWN: below(right_of(csr, 1), 1),
+        csr.term.KEY_LR: below(right_of(csr, 1), 1),
+        csr.term.KEY_KP_3: below(right_of(csr, 1), 1),
+
+        csr.term.KEY_LEFT: left_of(csr, 1),
+        csr.term.KEY_KP_4: left_of(csr, 1),
+
+        csr.term.KEY_CENTER: center(csr),
+        csr.term.KEY_KP_5: center(csr),
+
+        csr.term.KEY_RIGHT: right_of(csr, 1),
+        csr.term.KEY_KP_6: right_of(csr, 1),
+
+        csr.term.KEY_HOME: above(left_of(csr, 1), 1),
+        csr.term.KEY_KP_7: above(left_of(csr, 1), 1),
+
+        csr.term.KEY_UP: above(csr, 1),
+        csr.term.KEY_KP_8: above(csr, 1),
+
+        csr.term.KEY_PGUP: above(right_of(csr, 1), 1),
+        csr.term.KEY_KP_9: above(right_of(csr, 1), 1),
+
+        # shift + arrows
+        csr.term.KEY_SLEFT: left_of(csr, 10),
+        csr.term.KEY_SRIGHT: right_of(csr, 10),
+        csr.term.KEY_SDOWN: below(csr, 10),
+        csr.term.KEY_SUP: above(csr, 10),
+
+        # carriage return
+        csr.term.KEY_ENTER: home(below(csr, 1)),
+    }.get(inp_code, csr)
+
     term = Terminal()
     csr = Cursor(0, 0, term)
     screen = {}
     with term.hidden_cursor(), \
-            term.raw(), \
+            term.keystroke_input(raw=True), \
             term.location(), \
             term.fullscreen(), \
             term.keypad():
         inp = None
         while True:
             echo_yx(csr, term.reverse(screen.get((csr.y, csr.x), u' ')))
-            inp = term.inkey()
+            inp = term.keystroke()
 
             if inp == chr(3):
                 # ^c exits
@@ -189,8 +205,8 @@ def main():
             elif inp == chr(19):
                 # ^s saves
                 echo_yx(home(bottom(csr)),
-                        term.ljust(term.bold_white('Filename: ')))
-                echo_yx(right_of(home(bottom(csr)), len('Filename: ')), u'')
+                        term.ljust(term.bold_white(u'Filename: ')))
+                echo_yx(right_of(home(bottom(csr)), len(u'Filename: ')), u'')
                 save(screen, readline(term))
                 echo_yx(home(bottom(csr)), term.clear_eol)
                 redraw(term=term, screen=screen,
@@ -208,7 +224,7 @@ def main():
                 echo_yx(csr, screen.get((csr.y, csr.x), u' '))
                 csr = n_csr
 
-            elif not inp.is_sequence and inp.isprintable():
+            elif not inp.is_sequence and inp in string.printable:
                 echo_yx(csr, inp)
                 screen[(csr.y, csr.x)] = inp.__str__()
                 n_csr = right_of(csr, 1)

@@ -26,10 +26,9 @@ install:
     fi
 
 script:
+  - if [[ "${TOXENV}" == "py27" ]]; then tox -e sa; fi
+  - if [[ "${TOXENV}" == "py34" ]]; then tox -e docs; fi
   - tox -e $TOXENV
-
-after_success:
-  - if [[ "${TOXENV}" == "py34" ]]; then for f in ._coverage*; do mv $f `echo $f | tr -d '_'`; done; coverage combine; coveralls; fi
 
 notifications:
   email:

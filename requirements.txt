@@ -1,1 +1,1 @@
-wcwidth>=0.1.0
+wcwidth>=0.1.4

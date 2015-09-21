@@ -1,18 +1,25 @@
 #!/usr/bin/env python
-
+"""A simple cmd-line tool for displaying FormattingString capabilities."""
+from __future__ import print_function
 import argparse
-from blessed import Terminal
 
-parser = argparse.ArgumentParser(
-    description='displays argument as specified style')
+def main():
+    """Program entry point."""
+    from blessings import Terminal
 
-parser.add_argument('style', type=str, help='style formatter')
-parser.add_argument('text', type=str, nargs='+')
+    parser = argparse.ArgumentParser(
+        description='displays argument as specified style')
+
+    parser.add_argument('style', type=str, help='style formatter')
+    parser.add_argument('text', type=str, nargs='+')
 
 
-term = Terminal()
-args = parser.parse_args()
+    term = Terminal()
+    args = parser.parse_args()
 
-style = getattr(term, args.style)
+    style = getattr(term, args.style)
 
-print(style(' '.join(args.text)))
+    print(style(' '.join(args.text)))
+
+if __name__ == '__main__':
+    main()

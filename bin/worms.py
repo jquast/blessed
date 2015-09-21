@@ -1,28 +1,32 @@
 #!/usr/bin/env python
 """
-This is an example application for the 'blessed' Terminal library for python.
+This is an example application for the 'blessings' Terminal library for python.
 
 It is also an experiment in functional programming.
 """
 
 from __future__ import division, print_function
 from collections import namedtuple
-from random import randrange
 from functools import partial
-from blessed import Terminal
+from random import randrange
+
+from blessings import Terminal
 
 
 # python 2/3 compatibility, provide 'echo' function as an
 # alias for "print without newline and flush"
 try:
+    # pylint: disable=invalid-name
+    #         Invalid constant name "echo"
     echo = partial(print, end='', flush=True)
-    echo('begin.')
+    echo(u'')
 except TypeError:
     # TypeError: 'flush' is an invalid keyword argument for this function
     import sys
 
-    def echo(object):
-        sys.stdout.write(u'{}'.format(object))
+    def echo(text):
+        """python 2 version of print(end='', flush=True)."""
+        sys.stdout.write(u'{0}'.format(text))
         sys.stdout.flush()
 
 # a worm is a list of (y, x) segments Locations
@@ -39,97 +43,132 @@ Direction = namedtuple('Direction', ('y', 'x',))
 # these functions return a new Location instance, given
 # the direction indicated by their name.
 LEFT = (0, -1)
-left_of = lambda segment, term: Location(
-    y=segment.y,
-    x=max(0, segment.x - 1))
-
 RIGHT = (0, 1)
-right_of = lambda segment, term: Location(
-    y=segment.y,
-    x=min(term.width - 1, segment.x + 1))
-
 UP = (-1, 0)
-above = lambda segment, term: Location(
-    y=max(0, segment.y - 1),
-    x=segment.x)
-
 DOWN = (1, 0)
-below = lambda segment, term: Location(
-    y=min(term.height - 1, segment.y + 1),
-    x=segment.x)
 
-# return a direction function that defines the new bearing for any matching
-# keyboard code of inp_code; otherwise, the function for the current bearing.
-next_bearing = lambda term, inp_code, bearing: {
-    term.KEY_LEFT: left_of,
-    term.KEY_RIGHT: right_of,
-    term.KEY_UP: above,
-    term.KEY_DOWN: below,
-}.get(inp_code,
-      # direction function given the current bearing
-      {LEFT: left_of,
-       RIGHT: right_of,
-       UP: above,
-       DOWN: below}[(bearing.y, bearing.x)])
+def left_of(segment, term):
+    """Return Location left-of given segment."""
+    # pylint: disable=unused-argument
+    #         Unused argument 'term'
+    return Location(y=segment.y,
+                    x=max(0, segment.x - 1))
 
+def right_of(segment, term):
+    """Return Location right-of given segment."""
+    return Location(y=segment.y,
+                    x=min(term.width - 1, segment.x + 1))
 
-# return new bearing given the movement f(x).
-change_bearing = lambda f_mov, segment, term: Direction(
-    f_mov(segment, term).y - segment.y,
-    f_mov(segment, term).x - segment.x)
+def above(segment, term):
+    """Return Location above given segment."""
+    # pylint: disable=unused-argument
+    #         Unused argument 'term'
+    return Location(
+        y=max(0, segment.y - 1),
+        x=segment.x)
 
-# direction-flipped check, reject traveling in opposite direction.
-bearing_flipped = lambda dir1, dir2: (
-    (0, 0) == (dir1.y + dir2.y, dir1.x + dir2.x)
-)
+def below(segment, term):
+    """Return Location below given segment."""
+    return Location(
+        y=min(term.height - 1, segment.y + 1),
+        x=segment.x)
 
-# returns True if `loc' matches any (y, x) coordinates,
-# within list `segments' -- such as a list composing a worm.
-hit_any = lambda loc, segments: loc in segments
+def next_bearing(term, inp_code, bearing):
+    """
+    Return direction function for new bearing by inp_code.
 
-# same as above, but `locations' is also an array of (y, x) coordinates.
-hit_vany = lambda locations, segments: any(
-    hit_any(loc, segments) for loc in locations)
-
-# returns True if segments are same position (hit detection)
-hit = lambda src, dst: src.x == dst.x and src.y == dst.y
-
-# returns new worm_length if current nibble is hit,
-next_wormlength = lambda nibble, head, worm_length: (
-    worm_length + nibble.value if hit(head, nibble.location)
-    else worm_length)
-
-# returns new speed if current nibble is hit,
-next_speed = lambda nibble, head, speed, modifier: (
-    speed * modifier if hit(head, nibble.location)
-    else speed)
-
-# when displaying worm head, show a different glyph for horizontal/vertical
-head_glyph = lambda direction: (u':' if direction in (left_of, right_of)
-                                else u'"')
+    If no inp_code matches a bearing direction, return
+    a function for the current bearing.
+    """
+    return {
+        term.KEY_LEFT: left_of,
+        term.KEY_RIGHT: right_of,
+        term.KEY_UP: above,
+        term.KEY_DOWN: below,
+    }.get(inp_code,
+          # direction function given the current bearing
+          {LEFT: left_of,
+           RIGHT: right_of,
+           UP: above,
+           DOWN: below}[(bearing.y, bearing.x)])
 
 
-# provide the next nibble -- continuously generate a random new nibble so
-# long as the current nibble hits any location of the worm, otherwise
-# return a nibble of the same location and value as provided.
+def change_bearing(f_mov, segment, term):
+    """Return new bearing given the movement f(x)."""
+    return Direction(
+        f_mov(segment, term).y - segment.y,
+        f_mov(segment, term).x - segment.x)
+
+def bearing_flipped(dir1, dir2):
+    """
+    direction-flipped check.
+
+    Return true if dir2 travels in opposite direction of dir1.
+    """
+    return (0, 0) == (dir1.y + dir2.y, dir1.x + dir2.x)
+
+def hit_any(loc, segments):
+    """Return True if `loc' matches any (y, x) coordinates within segments."""
+    # `segments' -- a list composing a worm.
+    return loc in segments
+
+def hit_vany(locations, segments):
+    """Return True if any locations are found within any segments."""
+    return any(hit_any(loc, segments)
+               for loc in locations)
+
+def hit(src, dst):
+    """Return True if segments are same position (hit detection)."""
+    return src.x == dst.x and src.y == dst.y
+
+def next_wormlength(nibble, head, worm_length):
+    """Return new worm_length if current nibble is hit."""
+    if hit(head, nibble.location):
+        return worm_length + nibble.value
+    return worm_length
+
+def next_speed(nibble, head, speed, modifier):
+    """Return new speed if current nibble is hit."""
+    if hit(head, nibble.location):
+        return speed * modifier
+    return speed
+
+def head_glyph(direction):
+    """Return character for worm head depending on horiz/vert orientation."""
+    if direction in (left_of, right_of):
+        return u':'
+    return u'"'
+
+
 def next_nibble(term, nibble, head, worm):
-    l, v = nibble.location, nibble.value
-    while hit_vany([head] + worm, nibble_locations(l, v)):
-        l = Location(x=randrange(1, term.width - 1),
+    """
+    Provide the next nibble.
+
+    continuously generate a random new nibble so long as the current nibble
+    hits any location of the worm.  Otherwise, return a nibble of the same
+    location and value as provided.
+    """
+    loc, val = nibble.location, nibble.value
+    while hit_vany([head] + worm, nibble_locations(loc, val)):
+        loc = Location(x=randrange(1, term.width - 1),
                      y=randrange(1, term.height - 1))
-        v = nibble.value + 1
-    return Nibble(l, v)
+        val = nibble.value + 1
+    return Nibble(loc, val)
 
 
-# generate an array of locations for the current nibble's location -- a digit
-# such as '123' may be hit at 3 different (y, x) coordinates.
 def nibble_locations(nibble_location, nibble_value):
+    """Return array of locations for the current "nibble"."""
+    # generate an array of locations for the current nibble's location
+    # -- a digit such as '123' may be hit at 3 different (y, x) coordinates.
     return [Location(x=nibble_location.x + offset,
                      y=nibble_location.y)
             for offset in range(0, 1 + len('{}'.format(nibble_value)) - 1)]
 
 
 def main():
+    """Program entry point."""
+    # pylint: disable=too-many-locals
+    #         Too many local variables (20/15)
     term = Terminal()
     worm = [Location(x=term.width // 2, y=term.height // 2)]
     worm_length = 2
@@ -148,7 +187,7 @@ def main():
     modifier = 0.93
     inp = None
 
-    with term.hidden_cursor(), term.raw():
+    with term.hidden_cursor(), term.keystroke_input():
         while inp not in (u'q', u'Q'):
 
             # delete the tail of the worm at worm_length
@@ -175,10 +214,12 @@ def main():
             if n_nibble != nibble:
                 # erase the old one, careful to redraw the nibble contents
                 # with a worm color for those portions that overlay.
-                for (y, x) in nibble_locations(*nibble):
-                    echo(term.move(y, x) + (color_worm if (y, x) == head
-                                            else color_bg)(u' '))
-                    echo(term.normal)
+                for (yloc, xloc) in nibble_locations(*nibble):
+                    echo(u''.join((
+                        term.move(yloc, xloc),
+                        (color_worm if (yloc, xloc) == head
+                         else color_bg)(u' '),
+                        term.normal)))
                 # and draw the new,
                 echo(term.move(*n_nibble.location) + (
                     color_nibble('{}'.format(n_nibble.value))))
@@ -194,7 +235,7 @@ def main():
 
             # wait for keyboard input, which may indicate
             # a new direction (up/down/left/right)
-            inp = term.inkey(speed)
+            inp = term.keystroke(timeout=speed)
 
             # discover new direction, given keyboard input and/or bearing.
             nxt_direction = next_bearing(term, inp.code, bearing)
@@ -202,8 +243,8 @@ def main():
             # discover new bearing, given new direction compared to prev
             nxt_bearing = change_bearing(nxt_direction, head, term)
 
-            # disallow new bearing/direction when flipped (running into
-            # oneself, fe. travelling left while traveling right)
+            # disallow new bearing/direction when flipped: running into
+            # oneself, for example traveling left while traveling right.
             if not bearing_flipped(bearing, nxt_bearing):
                 direction = nxt_direction
                 bearing = nxt_bearing

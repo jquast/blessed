@@ -1,6 +1,6 @@
 [run]
 branch = True
-source = blessed
+source = blessings
 
 [report]
-omit = blessed/tests/*
+omit = blessings/tests/*

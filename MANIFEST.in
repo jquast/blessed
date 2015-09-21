@@ -1,4 +1,4 @@
-include README.rst
+include docs/intro.rst
 include LICENSE
 include tox.ini
-include blessed/tests/wall.ans
+include blessings/tests/wall.ans

@@ -1,10 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests for Terminal() sequences and sequence-awareness."""
 # std imports
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
 import platform
 import random
 import sys
@@ -21,9 +17,10 @@ from .accessories import (
     unicode_cap,
 )
 
-# 3rd-party
+# 3rd party
 import pytest
 import mock
+import six
 
 
 def test_capability():
@@ -44,7 +41,7 @@ def test_capability_without_tty():
     """Assert capability templates are '' when stream is not a tty."""
     @as_subprocess
     def child():
-        t = TestTerminal(stream=StringIO())
+        t = TestTerminal(stream=six.StringIO())
         assert t.save == u''
         assert t.red == u''
 
@@ -55,7 +52,7 @@ def test_capability_with_forced_tty():
     """force styling should return sequences even for non-ttys."""
     @as_subprocess
     def child():
-        t = TestTerminal(stream=StringIO(), force_styling=True)
+        t = TestTerminal(stream=six.StringIO(), force_styling=True)
         assert t.save == unicode_cap('sc')
 
     child()
@@ -94,8 +91,7 @@ def test_stream_attr():
                     reason="travis-ci does not have binary-packed terminals.")
 def test_emit_warnings_about_binpacked():
     """Test known binary-packed terminals (kermit, avatar) emit a warning."""
-    from blessed.sequences import _BINTERM_UNSUPPORTED_MSG
-    from blessed._binterms import binary_terminals
+    from blessings._binterms import BINTERM_UNSUPPORTED_MSG
 
     @as_subprocess
     def child(kind):
@@ -107,7 +103,7 @@ def test_emit_warnings_about_binpacked():
             TestTerminal(kind=kind, force_styling=True)
         except UserWarning:
             err = sys.exc_info()[1]
-            assert (err.args[0] == _BINTERM_UNSUPPORTED_MSG.format(kind) or
+            assert (err.args[0] == BINTERM_UNSUPPORTED_MSG.format(kind) or
                     err.args[0].startswith('Unknown parameter in ') or
                     err.args[0].startswith('Failed to setupterm(')
                     ), err
@@ -115,43 +111,49 @@ def test_emit_warnings_about_binpacked():
             assert 'warnings should have been emitted.'
         warnings.resetwarnings()
 
-    # any binary terminal should do.
-    child(binary_terminals[random.randrange(len(binary_terminals))])
+    # Although any binary terminal should do, FreeBSD has "termcap entry bugs"
+    # that cause false negatives, because their underlying curses library emits
+    # some kind of "warning" to stderr, which our @as_subprocess decorator
+    # determines to be noteworthy enough to fail the test:
+    #     https://gist.github.com/jquast/7b90af251fe4000baa09
+    #
+    # so we chose only one of beautiful lineage:
+    #    http://terminals.classiccmp.org/wiki/index.php/Tektronix_4207
+    child(kind='tek4207-s')
 
 
 def test_unit_binpacked_unittest():
     """Unit Test known binary-packed terminals emit a warning (travis-safe)."""
     import warnings
-    from blessed._binterms import binary_terminals
-    from blessed.sequences import (_BINTERM_UNSUPPORTED_MSG,
-                                   init_sequence_patterns)
+    from blessings._binterms import BINTERM_UNSUPPORTED_MSG
+    from blessings.sequences import init_sequence_patterns
     warnings.filterwarnings("error", category=UserWarning)
     term = mock.Mock()
-    term.kind = binary_terminals[random.randrange(len(binary_terminals))]
+    term.kind = 'tek4207-s'
 
     try:
         init_sequence_patterns(term)
     except UserWarning:
         err = sys.exc_info()[1]
-        assert err.args[0] == _BINTERM_UNSUPPORTED_MSG.format(term.kind)
+        assert err.args[0] == BINTERM_UNSUPPORTED_MSG.format(term.kind)
     else:
         assert False, 'Previous stmt should have raised exception.'
     warnings.resetwarnings()
 
 
-def test_merge_sequences():
+def test_sort_sequences():
     """Test sequences are filtered and ordered longest-first."""
-    from blessed.sequences import _merge_sequences
+    from blessings.sequences import _sort_sequences
     input_list = [u'a', u'aa', u'aaa', u'']
     output_expected = [u'aaa', u'aa', u'a']
-    assert (_merge_sequences(input_list) == output_expected)
+    assert (_sort_sequences(input_list) == output_expected)
 
 
 def test_location_with_styling(all_terms):
     """Make sure ``location()`` works on all terminals."""
     @as_subprocess
     def child_with_styling(kind):
-        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
+        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
         with t.location(3, 4):
             t.stream.write(u'hi')
         expected_output = u''.join(
@@ -168,7 +170,7 @@ def test_location_without_styling():
     @as_subprocess
     def child_without_styling():
         """No side effect for location as a context manager without styling."""
-        t = TestTerminal(stream=StringIO(), force_styling=None)
+        t = TestTerminal(stream=six.StringIO(), force_styling=None)
 
         with t.location(3, 4):
             t.stream.write(u'hi')
@@ -182,7 +184,7 @@ def test_horizontal_location(all_terms):
     """Make sure we can move the cursor horizontally without changing rows."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
+        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
         with t.location(x=5):
             pass
         expected_output = u''.join(
@@ -192,8 +194,8 @@ def test_horizontal_location(all_terms):
         assert (t.stream.getvalue() == expected_output), (
             repr(t.stream.getvalue()), repr(expected_output))
 
-    # skip 'screen', hpa is proxied (see later tests)
-    if all_terms != 'screen':
+    # skip 'screen', 'ansi': hpa is proxied (see later tests)
+    if all_terms not in ('screen', 'ansi'):
         child(all_terms)
 
 
@@ -201,7 +203,7 @@ def test_vertical_location(all_terms):
     """Make sure we can move the cursor horizontally without changing rows."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
+        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
         with t.location(y=5):
             pass
         expected_output = u''.join(
@@ -211,7 +213,7 @@ def test_vertical_location(all_terms):
         assert (t.stream.getvalue() == expected_output)
 
     # skip 'screen', vpa is proxied (see later tests)
-    if all_terms != 'screen':
+    if all_terms not in ('screen', 'ansi'):
         child(all_terms)
 
 
@@ -219,7 +221,7 @@ def test_inject_move_x():
     """Test injection of hpa attribute for screen/ansi (issue #55)."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
+        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
         COL = 5
         with t.location(x=COL):
             pass
@@ -239,7 +241,7 @@ def test_inject_move_y():
     """Test injection of vpa attribute for screen/ansi (issue #55)."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
+        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
         ROW = 5
         with t.location(y=ROW):
             pass
@@ -259,7 +261,7 @@ def test_inject_civis_and_cnorm_for_ansi():
     """Test injection of cvis attribute for ansi."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
+        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
         with t.hidden_cursor():
             pass
         expected_output = u''.join(
@@ -275,7 +277,7 @@ def test_zero_location(all_terms):
     """Make sure ``location()`` pays attention to 0-valued args."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
+        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
         with t.location(0, 0):
             pass
         expected_output = u''.join(
@@ -349,7 +351,7 @@ def test_null_callable_numeric_colors(all_terms):
     """``color(n)`` should be a no-op on null terminals."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(stream=StringIO(), kind=kind)
+        t = TestTerminal(stream=six.StringIO(), kind=kind)
         assert (t.color(5)('smoo') == 'smoo')
         assert (t.on_color(6)('smoo') == 'smoo')
 
@@ -427,7 +429,7 @@ def test_formatting_functions_without_tty(all_terms):
     """Test crazy-ass formatting wrappers when there's no tty."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=False)
+        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=False)
         assert (t.bold(u'hi') == u'hi')
         assert (t.green('hi') == u'hi')
         # Test non-ASCII chars, no longer really necessary:
@@ -479,7 +481,7 @@ def test_null_callable_string(all_terms):
     """Make sure NullCallableString tolerates all kinds of args."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(stream=StringIO(), kind=kind)
+        t = TestTerminal(stream=six.StringIO(), kind=kind)
         assert (t.clear == '')
         assert (t.move(1 == 2) == '')
         assert (t.move_x(1) == '')
@@ -495,7 +497,7 @@ def test_null_callable_string(all_terms):
 def test_bnc_parameter_emits_warning():
     """A fake capability without target digits emits a warning."""
     import warnings
-    from blessed.sequences import _build_numeric_capability
+    from blessings.sequences import _build_numeric_capability
 
     # given,
     warnings.filterwarnings("error", category=UserWarning)
@@ -517,7 +519,7 @@ def test_bnc_parameter_emits_warning():
 def test_bna_parameter_emits_warning():
     """A fake capability without any digits emits a warning."""
     import warnings
-    from blessed.sequences import _build_any_numeric_capability
+    from blessings.sequences import _build_any_numeric_capability
 
     # given,
     warnings.filterwarnings("error", category=UserWarning)
@@ -540,8 +542,8 @@ def test_padd():
     """ Test terminal.padd(seq). """
     @as_subprocess
     def child():
-        from blessed.sequences import Sequence
-        from blessed import Terminal
+        from blessings.sequences import Sequence
+        from blessings import Terminal
         term = Terminal('xterm-256color')
         assert Sequence('xyz\b', term).padd() == u'xy'
         assert Sequence('xxxx\x1b[3Dzz', term).padd() == u'xzz'

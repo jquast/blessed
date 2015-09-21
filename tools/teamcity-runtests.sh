@@ -1,7 +1,4 @@
 #!/bin/bash
-#
-# This script assumes that the project 'ptyprocess' is
-# available in the parent of the project's folder.
 set -e
 set -o pipefail
 
@@ -17,7 +14,7 @@ if [ X"$osrel" == X"Linux" ]; then
 	# cannot create a virtualenv for python2.6 due to use of
 	# "{}".format in virtualenv, throws exception
 	# ValueError: zero length field name in format.
-	_cmd='tox -epy27,py33,py34,pypy'
+	_cmd='tox -epy27,py33,py34,pypy,docs,sa'
 fi
 
 ret=0

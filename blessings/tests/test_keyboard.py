@@ -3,11 +3,6 @@
 # std imports
 import functools
 import tempfile
-try:
-    from StringIO import StringIO
-except ImportError:
-    import io
-    StringIO = io.StringIO
 import platform
 import signal
 import curses
@@ -35,15 +30,16 @@ from .accessories import (
 # 3rd-party
 import pytest
 import mock
+import six
 
 if sys.version_info[0] == 3:
     unichr = chr
 
 
-def test_kbhit_interrupted():
-    "kbhit() should not be interrupted with a signal handler."
+def test_char_is_ready_interrupted():
+    "_char_is_ready() should not be interrupted with a signal handler."
     pid, master_fd = pty.fork()
-    if pid is 0:
+    if pid == 0:
         try:
             cov = __import__('cov_core_init').init()
         except ImportError:
@@ -61,10 +57,10 @@ def test_kbhit_interrupted():
         signal.signal(signal.SIGWINCH, on_resize)
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.raw():
-            assert term.inkey(timeout=1.05) == u''
+        with term.keystroke_input(raw=True):
+            assert term.keystroke(timeout=1.05) == u''
         os.write(sys.__stdout__.fileno(), b'complete')
-        assert got_sigwinch is True
+        assert got_sigwinch
         if cov is not None:
             cov.stop()
             cov.save()
@@ -83,10 +79,10 @@ def test_kbhit_interrupted():
     assert math.floor(time.time() - stime) == 1.0
 
 
-def test_kbhit_interrupted_nonetype():
-    "kbhit() should also allow interruption with timeout of None."
+def test_char_is_ready_interrupted_nonetype():
+    "_char_is_ready() should also allow interruption with timeout of None."
     pid, master_fd = pty.fork()
-    if pid is 0:
+    if pid == 0:
         try:
             cov = __import__('cov_core_init').init()
         except ImportError:
@@ -104,10 +100,10 @@ def test_kbhit_interrupted_nonetype():
         signal.signal(signal.SIGWINCH, on_resize)
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.raw():
-            term.inkey(timeout=1)
+        with term.keystroke_input(raw=True):
+            term.keystroke(timeout=1)
         os.write(sys.__stdout__.fileno(), b'complete')
-        assert got_sigwinch is True
+        assert got_sigwinch
         if cov is not None:
             cov.stop()
             cov.save()
@@ -127,110 +123,21 @@ def test_kbhit_interrupted_nonetype():
     assert math.floor(time.time() - stime) == 1.0
 
 
-def test_kbhit_interrupted_no_continue():
-    "kbhit() may be interrupted when _intr_continue=False."
-    pid, master_fd = pty.fork()
-    if pid is 0:
-        try:
-            cov = __import__('cov_core_init').init()
-        except ImportError:
-            cov = None
-
-        # child pauses, writes semaphore and begins awaiting input
-        global got_sigwinch
-        got_sigwinch = False
-
-        def on_resize(sig, action):
-            global got_sigwinch
-            got_sigwinch = True
-
-        term = TestTerminal()
-        signal.signal(signal.SIGWINCH, on_resize)
-        read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
-        os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.raw():
-            term.inkey(timeout=1.05, _intr_continue=False)
-        os.write(sys.__stdout__.fileno(), b'complete')
-        assert got_sigwinch is True
-        if cov is not None:
-            cov.stop()
-            cov.save()
-        os._exit(0)
-
-    with echo_off(master_fd):
-        os.write(master_fd, SEND_SEMAPHORE)
-        read_until_semaphore(master_fd)
-        stime = time.time()
-        time.sleep(0.05)
-        os.kill(pid, signal.SIGWINCH)
-        output = read_until_eof(master_fd)
-
-    pid, status = os.waitpid(pid, 0)
-    assert output == u'complete'
-    assert os.WEXITSTATUS(status) == 0
-    assert math.floor(time.time() - stime) == 0.0
-
-
-def test_kbhit_interrupted_nonetype_no_continue():
-    "kbhit() may be interrupted when _intr_continue=False with timeout None."
-    pid, master_fd = pty.fork()
-    if pid is 0:
-        try:
-            cov = __import__('cov_core_init').init()
-        except ImportError:
-            cov = None
-
-        # child pauses, writes semaphore and begins awaiting input
-        global got_sigwinch
-        got_sigwinch = False
-
-        def on_resize(sig, action):
-            global got_sigwinch
-            got_sigwinch = True
-
-        term = TestTerminal()
-        signal.signal(signal.SIGWINCH, on_resize)
-        read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
-        os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.raw():
-            term.inkey(timeout=None, _intr_continue=False)
-        os.write(sys.__stdout__.fileno(), b'complete')
-        assert got_sigwinch is True
-        if cov is not None:
-            cov.stop()
-            cov.save()
-        os._exit(0)
-
-    with echo_off(master_fd):
-        os.write(master_fd, SEND_SEMAPHORE)
-        read_until_semaphore(master_fd)
-        stime = time.time()
-        time.sleep(0.05)
-        os.kill(pid, signal.SIGWINCH)
-        os.write(master_fd, b'X')
-        output = read_until_eof(master_fd)
-
-    pid, status = os.waitpid(pid, 0)
-    assert output == u'complete'
-    assert os.WEXITSTATUS(status) == 0
-    assert math.floor(time.time() - stime) == 0.0
-
-
-def test_cbreak_no_kb():
-    "cbreak() should not call tty.setcbreak() without keyboard."
+def test_keystroke_input_no_kb():
+    "keystroke_input() should not call tty.setcbreak() without keyboard."
     @as_subprocess
     def child():
         with tempfile.NamedTemporaryFile() as stream:
             term = TestTerminal(stream=stream)
             with mock.patch("tty.setcbreak") as mock_setcbreak:
-                with term.cbreak():
+                with term.keystroke_input():
                     assert not mock_setcbreak.called
-                assert term.keyboard_fd is None
+                assert term._keyboard_fd is None
     child()
 
 
 def test_notty_kb_is_None():
-    "keyboard_fd should be None when os.isatty returns False."
+    "term._keyboard_fd should be None when os.isatty returns False."
     # in this scenerio, stream is sys.__stdout__,
     # but os.isatty(0) is False,
     # such as when piping output to less(1)
@@ -239,91 +146,91 @@ def test_notty_kb_is_None():
         with mock.patch("os.isatty") as mock_isatty:
             mock_isatty.return_value = False
             term = TestTerminal()
-            assert term.keyboard_fd is None
+            assert term._keyboard_fd is None
     child()
 
 
-def test_raw_no_kb():
-    "raw() should not call tty.setraw() without keyboard."
+def test_raw_input_no_kb():
+    "keystroke_input(raw=True) should not call tty.setraw() without keyboard."
     @as_subprocess
     def child():
         with tempfile.NamedTemporaryFile() as stream:
             term = TestTerminal(stream=stream)
             with mock.patch("tty.setraw") as mock_setraw:
-                with term.raw():
+                with term.keystroke_input(raw=True):
                     assert not mock_setraw.called
-            assert term.keyboard_fd is None
+            assert term._keyboard_fd is None
     child()
 
 
-def test_kbhit_no_kb():
-    "kbhit() always immediately returns False without a keyboard."
+def test_char_is_ready_no_kb():
+    "_char_is_ready() always immediately returns False without a keyboard."
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
+        term = TestTerminal(stream=six.StringIO())
         stime = time.time()
-        assert term.keyboard_fd is None
-        assert term.kbhit(timeout=1.1) is False
-        assert (math.floor(time.time() - stime) == 1.0)
+        assert term._keyboard_fd is None
+        assert not term._char_is_ready(timeout=1.1)
+        assert math.floor(time.time() - stime) == 1.0
     child()
 
 
-def test_inkey_0s_cbreak_noinput():
-    "0-second inkey without input; '' should be returned."
+def test_keystroke_0s_keystroke_input_noinput():
+    "0-second keystroke without input; '' should be returned."
     @as_subprocess
     def child():
         term = TestTerminal()
-        with term.cbreak():
+        with term.keystroke_input():
             stime = time.time()
-            inp = term.inkey(timeout=0)
+            inp = term.keystroke(timeout=0)
             assert (inp == u'')
             assert (math.floor(time.time() - stime) == 0.0)
     child()
 
 
-def test_inkey_0s_cbreak_noinput_nokb():
-    "0-second inkey without data in input stream and no keyboard/tty."
+def test_keystroke_0s_keystroke_input_noinput_nokb():
+    "0-second keystroke without data in input stream and no keyboard/tty."
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
-        with term.cbreak():
+        term = TestTerminal(stream=six.StringIO())
+        with term.keystroke_input():
             stime = time.time()
-            inp = term.inkey(timeout=0)
+            inp = term.keystroke(timeout=0)
             assert (inp == u'')
             assert (math.floor(time.time() - stime) == 0.0)
     child()
 
 
-def test_inkey_1s_cbreak_noinput():
-    "1-second inkey without input; '' should be returned after ~1 second."
+def test_keystroke_1s_keystroke_input_noinput():
+    "1-second keystroke without input; '' should be returned after ~1 second."
     @as_subprocess
     def child():
         term = TestTerminal()
-        with term.cbreak():
+        with term.keystroke_input():
             stime = time.time()
-            inp = term.inkey(timeout=1)
+            inp = term.keystroke(timeout=1)
             assert (inp == u'')
             assert (math.floor(time.time() - stime) == 1.0)
     child()
 
 
-def test_inkey_1s_cbreak_noinput_nokb():
-    "1-second inkey without input or keyboard."
+def test_keystroke_1s_keystroke_input_noinput_nokb():
+    "1-second keystroke without input or keyboard."
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
-        with term.cbreak():
+        term = TestTerminal(stream=six.StringIO())
+        with term.keystroke_input():
             stime = time.time()
-            inp = term.inkey(timeout=1)
+            inp = term.keystroke(timeout=1)
             assert (inp == u'')
             assert (math.floor(time.time() - stime) == 1.0)
     child()
 
 
-def test_inkey_0s_cbreak_input():
-    "0-second inkey with input; Keypress should be immediately returned."
+def test_keystroke_0s_keystroke_input_with_input():
+    "0-second keystroke with input; Keypress should be immediately returned."
     pid, master_fd = pty.fork()
-    if pid is 0:
+    if pid == 0:
         try:
             cov = __import__('cov_core_init').init()
         except ImportError:
@@ -332,8 +239,8 @@ def test_inkey_0s_cbreak_input():
         term = TestTerminal()
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.cbreak():
-            inp = term.inkey(timeout=0)
+        with term.keystroke_input():
+            inp = term.keystroke(timeout=0)
             os.write(sys.__stdout__.fileno(), inp.encode('utf-8'))
         if cov is not None:
             cov.stop()
@@ -353,10 +260,10 @@ def test_inkey_0s_cbreak_input():
     assert math.floor(time.time() - stime) == 0.0
 
 
-def test_inkey_cbreak_input_slowly():
-    "0-second inkey with input; Keypress should be immediately returned."
+def test_keystroke_keystroke_input_with_input_slowly():
+    "0-second keystroke with input; Keypress should be immediately returned."
     pid, master_fd = pty.fork()
-    if pid is 0:
+    if pid == 0:
         try:
             cov = __import__('cov_core_init').init()
         except ImportError:
@@ -365,9 +272,9 @@ def test_inkey_cbreak_input_slowly():
         term = TestTerminal()
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.cbreak():
+        with term.keystroke_input():
             while True:
-                inp = term.inkey(timeout=0.5)
+                inp = term.keystroke(timeout=0.5)
                 os.write(sys.__stdout__.fileno(), inp.encode('utf-8'))
                 if inp == 'X':
                     break
@@ -395,11 +302,11 @@ def test_inkey_cbreak_input_slowly():
     assert math.floor(time.time() - stime) == 0.0
 
 
-def test_inkey_0s_cbreak_multibyte_utf8():
-    "0-second inkey with multibyte utf-8 input; should decode immediately."
+def test_keystroke_0s_keystroke_input_multibyte_utf8():
+    "0-second keystroke with multibyte utf-8 input; should decode immediately."
     # utf-8 bytes represent "latin capital letter upsilon".
     pid, master_fd = pty.fork()
-    if pid is 0:  # child
+    if pid == 0:  # child
         try:
             cov = __import__('cov_core_init').init()
         except ImportError:
@@ -407,8 +314,8 @@ def test_inkey_0s_cbreak_multibyte_utf8():
         term = TestTerminal()
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.cbreak():
-            inp = term.inkey(timeout=0)
+        with term.keystroke_input():
+            inp = term.keystroke(timeout=0)
             os.write(sys.__stdout__.fileno(), inp.encode('utf-8'))
         if cov is not None:
             cov.stop()
@@ -430,19 +337,19 @@ def test_inkey_0s_cbreak_multibyte_utf8():
 @pytest.mark.skipif(os.environ.get('TRAVIS', None) is not None or
                     platform.python_implementation() == 'PyPy',
                     reason="travis-ci nor pypy handle ^C very well.")
-def test_inkey_0s_raw_ctrl_c():
-    "0-second inkey with raw allows receiving ^C."
+def test_keystroke_0s_raw_input_ctrl_c():
+    "0-second keystroke with raw allows receiving ^C."
     pid, master_fd = pty.fork()
-    if pid is 0:  # child
+    if pid == 0:  # child
         try:
             cov = __import__('cov_core_init').init()
         except ImportError:
             cov = None
         term = TestTerminal()
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
-        with term.raw():
+        with term.keystroke_input(raw=True):
             os.write(sys.__stdout__.fileno(), RECV_SEMAPHORE)
-            inp = term.inkey(timeout=0)
+            inp = term.keystroke(timeout=0)
             os.write(sys.__stdout__.fileno(), inp.encode('latin1'))
         if cov is not None:
             cov.stop()
@@ -463,18 +370,18 @@ def test_inkey_0s_raw_ctrl_c():
     assert math.floor(time.time() - stime) == 0.0
 
 
-def test_inkey_0s_cbreak_sequence():
-    "0-second inkey with multibyte sequence; should decode immediately."
+def test_keystroke_0s_keystroke_input_sequence():
+    "0-second keystroke with multibyte sequence; should decode immediately."
     pid, master_fd = pty.fork()
-    if pid is 0:  # child
+    if pid == 0:  # child
         try:
             cov = __import__('cov_core_init').init()
         except ImportError:
             cov = None
         term = TestTerminal()
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.cbreak():
-            inp = term.inkey(timeout=0)
+        with term.keystroke_input():
+            inp = term.keystroke(timeout=0)
             os.write(sys.__stdout__.fileno(), inp.name.encode('ascii'))
             sys.stdout.flush()
         if cov is not None:
@@ -493,18 +400,18 @@ def test_inkey_0s_cbreak_sequence():
     assert math.floor(time.time() - stime) == 0.0
 
 
-def test_inkey_1s_cbreak_input():
-    "1-second inkey w/multibyte sequence; should return after ~1 second."
+def test_keystroke_1s_keystroke_input_with_input():
+    "1-second keystroke w/multibyte sequence; should return after ~1 second."
     pid, master_fd = pty.fork()
-    if pid is 0:  # child
+    if pid == 0:  # child
         try:
             cov = __import__('cov_core_init').init()
         except ImportError:
             cov = None
         term = TestTerminal()
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.cbreak():
-            inp = term.inkey(timeout=3)
+        with term.keystroke_input():
+            inp = term.keystroke(timeout=3)
             os.write(sys.__stdout__.fileno(), inp.name.encode('utf-8'))
             sys.stdout.flush()
         if cov is not None:
@@ -525,19 +432,19 @@ def test_inkey_1s_cbreak_input():
     assert math.floor(time.time() - stime) == 1.0
 
 
-def test_esc_delay_cbreak_035():
+def test_esc_delay_keystroke_input_035():
     "esc_delay will cause a single ESC (\\x1b) to delay for 0.35."
     pid, master_fd = pty.fork()
-    if pid is 0:  # child
+    if pid == 0:  # child
         try:
             cov = __import__('cov_core_init').init()
         except ImportError:
             cov = None
         term = TestTerminal()
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.cbreak():
+        with term.keystroke_input():
             stime = time.time()
-            inp = term.inkey(timeout=5)
+            inp = term.keystroke(timeout=5)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
                 '%s %i' % (inp.name, measured_time,)).encode('ascii'))
@@ -560,19 +467,19 @@ def test_esc_delay_cbreak_035():
     assert 34 <= int(duration_ms) <= 45, duration_ms
 
 
-def test_esc_delay_cbreak_135():
+def test_esc_delay_keystroke_input_135():
     "esc_delay=1.35 will cause a single ESC (\\x1b) to delay for 1.35."
     pid, master_fd = pty.fork()
-    if pid is 0:  # child
+    if pid == 0:  # child
         try:
             cov = __import__('cov_core_init').init()
         except ImportError:
             cov = None
         term = TestTerminal()
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.cbreak():
+        with term.keystroke_input():
             stime = time.time()
-            inp = term.inkey(timeout=5, esc_delay=1.35)
+            inp = term.keystroke(timeout=5, esc_delay=1.35)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
                 '%s %i' % (inp.name, measured_time,)).encode('ascii'))
@@ -595,19 +502,19 @@ def test_esc_delay_cbreak_135():
     assert 134 <= int(duration_ms) <= 145, int(duration_ms)
 
 
-def test_esc_delay_cbreak_timout_0():
+def test_esc_delay_keystroke_input_timout_0():
     """esc_delay still in effect with timeout of 0 ("nonblocking")."""
     pid, master_fd = pty.fork()
-    if pid is 0:  # child
+    if pid == 0:  # child
         try:
             cov = __import__('cov_core_init').init()
         except ImportError:
             cov = None
         term = TestTerminal()
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.cbreak():
+        with term.keystroke_input():
             stime = time.time()
-            inp = term.inkey(timeout=0)
+            inp = term.keystroke(timeout=0)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
                 '%s %i' % (inp.name, measured_time,)).encode('ascii'))
@@ -632,34 +539,34 @@ def test_esc_delay_cbreak_timout_0():
 
 def test_keystroke_default_args():
     "Test keyboard.Keystroke constructor with default arguments."
-    from blessed.keyboard import Keystroke
+    from blessings.keyboard import Keystroke
     ks = Keystroke()
     assert ks._name is None
     assert ks.name == ks._name
     assert ks._code is None
     assert ks.code == ks._code
     assert u'x' == u'x' + ks
-    assert ks.is_sequence is False
+    assert not ks.is_sequence
     assert repr(ks) in ("u''",  # py26, 27
                         "''",)  # py33
 
 
 def test_a_keystroke():
     "Test keyboard.Keystroke constructor with set arguments."
-    from blessed.keyboard import Keystroke
+    from blessings.keyboard import Keystroke
     ks = Keystroke(ucs=u'x', code=1, name=u'the X')
-    assert ks._name is u'the X'
+    assert ks._name == u'the X'
     assert ks.name == ks._name
-    assert ks._code is 1
+    assert ks._code == 1
     assert ks.code == ks._code
     assert u'xx' == u'x' + ks
-    assert ks.is_sequence is True
+    assert ks.is_sequence
     assert repr(ks) == "the X"
 
 
 def test_get_keyboard_codes():
     "Test all values returned by get_keyboard_codes are from curses."
-    from blessed.keyboard import (
+    from blessings.keyboard import (
         get_keyboard_codes,
         CURSES_KEYCODE_OVERRIDE_MIXIN,
     )
@@ -674,7 +581,7 @@ def test_get_keyboard_codes():
 
 def test_alternative_left_right():
     "Test _alternative_left_right behavior for space/backspace."
-    from blessed.keyboard import _alternative_left_right
+    from blessings.keyboard import _alternative_left_right
     term = mock.Mock()
     term._cuf1 = u''
     term._cub1 = u''
@@ -691,7 +598,7 @@ def test_alternative_left_right():
 
 def test_cuf1_and_cub1_as_RIGHT_LEFT(all_terms):
     "Test that cuf1 and cub1 are assigned KEY_RIGHT and KEY_LEFT."
-    from blessed.keyboard import get_keyboard_sequences
+    from blessings.keyboard import get_keyboard_sequences
 
     @as_subprocess
     def child(kind):
@@ -727,7 +634,7 @@ def test_get_keyboard_sequences_sort_order(xterms):
 def test_get_keyboard_sequence(monkeypatch):
     "Test keyboard.get_keyboard_sequence. "
     import curses.has_key
-    import blessed.keyboard
+    import blessings.keyboard
 
     (KEY_SMALL, KEY_LARGE, KEY_MIXIN) = range(3)
     (CAP_SMALL, CAP_LARGE) = 'cap-small cap-large'.split()
@@ -748,7 +655,7 @@ def test_get_keyboard_sequence(monkeypatch):
                               (KEY_LARGE, CAP_LARGE,))))
 
     # patch global sequence mix-in
-    monkeypatch.setattr(blessed.keyboard,
+    monkeypatch.setattr(blessings.keyboard,
                         'DEFAULT_SEQUENCE_MIXIN', (
                             (SEQ_MIXIN.decode('latin1'), KEY_MIXIN),))
 
@@ -756,7 +663,7 @@ def test_get_keyboard_sequence(monkeypatch):
     term = mock.Mock()
     term._cuf1 = SEQ_ALT_CUF1.decode('latin1')
     term._cub1 = SEQ_ALT_CUB1.decode('latin1')
-    keymap = blessed.keyboard.get_keyboard_sequences(term)
+    keymap = blessings.keyboard.get_keyboard_sequences(term)
 
     assert list(keymap.items()) == [
         (SEQ_LARGE.decode('latin1'), KEY_LARGE),
@@ -768,7 +675,7 @@ def test_get_keyboard_sequence(monkeypatch):
 
 def test_resolve_sequence():
     "Test resolve_sequence for order-dependent mapping."
-    from blessed.keyboard import resolve_sequence, OrderedDict
+    from blessings.keyboard import resolve_sequence, OrderedDict
     mapper = OrderedDict(((u'SEQ1', 1),
                           (u'SEQ2', 2),
                           # takes precedence over LONGSEQ, first-match
@@ -787,8 +694,8 @@ def test_resolve_sequence():
     ks = resolve_sequence(u'', mapper, codes)
     assert ks == u''
     assert ks.name is None
-    assert ks.code is None
-    assert ks.is_sequence is False
+    assert ks.code == None
+    assert not ks.is_sequence
     assert repr(ks) in ("u''",  # py26, 27
                         "''",)  # py33
 
@@ -796,35 +703,35 @@ def test_resolve_sequence():
     assert ks == u'n'
     assert ks.name is None
     assert ks.code is None
-    assert ks.is_sequence is False
+    assert not ks.is_sequence
     assert repr(ks) in (u"u'n'", "'n'",)
 
     ks = resolve_sequence(u'SEQ1', mapper, codes)
     assert ks == u'SEQ1'
     assert ks.name == u'KEY_SEQ1'
-    assert ks.code is 1
-    assert ks.is_sequence is True
+    assert ks.code == 1
+    assert ks.is_sequence
     assert repr(ks) in (u"KEY_SEQ1", "KEY_SEQ1")
 
     ks = resolve_sequence(u'LONGSEQ_longer', mapper, codes)
     assert ks == u'LONGSEQ'
     assert ks.name == u'KEY_LONGSEQ'
-    assert ks.code is 4
-    assert ks.is_sequence is True
+    assert ks.code == 4
+    assert ks.is_sequence
     assert repr(ks) in (u"KEY_LONGSEQ", "KEY_LONGSEQ")
 
     ks = resolve_sequence(u'LONGSEQ', mapper, codes)
     assert ks == u'LONGSEQ'
     assert ks.name == u'KEY_LONGSEQ'
-    assert ks.code is 4
-    assert ks.is_sequence is True
+    assert ks.code == 4
+    assert ks.is_sequence
     assert repr(ks) in (u"KEY_LONGSEQ", "KEY_LONGSEQ")
 
     ks = resolve_sequence(u'Lxxxxx', mapper, codes)
     assert ks == u'L'
     assert ks.name == u'KEY_L'
-    assert ks.code is 6
-    assert ks.is_sequence is True
+    assert ks.code == 6
+    assert ks.is_sequence
     assert repr(ks) in (u"KEY_L", "KEY_L")
 
 
@@ -840,7 +747,7 @@ def test_keypad_mixins_and_aliases():
     @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
-        from blessed.keyboard import resolve_sequence
+        from blessings.keyboard import resolve_sequence
 
         resolve = functools.partial(resolve_sequence,
                                     mapper=term._keymap,

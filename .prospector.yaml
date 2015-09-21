@@ -1,12 +1,15 @@
 inherits:
     - strictness_veryhigh
 
-ignore:
+ignore-patterns:
   - (^|/)\..+
   - ^docs/
-  # ignore tests and bin/ for the moment, their quality does not so much matter.
-  - ^bin/
-  - ^blessed/tests/
+  - ^build/
+  # ignore these, their quality does not so much matter.
+  - ^blessings/tests/
+  - ^tools/
+  # EK doesn't want setup.py checked
+  - ^setup.py
 
 test-warnings: true
 
@@ -24,14 +27,17 @@ frosted:
 mccabe:
     # complexity checking.
     run: true
+    disable:
+        # Terminal.__init__ is too complex (14)
+        - MC0001
 
 pep257:
     # docstring checking
-    run: true
+    run: false
 
 pep8:
     # style checking
-    run: true
+    run: false
 
 pyflakes:
     # preferring 'frosted' instead (a fork of)
@@ -39,29 +45,33 @@ pyflakes:
 
 pylint:
     # static analysis and then some
-    run: true
+    run: false
     options:
         # pytest module has dynamically assigned functions,
         # raising errors such as: E1101: Module 'pytest' has
         # no 'mark' member
         ignored-classes: pytest
     disable:
-        # Too many lines in module
-        ##- C0302
-        # Used * or ** magic
-        ##- W0142
-        # Used builtin function 'filter'.
-        # (For maintainability, one should prefer list comprehension.)
-        ##- W0141
-        # Use % formatting in logging functions but pass the % parameters
-        ##- W1202
+        # Access to a protected member _sugar of a client class
+        - protected-access
+        # blessings.Terminal: Too many instance attributes (12/7)
+        - too-many-instance-attributes
+        # blessings.Terminal: Too many public methods (25/20)
+        - too-many-public-methods
+        # blessings.Terminal: Too many branches (13/12)
+        - too-many-branches
+        # blessings.sequences.get_wontmove_sequence_patterns:
+        #   Used builtin function 'map'
+        - bad-builtin
+
 
 pyroma:
     # checks setup.py
     run: true
 
 vulture:
-    # this tool does a good job of finding unused code.
-    run: true
+    # this tool does a good job of finding unused code, which isn't terribly
+    # useful from an API perspective, disable.
+    run: false
 
 # vim: noai:ts=4:sw=4

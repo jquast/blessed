@@ -6,7 +6,7 @@ import mock
 
 def test_parameterizing_string_args_unspecified(monkeypatch):
     """Test default args of formatters.ParameterizingString."""
-    from blessed.formatters import ParameterizingString, FormattingString
+    from blessings.formatters import ParameterizingString, FormattingString
     # first argument to tparm() is the sequence name, returned as-is;
     # subsequent arguments are usually Integers.
     tparm = lambda *args: u'~'.join(
@@ -38,7 +38,7 @@ def test_parameterizing_string_args_unspecified(monkeypatch):
 
 def test_parameterizing_string_args(monkeypatch):
     """Test basic formatters.ParameterizingString."""
-    from blessed.formatters import ParameterizingString, FormattingString
+    from blessings.formatters import ParameterizingString, FormattingString
 
     # first argument to tparm() is the sequence name, returned as-is;
     # subsequent arguments are usually Integers.
@@ -71,7 +71,7 @@ def test_parameterizing_string_args(monkeypatch):
 
 def test_parameterizing_string_type_error(monkeypatch):
     """Test formatters.ParameterizingString raising TypeError"""
-    from blessed.formatters import ParameterizingString
+    from blessings.formatters import ParameterizingString
 
     def tparm_raises_TypeError(*args):
         raise TypeError('custom_err')
@@ -107,7 +107,7 @@ def test_parameterizing_string_type_error(monkeypatch):
 
 def test_formattingstring(monkeypatch):
     """Test formatters.FormattingString"""
-    from blessed.formatters import (FormattingString)
+    from blessings.formatters import FormattingString
 
     # given, with arg
     pstr = FormattingString(u'attr', u'norm')
@@ -124,7 +124,7 @@ def test_formattingstring(monkeypatch):
 
 def test_nullcallablestring(monkeypatch):
     """Test formatters.NullCallableString"""
-    from blessed.formatters import (NullCallableString)
+    from blessings.formatters import (NullCallableString)
 
     # given, with arg
     pstr = NullCallableString()
@@ -141,7 +141,7 @@ def test_nullcallablestring(monkeypatch):
 
 def test_split_compound():
     """Test formatters.split_compound."""
-    from blessed.formatters import split_compound
+    from blessings.formatters import split_compound
 
     assert split_compound(u'') == [u'']
     assert split_compound(u'a_b_c') == [u'a', u'b', u'c']
@@ -152,7 +152,7 @@ def test_split_compound():
 
 def test_resolve_capability(monkeypatch):
     """Test formatters.resolve_capability and term sugaring """
-    from blessed.formatters import resolve_capability
+    from blessings.formatters import resolve_capability
 
     # given, always returns a b'seq'
     tigetstr = lambda attr: ('seq-%s' % (attr,)).encode('latin1')
@@ -183,9 +183,9 @@ def test_resolve_capability(monkeypatch):
 
 def test_resolve_color(monkeypatch):
     """Test formatters.resolve_color."""
-    from blessed.formatters import (resolve_color,
-                                    FormattingString,
-                                    NullCallableString)
+    from blessings.formatters import (resolve_color,
+                                      FormattingString,
+                                      NullCallableString)
 
     color_cap = lambda digit: 'seq-%s' % (digit,)
     monkeypatch.setattr(curses, 'COLOR_RED', 1984)
@@ -227,28 +227,30 @@ def test_resolve_color(monkeypatch):
 
 def test_resolve_attribute_as_color(monkeypatch):
     """ Test simple resolve_attribte() given color name. """
-    import blessed
-    from blessed.formatters import resolve_attribute
+    import blessings
+    from blessings.formatters import resolve_attribute
 
     resolve_color = lambda term, digit: 'seq-%s' % (digit,)
     COLORS = set(['COLORX', 'COLORY'])
     COMPOUNDABLES = set(['JOINT', 'COMPOUND'])
-    monkeypatch.setattr(blessed.formatters, 'resolve_color', resolve_color)
-    monkeypatch.setattr(blessed.formatters, 'COLORS', COLORS)
-    monkeypatch.setattr(blessed.formatters, 'COMPOUNDABLES', COMPOUNDABLES)
+    monkeypatch.setattr(blessings.formatters, 'resolve_color', resolve_color)
+    monkeypatch.setattr(blessings.formatters, 'COLORS', COLORS)
+    monkeypatch.setattr(blessings.formatters, 'COMPOUNDABLES', COMPOUNDABLES)
     term = mock.Mock()
     assert resolve_attribute(term, 'COLORX') == u'seq-COLORX'
 
 
 def test_resolve_attribute_as_compoundable(monkeypatch):
     """ Test simple resolve_attribte() given a compoundable. """
-    import blessed
-    from blessed.formatters import resolve_attribute, FormattingString
+    import blessings
+    from blessings.formatters import resolve_attribute, FormattingString
 
     resolve_cap = lambda term, digit: 'seq-%s' % (digit,)
     COMPOUNDABLES = set(['JOINT', 'COMPOUND'])
-    monkeypatch.setattr(blessed.formatters, 'resolve_capability', resolve_cap)
-    monkeypatch.setattr(blessed.formatters, 'COMPOUNDABLES', COMPOUNDABLES)
+    monkeypatch.setattr(blessings.formatters,
+                        'resolve_capability',
+                        resolve_cap)
+    monkeypatch.setattr(blessings.formatters, 'COMPOUNDABLES', COMPOUNDABLES)
     term = mock.Mock()
     term.normal = 'seq-normal'
 
@@ -260,12 +262,16 @@ def test_resolve_attribute_as_compoundable(monkeypatch):
 
 def test_resolve_attribute_non_compoundables(monkeypatch):
     """ Test recursive compounding of resolve_attribute(). """
-    import blessed
-    from blessed.formatters import resolve_attribute, ParameterizingString
+    import blessings
+    from blessings.formatters import resolve_attribute, ParameterizingString
     uncompoundables = lambda attr: ['split', 'compound']
     resolve_cap = lambda term, digit: 'seq-%s' % (digit,)
-    monkeypatch.setattr(blessed.formatters, 'split_compound', uncompoundables)
-    monkeypatch.setattr(blessed.formatters, 'resolve_capability', resolve_cap)
+    monkeypatch.setattr(blessings.formatters,
+                        'split_compound',
+                        uncompoundables)
+    monkeypatch.setattr(blessings.formatters,
+                        'resolve_capability',
+                        resolve_cap)
     tparm = lambda *args: u'~'.join(
         arg.decode('latin1') if not num else '%s' % (arg,)
         for num, arg in enumerate(args)).encode('latin1')
@@ -286,12 +292,14 @@ def test_resolve_attribute_non_compoundables(monkeypatch):
 
 def test_resolve_attribute_recursive_compoundables(monkeypatch):
     """ Test recursive compounding of resolve_attribute(). """
-    import blessed
-    from blessed.formatters import resolve_attribute, FormattingString
+    import blessings
+    from blessings.formatters import resolve_attribute, FormattingString
 
     # patch,
     resolve_cap = lambda term, digit: 'seq-%s' % (digit,)
-    monkeypatch.setattr(blessed.formatters, 'resolve_capability', resolve_cap)
+    monkeypatch.setattr(blessings.formatters,
+                        'resolve_capability',
+                        resolve_cap)
     tparm = lambda *args: u'~'.join(
         arg.decode('latin1') if not num else '%s' % (arg,)
         for num, arg in enumerate(args)).encode('latin1')
@@ -316,7 +324,7 @@ def test_resolve_attribute_recursive_compoundables(monkeypatch):
 
 def test_pickled_parameterizing_string(monkeypatch):
     """Test pickle-ability of a formatters.ParameterizingString."""
-    from blessed.formatters import ParameterizingString, FormattingString
+    from blessings.formatters import ParameterizingString, FormattingString
 
     # simply send()/recv() over multiprocessing Pipe, a simple
     # pickle.loads(dumps(...)) did not reproduce this issue,
@@ -356,7 +364,7 @@ def test_tparm_returns_null(monkeypatch):
     """ Test 'tparm() returned NULL' is caught (win32 PDCurses systems). """
     # on win32, any calls to tparm raises curses.error with message,
     # "tparm() returned NULL", function PyCurses_tparm of _cursesmodule.c
-    from blessed.formatters import ParameterizingString, NullCallableString
+    from blessings.formatters import ParameterizingString, NullCallableString
 
     def tparm(*args):
         raise curses.error("tparm() returned NULL")
@@ -376,7 +384,7 @@ def test_tparm_other_exception(monkeypatch):
     """ Test 'tparm() returned NULL' is caught (win32 PDCurses systems). """
     # on win32, any calls to tparm raises curses.error with message,
     # "tparm() returned NULL", function PyCurses_tparm of _cursesmodule.c
-    from blessed.formatters import ParameterizingString, NullCallableString
+    from blessings.formatters import ParameterizingString, NullCallableString
 
     def tparm(*args):
         raise curses.error("unexpected error in tparm()")
