@@ -19,7 +19,7 @@ if sys.version_info < (2, 7):
     kwargs['install_requires'].extend(['ordereddict>=1.1'])
 
 setuptools.setup(
-    name='blessings',
+    name='blessed',
     version='1.9.5',
     description=('A thin, practical wrapper around terminal coloring, '
                  'styling, positioning, and keyboard input.'),
@@ -28,10 +28,10 @@ setuptools.setup(
     author='Erik Rose, Jeff Quast',
     author_email='erikrose@grinchcentral.com',
     license='MIT',
-    packages=['blessings', 'blessings.tests'],
-    url='https://github.com/erikrose/blessings',
+    packages=['blessed', 'blessed.tests'],
+    url='https://github.com/erikrose/blessed',
     include_package_data=True,
-    test_suite='blessings.tests',
+    test_suite='blessed.tests',
     zip_safe=True,
     classifiers=[
         'Intended Audience :: Developers',

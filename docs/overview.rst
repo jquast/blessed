@@ -34,7 +34,7 @@ Styling and Formatting
 Lots of handy formatting codes are available as attributes on a
 :class:`~.Terminal` class instance. For example::
 
-    from blessings import Terminal
+    from blessed import Terminal
 
     term = Terminal()
 
@@ -133,7 +133,7 @@ Prefixed with *on_*, the given color is used as the background color.
 Some terminals also provide an additional 8 high-intensity versions using
 *on_bright*, some example compound formats::
 
-    from blessings import Terminal
+    from blessed import Terminal
 
     term = Terminal()
 
@@ -145,7 +145,7 @@ You may also specify the :meth:`~.Terminal.color` index by number, which
 should be within the bounds of value returned by
 :attr:`~.Terminal.number_of_colors`::
 
-    from blessings import Terminal
+    from blessed import Terminal
 
     term = Terminal()
 
@@ -170,7 +170,7 @@ support colors but do support reverse video. For this reason, it may be
 desirable in some applications to simply select a foreground color, followed
 by reverse video to achieve the desired background color effect::
 
-    from blessings import Terminal
+    from blessed import Terminal
 
     term = Terminal()
 
@@ -189,7 +189,7 @@ Compound Formatting
 If you want to do lots of crazy formatting all at once, you can just mash it
 all together::
 
-    from blessings import Terminal
+    from blessed import Terminal
 
     term = Terminal()
 
@@ -204,7 +204,7 @@ line argument or configuration item::
 
     #!/usr/bin/env python
     import argparse
-    from blessings import Terminal
+    from blessed import Terminal
 
     parser = argparse.ArgumentParser(
         description='displays argument as specified style')
@@ -244,7 +244,7 @@ Moving Temporarily
 A context manager, :meth:`~.Terminal.location` is provided to move the cursor
 to an *(x, y)* screen position and restore the previous position upon exit::
 
-    from blessings import Terminal
+    from blessed import Terminal
 
     term = Terminal()
 
@@ -274,7 +274,7 @@ Moving Permanently
 If you just want to move and aren't worried about returning, do something like
 this::
 
-    from blessings import Terminal
+    from blessed import Terminal
 
     term = Terminal()
     print(term.move(10, 1) + 'Hi, mom!')
@@ -309,7 +309,7 @@ Height And Width
 Use the :attr:`~.Terminal.height` and :attr:`~.Terminal.width` properties to
 determine the size of the window::
 
-    from blessings import Terminal
+    from blessed import Terminal
 
     term = Terminal()
     height, width = term.height, term.width
@@ -320,7 +320,7 @@ These values are always current.  To detect when the size of the window
 changes, you may author a callback for SIGWINCH_ signals::
 
     import signal
-    from blessings import Terminal
+    from blessed import Terminal
 
     term = Terminal()
 
@@ -363,7 +363,7 @@ screen (such as your shell prompt) after exiting, you're seeing the
 There's also a context manager you can use as a shortcut::
 
     from __future__ import division
-    from blessings import Terminal
+    from blessed import Terminal
 
     term = Terminal()
     with term.fullscreen():
@@ -388,7 +388,7 @@ you see whether the terminal attached to the output stream is capable of
 formatting.  If it is *False*, you may refrain from drawing progress
 bars and other frippery and just stick to content::
 
-    from blessings import Terminal
+    from blessed import Terminal
 
     term = Terminal()
     if term.does_styling:
@@ -406,7 +406,7 @@ providing :meth:`~.Terminal.center`, :meth:`~.Terminal.ljust`, and
 the default *width* value::
 
     from __future__ import division
-    from blessings import Terminal
+    from blessed import Terminal
 
     term = Terminal()
     with term.location(y=term.height // 2):
@@ -420,7 +420,7 @@ class as method :meth:`~.Terminal.wrap` that is also sequence-aware, so now you
 may word-wrap strings containing sequences.  The following example displays a
 poem word-wrapped to 25 columns::
 
-    from blessings import Terminal
+    from blessed import Terminal
 
     term = Terminal()
 
@@ -443,7 +443,7 @@ keypress, much less arrow or function keys.
 Furthermore, when calling :func:`os.read` on input stream, only bytes are
 received, which must be decoded to unicode using the locale-preferred encoding.
 Finally, multiple bytes may be emitted which must be paired with some verb like
-``KEY_LEFT``: blessings handles all of these special cases for you!
+``KEY_LEFT``: blessed handles all of these special cases for you!
 
 keystroke_input
 ~~~~~~~~~~~~~~~
@@ -452,7 +452,7 @@ The context manager :meth:`~.Terminal.keystroke_input` can be used to enter
 *key-at-a-time* mode: Any keypress by the user is immediately consumed by read
 calls::
 
-    from blessings import Terminal
+    from blessed import Terminal
     import sys
 
     term = Terminal()
@@ -491,7 +491,7 @@ may be printed, joined with, or compared like any other unicode strings, it
 also provides the special attributes :attr:`~.Keystroke.is_sequence`,
 :attr:`~.Keystroke.code`, and :attr:`~.Keystroke.name`::
 
-    from blessings import Terminal
+    from blessed import Terminal
 
     term = Terminal()
 
@@ -544,7 +544,7 @@ are difficult to recall. The following helpful aliases are provided
 instead:
 
 =================== ============= ====================
-blessings           curses        note
+blessed           curses        note
 =================== ============= ====================
 ``KEY_DELETE``      ``KEY_DC``    chr(127).
 ``KEY_TAB``                       chr(9)

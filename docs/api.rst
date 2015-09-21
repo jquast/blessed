@@ -4,7 +4,7 @@ API Documentation
 terminal.py
 -----------
 
-.. automodule:: blessings.terminal
+.. automodule:: blessed.terminal
    :members:
    :undoc-members:
    :special-members: __getattr__
@@ -13,7 +13,7 @@ terminal.py
 formatters.py
 -------------
 
-.. automodule:: blessings.formatters
+.. automodule:: blessed.formatters
    :members:
    :undoc-members:
    :private-members:
@@ -24,7 +24,7 @@ formatters.py
 keyboard.py
 -----------
 
-.. automodule:: blessings.keyboard
+.. automodule:: blessed.keyboard
    :members:
    :undoc-members:
    :private-members:
@@ -37,7 +37,7 @@ keyboard.py
 sequences.py
 ------------
 
-.. automodule:: blessings.sequences
+.. automodule:: blessed.sequences
    :members:
    :undoc-members:
    :private-members:

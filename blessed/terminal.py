@@ -601,7 +601,7 @@ class Terminal(object):
 
         :rtype: str
 
-        >>> term = blessings.Terminal()
+        >>> term = blessed.Terminal()
         >>> term.strip(u' \x1b[0;3m XXX ')
         u'XXX'
         """
@@ -613,7 +613,7 @@ class Terminal(object):
 
         :rtype: str
 
-        >>> term = blessings.Terminal()
+        >>> term = blessed.Terminal()
         >>> term.rstrip(u' \x1b[0;3m XXX ')
         u'  XXX'
         """
@@ -625,7 +625,7 @@ class Terminal(object):
 
         :rtype: str
 
-        >>> term = blessings.Terminal()
+        >>> term = blessed.Terminal()
         >>> term.lstrip(u' \x1b[0;3m XXX ')
         u'XXX '
         """
@@ -637,7 +637,7 @@ class Terminal(object):
 
         :rtype: str
 
-        >>> term = blessings.Terminal()
+        >>> term = blessed.Terminal()
         >>> term.strip_seqs(u'\x1b[0;3mXXX')
         u'XXX'
         """

@@ -8,7 +8,7 @@ It is a very dumb and naive full-screen editor.  It can be saved to a file
 using ^S, which demonstrates using keystroke_input with parameter raw=True.
 """
 # My favorite quote, from a former assembly programmer learning
-# python with blessings, "Why wont python let me read memory
+# python with blessed, "Why wont python let me read memory
 # from screen like assembler? That's dumb." -xzip!impure
 
 from __future__ import division, print_function
@@ -16,7 +16,7 @@ import collections
 import functools
 import string
 
-from blessings import Terminal
+from blessed import Terminal
 
 # python 2/3 compatibility, provide 'echo' function as an
 # alias for "print without newline and flush"

@@ -6,7 +6,7 @@ ignore-patterns:
   - ^docs/
   - ^build/
   # ignore these, their quality does not so much matter.
-  - ^blessings/tests/
+  - ^blessed/tests/
   - ^tools/
   # EK doesn't want setup.py checked
   - ^setup.py
@@ -54,13 +54,13 @@ pylint:
     disable:
         # Access to a protected member _sugar of a client class
         - protected-access
-        # blessings.Terminal: Too many instance attributes (12/7)
+        # blessed.Terminal: Too many instance attributes (12/7)
         - too-many-instance-attributes
-        # blessings.Terminal: Too many public methods (25/20)
+        # blessed.Terminal: Too many public methods (25/20)
         - too-many-public-methods
-        # blessings.Terminal: Too many branches (13/12)
+        # blessed.Terminal: Too many branches (13/12)
         - too-many-branches
-        # blessings.sequences.get_wontmove_sequence_patterns:
+        # blessed.sequences.get_wontmove_sequence_patterns:
         #   Used builtin function 'map'
         - bad-builtin
 

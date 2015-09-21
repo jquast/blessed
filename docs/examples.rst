@@ -1,9 +1,9 @@
 Examples
 ========
 
-A few programs are provided with blessings to help interactively
+A few programs are provided with blessed to help interactively
 test the various API features, but also serve as examples of using
-blessings to develop applications.
+blessed to develop applications.
 
 These examples are not distributed with the package -- they are
 only available in the github repository.  You can retrieve them
@@ -12,7 +12,7 @@ link.
 
 editor.py
 ---------
-https://github.com/erikrose/blessings/blob/master/bin/editor.py
+https://github.com/erikrose/blessed/blob/master/bin/editor.py
 
 This program demonstrates using the directional keys and noecho input
 mode. It acts as a (very dumb) fullscreen editor, with support for
@@ -21,7 +21,7 @@ rudimentary line-editor as well.
 
 keymatrix.py
 ------------
-https://github.com/erikrose/blessings/blob/master/bin/editor.py
+https://github.com/erikrose/blessed/blob/master/bin/editor.py
 
 This program displays a "gameboard" of all known special KEY_NAME
 constants. When the key is depressed, it is highlighted, as well
@@ -30,7 +30,7 @@ of any key pressed.
 
 on_resize.py
 ------------
-https://github.com/erikrose/blessings/blob/master/bin/on_resize.py
+https://github.com/erikrose/blessed/blob/master/bin/on_resize.py
 
 This program installs a SIGWINCH signal handler, which detects
 screen resizes while also polling for input, displaying keypresses.
@@ -39,7 +39,7 @@ This demonstrates how a program can react to screen resize events.
 
 progress_bar.py
 ---------------
-https://github.com/erikrose/blessings/blob/master/bin/progress_bar.py
+https://github.com/erikrose/blessed/blob/master/bin/progress_bar.py
 
 This program demonstrates a simple progress bar. All text is written
 to stderr, to avoid the need to "flush" or emit newlines, and makes
@@ -48,7 +48,7 @@ scrolling progress bar.
 
 tprint.py
 ---------
-https://github.com/erikrose/blessings/blob/master/bin/tprint.py
+https://github.com/erikrose/blessed/blob/master/bin/tprint.py
 
 This program demonstrates how users may customize FormattingString
 styles.  Accepting a string style, such as "bold" or "bright_red"
@@ -59,10 +59,10 @@ styling.
 
 worms.py
 --------
-https://github.com/erikrose/blessings/blob/master/blessings/editor.py
+https://github.com/erikrose/blessed/blob/master/blessed/editor.py
 
 This program demonstrates how an interactive game could be made
-with blessings.  It is designed after the class game of "worms"
+with blessed.  It is designed after the class game of "worms"
 that was made available for free with QBASIC, and later more
 popularly known as "snake" as it was named on early mobile
 platforms.

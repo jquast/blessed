@@ -9,7 +9,7 @@ import sys
 import os
 
 # local
-from blessings.tests.accessories import (
+from blessed.tests.accessories import (
     all_terms,
     as_subprocess,
     TestTerminal,
@@ -41,7 +41,7 @@ def test_length_ansiart():
     @as_subprocess
     def child():
         import codecs
-        from blessings.sequences import Sequence
+        from blessed.sequences import Sequence
         term = TestTerminal(kind='xterm-256color')
         # this 'ansi' art contributed by xzip!impure for another project,
         # unlike most CP-437 DOS ansi art, this is actually utf-8 encoded.
@@ -276,7 +276,7 @@ def test_sequence_is_movement_false(all_terms):
     """Test parser about sequences that do not move the cursor."""
     @as_subprocess
     def child_mnemonics_wontmove(kind):
-        from blessings.sequences import measure_length
+        from blessed.sequences import measure_length
         t = TestTerminal(kind=kind)
         assert (0 == measure_length(u'', t))
         # not even a mbs
@@ -313,7 +313,7 @@ def test_sequence_is_movement_true(all_terms):
     """Test parsers about sequences that move the cursor."""
     @as_subprocess
     def child_mnemonics_willmove(kind):
-        from blessings.sequences import measure_length
+        from blessed.sequences import measure_length
         t = TestTerminal(kind=kind)
         # movements
         assert (len(t.move(98, 76)) ==

@@ -1,13 +1,13 @@
 """
 A thin, practical wrapper around terminal capabilities in Python.
 
-http://pypi.python.org/pypi/blessings
+http://pypi.python.org/pypi/blessed
 """
 # std imports
 import platform as _platform
 
 # local
-from blessings.terminal import Terminal
+from blessed.terminal import Terminal
 
 if ('3', '0', '0') <= _platform.python_version_tuple() < ('3', '2', '2+'):
     # Good till 3.2.10

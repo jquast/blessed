@@ -9,7 +9,7 @@ import math
 import re
 
 # local
-from blessings._binterms import BINARY_TERMINALS, BINTERM_UNSUPPORTED_MSG
+from blessed._binterms import BINARY_TERMINALS, BINTERM_UNSUPPORTED_MSG
 
 # 3rd party
 import wcwidth
@@ -52,7 +52,7 @@ def _build_numeric_capability(term, cap, optional=False,
     by regular expression pattern ``\d``.  Any other digits found are
     *not* replaced.
 
-    :param blessings.Terminal term: :class:`~.Terminal` instance.
+    :param blessed.Terminal term: :class:`~.Terminal` instance.
     :param str cap: terminal capability name.
     :param int num: the numeric to use for parameterized capability.
     :param int nparams: the number of parameters to use for capability.
@@ -78,7 +78,7 @@ def _build_any_numeric_capability(term, cap, num=99, nparams=1):
     r"""
     Return regular expression for capabilities containing any numerics.
 
-    :param blessings.Terminal term: :class:`~.Terminal` instance.
+    :param blessed.Terminal term: :class:`~.Terminal` instance.
     :param str cap: terminal capability name.
     :param int num: the numeric to use for parameterized capability.
     :param int nparams: the number of parameters to use for capability.
@@ -102,7 +102,7 @@ def get_movement_sequence_patterns(term):
     """
     Get list of regular expressions for sequences that cause movement.
 
-    :param blessings.Terminal term: :class:`~.Terminal` instance.
+    :param blessed.Terminal term: :class:`~.Terminal` instance.
     :rtype: list
     """
     bnc = functools.partial(_build_numeric_capability, term)
@@ -146,7 +146,7 @@ def get_wontmove_sequence_patterns(term):
     """
     Get list of regular expressions for sequences not causing movement.
 
-    :param blessings.Terminal term: :class:`~.Terminal` instance.
+    :param blessed.Terminal term: :class:`~.Terminal` instance.
     :rtype: list
     """
     bnc = functools.partial(_build_numeric_capability, term)
@@ -274,7 +274,7 @@ def init_sequence_patterns(term):
     returns a dictionary database of regular expressions, which is
     re-attached to the terminal by attributes of the same key-name.
 
-    :param blessings.Terminal term: :class:`~.Terminal` instance.
+    :param blessed.Terminal term: :class:`~.Terminal` instance.
     :rtype: dict
     :returns: dictionary containing mappings of sequence "groups",
         containing a compiled regular expression which it matches:
@@ -498,7 +498,7 @@ class Sequence(six.text_type):
         Class constructor.
 
         :param sequence_text: A string that may contain sequences.
-        :param blessings.Terminal term: :class:`~.Terminal` instance.
+        :param blessed.Terminal term: :class:`~.Terminal` instance.
         """
         new = six.text_type.__new__(cls, sequence_text)
         new._term = term
@@ -572,8 +572,8 @@ class Sequence(six.text_type):
     length.__doc__ += (
         u"""For example:
 
-            >>> from blessings import Terminal
-            >>> from blessings.sequences import Sequence
+            >>> from blessed import Terminal
+            >>> from blessed.sequences import Sequence
             >>> term = Terminal()
             >>> Sequence(term.clear + term.red(u'コンニチハ'), term).length()
             10
@@ -614,8 +614,8 @@ class Sequence(six.text_type):
         r"""
         Return string of all sequences removed.
 
-            >>> from blessings import Terminal
-            >>> from blessings.sequences import Sequence
+            >>> from blessed import Terminal
+            >>> from blessed.sequences import Sequence
             >>> term = Terminal()
             >>> Sequence(term.cuf(5) + term.red(u'test'), term).strip_seqs()
             u'     test'
@@ -650,8 +650,8 @@ class Sequence(six.text_type):
         r"""
         Transform non-destructive space or backspace into destructive ones.
 
-            >>> from blessings import Terminal
-            >>> from blessings.sequences import Sequence
+            >>> from blessed import Terminal
+            >>> from blessed.sequences import Sequence
             >>> term = Terminal()
             >>> seq = term.cuf(10) + '-->' + '\b\b'
             >>> padded = Sequence(seq, Terminal()).padd()
@@ -688,7 +688,7 @@ def measure_length(ucs, term):
     Return non-zero for string ``ucs`` that begins with a terminal sequence.
 
     :param str ucs: String that may begin with a terminal sequence.
-    :param blessings.Terminal term: :class:`~.Terminal` instance.
+    :param blessed.Terminal term: :class:`~.Terminal` instance.
     :rtype: int
     :returns: length of the sequence beginning at ``ucs``, if any.
         Otherwise 0 if ``ucs`` does not begin with a terminal
@@ -739,7 +739,7 @@ def termcap_distance(ucs, cap, unit, term):
         ``cub1``, ``cuf(n)``, or ``cuf1``.
     :param str cap: ``cub`` or ``cuf`` only.
     :param int unit: Unit multiplier, should always be ``1`` or ``-1``.
-    :param blessings.Terminal term: :class:`~.Terminal` instance.
+    :param blessed.Terminal term: :class:`~.Terminal` instance.
     :rtype: int
     :returns: the printable distance determined by the given sequence.  If
         the given sequence does not match any of the ``cub`` or ``cuf``
@@ -785,7 +785,7 @@ def horizontal_distance(ucs, term):
         - backspace (``\b``) returns value -1.
         - tab (``\t``) returns value 8.
 
-    :param blessings.Terminal term: :class:`~.Terminal` instance.
+    :param blessed.Terminal term: :class:`~.Terminal` instance.
     :rtype: int
 
     .. note:: Tabstop (``\t``) cannot be correctly calculated, as the relative
@@ -797,7 +797,7 @@ def horizontal_distance(ucs, term):
 
     elif ucs.startswith('\t'):
         # As best as I can prove it, a tabstop is always 8 by default.
-        # Though, given that blessings is:
+        # Though, given that blessed is:
         #
         #  1. unaware of the output device's current cursor position, and
         #  2. unaware of the location the callee may chose to output any

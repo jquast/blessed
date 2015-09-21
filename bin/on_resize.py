@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-This is an example application for the 'blessings' Terminal library for python.
+This is an example application for the 'blessed' Terminal library for python.
 
 Window size changes are caught by the 'on_resize' function using a traditional
 signal handler.  Meanwhile, blocking keyboard input is displayed to stdout.
@@ -10,7 +10,7 @@ term.keystroke().
 from __future__ import print_function
 import signal
 
-from blessings import Terminal
+from blessed import Terminal
 
 def main():
     """Program entry point."""

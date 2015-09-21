@@ -116,7 +116,7 @@ class ParameterizingProxyString(six.text_type):
 
     For example:
 
-    >>> from blessings import Terminal
+    >>> from blessed import Terminal
     >>> term = Terminal('screen')
     >>> hpa = ParameterizingString(term.hpa, term.normal, 'hpa')
     >>> hpa(9)

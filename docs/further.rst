@@ -1,7 +1,7 @@
 Further Reading
 ===============
 
-As a developer's API, blessings is often bundled with frameworks and toolsets
+As a developer's API, blessed is often bundled with frameworks and toolsets
 that dive deeper into Terminal I/O programming than :class:`~.Terminal` offers.
 Here are some recommended readings to help you along:
 

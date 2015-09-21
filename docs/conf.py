@@ -17,7 +17,7 @@ here = os.path.dirname(__file__)
 #sys.path.insert(0, os.path.abspath(os.path.join(here, os.pardir)))
 sys.path.insert(0, os.path.abspath('sphinxext'))  # for github.py
 
-github_project_url = "https://github.com/erikrose/blessings"
+github_project_url = "https://github.com/erikrose/blessed"
 
 
 # ! Monkey Patching!
@@ -44,7 +44,7 @@ def no_op_wraps(func):
     Replaces functools.wraps in order to undo wrapping when generating Sphinx documentation
     """
     import sys
-    if func.__module__ is None or 'blessings' not in func.__module__:
+    if func.__module__ is None or 'blessed' not in func.__module__:
         return functools.orig_wraps(func)
     def wrapper(decorator):
         sys.stderr.write('patched for function signature: {0!r}\n'.format(func))
@@ -54,7 +54,7 @@ functools.orig_wraps = functools.wraps
 functools.wraps = no_op_wraps
 import contextlib
 contextlib.wraps = no_op_wraps
-from blessings.terminal import *
+from blessed.terminal import *
 
 # -- General configuration ----------------------------------------------------
 
@@ -209,7 +209,7 @@ html_show_copyright = True
 # html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'blessingsdoc'
+htmlhelp_basename = 'blesseddoc'
 
 
 # -- Options for LaTeX output -------------------------------------------------
@@ -224,7 +224,7 @@ htmlhelp_basename = 'blessingsdoc'
 # (source start file, target name, title, author, documentclass
 # [howto/manual]).
 latex_documents = [
-    ('index', 'blessings.tex', u'Blessings Documentation',
+    ('index', 'blessed.tex', u'Blessings Documentation',
      u'Erik Rose, Jeff Quast', 'manual'),
 ]
 

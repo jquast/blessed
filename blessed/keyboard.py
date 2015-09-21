@@ -121,7 +121,7 @@ def _alternative_left_right(term):
     r"""
     Determine and return mapping of left and right arrow keys sequences.
 
-    :param blessings.Terminal term: :class:`~.Terminal` instance.
+    :param blessed.Terminal term: :class:`~.Terminal` instance.
     :rtype: dict
 
     This function supports :func:`get_terminal_sequences` to discover
@@ -145,7 +145,7 @@ def get_keyboard_sequences(term):
     r"""
     Return mapping of keyboard sequences paired by keycodes.
 
-    :param blessings.Terminal term: :class:`~.Terminal` instance.
+    :param blessed.Terminal term: :class:`~.Terminal` instance.
     :returns: mapping of keyboard unicode sequences paired by keycodes
         as integer.  This is used as the argument ``mapper`` to
         the supporting function :func:`resolve_sequence`.

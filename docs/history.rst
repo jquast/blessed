@@ -65,7 +65,7 @@ Version History
 
       - Cannot call :func:`curses.setupterm` more than once per process
         (from :meth:`Terminal.__init__`): emit a warning about what terminal
-        kind subsequent calls will use.  Previously, blessings pretended
+        kind subsequent calls will use.  Previously, blessed pretended
         to support a new terminal :attr:`~.kind`, but was actually using
         the :attr:`~.kind` specified by the first instantiation of
         :class:`~.Terminal`.

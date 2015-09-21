@@ -1,7 +1,7 @@
 """List of terminal definitions containing binary-packed sequences."""
 
 #: This list of terminals is manually managed, it describes all of the
-#: terminals that blessings cannot measure the sequence length for; they
+#: terminals that blessed cannot measure the sequence length for; they
 #: contain binary-packed capabilities instead of numerics, so it is not
 #: possible to build regular expressions in the way that sequences.py does.
 #:
@@ -872,7 +872,7 @@ ztx
 #: Message displayed when terminal containing binary-packed sequences
 #: is instantiated -- the 'warnings' module is used and may be filtered away.
 BINTERM_UNSUPPORTED_MSG = (
-    u"Terminal kind {0!r} contains binary-packed capabilities, blessings "
+    u"Terminal kind {0!r} contains binary-packed capabilities, blessed "
     u"is likely to fail to measure the length of its sequences.")
 
 __all__ = ['BINARY_TERMINALS', 'BINTERM_UNSUPPORTED_MSG']

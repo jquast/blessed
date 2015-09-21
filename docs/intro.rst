@@ -1,26 +1,26 @@
-.. image:: https://img.shields.io/travis/erikrose/blessings.svg
+.. image:: https://img.shields.io/travis/erikrose/blessed.svg
     :alt: Travis Continous Integration
-    :target: https://travis-ci.org/erikrose/blessings/
+    :target: https://travis-ci.org/erikrose/blessed/
 
 .. image:: https://img.shields.io/teamcity/http/teamcity-master.pexpect.org/s/Blessings_BuildHead.png
     :alt: TeamCity Build status
     :target: https://teamcity-master.pexpect.org/viewType.html?buildTypeId=Blessings_BuildHead&branch_Blessings=%3Cdefault%3E&tab=buildTypeStatusDiv
 
-.. image:: https://coveralls.io/repos/erikrose/blessings/badge.png?branch=master
+.. image:: https://coveralls.io/repos/erikrose/blessed/badge.png?branch=master
     :alt: Coveralls Code Coverage
-    :target: https://coveralls.io/r/erikrose/blessings?branch=master
+    :target: https://coveralls.io/r/erikrose/blessed?branch=master
 
-.. image:: https://img.shields.io/pypi/v/blessings.svg
+.. image:: https://img.shields.io/pypi/v/blessed.svg
     :alt: Latest Version
-    :target: https://pypi.python.org/pypi/blessings
+    :target: https://pypi.python.org/pypi/blessed
 
-.. image:: https://pypip.in/license/blessings/badge.svg
+.. image:: https://pypip.in/license/blessed/badge.svg
     :alt: License
     :target: http://opensource.org/licenses/MIT
 
-.. image:: https://img.shields.io/pypi/dm/blessings.svg
+.. image:: https://img.shields.io/pypi/dm/blessed.svg
     :alt: Downloads
-    :target: https://pypi.python.org/pypi/blessings
+    :target: https://pypi.python.org/pypi/blessed
 
 Introduction
 ============
@@ -29,7 +29,7 @@ Blessings is a thin, practical wrapper around terminal capabilities in Python.
 
 Coding with *Blessings* looks like this... ::
 
-    from blessings import Terminal
+    from blessed import Terminal
 
     t = Terminal()
 
@@ -75,7 +75,7 @@ Blessings **does not** provide...
 * Windows command prompt support.  A PDCurses_ build of python for windows
   provides only partial support at this time -- there are plans to merge with
   the ansi_ module in concert with colorama_ to resolve this.  `Patches welcome
-  <https://github.com/erikrose/blessings/issues/21>`_!
+  <https://github.com/erikrose/blessed/issues/21>`_!
 
 
 Before And After
@@ -121,7 +121,7 @@ print some underlined text at the bottom of the screen::
 
 The same program with *Blessings* is simply::
 
-    from blessings import Terminal
+    from blessed import Terminal
 
     term = Terminal()
     with term.location(0, term.height - 1):
@@ -130,7 +130,7 @@ The same program with *Blessings* is simply::
 Further Documentation
 ---------------------
 
-More documentation can be found at http://blessings.readthedocs.org/en/latest/
+More documentation can be found at http://blessed.readthedocs.org/en/latest/
 
 Bugs, Contributing, Support
 ---------------------------
@@ -139,7 +139,7 @@ Bugs, Contributing, Support
 We welcome your bug reports and feature suggestions!
 
 Would you like to **contribute**?  That's awesome!  We've written a
-`guide <http://blessings.readthedocs.org/en/latest/contributing.html>`_
+`guide <http://blessed.readthedocs.org/en/latest/contributing.html>`_
 to help you.
 
 Are you stuck and need **support**?  Give `stackoverflow`_ a try.  If
@@ -151,7 +151,7 @@ License
 
 Blessings is under the MIT License. See the LICENSE file.
 
-.. _`issue tracker`: https://github.com/erikrose/blessings/issues/
+.. _`issue tracker`: https://github.com/erikrose/blessed/issues/
 .. _curses: https://docs.python.org/3/library/curses.html
 .. _tigetstr: http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man3/tigetstr.3
 .. _tparm: http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man3/tparm.3

@@ -5,7 +5,7 @@ import argparse
 
 def main():
     """Program entry point."""
-    from blessings import Terminal
+    from blessed import Terminal
 
     parser = argparse.ArgumentParser(
         description='displays argument as specified style')

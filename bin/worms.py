@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-This is an example application for the 'blessings' Terminal library for python.
+This is an example application for the 'blessed' Terminal library for python.
 
 It is also an experiment in functional programming.
 """
@@ -10,7 +10,7 @@ from collections import namedtuple
 from functools import partial
 from random import randrange
 
-from blessings import Terminal
+from blessed import Terminal
 
 
 # python 2/3 compatibility, provide 'echo' function as an

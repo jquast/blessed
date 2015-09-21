@@ -12,7 +12,7 @@ Developing
 
 Install git, Python 2 and 3, pip, and tox.
 
-Then, from the blessings code folder::
+Then, from the blessed code folder::
 
     pip install --editable .
 

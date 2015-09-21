@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"Core blessings Terminal() tests."
+"Core blessed Terminal() tests."
 
 # std
 import collections
@@ -27,8 +27,8 @@ import six
 
 def test_export_only_Terminal():
     "Ensure only Terminal instance is exported for import * statements."
-    import blessings
-    assert blessings.__all__ == ['Terminal']
+    import blessed
+    assert blessed.__all__ == ['Terminal']
 
 
 def test_null_location(all_terms):
@@ -256,23 +256,23 @@ def test_setupterm_invalid_has_no_styling():
                     reason='PyPy freezes')
 def test_missing_ordereddict_uses_module(monkeypatch):
     "ordereddict module is imported when without collections.OrderedDict."
-    import blessings.keyboard
+    import blessed.keyboard
 
     if hasattr(collections, 'OrderedDict'):
         monkeypatch.delattr('collections.OrderedDict')
 
     try:
-        imp.reload(blessings.keyboard)
+        imp.reload(blessed.keyboard)
     except ImportError as err:
         assert err.args[0] in ("No module named ordereddict",  # py2
                                "No module named 'ordereddict'")  # py3
         sys.modules['ordereddict'] = mock.Mock()
         sys.modules['ordereddict'].OrderedDict = -1
-        imp.reload(blessings.keyboard)
-        assert blessings.keyboard.OrderedDict == -1
+        imp.reload(blessed.keyboard)
+        assert blessed.keyboard.OrderedDict == -1
         del sys.modules['ordereddict']
         monkeypatch.undo()
-        imp.reload(blessings.keyboard)
+        imp.reload(blessed.keyboard)
     else:
         assert platform.python_version_tuple() < ('2', '7')  # reached by py2.6
 
@@ -281,34 +281,34 @@ def test_missing_ordereddict_uses_module(monkeypatch):
                     reason='PyPy freezes')
 def test_python3_2_raises_exception(monkeypatch):
     "Test python version 3.0 through 3.2 raises an exception."
-    import blessings
+    import blessed
 
     monkeypatch.setattr('platform.python_version_tuple',
                         lambda: ('3', '2', '2'))
 
     try:
-        imp.reload(blessings)
+        imp.reload(blessed)
     except ImportError as err:
         assert err.args[0] == (
             'Blessings needs Python 3.2.3 or greater for Python 3 '
             'support due to http://bugs.python.org/issue10570.')
         monkeypatch.undo()
-        imp.reload(blessings)
+        imp.reload(blessed)
     else:
         assert False, 'Exception should have been raised'
 
 
 def test_without_dunder():
     "Ensure dunder does not remain in module (py2x InterruptedError test."
-    import blessings.terminal
-    assert '_' not in dir(blessings.terminal)
+    import blessed.terminal
+    assert '_' not in dir(blessed.terminal)
 
 
 def test_IOUnsupportedOperation():
     "Ensure stream that throws IOUnsupportedOperation results in non-tty."
     @as_subprocess
     def child():
-        import blessings.terminal
+        import blessed.terminal
 
         def side_effect():
             raise io.UnsupportedOperation
@@ -427,17 +427,17 @@ def test_win32_missing_tty_modules(monkeypatch):
             else:
                 __builtins__['__import__'] = __import__
             try:
-                import blessings.terminal
-                imp.reload(blessings.terminal)
+                import blessed.terminal
+                imp.reload(blessed.terminal)
             except UserWarning:
                 err = sys.exc_info()[1]
-                assert err.args[0] == blessings.terminal._MSG_NOSUPPORT
+                assert err.args[0] == blessed.terminal._MSG_NOSUPPORT
 
             warnings.filterwarnings("ignore", category=UserWarning)
-            import blessings.terminal
-            imp.reload(blessings.terminal)
-            assert not blessings.terminal.HAS_TTY
-            term = blessings.terminal.Terminal('ansi')
+            import blessed.terminal
+            imp.reload(blessed.terminal)
+            assert not blessed.terminal.HAS_TTY
+            term = blessed.terminal.Terminal('ansi')
             assert term.height == 24
             assert term.width == 80
 
@@ -447,7 +447,7 @@ def test_win32_missing_tty_modules(monkeypatch):
             else:
                 __builtins__['__import__'] = original_import
             warnings.resetwarnings()
-            import blessings.terminal
-            imp.reload(blessings.terminal)
+            import blessed.terminal
+            imp.reload(blessed.terminal)
 
     child()

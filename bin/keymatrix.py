@@ -9,7 +9,7 @@ from __future__ import division, print_function
 import functools
 import sys
 
-from blessings import Terminal
+from blessed import Terminal
 
 # python 2/3 compatibility, provide 'echo' function as an
 # alias for "print without newline and flush"

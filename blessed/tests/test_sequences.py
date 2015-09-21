@@ -91,7 +91,7 @@ def test_stream_attr():
                     reason="travis-ci does not have binary-packed terminals.")
 def test_emit_warnings_about_binpacked():
     """Test known binary-packed terminals (kermit, avatar) emit a warning."""
-    from blessings._binterms import BINTERM_UNSUPPORTED_MSG
+    from blessed._binterms import BINTERM_UNSUPPORTED_MSG
 
     @as_subprocess
     def child(kind):
@@ -125,8 +125,8 @@ def test_emit_warnings_about_binpacked():
 def test_unit_binpacked_unittest():
     """Unit Test known binary-packed terminals emit a warning (travis-safe)."""
     import warnings
-    from blessings._binterms import BINTERM_UNSUPPORTED_MSG
-    from blessings.sequences import init_sequence_patterns
+    from blessed._binterms import BINTERM_UNSUPPORTED_MSG
+    from blessed.sequences import init_sequence_patterns
     warnings.filterwarnings("error", category=UserWarning)
     term = mock.Mock()
     term.kind = 'tek4207-s'
@@ -143,7 +143,7 @@ def test_unit_binpacked_unittest():
 
 def test_sort_sequences():
     """Test sequences are filtered and ordered longest-first."""
-    from blessings.sequences import _sort_sequences
+    from blessed.sequences import _sort_sequences
     input_list = [u'a', u'aa', u'aaa', u'']
     output_expected = [u'aaa', u'aa', u'a']
     assert (_sort_sequences(input_list) == output_expected)
@@ -497,7 +497,7 @@ def test_null_callable_string(all_terms):
 def test_bnc_parameter_emits_warning():
     """A fake capability without target digits emits a warning."""
     import warnings
-    from blessings.sequences import _build_numeric_capability
+    from blessed.sequences import _build_numeric_capability
 
     # given,
     warnings.filterwarnings("error", category=UserWarning)
@@ -519,7 +519,7 @@ def test_bnc_parameter_emits_warning():
 def test_bna_parameter_emits_warning():
     """A fake capability without any digits emits a warning."""
     import warnings
-    from blessings.sequences import _build_any_numeric_capability
+    from blessed.sequences import _build_any_numeric_capability
 
     # given,
     warnings.filterwarnings("error", category=UserWarning)
@@ -542,8 +542,8 @@ def test_padd():
     """ Test terminal.padd(seq). """
     @as_subprocess
     def child():
-        from blessings.sequences import Sequence
-        from blessings import Terminal
+        from blessed.sequences import Sequence
+        from blessed import Terminal
         term = Terminal('xterm-256color')
         assert Sequence('xyz\b', term).padd() == u'xy'
         assert Sequence('xxxx\x1b[3Dzz', term).padd() == u'xzz'
