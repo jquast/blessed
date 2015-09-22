@@ -165,7 +165,7 @@ Version History
   * Allow :meth:`~.location` to operate on just an x *or* y coordinate.
 
 1.0
-  * Extracted Blessings from `nose-progressive`_.
+  * Extracted Blessed from `nose-progressive`_.
 
 
 .. _`jquast/blessed`: https://github.com/jquast/blessed

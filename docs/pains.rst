@@ -2,7 +2,7 @@ Growing Pains
 =============
 
 When constructing rich console applications, there are a surprisingly great
-number of portability issues.  Though Blessings provides an abstraction for
+number of portability issues.  Though Blessed provides an abstraction for
 the full terminal capability database to ensure compatibility across many
 types of terminals, there are still many portability issues that the
 terminal :attr:`~.kind` alone cannot abstract for you.

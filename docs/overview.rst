@@ -1,7 +1,7 @@
 Overview
 ========
 
-Blessings provides just **one** top-level object: :class:`~.Terminal`.
+Blessed provides just **one** top-level object: :class:`~.Terminal`.
 Instantiating a :class:`~.Terminal` figures out whether you're on a terminal at
 all and, if so, does any necessary setup:
 
@@ -336,7 +336,7 @@ changes, you may author a callback for SIGWINCH_ signals::
 Clearing The Screen
 -------------------
 
-Blessings provides syntactic sugar over some screen-clearing capabilities:
+Blessed provides syntactic sugar over some screen-clearing capabilities:
 
 ``clear``
   Clear the whole screen.
@@ -400,7 +400,7 @@ bars and other frippery and just stick to content::
 Sequence Awareness
 ------------------
 
-Blessings may measure the printable width of strings containing sequences,
+Blessed may measure the printable width of strings containing sequences,
 providing :meth:`~.Terminal.center`, :meth:`~.Terminal.ljust`, and
 :meth:`~.Terminal.rjust` methods, using the terminal screen's width as
 the default *width* value::

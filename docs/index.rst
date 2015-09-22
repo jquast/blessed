@@ -1,6 +1,6 @@
-===================================
-Welcome to Blessings documentation!
-===================================
+=================================
+Welcome to Blessed documentation!
+=================================
 
 Contents:
 

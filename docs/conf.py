@@ -83,7 +83,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Blessings'
+project = u'Blessed'
 copyright = u'2011 Erik Rose, Jeff Quast'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -224,7 +224,7 @@ htmlhelp_basename = 'blesseddoc'
 # (source start file, target name, title, author, documentclass
 # [howto/manual]).
 latex_documents = [
-    ('index', 'blessed.tex', u'Blessings Documentation',
+    ('index', 'blessed.tex', u'Blessed Documentation',
      u'Erik Rose, Jeff Quast', 'manual'),
 ]
 
@@ -257,7 +257,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'Blessings', u'Blessings Documentation',
+    ('index', 'Blessed', u'Blessed Documentation',
      [u'Erik Rose, Jeff Quast'], 1)
 ]
 

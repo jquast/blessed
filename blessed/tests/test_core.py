@@ -290,7 +290,7 @@ def test_python3_2_raises_exception(monkeypatch):
         imp.reload(blessed)
     except ImportError as err:
         assert err.args[0] == (
-            'Blessings needs Python 3.2.3 or greater for Python 3 '
+            'Blessed needs Python 3.2.3 or greater for Python 3 '
             'support due to http://bugs.python.org/issue10570.')
         monkeypatch.undo()
         imp.reload(blessed)

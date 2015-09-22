@@ -2,9 +2,9 @@
     :alt: Travis Continous Integration
     :target: https://travis-ci.org/erikrose/blessed/
 
-.. image:: https://img.shields.io/teamcity/http/teamcity-master.pexpect.org/s/Blessings_BuildHead.png
+.. image:: https://img.shields.io/teamcity/http/teamcity-master.pexpect.org/s/Blessed_BuildHead.png
     :alt: TeamCity Build status
-    :target: https://teamcity-master.pexpect.org/viewType.html?buildTypeId=Blessings_BuildHead&branch_Blessings=%3Cdefault%3E&tab=buildTypeStatusDiv
+    :target: https://teamcity-master.pexpect.org/viewType.html?buildTypeId=Blessed_BuildHead&branch_Blessed=%3Cdefault%3E&tab=buildTypeStatusDiv
 
 .. image:: https://coveralls.io/repos/erikrose/blessed/badge.png?branch=master
     :alt: Coveralls Code Coverage
@@ -25,9 +25,9 @@
 Introduction
 ============
 
-Blessings is a thin, practical wrapper around terminal capabilities in Python.
+Blessed is a thin, practical wrapper around terminal capabilities in Python.
 
-Coding with *Blessings* looks like this... ::
+Coding with *Blessed* looks like this... ::
 
     from blessed import Terminal
 
@@ -47,7 +47,7 @@ Coding with *Blessings* looks like this... ::
 Brief Overview
 --------------
 
-*Blessings* is a more simplified wrapper around curses_, providing :
+*Blessed* is a more simplified wrapper around curses_, providing :
 
 * Styles, color, and maybe a little positioning without necessarily
   clearing the whole screen first.
@@ -70,7 +70,7 @@ Brief Overview
 * Allows the printable length of strings containing sequences to be
   determined.
 
-Blessings **does not** provide...
+Blessed **does not** provide...
 
 * Windows command prompt support.  A PDCurses_ build of python for windows
   provides only partial support at this time -- there are plans to merge with
@@ -119,7 +119,7 @@ print some underlined text at the bottom of the screen::
     # Restore cursor position.
     print(rc)
 
-The same program with *Blessings* is simply::
+The same program with *Blessed* is simply::
 
     from blessed import Terminal
 
@@ -149,7 +149,7 @@ in the `issue tracker`_ with a well-formed question.
 License
 -------
 
-Blessings is under the MIT License. See the LICENSE file.
+Blessed is under the MIT License. See the LICENSE file.
 
 .. _`issue tracker`: https://github.com/erikrose/blessed/issues/
 .. _curses: https://docs.python.org/3/library/curses.html
