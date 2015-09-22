@@ -39,7 +39,7 @@ Coding with *Blessings* looks like this... ::
     with t.location(0, t.height - 1):
         print(t.center(t.blink('press any key to continue.')))
 
-    with t.keystroke_input():
+    with t.cbreak():
         inp = t.keystroke()
     print('You pressed ' + repr(inp))
 

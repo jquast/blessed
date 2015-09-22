@@ -187,7 +187,8 @@ def main():
     modifier = 0.93
     inp = None
 
-    with term.hidden_cursor(), term.keystroke_input():
+    echo(term.move(term.height, 0))
+    with term.hidden_cursor(), term.cbreak(), term.location():
         while inp not in (u'q', u'Q'):
 
             # delete the tail of the worm at worm_length

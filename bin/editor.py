@@ -2,15 +2,23 @@
 """
 A Dumb full-screen editor.
 
-This program demonstrates how to deal with the keypad for directional movement.
+This example program makes use of many context manager methods:
+:meth:`~.Terminal.hidden_cursor`, :meth:`~.Terminal.raw`,
+:meth:`~.Terminal.location`, :meth:`~.Terminal.fullscreen`, and
+:meth:`~.Terminal.keypad`.
 
-It is a very dumb and naive full-screen editor.  It can be saved to a file
-using ^S, which demonstrates using keystroke_input with parameter raw=True.
+Early curses work focused namely around writing screen editors, naturally
+any serious editor would make liberal use of special modes.
+
+``Ctrl - L``
+  refresh
+
+``Ctrl - C``
+  quit
+
+``Ctrl - S``
+  save
 """
-# My favorite quote, from a former assembly programmer learning
-# python with blessed, "Why wont python let me read memory
-# from screen like assembler? That's dumb." -xzip!impure
-
 from __future__ import division, print_function
 import collections
 import functools
@@ -33,6 +41,21 @@ except TypeError:
         """Display ``text`` and flush output."""
         sys.stdout.write(u'{}'.format(text))
         sys.stdout.flush()
+
+def input_filter(keystroke):
+    # For the given unicode character, return whether it should
+    # be allowed as input in our "always insert" mode. This
+    # somewhat requires that the interface use special
+    # application keys to perform functions, as alphanumeric
+    # input intended for persisting could otherwise be interpreted as a
+    # command sequence.
+    if keystroke.is_sequence:
+        # Namely, deny multi-byte sequences (such as '\x1b[A'),
+        return False
+    if ord(keystroke) < ord(u' '):
+        # or control characters (such as ^L),
+        return False
+    return True
 
 def echo_yx(cursor, text):
     """Move to ``cursor`` and display ``text``."""
@@ -189,7 +212,7 @@ def main():
     csr = Cursor(0, 0, term)
     screen = {}
     with term.hidden_cursor(), \
-            term.keystroke_input(raw=True), \
+            term.raw(), \
             term.location(), \
             term.fullscreen(), \
             term.keypad():
@@ -218,13 +241,15 @@ def main():
                 # ^l refreshes
                 redraw(term=term, screen=screen)
 
-            n_csr = lookup_move(inp.code, csr, term)
+            else:
+                n_csr = lookup_move(inp.code, csr, term)
+
             if n_csr != csr:
                 # erase old cursor,
                 echo_yx(csr, screen.get((csr.y, csr.x), u' '))
                 csr = n_csr
 
-            elif not inp.is_sequence and inp in string.printable:
+            elif input_filter(inp):
                 echo_yx(csr, inp)
                 screen[(csr.y, csr.x)] = inp.__str__()
                 n_csr = right_of(csr, 1)

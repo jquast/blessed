@@ -1,22 +1,20 @@
 Version History
 ===============
 
-1.9.5
-  * This release is primarily a set of contributions from the
-    `blessed <https://github.com/jquast/blessed>` fork by
-    :ghuser:`jquast` unless otherwise indicated.
+1.7
 
     **new features**:
 
-      - Context manager :meth:`~.keystroke_input`, which is equivalent
-        to :func:`tty.setcbreak`, and when argument ``raw=True``,
-        :func:`tty.setraw`, allowing input from the keyboard to be read
-        as each key is pressed.
-      - :meth:`~.keystroke` returns one or more characters received by
+      - Context manager :meth:`~.cbreak`, which is equivalent to
+        entering terminal state by :func:`tty.setcbreak` and returning
+        on exit, as well as the lesser recommended :meth:`~.raw`,
+        pairing from :func:`tty.setraw`.
+      - :meth:`~.inkey` returns one or more characters received by
         the keyboard as a unicode sequence, with additional attributes
         :attr:`~.Keystroke.code` and :attr:`~.Keystroke.name`.  When
-        not ``None``, a multi-byte sequence was received, allowing
-        application keys (such as arrow keys) to be detected.
+        the return value of :attr:`~.Keystroke.code` is not ``None``,
+        a multi-byte sequence was received, allowing application keys
+        (such as arrow keys) to be detected.
       - Context manager :meth:`~.keypad` emits sequences that enable
         "application keys" such as the diagonal keys on the numpad.
         This is equivalent to :meth:`curses.window.keypad`.

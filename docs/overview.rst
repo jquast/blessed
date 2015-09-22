@@ -445,10 +445,10 @@ received, which must be decoded to unicode using the locale-preferred encoding.
 Finally, multiple bytes may be emitted which must be paired with some verb like
 ``KEY_LEFT``: blessed handles all of these special cases for you!
 
-keystroke_input
-~~~~~~~~~~~~~~~
+cbreak
+~~~~~~
 
-The context manager :meth:`~.Terminal.keystroke_input` can be used to enter
+The context manager :meth:`~.Terminal.cbreak` can be used to enter
 *key-at-a-time* mode: Any keypress by the user is immediately consumed by read
 calls::
 
@@ -457,31 +457,23 @@ calls::
 
     term = Terminal()
 
-    with term.keystroke_input():
+    with term.cbreak():
         # block until any single key is pressed.
         sys.stdin.read(1)
 
-The mode entered using :meth:`~.Terminal.keystroke_input` is called
+The mode entered using :meth:`~.Terminal.cbreak` is called
 `cbreak(3)`_ in curses:
 
   The cbreak routine disables line buffering and erase/kill
   character-processing (interrupt and flow control characters are unaffected),
   making characters typed by the user immediately available to the program.
 
-:meth:`~.Terminal.keystroke_input` also accepts optional parameter
-:paramref:`~.Terminal.keystroke_input.raw` which may be set as *True*.  When
-used, the given behavior is described in `raw(3)`_ as follows:
-
-  The raw and noraw routines place the terminal into or out of raw mode.
-  Raw mode is similar to cbreak mode, in that characters typed are immediately
-  passed through to the user program.  The differences are that in raw mode,
-  the interrupt, quit, suspend, and flow control characters are all passed
-  through uninterpreted, instead of generating a signal.
+:meth:`~.Terminal.raw` is similar to cbreak, but not recommended.
 
 keystroke
 ~~~~~~~~~
 
-The method :meth:`~.Terminal.keystroke` combined with `keystroke_input`_
+The method :meth:`~.Terminal.keystroke` combined with cbreak_
 completes the circle of providing key-at-a-time keyboard input with multibyte
 encoding and awareness of application keys.
 
@@ -496,7 +488,7 @@ also provides the special attributes :attr:`~.Keystroke.is_sequence`,
     term = Terminal()
 
     print("press 'q' to quit.")
-    with term.keystroke_input():
+    with term.cbreak():
         val = u''
         while val not in (u'q', u'Q',):
             val = term.keystroke(timeout=5)

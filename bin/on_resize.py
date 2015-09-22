@@ -31,17 +31,15 @@ def main():
 
     signal.signal(signal.SIGWINCH, on_resize)
 
-    # note that, a terminal driver actually writes '\r\n' when '\n' is found,
-    # but in raw mode, we are allowed to write directly to the terminal without
-    # the interference of such driver -- so we must write \r\n ourselves; as
-    # python will append '\n' to our print statements, we simply end our
-    # statements with \r.
-    with term.keystroke_input():
-        print("press 'X' to stop.\r")
+    # display initial size
+    on_resize(term)
+
+    with term.cbreak():
+        print("press 'X' to stop.")
         inp = None
         while inp != 'X':
             inp = term.keystroke()
-            print(repr(inp) + u'\r')
+            print(repr(inp))
 
 if __name__ == '__main__':
     main()

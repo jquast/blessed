@@ -740,33 +740,31 @@ class Terminal(object):
         return False if self._keyboard_fd is None else check_r == ready_r
 
     @contextlib.contextmanager
-    def keystroke_input(self, raw=False):
+    def cbreak(self):
         """
-        Return a context manager that enables key-at-a-time input.
+        Allow each keystroke to be read immediately after it is pressed.
 
-        Normally, characters received from the keyboard cannot be read by
-        Python until the Return key is pressed. This is called
-        "cooked" or "canonical input" mode, and it allows the tty driver to provide
-        line-editing shuttling the input to your program. It is usually the
-        default mode set by a Unix shell before executing a program.
+        This is a context manager for :func:`tty.setcbreak`.
 
         This context manager activates 'rare' mode, the opposite of 'cooked'
-        mode: On entry, :func:`tty.setcbreak` mode is activated, disabling
-        line-buffering of keyboard input and turning off automatic echoing of
-        input. This allows each keystroke to be read immediately after it is
-        pressed.
+        mode: On entry, :func:`tty.setcbreak` mode is activated disabling
+        line-buffering of keyboard input and turning off automatic echo of
+        input as output.
 
-        :arg bool raw: When True, enter :func:`tty.setraw` mode instead.
-           Raw mode differs in that the interrupt, quit, suspend, and
-           flow-control characters are all passed through as their raw
-           character values instead of generating signals.
+        .. note:: You must explicitly print any user input you would like
+            displayed.  If you provide any kind of editing, you must handle
+            backspace and other line-editing control functions in this mode
+            as well!
 
-        Technically, this context manager sets the :mod:`termios` attributes of
-        the terminal attached to :obj:`sys.__stdin__`.
+        **Normally**, characters received from the keyboard cannot be read
+        by Python until the *Return* key is pressed. Also known as *cooked* or
+        *canonical input* mode, it allows the tty driver to provide
+        line-editing before shuttling the input to your program and is the
+        (implicit) default terminal mode set by most unix shells before
+        executing programs.
 
-        .. note:: You must explicitly print any input you would like displayed.
-            If you provide any kind of editing, you must handle backspace and
-            other line-editing control characters.
+        Technically, this context manager sets the :mod:`termios` attributes
+        of the terminal attached to :obj:`sys.__stdin__`.
 
         .. note:: :func:`tty.setcbreak` sets ``VMIN = 1`` and ``VTIME = 0``,
             see http://www.unixwiz.net/techtips/termios-vmin-vtime.html
@@ -774,8 +772,50 @@ class Terminal(object):
         if HAS_TTY and self._keyboard_fd is not None:
             # Save current terminal mode:
             save_mode = termios.tcgetattr(self._keyboard_fd)
-            mode_setter = tty.setraw if raw else tty.setcbreak
-            mode_setter(self._keyboard_fd, termios.TCSANOW)
+            tty.setcbreak(self._keyboard_fd, termios.TCSANOW)
+            try:
+                yield
+            finally:
+                # Restore prior mode:
+                termios.tcsetattr(self._keyboard_fd,
+                                  termios.TCSAFLUSH,
+                                  save_mode)
+        else:
+            yield
+
+    @contextlib.contextmanager
+    def raw(self):
+        """
+        A context manager for :func:`tty.setraw`.
+
+        Raw mode differs from :meth:`cbreak` mode in that input and output
+        processing of characters is disabled, in similar in that they both
+        allow each keystroke to be read immediately after it is pressed.
+
+        For input, the interrupt, quit, suspend, and flow control characters
+        are received as their raw control character values rather than
+        generating a signal.
+
+        For output, the newline ``\n`` is not sufficient enough to return
+        the carriage, **requiring carriage return displayed explicitly by
+        your program**::
+
+            >>> from __future__ import print_function
+            >>> with term.raw():
+            ...    print(repr('norml'))
+            ...    print(repr('CR LF'), end='\r\n')
+            ...
+            'norml'
+                   'CR LF'
+            >>>
+
+        Notice that the 'CR' began at the next line without the implicit
+        return of the carriage in raw mode.
+        """
+        if HAS_TTY and self._keyboard_fd is not None:
+            # Save current terminal mode:
+            save_mode = termios.tcgetattr(self._keyboard_fd)
+            tty.setraw(self._keyboard_fd, termios.TCSANOW)
             try:
                 yield
             finally:
@@ -814,8 +854,7 @@ class Terminal(object):
         """
         Read and return the next keystroke within a given timeout.
 
-        Generally, this should be used inside the :meth:`keystroke_input`
-        context manager.
+        Generally, this should be used inside the :meth:`raw` context manager.
 
         :arg float timeout: Number of seconds to wait for a keystroke before
             returning. When None (default), this method blocks indefinitely.
@@ -831,10 +870,9 @@ class Terminal(object):
         :returns: :class:`~.Keystroke`, which may be empty (``u''``) if
            ``timeout`` is specified and keystroke is not received.
 
-        .. note:: When used without the context manager
-            :meth:`keystroke_input`, :obj:`sys.__stdin__` remains
-            line-buffered, and this function will block until the return key
-            is pressed.
+        .. note:: When used without the context manager :meth:`cbreak`, or
+            :meth:`raw`, :obj:`sys.__stdin__` remains line-buffered, and this
+            function will block until the return key is pressed!
         """
         if timeout is None and self._keyboard_fd is None:
             raise NoKeyboard(

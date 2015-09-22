@@ -57,7 +57,7 @@ def test_char_is_ready_interrupted():
         signal.signal(signal.SIGWINCH, on_resize)
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.keystroke_input(raw=True):
+        with term.raw():
             assert term.keystroke(timeout=1.05) == u''
         os.write(sys.__stdout__.fileno(), b'complete')
         assert got_sigwinch
@@ -100,7 +100,7 @@ def test_char_is_ready_interrupted_nonetype():
         signal.signal(signal.SIGWINCH, on_resize)
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.keystroke_input(raw=True):
+        with term.raw():
             term.keystroke(timeout=1)
         os.write(sys.__stdout__.fileno(), b'complete')
         assert got_sigwinch
@@ -123,16 +123,29 @@ def test_char_is_ready_interrupted_nonetype():
     assert math.floor(time.time() - stime) == 1.0
 
 
-def test_keystroke_input_no_kb():
-    "keystroke_input() should not call tty.setcbreak() without keyboard."
+def test_break_input_no_kb():
+    "cbreak() should not call tty.setcbreak() without keyboard."
     @as_subprocess
     def child():
         with tempfile.NamedTemporaryFile() as stream:
             term = TestTerminal(stream=stream)
             with mock.patch("tty.setcbreak") as mock_setcbreak:
-                with term.keystroke_input():
+                with term.cbreak():
                     assert not mock_setcbreak.called
                 assert term._keyboard_fd is None
+    child()
+
+
+def test_raw_input_no_kb():
+    "raw should not call tty.setraw() without keyboard."
+    @as_subprocess
+    def child():
+        with tempfile.NamedTemporaryFile() as stream:
+            term = TestTerminal(stream=stream)
+            with mock.patch("tty.setraw") as mock_setraw:
+                with term.raw():
+                    assert not mock_setraw.called
+            assert term._keyboard_fd is None
     child()
 
 
@@ -150,19 +163,6 @@ def test_notty_kb_is_None():
     child()
 
 
-def test_raw_input_no_kb():
-    "keystroke_input(raw=True) should not call tty.setraw() without keyboard."
-    @as_subprocess
-    def child():
-        with tempfile.NamedTemporaryFile() as stream:
-            term = TestTerminal(stream=stream)
-            with mock.patch("tty.setraw") as mock_setraw:
-                with term.keystroke_input(raw=True):
-                    assert not mock_setraw.called
-            assert term._keyboard_fd is None
-    child()
-
-
 def test_char_is_ready_no_kb():
     "_char_is_ready() always immediately returns False without a keyboard."
     @as_subprocess
@@ -175,12 +175,12 @@ def test_char_is_ready_no_kb():
     child()
 
 
-def test_keystroke_0s_keystroke_input_noinput():
+def test_keystroke_0s_cbreak_noinput():
     "0-second keystroke without input; '' should be returned."
     @as_subprocess
     def child():
         term = TestTerminal()
-        with term.keystroke_input():
+        with term.cbreak():
             stime = time.time()
             inp = term.keystroke(timeout=0)
             assert (inp == u'')
@@ -188,12 +188,12 @@ def test_keystroke_0s_keystroke_input_noinput():
     child()
 
 
-def test_keystroke_0s_keystroke_input_noinput_nokb():
+def test_keystroke_0s_cbreak_noinput_nokb():
     "0-second keystroke without data in input stream and no keyboard/tty."
     @as_subprocess
     def child():
         term = TestTerminal(stream=six.StringIO())
-        with term.keystroke_input():
+        with term.cbreak():
             stime = time.time()
             inp = term.keystroke(timeout=0)
             assert (inp == u'')
@@ -201,12 +201,12 @@ def test_keystroke_0s_keystroke_input_noinput_nokb():
     child()
 
 
-def test_keystroke_1s_keystroke_input_noinput():
+def test_keystroke_1s_cbreak_noinput():
     "1-second keystroke without input; '' should be returned after ~1 second."
     @as_subprocess
     def child():
         term = TestTerminal()
-        with term.keystroke_input():
+        with term.cbreak():
             stime = time.time()
             inp = term.keystroke(timeout=1)
             assert (inp == u'')
@@ -214,12 +214,12 @@ def test_keystroke_1s_keystroke_input_noinput():
     child()
 
 
-def test_keystroke_1s_keystroke_input_noinput_nokb():
+def test_keystroke_1s_cbreak_noinput_nokb():
     "1-second keystroke without input or keyboard."
     @as_subprocess
     def child():
         term = TestTerminal(stream=six.StringIO())
-        with term.keystroke_input():
+        with term.cbreak:
             stime = time.time()
             inp = term.keystroke(timeout=1)
             assert (inp == u'')
@@ -227,7 +227,7 @@ def test_keystroke_1s_keystroke_input_noinput_nokb():
     child()
 
 
-def test_keystroke_0s_keystroke_input_with_input():
+def test_keystroke_0s_cbreak_with_input():
     "0-second keystroke with input; Keypress should be immediately returned."
     pid, master_fd = pty.fork()
     if pid == 0:
@@ -239,7 +239,7 @@ def test_keystroke_0s_keystroke_input_with_input():
         term = TestTerminal()
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.keystroke_input():
+        with term.cbreak():
             inp = term.keystroke(timeout=0)
             os.write(sys.__stdout__.fileno(), inp.encode('utf-8'))
         if cov is not None:
@@ -260,7 +260,7 @@ def test_keystroke_0s_keystroke_input_with_input():
     assert math.floor(time.time() - stime) == 0.0
 
 
-def test_keystroke_keystroke_input_with_input_slowly():
+def test_keystroke_cbreak_with_input_slowly():
     "0-second keystroke with input; Keypress should be immediately returned."
     pid, master_fd = pty.fork()
     if pid == 0:
@@ -272,7 +272,7 @@ def test_keystroke_keystroke_input_with_input_slowly():
         term = TestTerminal()
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.keystroke_input():
+        with term.cbreak():
             while True:
                 inp = term.keystroke(timeout=0.5)
                 os.write(sys.__stdout__.fileno(), inp.encode('utf-8'))
@@ -302,7 +302,7 @@ def test_keystroke_keystroke_input_with_input_slowly():
     assert math.floor(time.time() - stime) == 0.0
 
 
-def test_keystroke_0s_keystroke_input_multibyte_utf8():
+def test_keystroke_0s_cbreak_multibyte_utf8():
     "0-second keystroke with multibyte utf-8 input; should decode immediately."
     # utf-8 bytes represent "latin capital letter upsilon".
     pid, master_fd = pty.fork()
@@ -314,7 +314,7 @@ def test_keystroke_0s_keystroke_input_multibyte_utf8():
         term = TestTerminal()
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.keystroke_input():
+        with term.cbreak():
             inp = term.keystroke(timeout=0)
             os.write(sys.__stdout__.fileno(), inp.encode('utf-8'))
         if cov is not None:
@@ -347,7 +347,7 @@ def test_keystroke_0s_raw_input_ctrl_c():
             cov = None
         term = TestTerminal()
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
-        with term.keystroke_input(raw=True):
+        with term.raw():
             os.write(sys.__stdout__.fileno(), RECV_SEMAPHORE)
             inp = term.keystroke(timeout=0)
             os.write(sys.__stdout__.fileno(), inp.encode('latin1'))
@@ -370,7 +370,7 @@ def test_keystroke_0s_raw_input_ctrl_c():
     assert math.floor(time.time() - stime) == 0.0
 
 
-def test_keystroke_0s_keystroke_input_sequence():
+def test_keystroke_0s_cbreak_sequence():
     "0-second keystroke with multibyte sequence; should decode immediately."
     pid, master_fd = pty.fork()
     if pid == 0:  # child
@@ -380,7 +380,7 @@ def test_keystroke_0s_keystroke_input_sequence():
             cov = None
         term = TestTerminal()
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.keystroke_input():
+        with term.cbreak():
             inp = term.keystroke(timeout=0)
             os.write(sys.__stdout__.fileno(), inp.name.encode('ascii'))
             sys.stdout.flush()
@@ -400,7 +400,7 @@ def test_keystroke_0s_keystroke_input_sequence():
     assert math.floor(time.time() - stime) == 0.0
 
 
-def test_keystroke_1s_keystroke_input_with_input():
+def test_keystroke_1s_cbreak_with_input():
     "1-second keystroke w/multibyte sequence; should return after ~1 second."
     pid, master_fd = pty.fork()
     if pid == 0:  # child
@@ -410,7 +410,7 @@ def test_keystroke_1s_keystroke_input_with_input():
             cov = None
         term = TestTerminal()
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.keystroke_input():
+        with term.cbreak():
             inp = term.keystroke(timeout=3)
             os.write(sys.__stdout__.fileno(), inp.name.encode('utf-8'))
             sys.stdout.flush()
@@ -432,7 +432,7 @@ def test_keystroke_1s_keystroke_input_with_input():
     assert math.floor(time.time() - stime) == 1.0
 
 
-def test_esc_delay_keystroke_input_035():
+def test_esc_delay_cbreak_035():
     "esc_delay will cause a single ESC (\\x1b) to delay for 0.35."
     pid, master_fd = pty.fork()
     if pid == 0:  # child
@@ -442,7 +442,7 @@ def test_esc_delay_keystroke_input_035():
             cov = None
         term = TestTerminal()
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.keystroke_input():
+        with term.cbreak():
             stime = time.time()
             inp = term.keystroke(timeout=5)
             measured_time = (time.time() - stime) * 100
@@ -467,7 +467,7 @@ def test_esc_delay_keystroke_input_035():
     assert 34 <= int(duration_ms) <= 45, duration_ms
 
 
-def test_esc_delay_keystroke_input_135():
+def test_esc_delay_cbreak_135():
     "esc_delay=1.35 will cause a single ESC (\\x1b) to delay for 1.35."
     pid, master_fd = pty.fork()
     if pid == 0:  # child
@@ -477,7 +477,7 @@ def test_esc_delay_keystroke_input_135():
             cov = None
         term = TestTerminal()
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.keystroke_input():
+        with term.cbreak():
             stime = time.time()
             inp = term.keystroke(timeout=5, esc_delay=1.35)
             measured_time = (time.time() - stime) * 100
@@ -502,7 +502,7 @@ def test_esc_delay_keystroke_input_135():
     assert 134 <= int(duration_ms) <= 145, int(duration_ms)
 
 
-def test_esc_delay_keystroke_input_timout_0():
+def test_esc_delay_cbreak_timout_0():
     """esc_delay still in effect with timeout of 0 ("nonblocking")."""
     pid, master_fd = pty.fork()
     if pid == 0:  # child
@@ -512,7 +512,7 @@ def test_esc_delay_keystroke_input_timout_0():
             cov = None
         term = TestTerminal()
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
-        with term.keystroke_input():
+        with term.cbreak():
             stime = time.time()
             inp = term.keystroke(timeout=0)
             measured_time = (time.time() - stime) * 100

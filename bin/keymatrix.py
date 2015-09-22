@@ -99,7 +99,7 @@ def main():
     gameboard = build_gameboard(term)
     inps = []
 
-    with term.keystroke_input(raw=True), term.keypad(), term.location():
+    with term.raw(), term.keypad(), term.location():
         inp = term.keystroke(timeout=0)
         while inp != chr(3):
             if dirty:
@@ -122,7 +122,7 @@ def main():
                     score, level = add_score(score, 100, level)
             inps.append(inp)
 
-    with term.keystroke_input():
+    with term.cbreak():
         echo(term.move(term.height))
         echo(
             u'{term.clear_eol}Your final score was {score} '

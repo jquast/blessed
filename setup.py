@@ -20,7 +20,7 @@ if sys.version_info < (2, 7):
 
 setuptools.setup(
     name='blessed',
-    version='1.9.5',
+    version='1.7',
     description=('A thin, practical wrapper around terminal coloring, '
                  'styling, positioning, and keyboard input.'),
     long_description=open(join(dirname(__file__),

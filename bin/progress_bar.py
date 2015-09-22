@@ -21,7 +21,7 @@ def main():
         'Terminal does not support hpa (Horizontal position absolute)')
 
     col, offset = 1, 1
-    with term.keystroke_input():
+    with term.cbreak():
         inp = None
         print("press 'X' to stop.")
         sys.stderr.write(term.move(term.height, 0) + u'[')

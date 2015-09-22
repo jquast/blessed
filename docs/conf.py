@@ -91,7 +91,7 @@ copyright = u'2011 Erik Rose, Jeff Quast'
 # built documents.
 #
 # The short X.Y version.
-version = '1.9.5'
+version = '1.7'
 
 # The full version, including alpha/beta/rc tags.
 release = version
