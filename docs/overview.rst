@@ -330,7 +330,7 @@ changes, you may author a callback for SIGWINCH_ signals::
     signal.signal(signal.SIGWINCH, on_resize)
 
     # wait for keypress
-    term.keystroke()
+    term.inkey()
 
 
 Clearing The Screen
@@ -369,7 +369,7 @@ There's also a context manager you can use as a shortcut::
     with term.fullscreen():
         print(term.move_y(term.height // 2) +
               term.center('press any key').rstrip())
-        term.keystroke()
+        term.inkey()
 
 
 Pipe Savvy
@@ -470,14 +470,14 @@ The mode entered using :meth:`~.Terminal.cbreak` is called
 
 :meth:`~.Terminal.raw` is similar to cbreak, but not recommended.
 
-keystroke
-~~~~~~~~~
+inkey
+~~~~~
 
-The method :meth:`~.Terminal.keystroke` combined with cbreak_
+The method :meth:`~.Terminal.inkey` combined with cbreak_
 completes the circle of providing key-at-a-time keyboard input with multibyte
 encoding and awareness of application keys.
 
-:meth:`~.Terminal.keystroke` resolves many issues with terminal input by
+:meth:`~.Terminal.inkey` resolves many issues with terminal input by
 returning a unicode-derived :class:`~.Keystroke` instance.  Its return value
 may be printed, joined with, or compared like any other unicode strings, it
 also provides the special attributes :attr:`~.Keystroke.is_sequence`,
@@ -491,7 +491,7 @@ also provides the special attributes :attr:`~.Keystroke.is_sequence`,
     with term.cbreak():
         val = u''
         while val not in (u'q', u'Q',):
-            val = term.keystroke(timeout=5)
+            val = term.inkey(timeout=5)
             if not val:
                # timeout
                print("It sure is quiet in here ...")
@@ -515,11 +515,11 @@ Its output might appear as::
     got q.
     bye!
 
-A :paramref:`~.Terminal.keystroke.timeout` value of *None* (default) will block
+A :paramref:`~.Terminal.inkey.timeout` value of *None* (default) will block
 forever until a keypress is received. Any other value specifies the length of
 time to poll for input: if no input is received after the given time has
 elapsed, an empty string is returned. A
-:paramref:`~.Terminal.keystroke.timeout` value of *0* is non-blocking.
+:paramref:`~.Terminal.inkey.timeout` value of *0* is non-blocking.
 
 keyboard codes
 ~~~~~~~~~~~~~~

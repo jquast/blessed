@@ -58,7 +58,7 @@ def test_char_is_ready_interrupted():
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.raw():
-            assert term.keystroke(timeout=1.05) == u''
+            assert term.inkey(timeout=1.05) == u''
         os.write(sys.__stdout__.fileno(), b'complete')
         assert got_sigwinch
         if cov is not None:
@@ -101,7 +101,7 @@ def test_char_is_ready_interrupted_nonetype():
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.raw():
-            term.keystroke(timeout=1)
+            term.inkey(timeout=1)
         os.write(sys.__stdout__.fileno(), b'complete')
         assert got_sigwinch
         if cov is not None:
@@ -182,7 +182,7 @@ def test_keystroke_0s_cbreak_noinput():
         term = TestTerminal()
         with term.cbreak():
             stime = time.time()
-            inp = term.keystroke(timeout=0)
+            inp = term.inkey(timeout=0)
             assert (inp == u'')
             assert (math.floor(time.time() - stime) == 0.0)
     child()
@@ -195,7 +195,7 @@ def test_keystroke_0s_cbreak_noinput_nokb():
         term = TestTerminal(stream=six.StringIO())
         with term.cbreak():
             stime = time.time()
-            inp = term.keystroke(timeout=0)
+            inp = term.inkey(timeout=0)
             assert (inp == u'')
             assert (math.floor(time.time() - stime) == 0.0)
     child()
@@ -208,7 +208,7 @@ def test_keystroke_1s_cbreak_noinput():
         term = TestTerminal()
         with term.cbreak():
             stime = time.time()
-            inp = term.keystroke(timeout=1)
+            inp = term.inkey(timeout=1)
             assert (inp == u'')
             assert (math.floor(time.time() - stime) == 1.0)
     child()
@@ -221,7 +221,7 @@ def test_keystroke_1s_cbreak_noinput_nokb():
         term = TestTerminal(stream=six.StringIO())
         with term.cbreak:
             stime = time.time()
-            inp = term.keystroke(timeout=1)
+            inp = term.inkey(timeout=1)
             assert (inp == u'')
             assert (math.floor(time.time() - stime) == 1.0)
     child()
@@ -240,7 +240,7 @@ def test_keystroke_0s_cbreak_with_input():
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
-            inp = term.keystroke(timeout=0)
+            inp = term.inkey(timeout=0)
             os.write(sys.__stdout__.fileno(), inp.encode('utf-8'))
         if cov is not None:
             cov.stop()
@@ -274,7 +274,7 @@ def test_keystroke_cbreak_with_input_slowly():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             while True:
-                inp = term.keystroke(timeout=0.5)
+                inp = term.inkey(timeout=0.5)
                 os.write(sys.__stdout__.fileno(), inp.encode('utf-8'))
                 if inp == 'X':
                     break
@@ -315,7 +315,7 @@ def test_keystroke_0s_cbreak_multibyte_utf8():
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
-            inp = term.keystroke(timeout=0)
+            inp = term.inkey(timeout=0)
             os.write(sys.__stdout__.fileno(), inp.encode('utf-8'))
         if cov is not None:
             cov.stop()
@@ -349,7 +349,7 @@ def test_keystroke_0s_raw_input_ctrl_c():
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         with term.raw():
             os.write(sys.__stdout__.fileno(), RECV_SEMAPHORE)
-            inp = term.keystroke(timeout=0)
+            inp = term.inkey(timeout=0)
             os.write(sys.__stdout__.fileno(), inp.encode('latin1'))
         if cov is not None:
             cov.stop()
@@ -381,7 +381,7 @@ def test_keystroke_0s_cbreak_sequence():
         term = TestTerminal()
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
-            inp = term.keystroke(timeout=0)
+            inp = term.inkey(timeout=0)
             os.write(sys.__stdout__.fileno(), inp.name.encode('ascii'))
             sys.stdout.flush()
         if cov is not None:
@@ -411,7 +411,7 @@ def test_keystroke_1s_cbreak_with_input():
         term = TestTerminal()
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
-            inp = term.keystroke(timeout=3)
+            inp = term.inkey(timeout=3)
             os.write(sys.__stdout__.fileno(), inp.name.encode('utf-8'))
             sys.stdout.flush()
         if cov is not None:
@@ -444,7 +444,7 @@ def test_esc_delay_cbreak_035():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            inp = term.keystroke(timeout=5)
+            inp = term.inkey(timeout=5)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
                 '%s %i' % (inp.name, measured_time,)).encode('ascii'))
@@ -479,7 +479,7 @@ def test_esc_delay_cbreak_135():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            inp = term.keystroke(timeout=5, esc_delay=1.35)
+            inp = term.inkey(timeout=5, esc_delay=1.35)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
                 '%s %i' % (inp.name, measured_time,)).encode('ascii'))
@@ -514,7 +514,7 @@ def test_esc_delay_cbreak_timout_0():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            inp = term.keystroke(timeout=0)
+            inp = term.inkey(timeout=0)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
                 '%s %i' % (inp.name, measured_time,)).encode('ascii'))

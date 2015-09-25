@@ -67,7 +67,7 @@ def readline(term, width=20):
     """A rudimentary readline implementation."""
     text = u''
     while True:
-        inp = term.keystroke()
+        inp = term.inkey()
         if inp.code == term.KEY_ENTER:
             break
         elif inp.code == term.KEY_ESCAPE or inp == chr(3):
@@ -219,7 +219,7 @@ def main():
         inp = None
         while True:
             echo_yx(csr, term.reverse(screen.get((csr.y, csr.x), u' ')))
-            inp = term.keystroke()
+            inp = term.inkey()
 
             if inp == chr(3):
                 # ^c exits

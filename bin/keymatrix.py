@@ -100,12 +100,12 @@ def main():
     inps = []
 
     with term.raw(), term.keypad(), term.location():
-        inp = term.keystroke(timeout=0)
+        inp = term.inkey(timeout=0)
         while inp != chr(3):
             if dirty:
                 refresh(term, gameboard, level, score, inps)
                 dirty = False
-            inp = term.keystroke(timeout=5.0)
+            inp = term.inkey(timeout=5.0)
             dirty = True
             if (inp.is_sequence and
                     inp.name in gameboard and
@@ -138,7 +138,7 @@ def main():
                 hit_highbit=hit_highbit,
                 hit_unicode=hit_unicode)
         )
-        term.keystroke()
+        term.inkey()
 
 if __name__ == '__main__':
     main()

@@ -236,7 +236,7 @@ def main():
 
             # wait for keyboard input, which may indicate
             # a new direction (up/down/left/right)
-            inp = term.keystroke(timeout=speed)
+            inp = term.inkey(timeout=speed)
 
             # discover new direction, given keyboard input and/or bearing.
             nxt_direction = next_bearing(term, inp.code, bearing)

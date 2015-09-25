@@ -40,7 +40,7 @@ def main():
             sys.stderr.write(term.move_x(col))
             sys.stderr.write(u'|\b')
             sys.stderr.flush()
-            inp = term.keystroke(0.04)
+            inp = term.inkey(0.04)
     print()
 
 if __name__ == '__main__':

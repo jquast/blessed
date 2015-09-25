@@ -40,7 +40,7 @@ Coding with *Blessed* looks like this... ::
         print(t.center(t.blink('press any key to continue.')))
 
     with t.cbreak():
-        inp = t.keystroke()
+        inp = t.inkey()
     print('You pressed ' + repr(inp))
 
 
