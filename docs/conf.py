@@ -1,6 +1,7 @@
 # std imports
 import sys
 import os
+import json
 
 # 3rd-party
 import sphinx_rtd_theme
@@ -13,11 +14,9 @@ from docutils.utils import get_source_line
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-here = os.path.dirname(__file__)
-#sys.path.insert(0, os.path.abspath(os.path.join(here, os.pardir)))
+HERE = os.path.dirname(__file__)
 sys.path.insert(0, os.path.abspath('sphinxext'))  # for github.py
-
-github_project_url = "https://github.com/erikrose/blessed"
+github_project_url = "https://github.com/jquast/blessed"
 
 
 # ! Monkey Patching!
@@ -91,7 +90,9 @@ copyright = u'2011 Erik Rose, Jeff Quast'
 # built documents.
 #
 # The short X.Y version.
-version = '1.7'
+version = json.load(
+    open(os.path.join(HERE, os.pardir, 'version.json'), 'r')
+)['version']
 
 # The full version, including alpha/beta/rc tags.
 release = version

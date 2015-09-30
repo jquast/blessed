@@ -1,32 +1,40 @@
 #!/usr/bin/env python
-import sys
-from os.path import dirname, join
-
+import os
 import setuptools
-import setuptools.command.develop
-import setuptools.command.test
 
-kwargs = {
-    'install_requires': [
-        'wcwidth>=0.1.4',
-        'six>=1.9.0',
-    ]
-}
+def _get_install_requires(fname):
+    import sys
+    result = [req_line.strip() for req_line in open(fname)
+              if req_line.strip() and not req_line.startswith('#')]
 
-if sys.version_info < (2, 7):
-    # we make use of collections.ordereddict: for python 2.6 we require the
-    # assistance of the 'orderddict' module which backports the same.
-    kwargs['install_requires'].extend(['ordereddict>=1.1'])
+    # support python2.6 by using backport of 'orderedict'
+    if sys.version_info < (2, 7):
+        result.append('ordereddict==1.1')
+
+    return result
+
+def _get_version(fname):
+    import json
+    return json.load(open(fname, 'r'))['version']
+
+def _get_long_description(fname):
+    import codecs
+    return codecs.open(fname, 'r', 'utf8').read()
+
+HERE = os.path.dirname(__file__)
 
 setuptools.setup(
     name='blessed',
-    version='1.7',
-    description=('A thin, practical wrapper around terminal coloring, '
-                 'styling, positioning, and keyboard input.'),
-    long_description=open(join(dirname(__file__),
-                               'docs', 'intro.rst')).read(),
-    author='Erik Rose, Jeff Quast',
-    author_email='erikrose@grinchcentral.com',
+    version=_get_version(
+        fname=os.path.join(HERE, 'version.json')),
+    install_requires=_get_install_requires(
+        fname=os.path.join(HERE, 'requirements.txt')),
+    long_description=_get_long_description(
+        fname=os.path.join(HERE, 'docs', 'intro.rst')),
+    description=('A thin, practical wrapper around terminal styling, '
+                 'screen positioning, and keyboard input.'),
+    author='Jeff Quast, Erik Rose',
+    author_email='contact@jeffquast.com',
     license='MIT',
     packages=['blessed', 'blessed.tests'],
     url='https://github.com/erikrose/blessed',
@@ -55,5 +63,4 @@ setuptools.setup(
     keywords=['terminal', 'sequences', 'tty', 'curses', 'ncurses',
               'formatting', 'style', 'color', 'console', 'keyboard',
               'ansi', 'xterm'],
-    **kwargs
 )
