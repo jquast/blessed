@@ -7,9 +7,6 @@ ignore-patterns:
   - ^build/
   # ignore these, their quality does not so much matter.
   - ^blessed/tests/
-  - ^tools/
-  # EK doesn't want setup.py checked
-  - ^setup.py
 
 test-warnings: true
 
