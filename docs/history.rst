@@ -43,7 +43,6 @@ Version History
         (of friendly names ``move_x``, ``move_y``, ``hide_cursor``,
         and ``normal_hide``) to work on tmux(1) or screen(1) by emulating
         support by proxy if they are not offered by the termcap database.
-      - pypy is now a supported python platform implementation.
       - enhanced sphinx documentation.
 
     **testing improvements**:

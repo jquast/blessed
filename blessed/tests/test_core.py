@@ -252,8 +252,6 @@ def test_setupterm_invalid_has_no_styling():
     child()
 
 
-@pytest.mark.skipif(platform.python_implementation() == 'PyPy',
-                    reason='PyPy freezes')
 def test_missing_ordereddict_uses_module(monkeypatch):
     "ordereddict module is imported when without collections.OrderedDict."
     import blessed.keyboard
@@ -277,8 +275,6 @@ def test_missing_ordereddict_uses_module(monkeypatch):
         assert platform.python_version_tuple() < ('2', '7')  # reached by py2.6
 
 
-@pytest.mark.skipif(platform.python_implementation() == 'PyPy',
-                    reason='PyPy freezes')
 def test_python3_2_raises_exception(monkeypatch):
     "Test python version 3.0 through 3.2 raises an exception."
     import blessed
