@@ -10,7 +10,7 @@ We welcome contributions via GitHub pull requests:
 Developing
 ----------
 
-Install git, Python 2 and 3, pip, and tox.
+Install git, Python 2 and 3, and pip.
 
 Then, from the blessed code folder::
 
@@ -30,9 +30,9 @@ Test Coverage
 ~~~~~~~~~~~~~
 
 Blessed has 99% code coverage, and we'd like to keep it that way, as
-terminals are fiddly beasts. Thus, when you contribute a new feature, make sure
-it is covered by tests. Likewise, a bug fix should include a test demonstrating
-the bug.
+terminals are fiddly beasts. Thus, when you contribute a new feature, make
+sure it is covered by tests. Likewise, a bug fix should include a test
+demonstrating the bug.
 
 Style and Static Analysis
 ~~~~~~~~~~~~~~~~~~~~~~~~~
