@@ -20,6 +20,7 @@ try:
     import termios
     import fcntl
     import tty
+    HAS_TTY = True
 except ImportError:
     _TTY_METHODS = ('setraw', 'cbreak', 'kbhit', 'height', 'width')
     _MSG_NOSUPPORT = (
@@ -29,8 +30,6 @@ except ImportError:
         "them: {1}".format(sys.platform.lower(), ', '.join(_TTY_METHODS)))
     warnings.warn(_MSG_NOSUPPORT)
     HAS_TTY = False
-else:
-    HAS_TTY = True
 
 try:
     InterruptedError
@@ -218,8 +217,8 @@ class Terminal(object):
                 self._keyboard_decoder = codecs.getincrementaldecoder(
                     self._encoding)()
             except LookupError as err:
-                warnings.warn('LookupError: %s, fallback to ASCII for '
-                              'keyboard.' % (err,))
+                warnings.warn('LookupError: {0}, fallback to ASCII for '
+                              'keyboard.'.format(err))
                 self._encoding = 'ascii'
                 self._keyboard_decoder = codecs.getincrementaldecoder(
                     self._encoding)()
@@ -282,16 +281,16 @@ class Terminal(object):
         return self._height_and_width().ws_col
 
     @staticmethod
-    def _winsize(fdesc):
+    def _winsize(fd):
         """
-        Return named tuple describing size of the terminal by ``fdesc``.
+        Return named tuple describing size of the terminal by ``fd``.
 
         If the given platform does not have modules :mod:`termios`,
         :mod:`fcntl`, or :mod:`tty`, window size of 80 columns by 24
         rows is always returned.
 
-        :param int fdesc: file descriptor queries for its window size.
-        :raises IOError: the file descriptor ``fdesc`` is not a terminal.
+        :param int fd: file descriptor queries for its window size.
+        :raises IOError: the file descriptor ``fd`` is not a terminal.
         :rtype: WINSZ
 
         WINSZ is a :class:`collections.namedtuple` instance, whose structure
@@ -304,7 +303,7 @@ class Terminal(object):
             - ``ws_ypixel``: height of terminal by pixels (not accurate).
         """
         if HAS_TTY:
-            data = fcntl.ioctl(fdesc, termios.TIOCGWINSZ, WINSZ._BUF)
+            data = fcntl.ioctl(fd, termios.TIOCGWINSZ, WINSZ._BUF)
             return WINSZ(*struct.unpack(WINSZ._FMT, data))
         return WINSZ(ws_row=24, ws_col=80, ws_xpixel=0, ws_ypixel=0)
 
@@ -328,12 +327,12 @@ class Terminal(object):
             - ``ws_ypixel``: height of terminal by pixels (not accurate).
 
         """
-        for fdesc in (self._init_descriptor, sys.__stdout__):
+        for fd in (self._init_descriptor, sys.__stdout__):
             # pylint: disable=pointless-except
             #         Except doesn't do anything
             try:
-                if fdesc is not None:
-                    return self._winsize(fdesc)
+                if fd is not None:
+                    return self._winsize(fd)
             except IOError:
                 pass
 
@@ -668,7 +667,7 @@ class Terminal(object):
 
         return lines
 
-    def _next_char(self):
+    def getch(self):
         """
         Read, decode, and return the next byte from the keyboard stream.
 
@@ -676,10 +675,10 @@ class Terminal(object):
         :returns: a single unicode character, or ``u''`` if a multi-byte
             sequence has not yet been fully received.
 
-        This method supports :meth:`keystroke`, reading only one byte from
+        This method name and behavior mimics curses ``getch(void)``, and is
+        supports supports :meth:`inkey`, reading only one byte from
         the keyboard string at a time. This method should always return
-        without blocking if called when :meth:`_char_is_ready` returns
-        True.
+        without blocking if called after :meth:`kbhit` has returned True.
 
         Implementors of alternate input stream methods should override
         this method.
@@ -688,12 +687,13 @@ class Terminal(object):
         byte = os.read(self._keyboard_fd, 1)
         return self._keyboard_decoder.decode(byte, final=False)
 
-    def _char_is_ready(self, timeout=None):
+    def kbhit(self, timeout=None):
         """
-        Return whether a keypress has been detected on the keyboard
+        Return whether a keypress has been detected on the keyboard.
 
-        This method is used by method :meth:`keystroke` to determine if
-        a byte may be read using method :meth:`_next_char` without blocking.
+        This method is used by :meth:`inkey` to determine if a byte may
+        be read using :meth:`getch` without blocking.  The standard
+        implementation simply uses the :func:`select.select` call on stdin.
 
         :arg float timeout: When ``timeout`` is 0, this call is
             non-blocking, otherwise blocking indefinitely until keypress
@@ -702,7 +702,7 @@ class Terminal(object):
             elapsed (float).
         :rtype: bool
         :returns: True if a keypress is awaiting to be read on the keyboard
-            attached to this terminal. If input is not a terminal, False is
+            attached to this terminal.  When input is not a terminal, False is
             always returned.
         """
         stime = time.time()
@@ -797,16 +797,18 @@ class Terminal(object):
         generating a signal.
 
         For output, the newline ``\n`` is not sufficient enough to return
-        the carriage, **requiring carriage return displayed explicitly by
-        your program**::
+        the carriage, **requiring ``\r`` printed explicitly by your
+        program**.
 
             >>> from __future__ import print_function
             >>> with term.raw():
-            ...    print(repr('norml'))
-            ...    print(repr('CR LF'), end='\r\n')
+            ...    print(norml)
+            ...    print(CR LF, end='\r\n')
+            ...    print(col0, end='\r\n')
             ...
-            'norml'
-                   'CR LF'
+            norml
+                   CR LF
+            col0
             >>>
 
         Notice that the 'CR' began at the next line without the implicit
@@ -850,30 +852,38 @@ class Terminal(object):
         finally:
             self.stream.write(self.rmkx)
 
-    def keystroke(self, timeout=None, esc_delay=0.35):
+    def inkey(self, timeout=None, esc_delay=0.35, **_kwargs):
         """
-        Read and return the next keystroke within a given timeout.
+        Read and return the next keyboard event within given timeout.
 
         Generally, this should be used inside the :meth:`raw` context manager.
 
         :arg float timeout: Number of seconds to wait for a keystroke before
-            returning. When None (default), this method blocks indefinitely.
-        :arg float esc_delay: To distinguish between ``KEY_ESCAPE`` and
-           sequences beginning with escape, the parameter ``esc_delay``
-           specifies the amount of time after receiving the escape character
+            returning.  When ``None`` (default), this method may block
+            indefinitely.
+        :arg float esc_delay: To distinguish between the keystroke of
+           ``KEY_ESCAPE``, and sequences beginning with escape, the parameter
+           ``esc_delay`` specifies the amount of time after receiving escape
            (``chr(27)``) to seek for the completion of an application key
-           before returning a :class:`~.Keystroke` for ``KEY_ESCAPE``.
+           before returning a :class:`~.Keystroke` instance for
+           ``KEY_ESCAPE``.
         :rtype: :class:`~.Keystroke`.
+        :returns: :class:`~.Keystroke`, which may be empty (``u''``) if
+           ``timeout`` is specified and keystroke is not received.
         :raises NoKeyboard: The :attr:`stream` is not a terminal, and
             ``timeout`` is None, which would cause the program to hang
             forever.
-        :returns: :class:`~.Keystroke`, which may be empty (``u''``) if
-           ``timeout`` is specified and keystroke is not received.
 
         .. note:: When used without the context manager :meth:`cbreak`, or
             :meth:`raw`, :obj:`sys.__stdin__` remains line-buffered, and this
             function will block until the return key is pressed!
         """
+        if _kwargs.pop('_intr_continue', None) is not None:
+            warnings.warn('keyword argument _intr_continue deprecated, '
+                          'since 1.9.6 it is as though value is always True.')
+        if _kwargs:
+            raise TypeError('inkey() got unexpected keyword arguments {!r}'
+                            .format(_kwargs))
         if timeout is None and self._keyboard_fd is None:
             raise NoKeyboard(
                 'Waiting for a keystroke on a terminal with no keyboard '
@@ -885,7 +895,7 @@ class Terminal(object):
             Return time remaining since ``stime`` before given ``timeout``.
 
             This function assists determining the value of ``timeout`` for
-            class method :meth:`_char_is_ready`.
+            class method :meth:`kbhit`.
 
             :arg float stime: starting time for measurement
             :arg float timeout: timeout period, may be set to None to
@@ -911,35 +921,34 @@ class Terminal(object):
             ucs += self._keyboard_buf.pop()
 
         # receive all immediately available bytes
-        while self._char_is_ready(timeout=0):
-            ucs += self._next_char()
+        while self.kbhit(timeout=0):
+            ucs += self.getch()
 
         # decode keystroke, if any
-        keystroke = resolve(text=ucs)
+        ks = resolve(text=ucs)
 
         # so long as the most immediately received or buffered keystroke is
         # incomplete, (which may be a multibyte encoding), block until until
         # one is received.
-        while (not keystroke and
-               self._char_is_ready(timeout=time_left(stime, timeout))):
-            ucs += self._next_char()
-            keystroke = resolve(text=ucs)
+        while not ks and self.kbhit(timeout=time_left(stime, timeout)):
+            ucs += self.getch()
+            ks = resolve(text=ucs)
 
         # handle escape key (KEY_ESCAPE) vs. escape sequence (which begins
         # with KEY_ESCAPE, \x1b[, \x1bO, or \x1b?), up to esc_delay when
         # received. This is not optimal, but causes least delay when
         # (currently unhandled, and rare) "meta sends escape" is used,
         # or when an unsupported sequence is sent.
-        if keystroke.code == self.KEY_ESCAPE:
+        if ks.code == self.KEY_ESCAPE:
             esctime = time.time()
-            while (keystroke.code == self.KEY_ESCAPE and
-                   self._char_is_ready(timeout=time_left(esctime, esc_delay))):
-                ucs += self._next_char()
-                keystroke = resolve(text=ucs)
+            while (ks.code == self.KEY_ESCAPE and
+                   self.kbhit(timeout=time_left(esctime, esc_delay))):
+                ucs += self.getch()
+                ks = resolve(text=ucs)
 
         # buffer any remaining text received
-        self._keyboard_buf.extendleft(ucs[len(keystroke):])
-        return keystroke
+        self._keyboard_buf.extendleft(ucs[len(ks):])
+        return ks
 
 
 class NoKeyboard(Exception):

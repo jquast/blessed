@@ -36,8 +36,8 @@ if sys.version_info[0] == 3:
     unichr = chr
 
 
-def test_char_is_ready_interrupted():
-    "_char_is_ready() should not be interrupted with a signal handler."
+def test_kbhit_interrupted():
+    "kbhit() should not be interrupted with a signal handler."
     pid, master_fd = pty.fork()
     if pid == 0:
         try:
@@ -79,8 +79,8 @@ def test_char_is_ready_interrupted():
     assert math.floor(time.time() - stime) == 1.0
 
 
-def test_char_is_ready_interrupted_nonetype():
-    "_char_is_ready() should also allow interruption with timeout of None."
+def test_kbhit_interrupted_nonetype():
+    "kbhit() should also allow interruption with timeout of None."
     pid, master_fd = pty.fork()
     if pid == 0:
         try:
@@ -163,14 +163,14 @@ def test_notty_kb_is_None():
     child()
 
 
-def test_char_is_ready_no_kb():
-    "_char_is_ready() always immediately returns False without a keyboard."
+def test_kbhit_no_kb():
+    "kbhit() always immediately returns False without a keyboard."
     @as_subprocess
     def child():
         term = TestTerminal(stream=six.StringIO())
         stime = time.time()
         assert term._keyboard_fd is None
-        assert not term._char_is_ready(timeout=1.1)
+        assert not term.kbhit(timeout=1.1)
         assert math.floor(time.time() - stime) == 1.0
     child()
 
@@ -219,7 +219,7 @@ def test_keystroke_1s_cbreak_noinput_nokb():
     @as_subprocess
     def child():
         term = TestTerminal(stream=six.StringIO())
-        with term.cbreak:
+        with term.cbreak():
             stime = time.time()
             inp = term.inkey(timeout=1)
             assert (inp == u'')
