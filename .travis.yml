@@ -1,35 +1,40 @@
 language: python
-# http://blog.travis-ci.com/2014-12-17-faster-builds-with-container-based-infrastructure/
 sudo: false
 
-env:
-  - TOXENV=py26
-  - TOXENV=py27
-  - TOXENV=py33
-  - TOXENV=pypy
-  - TOXENV=py34
-
-install:
-  - pip install -q tox 
-
-  # for python versions <27, we must install ordereddict
-  # mimicking the same dynamically generated 'requires='
-  # in setup.py
-  - if [[ "${TOXENV}" == "py25" ]] || [[ "${TOXENV}" == "py26" ]]; then
-        pip install -q ordereddict;
-    fi
-
-  # for python version =27, install coverage, coveralls.
-  # (coverage only measured and published for one version)
-  - if [[ "${TOXENV}" == "py34" ]]; then
-        pip install -q coverage coveralls;
-    fi
-
+before_script:
+  - pip install -q tox
 script:
-  - if [[ "${TOXENV}" == "py27" ]]; then tox -e sa; fi
-  - if [[ "${TOXENV}" == "py34" ]]; then tox -e docs; fi
-  - tox -e $TOXENV
+  - tox
+
+matrix:
+  fast_finish: true
+  allow_failures:
+    - env: TOXENV=docs
+  include:
+    - env: TOXENV=sa
+    - env: TOXENV=docs
+    - python: 2.6
+      env: TOXENV=py26
+    - python: 2.7
+      env: TOXENV=py27
+    - python: 3.3
+      env: TOXENV=py33
+    - python: 3.4
+      env: TOXENV=py34
+    - python: 3.5
+      env: TOXENV=py35
+    - python: pypy
+      env: TOXENV=pypy
 
 notifications:
   email:
-    - contact@jeffquast.com
+    recipients:
+      - contact@jeffquast.com
+    on_success: change
+    on_failure: change
+  irc:
+    channels:
+       - "irc.efnet.org#1984"
+    skip_join: true
+    on_success: change
+    on_failure: change
