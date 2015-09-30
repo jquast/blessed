@@ -67,8 +67,7 @@ pyroma:
     run: true
 
 vulture:
-    # this tool does a good job of finding unused code, which isn't terribly
-    # useful from an API perspective, disable.
+    # this tool does a good job of finding unused code.
     run: false
 
 # vim: noai:ts=4:sw=4
