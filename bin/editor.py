@@ -22,7 +22,6 @@ any serious editor would make liberal use of special modes.
 from __future__ import division, print_function
 import collections
 import functools
-import string
 
 from blessed import Terminal
 
