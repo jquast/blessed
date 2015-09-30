@@ -1,14 +1,14 @@
-.. image:: https://img.shields.io/travis/erikrose/blessed.svg
+.. image:: https://img.shields.io/travis/jquast/blessed.svg
     :alt: Travis Continous Integration
-    :target: https://travis-ci.org/erikrose/blessed/
+    :target: https://travis-ci.org/jquast/blessed/
 
 .. image:: https://img.shields.io/teamcity/http/teamcity-master.pexpect.org/s/Blessed_BuildHead.png
     :alt: TeamCity Build status
     :target: https://teamcity-master.pexpect.org/viewType.html?buildTypeId=Blessed_BuildHead&branch_Blessed=%3Cdefault%3E&tab=buildTypeStatusDiv
 
-.. image:: https://coveralls.io/repos/erikrose/blessed/badge.png?branch=master
+.. image:: https://coveralls.io/repos/jquast/blessed/badge.png?branch=master
     :alt: Coveralls Code Coverage
-    :target: https://coveralls.io/r/erikrose/blessed?branch=master
+    :target: https://coveralls.io/r/jquast/blessed?branch=master
 
 .. image:: https://img.shields.io/pypi/v/blessed.svg
     :alt: Latest Version
@@ -75,7 +75,7 @@ Blessed **does not** provide...
 * Windows command prompt support.  A PDCurses_ build of python for windows
   provides only partial support at this time -- there are plans to merge with
   the ansi_ module in concert with colorama_ to resolve this.  `Patches welcome
-  <https://github.com/erikrose/blessed/issues/21>`_!
+  <https://github.com/jquast/blessed/issues/21>`_!
 
 
 Before And After
@@ -151,7 +151,7 @@ License
 
 Blessed is under the MIT License. See the LICENSE file.
 
-.. _`issue tracker`: https://github.com/erikrose/blessed/issues/
+.. _`issue tracker`: https://github.com/jquast/blessed/issues/
 .. _curses: https://docs.python.org/3/library/curses.html
 .. _tigetstr: http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man3/tigetstr.3
 .. _tparm: http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man3/tparm.3
