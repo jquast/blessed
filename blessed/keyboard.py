@@ -348,4 +348,4 @@ CURSES_KEYCODE_OVERRIDE_MIXIN = (
     ('KEY_BEGIN', curses.KEY_BEG),
 )
 
-__all__ = ['Keystroke', 'get_keyboard_codes', 'get_keyboard_sequences']
+__all__ = ('Keystroke', 'get_keyboard_codes', 'get_keyboard_sequences',)

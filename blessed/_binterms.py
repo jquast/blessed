@@ -875,4 +875,4 @@ BINTERM_UNSUPPORTED_MSG = (
     u"Terminal kind {0!r} contains binary-packed capabilities, blessed "
     u"is likely to fail to measure the length of its sequences.")
 
-__all__ = ['BINARY_TERMINALS', 'BINTERM_UNSUPPORTED_MSG']
+__all__ = ('BINARY_TERMINALS', 'BINTERM_UNSUPPORTED_MSG',)

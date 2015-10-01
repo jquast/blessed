@@ -28,7 +28,7 @@ import six
 def test_export_only_Terminal():
     "Ensure only Terminal instance is exported for import * statements."
     import blessed
-    assert blessed.__all__ == ['Terminal']
+    assert blessed.__all__ == ('Terminal',)
 
 
 def test_null_location(all_terms):
@@ -434,7 +434,9 @@ def test_win32_missing_tty_modules(monkeypatch):
             imp.reload(blessed.terminal)
             assert not blessed.terminal.HAS_TTY
             term = blessed.terminal.Terminal('ansi')
-            assert term.height == 24
+            # https://en.wikipedia.org/wiki/VGA-compatible_text_mode
+            # see section '#PC_common_text_modes'
+            assert term.height == 25
             assert term.width == 80
 
         finally:

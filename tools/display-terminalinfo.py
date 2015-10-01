@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-""" Display known information about our terminal. """
+"""Display known information about our terminal."""
+# pylint: disable=invalid-name
+#         Invalid module name "display-terminalinfo"
 from __future__ import print_function
 import termios
 import locale
@@ -94,11 +96,11 @@ CTLCHAR_INDEX = {
 
 
 def display_bitmask(kind, bitmap, value):
-    """ Display all matching bitmask values for ``value`` given ``bitmap``. """
+    """Display all matching bitmask values for ``value`` given ``bitmap``."""
     col1_width = max(map(len, list(bitmap.keys()) + [kind]))
     col2_width = 7
-    FMT = '{name:>{col1_width}} {value:>{col2_width}}   {description}'
-    print(FMT.format(name=kind,
+    fmt = '{name:>{col1_width}} {value:>{col2_width}}   {description}'
+    print(fmt.format(name=kind,
                      value='Value',
                      description='Description',
                      col1_width=col1_width,
@@ -112,7 +114,7 @@ def display_bitmask(kind, bitmap, value):
             bit_val = 'on' if bool(value & bitmask) else 'off'
         except AttributeError:
             bit_val = 'undef'
-        print(FMT.format(name=flag_name,
+        print(fmt.format(name=flag_name,
                          value=bit_val,
                          description=description,
                          col1_width=col1_width,
@@ -120,14 +122,14 @@ def display_bitmask(kind, bitmap, value):
     print()
 
 
-def display_ctl_chars(index, cc):
-    """ Display all control character indicies, names, and values. """
+def display_ctl_chars(index, ctlc):
+    """Display all control character indicies, names, and values."""
     title = 'Special Character'
     col1_width = len(title)
     col2_width = max(map(len, index.values()))
-    FMT = '{idx:<{col1_width}}   {name:<{col2_width}} {value}'
+    fmt = '{idx:<{col1_width}}   {name:<{col2_width}} {value}'
     print('Special line Characters'.center(40).rstrip())
-    print(FMT.format(idx='Index',
+    print(fmt.format(idx='Index',
                      name='Name',
                      value='Value',
                      col1_width=col1_width,
@@ -138,14 +140,14 @@ def display_ctl_chars(index, cc):
     for index_name, name in index.items():
         try:
             index = getattr(termios, index_name)
-            value = cc[index]
+            value = ctlc[index]
             if value == b'\xff':
                 value = '_POSIX_VDISABLE'
             else:
                 value = repr(value)
         except AttributeError:
             value = 'undef'
-        print(FMT.format(idx=index_name,
+        print(fmt.format(idx=index_name,
                          name=name,
                          value=value,
                          col1_width=col1_width,
@@ -154,9 +156,10 @@ def display_ctl_chars(index, cc):
 
 
 def display_conf(kind, names, getter):
+    """Helper displays results of os.pathconf_names values."""
     col1_width = max(map(len, names))
-    FMT = '{name:>{col1_width}}   {value}'
-    print(FMT.format(name=kind,
+    fmt = '{name:>{col1_width}}   {value}'
+    print(fmt.format(name=kind,
                      value='value',
                      col1_width=col1_width))
     print('{0} {1}'.format('-' * col1_width, '-' * 27))
@@ -165,11 +168,12 @@ def display_conf(kind, names, getter):
             value = getter(name)
         except OSError as err:
             value = err
-        print(FMT.format(name=name, value=value, col1_width=col1_width))
+        print(fmt.format(name=name, value=value, col1_width=col1_width))
     print()
 
 
 def main():
+    """Program entry point."""
     fd = sys.stdin.fileno()
     locale.setlocale(locale.LC_ALL, '')
     encoding = locale.getpreferredencoding()
@@ -182,8 +186,9 @@ def main():
                  getter=lambda name: os.fpathconf(fd, name))
 
     try:
-        (iflag, oflag, cflag, lflag, ispeed, ospeed, cc
-         ) = termios.tcgetattr(fd)
+        (iflag, oflag, cflag, lflag,
+         _, _,  # input / output speed (bps macros)
+         ctlc) = termios.tcgetattr(fd)
     except termios.error as err:
         print('stdin is not a typewriter: {0}'.format(err))
     else:
@@ -200,7 +205,7 @@ def main():
                         bitmap=BITMAP_LFLAG,
                         value=lflag)
         display_ctl_chars(index=CTLCHAR_INDEX,
-                          cc=cc)
+                          ctlc=ctlc)
         print('os.ttyname({0}) => {1}'.format(fd, os.ttyname(fd)))
         print('os.ctermid() => {0}'.format(os.ttyname(fd)))
 

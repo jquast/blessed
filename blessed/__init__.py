@@ -15,4 +15,4 @@ if ('3', '0', '0') <= _platform.python_version_tuple() < ('3', '2', '2+'):
     raise ImportError('Blessed needs Python 3.2.3 or greater for Python 3 '
                       'support due to http://bugs.python.org/issue10570.')
 
-__all__ = ['Terminal']
+__all__ = ('Terminal',)

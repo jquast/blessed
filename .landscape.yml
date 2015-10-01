@@ -1,0 +1,83 @@
+inherits:
+    - strictness_veryhigh
+
+ignore-patterns:
+    - (^|/)\..+
+    - ^docs/
+    - ^build/
+    # ignore these, their quality does not so much matter.
+    - ^blessed/tests/
+
+test-warnings: true
+
+output-format: grouped
+
+dodgy:
+    # Looks at Python code to search for things which look "dodgy"
+    # such as passwords or git conflict artifacts
+    run: true
+
+pyflakes:
+    # preferring 'frosted' instead (a fork of)
+    run: false
+
+frosted:
+    # static analysis, pyflakes improved?
+    #
+    run: true
+    disable:
+        # Terminal imported but unused (false)
+        - 'E101'
+
+mccabe:
+    # complexity checking.  We know of only one offense of the
+    # default of 10, which is Terminal.inkey() at exactly 10.
+    # It is not easily avoided, likely removing deprecation
+    # warnings in a future release will help reduce it.
+    run: false
+    options:
+        max-complexity: 11
+
+pep257:
+    # docstring checking
+    run: true
+    disable:
+        # 1 blank line required before class docstring
+        - 'D203'
+        # 1 blank line required after class docstring
+        - 'D204'
+
+
+pep8:
+    # style checking
+    run: true
+
+pylint:
+    # static analysis and then some
+    run: true
+    options:
+        # pytest module has dynamically assigned functions,
+        # raising errors such as: E1101: Module 'pytest' has
+        # no 'mark' member
+        ignored-classes: pytest
+        # List of builtins function names that should not be used, separated by a comma
+        # bad-functions=map,filter,input
+        bad-functions: input
+        persistent: no
+        # 'ks' is often-cited variable representing Keystroke instance.
+        # 'fd' is a common shorthand term for file descriptor (as int).
+        good-names: _,ks,fd
+
+    disable:
+        # Access to a protected member _sugar of a client class
+        - protected-access
+
+pyroma:
+    # checks setup.py
+    run: true
+
+vulture:
+    # this tool does a good job of finding unused code.
+    run: false
+
+# vim: noai:ts=4:sw=4

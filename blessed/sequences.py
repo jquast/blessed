@@ -15,7 +15,7 @@ from blessed._binterms import BINARY_TERMINALS, BINTERM_UNSUPPORTED_MSG
 import wcwidth
 import six
 
-__all__ = ['init_sequence_patterns', 'Sequence', 'SequenceTextWrapper']
+__all__ = ('init_sequence_patterns', 'Sequence', 'SequenceTextWrapper',)
 
 
 def _sort_sequences(regex_seqlist):
@@ -38,6 +38,8 @@ def _sort_sequences(regex_seqlist):
     # typically occur for output sequences, though with so many
     # programmatically generated regular expressions for so many terminal
     # types, it is feasible.
+    # pylint: disable=bad-builtin
+    #         Used builtin function 'filter'
     return sorted(list(filter(None, regex_seqlist)), key=len, reverse=True)
 
 
@@ -152,6 +154,8 @@ def get_wontmove_sequence_patterns(term):
     bnc = functools.partial(_build_numeric_capability, term)
     bna = functools.partial(_build_any_numeric_capability, term)
 
+    # pylint: disable=bad-builtin
+    #         Used builtin function 'map'
     return list([
         # print_screen: Print contents of screen
         re.escape(term.mc0),

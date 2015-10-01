@@ -1,6 +1,7 @@
 # encoding: utf-8
 """This module contains :class:`Terminal`, the primary API entry point."""
-
+# pylint: disable=too-many-lines
+#         Too many lines in module (1027/1000)
 import codecs
 import collections
 import contextlib
@@ -38,35 +39,36 @@ except NameError:
     InterruptedError = select.error
 
 # local imports
-from .formatters import (
-    ParameterizingString,
-    NullCallableString,
-    resolve_capability,
-    resolve_attribute,
-)
+from .formatters import (ParameterizingString,
+                         NullCallableString,
+                         resolve_capability,
+                         resolve_attribute,
+                         )
 
-from .sequences import (
-    init_sequence_patterns,
-    SequenceTextWrapper,
-    Sequence,
-)
+from .sequences import (init_sequence_patterns,
+                        SequenceTextWrapper,
+                        Sequence,
+                        )
 
-from .keyboard import (
-    get_keyboard_sequences,
-    get_keyboard_codes,
-    resolve_sequence,
-)
+from .keyboard import (get_keyboard_sequences,
+                       get_keyboard_codes,
+                       resolve_sequence,
+                       )
 
 
 class Terminal(object):
     """
-    An abstraction for color, style, positioning, and input in the terminal
+    An abstraction for color, style, positioning, and input in the terminal.
 
     This keeps the endless calls to ``tigetstr()`` and ``tparm()`` out of your
     code, acts intelligently when somebody pipes your output to a non-terminal,
     and abstracts over the complexity of unbuffered keyboard input. It uses the
     terminfo database to remain portable across terminal types.
     """
+    # pylint: disable=too-many-instance-attributes,too-many-public-methods
+    #         Too many public methods (28/20)
+    #         Too many instance attributes (12/7)
+
     #: Sugary names for commonly-used capabilities
     _sugar = dict(
         save='sc',
@@ -121,6 +123,7 @@ class Terminal(object):
             If ``stream`` is not a tty, empty Unicode strings are returned for
             all capability values, so things like piping your program output to
             a pipe or file does not emit terminal sequences.
+
         :param bool force_styling: Whether to force the emission of
             capabilities even if :obj:`sys.__stdout__` does not seem to be
             connected to a terminal. If you want to force styling to not
@@ -130,10 +133,6 @@ class Terminal(object):
             something like ``less -r`` or build systems which support decoding
             of terminal sequences.
         """
-        # pylint: disable=global-statement
-        #         Using the global statement (col 8)
-
-        global _CUR_TERM
         self._keyboard_fd = None
 
         # Default stream is stdout, keyboard valid as stdin only when
@@ -166,36 +165,56 @@ class Terminal(object):
         self._kind = kind or os.environ.get('TERM', 'unknown')
 
         if self.does_styling:
-            # Make things like tigetstr() work. Explicit args make setupterm()
-            # work even when -s is passed to nosetests. Lean toward sending
-            # init sequences to the stream if it has a file descriptor, and
-            # send them to stdout as a fallback, since they have to go
-            # somewhere.
-            try:
-                if (platform.python_implementation() == 'PyPy' and
-                        isinstance(self._kind, unicode)):
-                    # pypy/2.4.0_2/libexec/lib_pypy/_curses.py, line 1131
-                    # TypeError: initializer for ctype 'char *' must be a str
-                    curses.setupterm(self._kind.encode('ascii'),
-                                     self._init_descriptor)
-                else:
-                    curses.setupterm(self._kind, self._init_descriptor)
-            except curses.error as err:
-                warnings.warn('Failed to setupterm(kind={0!r}): {1}'
-                              .format(self._kind, err))
-                self._kind = None
-                self._does_styling = False
-            else:
-                if _CUR_TERM is None or self._kind == _CUR_TERM:
-                    _CUR_TERM = self._kind
-                else:
-                    warnings.warn(
-                        'A terminal of kind "%s" has been requested; due to an'
-                        ' internal python curses bug, terminal capabilities'
-                        ' for a terminal of kind "%s" will continue to be'
-                        ' returned for the remainder of this process.' % (
-                            self._kind, _CUR_TERM,))
+            self._init_curses()
 
+        self._stream = stream
+
+    def _init_curses(self):
+        """Initialize curses (call setupterm)."""
+        # Make things like tigetstr() work. Explicit args make setupterm()
+        # work even when -s is passed to nosetests. Lean toward sending
+        # init sequences to the stream if it has a file descriptor, and
+        # send them to stdout as a fallback, since they have to go
+        # somewhere.
+        #
+        # pylint: disable=attribute-defined-outside-init,global-statement
+        global _CUR_TERM
+        try:
+            if (platform.python_implementation() == 'PyPy' and
+                    isinstance(self._kind, unicode)):
+                # pypy/2.4.0_2/libexec/lib_pypy/_curses.py, line 1131
+                # TypeError: initializer for ctype 'char *' must be a str
+                curses.setupterm(self._kind.encode('ascii'),
+                                 self._init_descriptor)
+            else:
+                curses.setupterm(self._kind, self._init_descriptor)
+        except curses.error as err:
+            warnings.warn('Failed to setupterm(kind={0!r}): {1}'
+                          .format(self._kind, err))
+            self._kind = None
+            self._does_styling = False
+        else:
+            if _CUR_TERM is None or self._kind == _CUR_TERM:
+                _CUR_TERM = self._kind
+            else:
+                warnings.warn(
+                    'A terminal of kind "%s" has been requested; due to an'
+                    ' internal python curses bug, terminal capabilities'
+                    ' for a terminal of kind "%s" will continue to be'
+                    ' returned for the remainder of this process.' % (
+                        self._kind, _CUR_TERM,))
+
+        self._init_keyboard()
+
+    def init_keyboard(self):
+        """
+        Initialize keyboard data determined by capability.
+
+        The following attributes are initialized: :attr:`~._keycodes`,
+        :attr:`~._keymap`, :attr:`~._keyboard_buf`, :attr:`~._encoding`,
+        :attr:`~._keyboard_decoder`, :attr:`~._encoding`.
+        """
+        # pylint: disable=attribute-defined-outside-init
         for re_name, re_val in init_sequence_patterns(self).items():
             setattr(self, re_name, re_val)
 
@@ -223,8 +242,6 @@ class Terminal(object):
                 self._keyboard_decoder = codecs.getincrementaldecoder(
                     self._encoding)()
 
-        self._stream = stream
-
     def __getattr__(self, attr):
         r"""
         Return a terminal capability as Unicode string.
@@ -235,18 +252,18 @@ class Terminal(object):
         returns a callable, so you can use ``term.bold("hi")`` which
         results in the joining of ``(term.bold, "hi", term.normal)``.
 
-        Compound formatters may also be used. For example...
+        Compound formatters may also be used. For example::
 
-        >>> term.bold_blink_red_on_green("merry x-mas!").
-        u'\x1b[1m\x1b[5m\x1b[31m\x1b[42mmerry x-mas!\x1b[m'
+            >>> term.bold_blink_red_on_green("merry x-mas!")
 
         For a parametrized capability such as ``move`` (or ``cup``), pass the
-        parameters as positional arguments:
-        
-        >>> term.move(line, column)
-        
-        See the manual page terminfo(5) for a complete list of capabilities and
-        their arguments.
+        parameters as positional arguments::
+
+            >>> term.move(line, column)
+
+        See the manual page `terminfo(5)
+        <http://invisible-island.net/ncurses/man/terminfo.5.html>`_ for a
+        complete list of capabilities and their arguments.
         """
         if not self.does_styling:
             return NullCallableString()
@@ -257,27 +274,47 @@ class Terminal(object):
 
     @property
     def kind(self):
-        """The terminal type this instance was initialized with"""
+        """
+        Read-only property: Terminal kind determined on class initialization.
+
+        :rtype: str
+        """
         return self._kind
 
     @property
     def does_styling(self):
-        """Whether this instance will emit terminal sequences"""
+        """
+        Read-only property: Whether this class instance may emit sequences.
+
+        :rtype: bool
+        """
         return self._does_styling
 
     @property
     def is_a_tty(self):
-        """Whether :attr:`~.stream` is a terminal"""
+        """
+        Read-only property: Whether :attr:`~.stream` is a terminal.
+
+        :rtype: bool
+        """
         return self._is_a_tty
 
     @property
     def height(self):
-        """The height of the terminal (in number of lines)"""
+        """
+        Read-only property: Height of the terminal (in number of lines).
+
+        :rtype: int
+        """
         return self._height_and_width().ws_row
 
     @property
     def width(self):
-        """The width of the terminal (in number of columns)"""
+        """
+        Read-only property: Width of the terminal (in number of columns).
+
+        :rtype: int
+        """
         return self._height_and_width().ws_col
 
     @staticmethod
@@ -286,7 +323,7 @@ class Terminal(object):
         Return named tuple describing size of the terminal by ``fd``.
 
         If the given platform does not have modules :mod:`termios`,
-        :mod:`fcntl`, or :mod:`tty`, window size of 80 columns by 24
+        :mod:`fcntl`, or :mod:`tty`, window size of 80 columns by 25
         rows is always returned.
 
         :param int fd: file descriptor queries for its window size.
@@ -305,7 +342,7 @@ class Terminal(object):
         if HAS_TTY:
             data = fcntl.ioctl(fd, termios.TIOCGWINSZ, WINSZ._BUF)
             return WINSZ(*struct.unpack(WINSZ._FMT, data))
-        return WINSZ(ws_row=24, ws_col=80, ws_xpixel=0, ws_ypixel=0)
+        return WINSZ(ws_row=25, ws_col=80, ws_xpixel=0, ws_ypixel=0)
 
     def _height_and_width(self):
         """
@@ -313,7 +350,9 @@ class Terminal(object):
 
         If :attr:`stream` or :obj:`sys.__stdout__` is not a tty or does not
         support :func:`fcntl.ioctl` of :const:`termios.TIOCGWINSZ`, a window
-        size of 80 columns by 24 rows is returned.
+        size of 80 columns by 25 rows is returned for any values not
+        represented by environment variables ``LINES`` and ``COLUMNS``, which
+        is the default text mode of IBM PC compatibles.
 
         :rtype: WINSZ
 
@@ -385,19 +424,19 @@ class Terminal(object):
     @contextlib.contextmanager
     def fullscreen(self):
         """
-        Return a context manager that enters fullscreen mode while inside it
-        and restores normal mode on leaving.
+        Context manager that switches to secondary screen, restoring on exit.
 
-        Under the hood, this switches between the primary screen buffer and the
-        secondary one. The primary one is saved on entry and restored on exit.
-        Likewise, the secondary contents are also stable and are faithfully
-        restored on the next entry::
+        Under the hood, this switches between the primary screen buffer and
+        the secondary one. The primary one is saved on entry and restored on
+        exit.  Likewise, the secondary contents are also stable and are
+        faithfully restored on the next entry::
 
             with term.fullscreen():
                 main()
 
-        .. note:: There is only one primary buffer and one secondary one. Thus, :meth:`fullscreen` calls cannot be nested: only one should
-            be entered at a time.
+        .. note:: There is only one primary and one secondary screen buffer.
+           :meth:`fullscreen` calls cannot be nested, only one should be
+           entered at a time.
         """
         self.stream.write(self.enter_fullscreen)
         try:
@@ -408,8 +447,7 @@ class Terminal(object):
     @contextlib.contextmanager
     def hidden_cursor(self):
         """
-        Return a context manager that hides the cursor while inside it and
-        makes it visible on leaving. ::
+        Context manager that hides the cursor, setting visibility on exit.
 
             with term.hidden_cursor():
                 main()
@@ -426,7 +464,7 @@ class Terminal(object):
     @property
     def color(self):
         """
-        A callable string that sets the foreground color
+        A callable string that sets the foreground color.
 
         :arg int num: The foreground color index. This should be within the
            bounds of :attr:`~.number_of_colors`.
@@ -445,7 +483,7 @@ class Terminal(object):
     @property
     def on_color(self):
         """
-        A capability that sets the background color
+        A callable capability that sets the background color.
 
         :arg int num: The background color index.
         :rtype: ParameterizingString
@@ -458,13 +496,13 @@ class Terminal(object):
     @property
     def normal(self):
         """
-        A capability that resets all video attributes
+        A capability that resets all video attributes.
 
         :rtype: str
 
-        normal is an alias for ``sgr0`` or ``exit_attribute_mode``. Any
-        styling attributes previously applied, such as foreground or background
-        colors, reverse video, or bold are reset to defaults.
+        ``normal`` is an alias for ``sgr0`` or ``exit_attribute_mode``. Any
+        styling attributes previously applied, such as foreground or
+        background colors, reverse video, or bold are reset to defaults.
         """
         if self._normal:
             return self._normal
@@ -474,7 +512,7 @@ class Terminal(object):
     @property
     def stream(self):
         """
-        The stream the terminal outputs to
+        Read-only property: stream the terminal outputs to.
 
         This is a convenience attribute. It is used internally for implied
         writes performed by context managers :meth:`~.hidden_cursor`,
@@ -485,12 +523,13 @@ class Terminal(object):
     @property
     def number_of_colors(self):
         """
-        The number of colors the terminal supports
+        Read-only property: number of colors supported by terminal.
 
-        Common values are 0, 8, 16, 88, and 256. Most commonly, this may be
-        used to test whether the terminal supports colors. Though the
-        underlying capability returns -1 when there is no color support, we
-        return 0. This lets you test more Pythonically::
+        Common values are 0, 8, 16, 88, and 256.
+
+        Most commonly, this may be used to test whether the terminal supports
+        colors. Though the underlying capability returns -1 when there is no
+        color support, we return 0. This lets you test more Pythonically::
 
             if term.number_of_colors:
                 ...
@@ -507,7 +546,7 @@ class Terminal(object):
     @property
     def _foreground_color(self):
         """
-        Convenience capability to support :attr:`~.on_color`
+        Convenience capability to support :attr:`~.on_color`.
 
         Prefers returning sequence for capability ``setaf``, "Set foreground
         color to #1, using ANSI escape". If the given terminal does not
@@ -519,7 +558,7 @@ class Terminal(object):
     @property
     def _background_color(self):
         """
-        Convenience capability to support :attr:`~.on_color`
+        Convenience capability to support :attr:`~.on_color`.
 
         Prefers returning sequence for capability ``setab``, "Set background
         color to #1, using ANSI escape". If the given terminal does not
@@ -632,7 +671,7 @@ class Terminal(object):
 
     def strip_seqs(self, text):
         r"""
-        Return ``text`` stripped of only its terminal sequences
+        Return ``text`` stripped of only its terminal sequences.
 
         :rtype: str
 
@@ -785,7 +824,7 @@ class Terminal(object):
 
     @contextlib.contextmanager
     def raw(self):
-        """
+        r"""
         A context manager for :func:`tty.setraw`.
 
         Raw mode differs from :meth:`cbreak` mode in that input and output
@@ -801,7 +840,7 @@ class Terminal(object):
         program::
 
             with term.raw():
-                   print("printing in raw mode", end="\\r\\n")
+                   print("printing in raw mode", end="\r\n")
 
         """
         if HAS_TTY and self._keyboard_fd is not None:
@@ -860,25 +899,25 @@ class Terminal(object):
         :rtype: :class:`~.Keystroke`.
         :returns: :class:`~.Keystroke`, which may be empty (``u''``) if
            ``timeout`` is specified and keystroke is not received.
-        :raises NoKeyboard: The :attr:`stream` is not a terminal, and
-            ``timeout`` is None, which would cause the program to hang
-            forever.
+        :raises RuntimeError: When :attr:`stream` is not a terminal, having
+        no keyboard attached, a ``timeout`` value of ``None`` would block
+        indefinitely, prevented by by raising an exception.
 
         .. note:: When used without the context manager :meth:`cbreak`, or
             :meth:`raw`, :obj:`sys.__stdin__` remains line-buffered, and this
             function will block until the return key is pressed!
         """
         if _kwargs.pop('_intr_continue', None) is not None:
-            warnings.warn('keyword argument _intr_continue deprecated, '
-                          'since 1.9.6 it is as though value is always True.')
+            warnings.warn('keyword argument _intr_continue deprecated: '
+                          'beginning v1.9.6, behavior is as though such '
+                          'value is always True.')
         if _kwargs:
             raise TypeError('inkey() got unexpected keyword arguments {!r}'
                             .format(_kwargs))
         if timeout is None and self._keyboard_fd is None:
-            raise NoKeyboard(
-                'Waiting for a keystroke on a terminal with no keyboard '
-                'attached and no timeout would hang forever. Add a timeout, '
-                'and revise your program logic.')
+            raise RuntimeError(
+                'Terminal.inkey() called, but no terminal with keyboard '
+                'attached to process.  This call would hang forever.')
 
         def time_left(stime, timeout):
             """
@@ -939,11 +978,6 @@ class Terminal(object):
         # buffer any remaining text received
         self._keyboard_buf.extendleft(ucs[len(ks):])
         return ks
-
-
-class NoKeyboard(Exception):
-    """An error raised when an Illegal operation requiring a keyboard without
-    one attached."""
 
 
 class WINSZ(collections.namedtuple('WINSZ', (

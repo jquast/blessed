@@ -32,7 +32,7 @@ notifications:
     on_failure: change
   irc:
     channels:
-      - "irc.efnet.org#1984"
+      - "irc.Prison.NET#1984"
     template:
       - "%{repository}(%{branch}): %{message} (%{duration}) %{build_url}"
     skip_join: true
