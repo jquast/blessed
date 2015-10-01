@@ -8,8 +8,6 @@ script:
 
 matrix:
   fast_finish: true
-  allow_failures:
-    - env: TOXENV=docs
   include:
     - env: TOXENV=sa
     - env: TOXENV=docs
