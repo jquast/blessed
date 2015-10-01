@@ -234,9 +234,9 @@ When you want to move the cursor, you have a few choices:
 - ``move_y(row)`` capability.
 - ``move_x(col)`` capability.
 
-.. note:: The :meth:`~.Terminal.location` method receives arguments in form
-    of *(x, y)*, whereas the ``move()`` capability receives arguments in form
-    of *(y, x)*.  This will be changed to match in the 2.0 release, :ghissue:`58`.
+.. warning:: The :meth:`~.Terminal.location` method receives arguments in
+   positional order *(x, y)*, whereas the ``move()`` capability receives
+   arguments in order *(y, x)*.
 
 Moving Temporarily
 ~~~~~~~~~~~~~~~~~~
@@ -536,7 +536,7 @@ are difficult to recall. The following helpful aliases are provided
 instead:
 
 =================== ============= ====================
-blessed           curses        note
+blessed             curses        note
 =================== ============= ====================
 ``KEY_DELETE``      ``KEY_DC``    chr(127).
 ``KEY_TAB``                       chr(9)

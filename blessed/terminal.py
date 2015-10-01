@@ -796,23 +796,13 @@ class Terminal(object):
         are received as their raw control character values rather than
         generating a signal.
 
-        For output, the newline ``\n`` is not sufficient enough to return
-        the carriage, **requiring ``\r`` printed explicitly by your
-        program**.
+        For output, the newline ``chr(10)`` is not sufficient enough to return
+        the carriage, requiring ``chr(13)`` printed explicitly by your
+        program::
 
-            >>> from __future__ import print_function
-            >>> with term.raw():
-            ...    print(norml)
-            ...    print(CR LF, end='\r\n')
-            ...    print(col0, end='\r\n')
-            ...
-            norml
-                   CR LF
-            col0
-            >>>
+            with term.raw():
+                   print("printing in raw mode", end="\\r\\n")
 
-        Notice that the 'CR' began at the next line without the implicit
-        return of the carriage in raw mode.
         """
         if HAS_TTY and self._keyboard_fd is not None:
             # Save current terminal mode:
