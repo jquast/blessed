@@ -334,7 +334,7 @@ def test_keystroke_0s_cbreak_multibyte_utf8():
     assert math.floor(time.time() - stime) == 0.0
 
 
-@pytest.mark.skipif(os.environ.get('TRAVIS', None) is not None
+@pytest.mark.skipif(os.environ.get('TRAVIS', None) is not None,
                     reason="travis-ci does not handle ^C very well.")
 def test_keystroke_0s_raw_input_ctrl_c():
     "0-second keystroke with raw allows receiving ^C."
