@@ -85,8 +85,7 @@ Here are some recommended readings to help you along:
   `xterm <http://invisible-island.net/xterm/xterm.html>`_, as well as a
   primary maintainer of many related packages such as `ncurses
   <http://invisible-island.net/ncurses/ncurses.html>`_ for quite a long
-  while.  There is often speculation and misinformation among developers of
-  terminal emulators and programs that interact with them.
+  while.
 
 - `termcap & terminfo (O'Reilly Nutshell)
   <http://www.amazon.com/termcap-terminfo-OReilly-Nutshell-Linda/dp/0937175226>`_
