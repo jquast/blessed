@@ -133,6 +133,8 @@ class Terminal(object):
             something like ``less -r`` or build systems which support decoding
             of terminal sequences.
         """
+        # pylint: disable=global-statement,too-many-branches
+        global _CUR_TERM
         self._keyboard_fd = None
 
         # Default stream is stdout, keyboard valid as stdin only when
@@ -165,56 +167,42 @@ class Terminal(object):
         self._kind = kind or os.environ.get('TERM', 'unknown')
 
         if self.does_styling:
-            self._init_curses()
+            # Initialize curses (call setupterm).
+            #
+            # Make things like tigetstr() work. Explicit args make setupterm()
+            # work even when -s is passed to nosetests. Lean toward sending
+            # init sequences to the stream if it has a file descriptor, and
+            # send them to stdout as a fallback, since they have to go
+            # somewhere.
+            try:
+                if (platform.python_implementation() == 'PyPy' and
+                        isinstance(self._kind, unicode)):
+                    # pypy/2.4.0_2/libexec/lib_pypy/_curses.py, line 1131
+                    # TypeError: initializer for ctype 'char *' must be a str
+                    curses.setupterm(self._kind.encode('ascii'),
+                                     self._init_descriptor)
+                else:
+                    curses.setupterm(self._kind, self._init_descriptor)
+            except curses.error as err:
+                warnings.warn('Failed to setupterm(kind={0!r}): {1}'
+                              .format(self._kind, err))
+                self._kind = None
+                self._does_styling = False
+            else:
+                if _CUR_TERM is None or self._kind == _CUR_TERM:
+                    _CUR_TERM = self._kind
+                else:
+                    warnings.warn(
+                        'A terminal of kind "%s" has been requested; due to an'
+                        ' internal python curses bug, terminal capabilities'
+                        ' for a terminal of kind "%s" will continue to be'
+                        ' returned for the remainder of this process.' % (
+                            self._kind, _CUR_TERM,))
 
-        self._stream = stream
-
-    def _init_curses(self):
-        """Initialize curses (call setupterm)."""
-        # Make things like tigetstr() work. Explicit args make setupterm()
-        # work even when -s is passed to nosetests. Lean toward sending
-        # init sequences to the stream if it has a file descriptor, and
-        # send them to stdout as a fallback, since they have to go
-        # somewhere.
+        # Initialize keyboard data determined by capability.
         #
-        # pylint: disable=attribute-defined-outside-init,global-statement
-        global _CUR_TERM
-        try:
-            if (platform.python_implementation() == 'PyPy' and
-                    isinstance(self._kind, unicode)):
-                # pypy/2.4.0_2/libexec/lib_pypy/_curses.py, line 1131
-                # TypeError: initializer for ctype 'char *' must be a str
-                curses.setupterm(self._kind.encode('ascii'),
-                                 self._init_descriptor)
-            else:
-                curses.setupterm(self._kind, self._init_descriptor)
-        except curses.error as err:
-            warnings.warn('Failed to setupterm(kind={0!r}): {1}'
-                          .format(self._kind, err))
-            self._kind = None
-            self._does_styling = False
-        else:
-            if _CUR_TERM is None or self._kind == _CUR_TERM:
-                _CUR_TERM = self._kind
-            else:
-                warnings.warn(
-                    'A terminal of kind "%s" has been requested; due to an'
-                    ' internal python curses bug, terminal capabilities'
-                    ' for a terminal of kind "%s" will continue to be'
-                    ' returned for the remainder of this process.' % (
-                        self._kind, _CUR_TERM,))
-
-        self._init_keyboard()
-
-    def init_keyboard(self):
-        """
-        Initialize keyboard data determined by capability.
-
-        The following attributes are initialized: :attr:`~._keycodes`,
-        :attr:`~._keymap`, :attr:`~._keyboard_buf`, :attr:`~._encoding`,
-        :attr:`~._keyboard_decoder`, :attr:`~._encoding`.
-        """
-        # pylint: disable=attribute-defined-outside-init
+        # The following attributes are initialized: _keycodes,
+        # _keymap, _keyboard_buf, _encoding, and _keyboard_decoder.
         for re_name, re_val in init_sequence_patterns(self).items():
             setattr(self, re_name, re_val)
 
@@ -241,6 +229,8 @@ class Terminal(object):
                 self._encoding = 'ascii'
                 self._keyboard_decoder = codecs.getincrementaldecoder(
                     self._encoding)()
+
+        self._stream = stream
 
     def __getattr__(self, attr):
         r"""
