@@ -40,7 +40,6 @@ setuptools.setup(
     packages=['blessed', 'blessed.tests'],
     url='https://github.com/erikrose/blessed',
     include_package_data=True,
-    test_suite='blessed.tests',
     zip_safe=True,
     classifiers=[
         'Intended Audience :: Developers',

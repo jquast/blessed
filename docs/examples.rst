@@ -21,7 +21,7 @@ rudimentary line-editor as well.
 
 keymatrix.py
 ------------
-https://github.com/jquast/blessed/blob/master/bin/editor.py
+https://github.com/jquast/blessed/blob/master/bin/keymatrix.py
 
 This program displays a "gameboard" of all known special KEY_NAME
 constants. When the key is depressed, it is highlighted, as well
@@ -59,10 +59,10 @@ styling.
 
 worms.py
 --------
-https://github.com/jquast/blessed/blob/master/blessed/editor.py
+https://github.com/jquast/blessed/blob/master/bin/worms.py
 
 This program demonstrates how an interactive game could be made
-with blessed.  It is designed after the class game of "worms"
-that was made available for free with QBASIC, and later more
-popularly known as "snake" as it was named on early mobile
+with blessed.  It is designed after the class game of WORMS.BAS,
+distributed with early Microsoft Q-BASIC for PC-DOS, and later
+more popularly known as "snake" as it was named on early mobile
 platforms.

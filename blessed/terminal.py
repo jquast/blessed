@@ -716,7 +716,7 @@ class Terminal(object):
         byte = os.read(self._keyboard_fd, 1)
         return self._keyboard_decoder.decode(byte, final=False)
 
-    def kbhit(self, timeout=None):
+    def kbhit(self, timeout=None, **_kwargs):
         """
         Return whether a keypress has been detected on the keyboard.
 
@@ -734,6 +734,14 @@ class Terminal(object):
             attached to this terminal.  When input is not a terminal, False is
             always returned.
         """
+        if _kwargs.pop('_intr_continue', None) is not None:
+            warnings.warn('keyword argument _intr_continue deprecated: '
+                          'beginning v1.9.6, behavior is as though such '
+                          'value is always True.')
+        if _kwargs:
+            raise TypeError('inkey() got unexpected keyword arguments {!r}'
+                            .format(_kwargs))
+
         stime = time.time()
         ready_r = [None, ]
         check_r = [self._keyboard_fd] if self._keyboard_fd is not None else []
@@ -890,8 +898,8 @@ class Terminal(object):
         :returns: :class:`~.Keystroke`, which may be empty (``u''``) if
            ``timeout`` is specified and keystroke is not received.
         :raises RuntimeError: When :attr:`stream` is not a terminal, having
-        no keyboard attached, a ``timeout`` value of ``None`` would block
-        indefinitely, prevented by by raising an exception.
+            no keyboard attached, a ``timeout`` value of ``None`` would block
+            indefinitely, prevented by by raising an exception.
 
         .. note:: When used without the context manager :meth:`cbreak`, or
             :meth:`raw`, :obj:`sys.__stdin__` remains line-buffered, and this
