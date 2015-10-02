@@ -236,7 +236,8 @@ When you want to move the cursor, you have a few choices:
 
 .. warning:: The :meth:`~.Terminal.location` method receives arguments in
    positional order *(x, y)*, whereas the ``move()`` capability receives
-   arguments in order *(y, x)*.
+   arguments in order *(y, x)*.  Please use keyword arguments as a later
+   release may correct the argument order of :meth:`~.Terminal.location`.
 
 Moving Temporarily
 ~~~~~~~~~~~~~~~~~~

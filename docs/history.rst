@@ -1,5 +1,6 @@
 Version History
 ===============
+
 1.9
   * enhancement: :paramref:`~.Terminal.wrap.break_long_words` now supported by
     :meth:`Terminal.wrap`

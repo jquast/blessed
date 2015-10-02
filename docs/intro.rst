@@ -74,8 +74,8 @@ Blessed **does not** provide...
 
 * Windows command prompt support.  A PDCurses_ build of python for windows
   provides only partial support at this time -- there are plans to merge with
-  the ansi_ module in concert with colorama_ to resolve this.  `Patches welcome
-  <https://github.com/jquast/blessed/issues/21>`_!
+  the ansi_ module in concert with colorama_ to resolve this.  `Patches
+  welcome <https://github.com/jquast/blessed/issues/18>`_!
 
 
 Before And After

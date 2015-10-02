@@ -1,15 +1,10 @@
 Growing Pains
 =============
 
-When constructing rich console applications, there are a surprisingly great
-number of portability issues.  Though Blessed provides an abstraction for
-the full terminal capability database to ensure compatibility across many
-types of terminals, there are still many portability issues that the
-terminal :attr:`~.kind` alone cannot abstract for you.
-
-This section intends to raise awareness and guide you through these kinds of
-issues.
-
+When making terminal applications, there are a surprisingly number of
+portability issues and edge cases.  Although Blessed provides an abstraction
+for the full curses capability database, it is not sufficient to secure
+you from several considerations shared here.
 
 8 and 16 colors
 ---------------
@@ -26,8 +21,7 @@ original video terminals.  Some find these values uncomfortably intense: in
 their original CRT form, their contrast and brightness was lowered by hardware
 dials, whereas today's LCD's typically display well only near full intensity.
 
-Though one can not *trust*, much less *query* through Terminal I/O routines
-the colorspace of the remote terminal, **we can**:
+Though we may not *detect* the colorspace of the remote terminal, **we can**:
 
 - Trust that a close approximation of the `CGA Color Palette`_ for the base
   16 colors will be displayed for **most** users.
@@ -48,23 +42,25 @@ the colorspace of the remote terminal, **we can**:
 Where is brown, purple, or grey?
 --------------------------------
 
-There are **only 8 color names** on even a 16-color terminal:  The second
-eight colors are "high intensity" versions of the first in direct series.  The
-colors *brown*, *purple*, and *grey* are not named in the first series, though
-they are available!
+There are **only 8 color names** on a 16-color terminal:  The second set of
+eight colors are "high intensity" versions of the first in direct series.
+
+The colors *brown*, *purple*, and *grey* are not named in the first series,
+though they are available:
 
 - **brown**: *yellow is brown*, only high-intensity yellow
   (``bright_yellow``) is yellow!
 
 - **purple**: *magenta is purple*.  In earlier, 4-bit color spaces, there
   were only black, cyan, magenta, and white of low and high intensity, such
-  as found on a common home computer of the time such as the `ZX Spectrum`_.
+  as found on common home computers like the `ZX Spectrum`_.
 
   Additional "colors" were only possible through dithering.  The color names
   cyan and magenta on later graphics adapters are carried over from its
   predecessors.  Although the color cyan remained true in RGB value on
   16-color to its predecessor, magenta shifted farther towards blue from red
-  becoming purple (as true red was introduced as one of the base 8 colors).
+  becoming purple (as true red was introduced as one of the new base 8
+  colors).
 
 - **grey**: there are actually **three shades of grey** (or American spelling,
   'gray'), though the color attribute named 'grey' does not exist!
@@ -297,26 +293,25 @@ Alt or meta sends Escape
 ------------------------
 
 Programs using GNU readline such as bash continue to provide default mappings
-such as *ALT+u/l* to uppercase/lowercase word after cursor. This is achieved
-by the configuration option, altSendsEscape or `metaSendsEscape
+such as *ALT+u* to uppercase the word after cursor.  This is achieved
+by the configuration option altSendsEscape or `metaSendsEscape
 <http://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Alt-and-Meta-Keys>`_
 
 The default for most terminals, however, is that the meta key is bound by
-the operating system (such as *META+f* for find), and that alt is used for
-inserting international keys, where the combination *ALT+u, a* is used
-to insert the character ``ä``.
-
-The ability to detect alt or meta key combinations is achieved by two means:
-
-  - The alt or meta key sets the 8th bit "high", so that *ALT+z* becomes
-    the value of ``'z'`` + 128: ``ú``
-  - The alt or meta key prefaces the combining character with escape, so
-    that *ALT+z* becomes *Escape + z*: ``\x1bz``
+the operating system (such as *META + F* for find), and that *ALT* is used
+for inserting international keys (where the combination *ALT+u, a* is used
+to insert the character ``ä``).
 
 It is therefore a recommendation to **avoid alt or meta keys entirely** in
 applications, and instead prefer the ctrl-key combinations, so as to avoid
 instructing your users to configure their terminal emulators to communicate
 such sequences.
+
+If you wish to allow them optionally (such as through readline), the ability
+to detect alt or meta key combinations is achieved by prefacing the combining
+character with escape, so that *ALT+z* becomes *Escape + z* (or, in raw form
+``\x1bz``).  Blessings currently provides no further assistance in detecting
+these key combinations.
 
 
 Backspace sends delete
@@ -326,13 +321,11 @@ Typically, backspace is ``^H`` (8, or 0x08) and delete is ^? (127, or 0x7f).
 
 On some systems however, the key for backspace is actually labeled and
 transmitted as "delete", though its function in the operating system behaves
-just as backspace.  It is highly recommend to accept **both** ``KEY_DELETE``
-and ``KEY_BACKSPACE`` as having the same meaning except when implementing full
-screen editors.
+just as backspace.
 
-And only then, to provide the choice to map delete as true delete as a
-non-default configuration option.
-
+It is highly recommend to accept **both** ``KEY_DELETE`` and ``KEY_BACKSPACE``
+as having the same meaning except when implementing full screen editors,
+and provide a choice to enable the delete mode by configuration.
 
 The misnomer of ANSI
 --------------------

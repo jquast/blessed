@@ -3,6 +3,7 @@
 import os
 import setuptools
 
+
 def _get_install_requires(fname):
     import sys
     result = [req_line.strip() for req_line in open(fname)
@@ -14,9 +15,11 @@ def _get_install_requires(fname):
 
     return result
 
+
 def _get_version(fname):
     import json
     return json.load(open(fname, 'r'))['version']
+
 
 def _get_long_description(fname):
     import codecs
@@ -30,8 +33,10 @@ setuptools.setup(
         fname=os.path.join(HERE, 'version.json')),
     install_requires=_get_install_requires(
         fname=os.path.join(HERE, 'requirements.txt')),
-    long_description=_get_long_description(
-        fname=os.path.join(HERE, 'docs', 'intro.rst')),
+    long_description='{0}\n\n{1}'.format(
+        _get_long_description(os.path.join(HERE, 'docs', 'intro.rst')),
+        _get_long_description(os.path.join(HERE, 'docs', 'history.rst')),
+    ),
     description=('A thin, practical wrapper around terminal styling, '
                  'screen positioning, and keyboard input.'),
     author='Jeff Quast, Erik Rose',
