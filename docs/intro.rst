@@ -8,7 +8,7 @@
 
 .. image:: https://coveralls.io/repos/jquast/blessed/badge.svg?branch=master&service=github
     :alt: Coveralls Code Coverage
-    :target: https://coveralls.io/github/jquast/blessed?branch=master 
+    :target: https://coveralls.io/github/jquast/blessed?branch=master
 
 .. image:: https://img.shields.io/pypi/v/blessed.svg
     :alt: Latest Version
