@@ -1,4 +1,5 @@
 .coverage
+._coverage.*
 .coverage.*
 .cache
 .tox
