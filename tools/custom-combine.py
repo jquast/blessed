@@ -5,6 +5,7 @@ from __future__ import print_function
 
 # local
 import subprocess
+import tempfile
 import shutil
 import glob
 import os
@@ -18,17 +19,21 @@ COVERAGERC = os.path.join(PROJ_ROOT, '.coveragerc')
 
 def main():
     """Program entry point."""
-    coverage_files = glob.glob(os.path.join(PROJ_ROOT, '._coverage.*'))
-    for fname in coverage_files:
-        dst_name = '.{0}'.format(os.path.basename(fname).lstrip('._'))
-        dst_path = os.path.join(PROJ_ROOT, dst_name)
-        try:
-            shutil.copy(fname, dst_path)
-        except:
-            print('+ cp {0} {1}'.format(os.path.basename(fname), dst_name))
-            raise
     cov = coverage.Coverage(config_file=COVERAGERC)
     cov.combine()
+
+    # we must duplicate these files, coverage.py unconditionally
+    # deletes them on .combine().
+    _data_paths = glob.glob(os.path.join(PROJ_ROOT, '._coverage.*'))
+    dst_folder = tempfile.mkdtemp()
+    data_paths = []
+    for src in _data_paths:
+        dst = os.path.join(dst_folder, os.path.basename(src))
+        shutil.copy(src, dst)
+        data_paths.append(dst)
+
+    print("combining coverage: {0}".format(data_paths))
+    cov.combine(data_paths=data_paths)
     cov.load()
     cov.html_report()
     print("--> open {0}/htmlcov/index.html for review."
@@ -36,7 +41,7 @@ def main():
 
     fout = six.StringIO()
     cov.report(file=fout)
-    for line in fout.getvalue().decode('ascii').splitlines():
+    for line in fout.getvalue().splitlines():
         if u'TOTAL' in line:
             total_line = line
             break

@@ -11,3 +11,4 @@ precision = 1
 [paths]
 source =
     blessed/
+    /opt/TeamCity/*/blessed/*.py
