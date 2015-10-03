@@ -151,6 +151,18 @@ def test_raw_input_no_kb():
     child()
 
 
+def test_raw_input_with_kb():
+    "raw should call tty.setraw() when with keyboard."
+    @as_subprocess
+    def child():
+        term = TestTerminal()
+        assert term._keyboard_fd is not None
+        with mock.patch("tty.setraw") as mock_setraw:
+            with term.raw():
+                assert mock_setraw.called
+    child()
+
+
 def test_notty_kb_is_None():
     "term._keyboard_fd should be None when os.isatty returns False."
     # in this scenerio, stream is sys.__stdout__,

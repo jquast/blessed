@@ -1,7 +1,6 @@
 # encoding: utf-8
 # std imports
 import itertools
-import platform
 import termios
 import struct
 import fcntl
@@ -222,8 +221,6 @@ def test_env_winsize():
     child()
 
 
-@pytest.mark.skipif(platform.python_implementation() == 'PyPy',
-                    reason='PyPy fails TIOCSWINSZ')
 def test_winsize(many_lines, many_columns):
     """Test height and width is appropriately queried in a pty."""
     @as_subprocess
@@ -241,8 +238,28 @@ def test_winsize(many_lines, many_columns):
     child(lines=many_lines, cols=many_columns)
 
 
-@pytest.mark.skipif(platform.python_implementation() == 'PyPy',
-                    reason='PyPy fails TIOCSWINSZ')
+def test_Sequence_alignment_fixed_width():
+    @as_subprocess
+    def child(kind):
+        t = TestTerminal(kind=kind)
+        pony_msg = 'pony express, all aboard, choo, choo!'
+        pony_len = len(pony_msg)
+        pony_colored = u''.join(
+            ['%s%s' % (t.color(n % 7), ch,)
+             for n, ch in enumerate(pony_msg)])
+        pony_colored += t.normal
+        ladjusted = t.ljust(pony_colored, 88)
+        radjusted = t.rjust(pony_colored, 88)
+        centered = t.center(pony_colored, 88)
+        assert (t.length(pony_colored) == pony_len)
+        assert (t.length(centered.strip()) == pony_len)
+        assert (t.length(centered) == len(pony_msg.center(88)))
+        assert (t.length(ladjusted.strip()) == pony_len)
+        assert (t.length(ladjusted) == len(pony_msg.ljust(88)))
+        assert (t.length(radjusted.strip()) == pony_len)
+        assert (t.length(radjusted) == len(pony_msg.rjust(88)))
+
+
 def test_Sequence_alignment(all_terms):
     """Tests methods related to Sequence class, namely ljust, rjust, center."""
     @as_subprocess

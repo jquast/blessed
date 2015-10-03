@@ -176,7 +176,7 @@ def get_proxy_string(term, attr):
     # normalize 'screen-256color', or 'ansi.sys' to its basic names
     term_kind = next(iter(_kind for _kind in ('screen', 'ansi',)
                           if term.kind.startswith(_kind)), term)
-    return {
+    _proxy_table = {  # pragma: no cover
         'screen': {
             # proxy move_x/move_y for 'screen' terminal type, used by tmux(1).
             'hpa': ParameterizingProxyString(
@@ -198,7 +198,8 @@ def get_proxy_string(term, attr):
             'sc': '\x1b[s',
             'rc': '\x1b[u',
         }
-    }.get(term_kind, {}).get(attr, None)
+    }
+    return _proxy_table.get(term_kind, {}).get(attr, None)
 
 
 class FormattingString(six.text_type):

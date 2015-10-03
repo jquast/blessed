@@ -1,6 +1,9 @@
 [run]
 branch = True
 source = blessed
+parallel = True
 
 [report]
 omit = blessed/tests/*
+exclude_lines = pragma: no cover
+precision = 1

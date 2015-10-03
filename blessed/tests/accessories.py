@@ -25,7 +25,8 @@ TestTerminal = functools.partial(Terminal, kind='xterm-256color')
 SEND_SEMAPHORE = SEMAPHORE = b'SEMAPHORE\n'
 RECV_SEMAPHORE = b'SEMAPHORE\r\n'
 many_lines_params = [40, 80]
-many_columns_params = [5, 25]
+# we must test a '1' column for conditional in _handle_long_word
+many_columns_params = [1, 10]
 
 if os.environ.get('TEST_QUICK'):
     many_lines_params = [80,]
@@ -70,7 +71,13 @@ class as_subprocess(object):
             cov = None
             try:
                 import coverage
-                cov = coverage.Coverage(data_suffix=True)
+                _coveragerc = os.path.join(os.path.dirname(__file__),
+                                           os.pardir, os.pardir,
+                                           '.coveragerc')
+                cov = coverage.Coverage(config_file=_coveragerc)
+                cov.set_option("run:note",
+                               "@as_subprocess-{0};{1}(*{2}, **{3})".format(
+                                   os.getpid(), self.func, args, kwargs))
                 cov.start()
             except ImportError:
                 pass

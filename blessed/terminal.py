@@ -10,7 +10,6 @@ import functools
 import io
 import locale
 import os
-import platform
 import select
 import struct
 import sys
@@ -175,14 +174,7 @@ class Terminal(object):
             # send them to stdout as a fallback, since they have to go
             # somewhere.
             try:
-                if (platform.python_implementation() == 'PyPy' and
-                        isinstance(self._kind, unicode)):
-                    # pypy/2.4.0_2/libexec/lib_pypy/_curses.py, line 1131
-                    # TypeError: initializer for ctype 'char *' must be a str
-                    curses.setupterm(self._kind.encode('ascii'),
-                                     self._init_descriptor)
-                else:
-                    curses.setupterm(self._kind, self._init_descriptor)
+                curses.setupterm(self._kind, self._init_descriptor)
             except curses.error as err:
                 warnings.warn('Failed to setupterm(kind={0!r}): {1}'
                               .format(self._kind, err))

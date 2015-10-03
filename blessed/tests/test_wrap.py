@@ -7,7 +7,6 @@ from .accessories import (
     as_subprocess,
     TestTerminal,
     many_columns,
-    all_terms,
 )
 
 # 3rd party
@@ -69,13 +68,12 @@ def test_SequenceWrapper_invalid_width():
 
 
 @pytest.mark.parametrize("kwargs", TEXTWRAP_KEYWORD_COMBINATIONS)
-def test_SequenceWrapper(all_terms, many_columns, kwargs):
+def test_SequenceWrapper(many_columns, kwargs):
     """Test that text wrapping matches internal extra options."""
     @as_subprocess
-    def child(term, width, kwargs):
+    def child(width, pgraph, kwargs):
         # build a test paragraph, along with a very colorful version
         term = TestTerminal()
-        pgraph = u' Z! a bc defghij klmnopqrstuvw<<>>xyz012345678900  '
         attributes = ('bright_red', 'on_bright_blue', 'underline', 'reverse',
                       'red_reverse', 'red_on_white', 'superscript',
                       'subscript', 'on_bright_white')
@@ -110,4 +108,6 @@ def test_SequenceWrapper(all_terms, many_columns, kwargs):
         # ensure our colored textwrap is the same paragraph length
         assert (len(internal_wrapped) == len(my_wrapped_colored))
 
-    child(all_terms, many_columns, kwargs)
+    child(width=many_columns, kwargs=kwargs,
+          pgraph=u' Z! a bc defghij klmnopqrstuvw<<>>xyz012345678900 '*2)
+    child(width=many_columns, kwargs=kwargs, pgraph=u'a bb ccc')
