@@ -11,7 +11,7 @@ matrix:
   include:
     - env: TOXENV=about
     - env: TOXENV=sa
-    - env: TOXENV=docs
+    - env: TOXENV=sphinx
     - python: 2.7
       env: TOXENV=py27 TEST_QUICK=1
     - python: 3.4

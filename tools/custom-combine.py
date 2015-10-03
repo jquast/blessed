@@ -2,14 +2,19 @@
 """Simple script provides coverage combining across build chains."""
 # pylint: disable=invalid-name
 from __future__ import print_function
+
+# local
 import subprocess
-import platform
 import shutil
 import glob
 import os
 
-PROJ_ROOT = os.path.join(os.path.dirname(__file__), os.pardir)
+# 3rd-party
+import coverage
+import six
 
+PROJ_ROOT = os.path.join(os.path.dirname(__file__), os.pardir)
+COVERAGERC = os.path.join(PROJ_ROOT, '.coveragerc')
 
 def main():
     """Program entry point."""
@@ -22,17 +27,16 @@ def main():
         except:
             print('+ cp {0} {1}'.format(os.path.basename(fname), dst_name))
             raise
-    subprocess.check_call(['coverage', 'combine'], cwd=PROJ_ROOT)
+    cov = coverage.Coverage(config_file=COVERAGERC)
+    cov.combine()
+    cov.load()
+    cov.html_report()
+    print("--> open {0}/htmlcov/index.html for review."
+          .format(os.path.relpath(PROJ_ROOT)))
 
-    cmd_args = ['coverage', 'report',
-                '--rcfile={0}'.format(
-                    os.path.join(PROJ_ROOT, '.coveragerc'))]
-    outp, _ = subprocess.Popen(cmd_args, cwd=PROJ_ROOT,
-                               stdout=subprocess.PIPE).communicate()
-
-    # for teamcity (CI) ...
-    total_line = None
-    for line in outp.decode('ascii').splitlines():
+    fout = six.StringIO()
+    cov.report(file=fout)
+    for line in fout.getvalue().decode('ascii').splitlines():
         if u'TOTAL' in line:
             total_line = line
             break
