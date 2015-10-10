@@ -441,6 +441,33 @@ def test_compound_formatting(all_terms):
     child(all_terms)
 
 
+def test_nested_formatting(all_terms):
+    """Test complex nested compound formatting, wow!"""
+    @as_subprocess
+    def child(kind):
+        t = TestTerminal(kind=kind)
+
+        # Test deeply nested styles
+        given = t.green('-a-', t.bold('-b-', t.underline('-c-'),
+                                      '-d-'),
+                        '-e-')
+        expected = u''.join((
+            t.green, '-a-', t.bold, '-b-', t.underline, '-c-', t.normal,
+            t.green, t.bold, '-d-',
+            t.normal, t.green, '-e-', t.normal))
+        assert given == expected
+
+        # Test off-and-on nested styles
+        given = t.green('off ', t.underline('ON'),
+                        ' off ', t.underline('ON'),
+                        ' off')
+        expected = u''.join((
+            t.green, 'off ', t.underline, 'ON',
+            t.normal, t.green , ' off ', t.underline, 'ON',
+            t.normal, t.green, ' off', t.normal))
+        assert given == expected
+
+
 def test_formatting_functions_without_tty(all_terms):
     """Test crazy-ass formatting wrappers when there's no tty."""
     @as_subprocess
@@ -451,6 +478,20 @@ def test_formatting_functions_without_tty(all_terms):
         # Test non-ASCII chars, no longer really necessary:
         assert (t.bold_green(u'boö') == u'boö')
         assert (t.bold_underline_green_on_red('loo') == u'loo')
+
+        # Test deeply nested styles
+        given = t.green('-a-', t.bold('-b-', t.underline('-c-'),
+                                      '-d-'),
+                        '-e-')
+        expected = u'-a--b--c--d--e-'
+        assert given == expected
+
+        # Test off-and-on nested styles
+        given = t.green('off ', t.underline('ON'),
+                        ' off ', t.underline('ON'),
+                        ' off')
+        expected = u'off ON off ON off'
+        assert given == expected
         assert (t.on_bright_red_bold_bright_green_underline('meh') == u'meh')
 
     child(all_terms)
@@ -502,9 +543,7 @@ def test_null_callable_string(all_terms):
         assert (t.move(1 == 2) == '')
         assert (t.move_x(1) == '')
         assert (t.bold() == '')
-        assert (t.bold('', 'x', 'huh?') == '')
-        assert (t.bold('', 9876) == '')
-        assert (t.uhh(9876) == '')
+        assert (t.bold('', 'x', 'huh?') == 'xhuh?')
         assert (t.clear('x') == 'x')
 
     child(all_terms)

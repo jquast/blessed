@@ -112,18 +112,18 @@ class ParameterizingProxyString(six.text_type):
     given positional ``*args`` of :meth:`ParameterizingProxyString.__call__`
     into a terminal sequence.
 
-    For example:
+    For example::
 
-    >>> from blessed import Terminal
-    >>> term = Terminal('screen')
-    >>> hpa = ParameterizingString(term.hpa, term.normal, 'hpa')
-    >>> hpa(9)
-    u''
-    >>> fmt = u'\x1b[{0}G'
-    >>> fmt_arg = lambda *arg: (arg[0] + 1,)
-    >>> hpa = ParameterizingProxyString((fmt, fmt_arg), term.normal, 'hpa')
-    >>> hpa(9)
-    u'\x1b[10G'
+        >>> from blessed import Terminal
+        >>> term = Terminal('screen')
+        >>> hpa = ParameterizingString(term.hpa, term.normal, 'hpa')
+        >>> hpa(9)
+        u''
+        >>> fmt = u'\x1b[{0}G'
+        >>> fmt_arg = lambda *arg: (arg[0] + 1,)
+        >>> hpa = ParameterizingProxyString((fmt, fmt_arg), term.normal, 'hpa')
+        >>> hpa(9)
+        u'\x1b[10G'
     """
 
     def __new__(cls, *args):
@@ -208,13 +208,13 @@ class FormattingString(six.text_type):
     directly, or as a callable.  When used directly, it simply emits
     the given terminal sequence.  When used as a callable, it wraps the
     given (string) argument with the 2nd argument used by the class
-    constructor.
+    constructor::
 
-    >>> style = FormattingString(term.bright_blue, term.normal)
-    >>> print(repr(style))
-    u'\x1b[94m'
-    >>> style('Big Blue')
-    u'\x1b[94mBig Blue\x1b(B\x1b[m'
+        >>> style = FormattingString(term.bright_blue, term.normal)
+        >>> print(repr(style))
+        u'\x1b[94m'
+        >>> style('Big Blue')
+        u'\x1b[94mBig Blue\x1b(B\x1b[m'
     """
 
     def __new__(cls, *args):
@@ -229,11 +229,30 @@ class FormattingString(six.text_type):
         new._normal = len(args) > 1 and args[1] or u''
         return new
 
-    def __call__(self, text):
+    def __call__(self, *args):
         """Return ``text`` joined by ``sequence`` and ``normal``."""
-        if len(self):
-            return u''.join((self, text, self._normal))
-        return text
+        # Jim Allman brings us this convenience of allowing existing
+        # unicode strings to be joined as a call parameter to a formatting
+        # string result, allowing nestation:
+        #
+        # >>> t.red('This is ', t.bold('extremely'), ' dangerous!')
+        for idx, ucs_part in enumerate(args):
+            if not isinstance(ucs_part, six.string_types):
+                raise TypeError("Positional argument #{idx} is {is_type} "
+                                "expected any of {expected_types}: "
+                                "{ucs_part!r}".format(
+                                    idx=idx, ucs_part=ucs_part,
+                                    is_type=type(ucs_part),
+                                    expected_types=six.string_types,
+                                ))
+        postfix = u''
+        if len(self) and self._normal:
+            postfix = self._normal
+            _refresh = self._normal + self
+            args = [_refresh.join(ucs_part.split(self._normal))
+                    for ucs_part in args]
+
+        return self + u''.join(args) + postfix
 
 
 class NullCallableString(six.text_type):
@@ -262,7 +281,7 @@ class NullCallableString(six.text_type):
         the first arg, acting in place of :class:`FormattingString` without
         any attributes.
         """
-        if len(args) != 1 or isinstance(args[0], int):
+        if len(args) == 0 or isinstance(args[0], int):
             # I am acting as a ParameterizingString.
 
             # tparm can take not only ints but also (at least) strings as its
@@ -283,7 +302,7 @@ class NullCallableString(six.text_type):
             # without color support, so turtles all the way down: we return
             # another instance.
             return NullCallableString()
-        return args[0]
+        return u''.join(args)
 
 
 def split_compound(compound):

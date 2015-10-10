@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 """Tests string formatting functions."""
+# std
 import curses
+
+# 3rd-party
 import mock
+import pytest
 
 
 def test_parameterizing_string_args_unspecified(monkeypatch):
@@ -70,7 +74,7 @@ def test_parameterizing_string_args(monkeypatch):
 
 
 def test_parameterizing_string_type_error(monkeypatch):
-    """Test formatters.ParameterizingString raising TypeError"""
+    """Test formatters.ParameterizingString raising TypeError."""
     from blessed.formatters import ParameterizingString
 
     def tparm_raises_TypeError(*args):
@@ -106,7 +110,7 @@ def test_parameterizing_string_type_error(monkeypatch):
 
 
 def test_formattingstring(monkeypatch):
-    """Test formatters.FormattingString"""
+    """Test simple __call__ behavior of formatters.FormattingString."""
     from blessed.formatters import FormattingString
 
     # given, with arg
@@ -117,9 +121,39 @@ def test_formattingstring(monkeypatch):
     assert str(pstr) == u'attr'
     assert pstr('text') == u'attrtextnorm'
 
-    # given, without arg
+    # given, with empty attribute
     pstr = FormattingString(u'', u'norm')
     assert pstr('text') == u'text'
+
+
+def test_nested_formattingstring(monkeypatch):
+    """Test nested __call__ behavior of formatters.FormattingString."""
+    from blessed.formatters import FormattingString
+
+    # given, with arg
+    pstr = FormattingString(u'a1-', u'n-')
+    zstr = FormattingString(u'a2-', u'n-')
+
+    # exercise __call__
+    assert pstr('x-', zstr('f-'), 'q-') == 'a1-x-a2-f-n-a1-q-n-'
+
+
+def test_nested_formattingstring_type_error(monkeypatch):
+    """Test formatters.FormattingString raising TypeError."""
+    from blessed.formatters import FormattingString
+
+    # given,
+    pstr = FormattingString(u'a-', u'n-')
+    expected_msg = (
+        "Positional argument #1 is {0} expected any of "
+        .format(type(1)))
+
+    # exercise,
+    with pytest.raises(TypeError) as err:
+        pstr('text', 1, '...')
+
+    # verify,
+    assert expected_msg in '{0}'.format(err)
 
 
 def test_nullcallablestring(monkeypatch):
@@ -129,11 +163,10 @@ def test_nullcallablestring(monkeypatch):
     # given, with arg
     pstr = NullCallableString()
 
-    # excersize __call__,
+    # exercise __call__,
     assert str(pstr) == u''
     assert pstr('text') == u'text'
-    assert pstr('text', 1) == u''
-    assert pstr('text', 'moretext') == u''
+    assert pstr('text', 'moretext') == u'textmoretext'
     assert pstr(99, 1) == u''
     assert pstr() == u''
     assert pstr(0) == u''
