@@ -829,21 +829,13 @@ class Terminal(object):
         byte = os.read(self._keyboard_fd, 1)
         return self._keyboard_decoder.decode(byte, final=False)
 
-    def ungetch(self, ucs):
+    def ungetch(self, text):
         """
         Buffer input data to be discovered by next call to :meth:`~.inkey`.
 
-        The purpose of this method is for :meth:`~.inkey` to be allowed to
-        see the same keyboard input throughout multiple calls, or by
-        the built-in :meth:`~.get_location` for seeking automated input:
-        if the response pattern is not discovered within a timeout period,
-        any other keyboard input received will be re-buffered to be returned
-        by the next call to :meth:`~.inkey`.
-
-        Implementors of alternate input stream methods should override
-        this method.
+        :param str ucs: String to be buffered as keyboard input.
         """
-        self._keyboard_buf.extendleft(ucs)
+        self._keyboard_buf.extendleft(text)
 
     def kbhit(self, timeout=None, **_kwargs):
         """

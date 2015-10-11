@@ -13,3 +13,4 @@ docs/_build
 htmlcov
 .coveralls.yml
 .DS_Store
+.*.sw?
