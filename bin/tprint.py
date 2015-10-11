@@ -1,25 +1,37 @@
 #!/usr/bin/env python
-"""A simple cmd-line tool for displaying FormattingString capabilities."""
+"""
+A simple cmd-line tool for displaying FormattingString capabilities.
+
+For example::
+
+    $ python tprint.py bold A rather bold statement.
+
+"""
+# std
 from __future__ import print_function
 import argparse
 
-def main():
-    """Program entry point."""
-    from blessed import Terminal
+# local
+from blessed import Terminal
 
+
+def parse_args():
+    """Parse sys.argv, returning dict suitable for main()."""
     parser = argparse.ArgumentParser(
         description='displays argument as specified style')
 
     parser.add_argument('style', type=str, help='style formatter')
     parser.add_argument('text', type=str, nargs='+')
 
+    return dict(parser.parse_args()._get_kwargs())
 
+
+def main(style, text):
+    """ Program entry point."""
     term = Terminal()
-    args = parser.parse_args()
+    style = getattr(term, style)
+    print(style(' '.join(text)))
 
-    style = getattr(term, args.style)
-
-    print(style(' '.join(args.text)))
 
 if __name__ == '__main__':
-    main()
+    exit(main(**parse_args()))
