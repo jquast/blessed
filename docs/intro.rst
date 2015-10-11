@@ -18,6 +18,10 @@
     :alt: Downloads
     :target: https://pypi.python.org/pypi/blessed
 
+.. image:: https://badges.gitter.im/Join%20Chat.svg
+    :alt: Join Chat
+    :target: https://gitter.im/jquast/blessed
+
 Introduction
 ============
 
