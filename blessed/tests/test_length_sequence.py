@@ -1,26 +1,24 @@
 # encoding: utf-8
+# std imports
 import itertools
-import platform
 import termios
 import struct
 import fcntl
 import sys
 import os
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
 
-from .accessories import (
-    all_standard_terms,
+# local
+from blessed.tests.accessories import (
+    all_terms,
     as_subprocess,
     TestTerminal,
     many_columns,
     many_lines,
-    all_terms,
 )
 
+# 3rd party
 import pytest
+import six
 
 
 def test_length_cjk():
@@ -205,7 +203,7 @@ def test_env_winsize():
         # set the pty's virtual window size
         os.environ['COLUMNS'] = '99'
         os.environ['LINES'] = '11'
-        t = TestTerminal(stream=StringIO())
+        t = TestTerminal(stream=six.StringIO())
         save_init = t._init_descriptor
         save_stdout = sys.__stdout__
         try:
@@ -223,8 +221,6 @@ def test_env_winsize():
     child()
 
 
-@pytest.mark.skipif(platform.python_implementation() == 'PyPy',
-                    reason='PyPy fails TIOCSWINSZ')
 def test_winsize(many_lines, many_columns):
     """Test height and width is appropriately queried in a pty."""
     @as_subprocess
@@ -242,9 +238,29 @@ def test_winsize(many_lines, many_columns):
     child(lines=many_lines, cols=many_columns)
 
 
-@pytest.mark.skipif(platform.python_implementation() == 'PyPy',
-                    reason='PyPy fails TIOCSWINSZ')
-def test_Sequence_alignment(all_terms, many_lines):
+def test_Sequence_alignment_fixed_width():
+    @as_subprocess
+    def child(kind):
+        t = TestTerminal(kind=kind)
+        pony_msg = 'pony express, all aboard, choo, choo!'
+        pony_len = len(pony_msg)
+        pony_colored = u''.join(
+            ['%s%s' % (t.color(n % 7), ch,)
+             for n, ch in enumerate(pony_msg)])
+        pony_colored += t.normal
+        ladjusted = t.ljust(pony_colored, 88)
+        radjusted = t.rjust(pony_colored, 88)
+        centered = t.center(pony_colored, 88)
+        assert (t.length(pony_colored) == pony_len)
+        assert (t.length(centered.strip()) == pony_len)
+        assert (t.length(centered) == len(pony_msg.center(88)))
+        assert (t.length(ladjusted.strip()) == pony_len)
+        assert (t.length(ladjusted) == len(pony_msg.ljust(88)))
+        assert (t.length(radjusted.strip()) == pony_len)
+        assert (t.length(radjusted) == len(pony_msg.rjust(88)))
+
+
+def test_Sequence_alignment(all_terms):
     """Tests methods related to Sequence class, namely ljust, rjust, center."""
     @as_subprocess
     def child(kind, lines=25, cols=80):
@@ -270,7 +286,7 @@ def test_Sequence_alignment(all_terms, many_lines):
         assert (t.length(radjusted.strip()) == pony_len)
         assert (t.length(radjusted) == len(pony_msg.rjust(t.width)))
 
-    child(kind=all_terms, lines=many_lines)
+    child(kind=all_terms)
 
 
 def test_sequence_is_movement_false(all_terms):
@@ -310,7 +326,7 @@ def test_sequence_is_movement_false(all_terms):
     child_mnemonics_wontmove(all_terms)
 
 
-def test_sequence_is_movement_true(all_standard_terms):
+def test_sequence_is_movement_true(all_terms):
     """Test parsers about sequences that move the cursor."""
     @as_subprocess
     def child_mnemonics_willmove(kind):
@@ -340,4 +356,14 @@ def test_sequence_is_movement_true(all_standard_terms):
         assert not t.clear or (len(t.clear) ==
                                measure_length(t.clear, t))
 
-    child_mnemonics_willmove(all_standard_terms)
+    child_mnemonics_willmove(all_terms)
+
+
+def test_foreign_sequences():
+    """Test parsers about sequences received from foreign sources."""
+    @as_subprocess
+    def child(kind):
+        from blessed.sequences import measure_length
+        t = TestTerminal(kind=kind)
+        assert measure_length(u'\x1b[m', t) == len('\x1b[m')
+    child(kind='ansi')

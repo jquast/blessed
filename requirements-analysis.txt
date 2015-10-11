@@ -1,0 +1,3 @@
+prospector[with_frosted,with_pyroma]
+restructuredtext_lint
+doc8

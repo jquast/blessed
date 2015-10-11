@@ -1,73 +1,69 @@
 #!/usr/bin/env python
-import sys
+"""Distutils setup script."""
 import os
 import setuptools
-import setuptools.command.develop
-import setuptools.command.test
-
-here = os.path.dirname(__file__)
 
 
-class SetupDevelop(setuptools.command.develop.develop):
-    def run(self):
-        assert os.getenv('VIRTUAL_ENV'), 'You should be in a virtualenv'
-        self.spawn(('pip', 'install', '-U', '-r',
-                    os.path.join(here, 'dev-requirements.txt')))
-        setuptools.command.develop.develop.run(self)
+def _get_install_requires(fname):
+    import sys
+    result = [req_line.strip() for req_line in open(fname)
+              if req_line.strip() and not req_line.startswith('#')]
+
+    # support python2.6 by using backport of 'orderedict'
+    if sys.version_info < (2, 7):
+        result.append('ordereddict==1.1')
+
+    return result
 
 
-class SetupTest(setuptools.command.test.test):
-    def run(self):
-        self.spawn(('tox',))
+def _get_version(fname):
+    import json
+    return json.load(open(fname, 'r'))['version']
 
 
-def main():
-    extra = {
-        'install_requires': [
-            'wcwidth>=0.1.0',
-        ]
-    }
-    if sys.version_info < (2, 7,):
-        extra['install_requires'].extend(['ordereddict>=1.1'])
+def _get_long_description(fname):
+    import codecs
+    return codecs.open(fname, 'r', 'utf8').read()
 
-    setuptools.setup(
-        name='blessed',
-        version='1.9.4',
-        description="A feature-filled fork of Erik Rose's blessings project",
-        long_description=open(os.path.join(here, 'README.rst')).read(),
-        author='Jeff Quast',
-        author_email='contact@jeffquast.com',
-        license='MIT',
-        packages=['blessed', 'blessed.tests'],
-        url='https://github.com/jquast/blessed',
-        include_package_data=True,
-        test_suite='blessed.tests',
-        classifiers=[
-            'Intended Audience :: Developers',
-            'Natural Language :: English',
-            'Development Status :: 5 - Production/Stable',
-            'Environment :: Console',
-            'Environment :: Console :: Curses',
-            'License :: OSI Approved :: MIT License',
-            'Operating System :: POSIX',
-            'Programming Language :: Python :: 2',
-            'Programming Language :: Python :: 2.6',
-            'Programming Language :: Python :: 2.7',
-            'Programming Language :: Python :: 3',
-            'Programming Language :: Python :: 3.2',
-            'Programming Language :: Python :: 3.3',
-            'Programming Language :: Python :: 3.4',
-            'Topic :: Software Development :: Libraries',
-            'Topic :: Software Development :: User Interfaces',
-            'Topic :: Terminals'
-            ],
-        keywords=['terminal', 'sequences', 'tty', 'curses', 'ncurses',
-                  'formatting', 'style', 'color', 'console', 'keyboard',
-                  'ansi', 'xterm'],
-        cmdclass={'develop': SetupDevelop,
-                  'test': SetupTest},
-        **extra
-    )
+HERE = os.path.dirname(__file__)
 
-if __name__ == '__main__':
-    main()
+setuptools.setup(
+    name='blessed',
+    version=_get_version(
+        fname=os.path.join(HERE, 'version.json')),
+    install_requires=_get_install_requires(
+        fname=os.path.join(HERE, 'requirements.txt')),
+    long_description=_get_long_description(
+        fname=os.path.join(HERE, 'docs', 'intro.rst')),
+    description=('A thin, practical wrapper around terminal styling, '
+                 'screen positioning, and keyboard input.'),
+    author='Jeff Quast, Erik Rose',
+    author_email='contact@jeffquast.com',
+    license='MIT',
+    packages=['blessed', 'blessed.tests'],
+    url='https://github.com/jquast/blessed',
+    include_package_data=True,
+    zip_safe=True,
+    classifiers=[
+        'Intended Audience :: Developers',
+        'Natural Language :: English',
+        'Development Status :: 5 - Production/Stable',
+        'Environment :: Console',
+        'Environment :: Console :: Curses',
+        'License :: OSI Approved :: MIT License',
+        'Operating System :: POSIX',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.6',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.2',
+        'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.4',
+        'Topic :: Software Development :: Libraries',
+        'Topic :: Software Development :: User Interfaces',
+        'Topic :: Terminals'
+    ],
+    keywords=['terminal', 'sequences', 'tty', 'curses', 'ncurses',
+              'formatting', 'style', 'color', 'console', 'keyboard',
+              'ansi', 'xterm'],
+)

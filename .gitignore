@@ -1,11 +1,15 @@
 .coverage
+._coverage.*
+.coverage.*
 .cache
 .tox
 *.egg-info
 *.egg
 *.pyc
+results*.xml
 build
 dist
 docs/_build
 htmlcov
 .coveralls.yml
+.DS_Store

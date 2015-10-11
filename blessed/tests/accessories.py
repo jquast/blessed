@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """Accessories for automated py.test runner."""
-# std
-from __future__ import with_statement
+# standard imports
+from __future__ import with_statement, print_function
 import contextlib
+import subprocess
 import functools
 import traceback
 import termios
@@ -14,29 +15,53 @@ import os
 
 # local
 from blessed import Terminal
+from blessed._binterms import BINARY_TERMINALS
 
-# 3rd
+# 3rd-party
 import pytest
-
-if sys.version_info[0] == 3:
-    text_type = str
-else:
-    text_type = unicode  # noqa
+import six
 
 TestTerminal = functools.partial(Terminal, kind='xterm-256color')
 SEND_SEMAPHORE = SEMAPHORE = b'SEMAPHORE\n'
 RECV_SEMAPHORE = b'SEMAPHORE\r\n'
-all_xterms_params = ['xterm', 'xterm-256color']
-all_terms_params = ['screen', 'vt220', 'rxvt', 'cons25', 'linux', 'ansi']
-binpacked_terminal_params = ['avatar', 'kermit']
-many_lines_params = [30, 100]
-many_columns_params = [10, 100]
-if os.environ.get('TRAVIS', None) is None:
-    # TRAVIS-CI has a limited type of terminals, the others ...
-    all_terms_params.extend(['avatar', 'kermit', 'dtterm', 'wyse520',
-                             'minix', 'eterm', 'aixterm', 'putty'])
-all_standard_terms_params = (set(all_terms_params) -
-                             set(binpacked_terminal_params))
+many_lines_params = [40, 80]
+# we must test a '1' column for conditional in _handle_long_word
+many_columns_params = [1, 10]
+
+if os.environ.get('TEST_QUICK'):
+    many_lines_params = [80,]
+    many_columns_params = [25,]
+
+all_terms_params = 'xterm screen ansi vt220 rxvt cons25 linux'.split()
+
+if os.environ.get('TEST_FULL'):
+    try:
+        all_terms_params = [
+            # use all values of the first column of data in output of 'toe -a'
+            _term.split(None, 1)[0] for _term in
+            subprocess.Popen(('toe', '-a'),
+                             stdout=subprocess.PIPE,
+                             close_fds=True)
+            .communicate()[0].splitlines()]
+    except OSError:
+        pass
+elif os.environ.get('TEST_QUICK'):
+    all_terms_params = 'xterm screen ansi linux'.split()
+
+
+def init_subproc_coverage(run_note):
+        try:
+            import coverage
+        except ImportError:
+            return None
+        _coveragerc = os.path.join(
+            os.path.dirname(__file__),
+            os.pardir, os.pardir,
+            '.coveragerc')
+        cov = coverage.Coverage(config_file=_coveragerc)
+        cov.set_option("run:note", run_note)
+        cov.start()
+        return cov
 
 
 class as_subprocess(object):
@@ -51,17 +76,18 @@ class as_subprocess(object):
         self.func = func
 
     def __call__(self, *args, **kwargs):
+        pid_testrunner = os.getpid()
         pid, master_fd = pty.fork()
-        if pid is self._CHILD_PID:
+        if pid == self._CHILD_PID:
             # child process executes function, raises exception
             # if failed, causing a non-zero exit code, using the
             # protected _exit() function of ``os``; to prevent the
             # 'SystemExit' exception from being thrown.
+            cov = init_subproc_coverage(
+                "@as_subprocess-{pid};{func_name}(*{args}, **{kwargs})"
+                .format(pid=os.getpid(), func_name=self.func,
+                        args=args, kwargs=kwargs))
             try:
-                try:
-                    cov = __import__('cov_core_init').init()
-                except ImportError:
-                    cov = None
                 self.func(*args, **kwargs)
             except Exception:
                 e_type, e_value, e_tb = sys.exc_info()
@@ -86,7 +112,13 @@ class as_subprocess(object):
                     cov.save()
                 os._exit(0)
 
-        exc_output = text_type()
+        # detect rare fork in test runner, when bad bugs happen
+        if pid_testrunner != os.getpid():
+            print('TEST RUNNER HAS FORKED, {0}=>{1}: EXIT'
+                  .format(pid_testrunner, os.getpid()), file=sys.stderr)
+            os._exit(1)
+
+        exc_output = six.text_type()
         decoder = codecs.getincrementaldecoder(self.encoding)()
         while True:
             try:
@@ -127,7 +159,7 @@ def read_until_semaphore(fd, semaphore=RECV_SEMAPHORE,
     # process will read xyz\\r\\n -- this is how pseudo terminals
     # behave; a virtual terminal requires both carriage return and
     # line feed, it is only for convenience that \\n does both.
-    outp = text_type()
+    outp = six.text_type()
     decoder = codecs.getincrementaldecoder(encoding)()
     semaphore = semaphore.decode('ascii')
     while not outp.startswith(semaphore):
@@ -147,7 +179,7 @@ def read_until_semaphore(fd, semaphore=RECV_SEMAPHORE,
 def read_until_eof(fd, encoding='utf8'):
     """Read file descriptor ``fd`` until EOF. Return decoded string."""
     decoder = codecs.getincrementaldecoder(encoding)()
-    outp = text_type()
+    outp = six.text_type()
     while True:
         try:
             _exc = os.read(fd, 100)
@@ -174,7 +206,10 @@ def echo_off(fd):
 
 def unicode_cap(cap):
     """Return the result of ``tigetstr`` except as Unicode."""
-    val = curses.tigetstr(cap)
+    try:
+        val = curses.tigetstr(cap)
+    except curses.error:
+        val = None
     if val:
         return val.decode('latin1')
     return u''
@@ -182,35 +217,29 @@ def unicode_cap(cap):
 
 def unicode_parm(cap, *parms):
     """Return the result of ``tparm(tigetstr())`` except as Unicode."""
-    cap = curses.tigetstr(cap)
+    try:
+        cap = curses.tigetstr(cap)
+    except curses.error:
+        cap = None
     if cap:
-        val = curses.tparm(cap, *parms)
+        try:
+            val = curses.tparm(cap, *parms)
+        except curses.error:
+            val = None
         if val:
             return val.decode('latin1')
     return u''
 
 
-@pytest.fixture(params=binpacked_terminal_params)
+@pytest.fixture(params=BINARY_TERMINALS)
 def unsupported_sequence_terminals(request):
     """Terminals that emit warnings for unsupported sequence-awareness."""
-    return request.param
-
-
-@pytest.fixture(params=all_xterms_params)
-def xterms(request):
-    """Common kind values for xterm terminals."""
     return request.param
 
 
 @pytest.fixture(params=all_terms_params)
 def all_terms(request):
     """Common kind values for all kinds of terminals."""
-    return request.param
-
-
-@pytest.fixture(params=all_standard_terms_params)
-def all_standard_terms(request):
-    """Common kind values for all kinds of terminals (except binary-packed)."""
     return request.param
 
 

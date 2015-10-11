@@ -9,11 +9,13 @@ fails to provide one, but blessed recognizes that it actually does, and
 provides a proxy.
 """
 from __future__ import print_function
-from blessed import Terminal
 import sys
+
+from blessed import Terminal
 
 
 def main():
+    """Program entry point."""
     term = Terminal()
     assert term.hpa(1) != u'', (
         'Terminal does not support hpa (Horizontal position absolute)')
@@ -29,9 +31,14 @@ def main():
                 offset = -1
             elif col <= 1:
                 offset = 1
-            sys.stderr.write(term.move_x(col) + u'.' if offset == -1 else '=')
+            sys.stderr.write(term.move_x(col))
+            if offset == -1:
+                sys.stderr.write(u'.')
+            else:
+                sys.stderr.write(u'=')
             col += offset
-            sys.stderr.write(term.move_x(col) + u'|\b')
+            sys.stderr.write(term.move_x(col))
+            sys.stderr.write(u'|\b')
             sys.stderr.flush()
             inp = term.inkey(0.04)
     print()
