@@ -70,9 +70,10 @@ def _build_numeric_capability(term, cap, optional=False,
             # search for matching ascii, n-1 through n+1
             if str(num) in cap_re:
                 # modify & return n to matching digit expression
-                cap_re = cap_re.replace(str(num), r'(\d+)%s' % (opt,))
+                cap_re = cap_re.replace(str(num), r'(\d+){0}'.format(opt))
                 return cap_re
-        warnings.warn('Unknown parameter in %r (%r, %r)' % (cap, _cap, cap_re))
+        warnings.warn('Unknown parameter in {0:!r}, {1!r}: {2!r})'
+                      .format(cap, _cap, cap_re), RuntimeWarning)
     return None  # no such capability
 
 
@@ -96,7 +97,8 @@ def _build_any_numeric_capability(term, cap, num=99, nparams=1):
         cap_re = re.sub(r'(\d+)', r'(\d+)', cap_re)
         if r'(\d+)' in cap_re:
             return cap_re
-        warnings.warn('Missing numerics in %r, %r' % (cap, cap_re))
+        warnings.warn('Missing numerics in {0:!r}: {1:!r}'
+                      .format(cap, cap_re), RuntimeWarning)
     return None  # no such capability
 
 
@@ -345,8 +347,8 @@ def init_sequence_patterns(term):
         ]
 
     # compile as regular expressions, OR'd.
-    _re_will_move = re.compile('(%s)' % ('|'.join(_will_move)))
-    _re_wont_move = re.compile('(%s)' % ('|'.join(_wont_move)))
+    _re_will_move = re.compile(u'({0})'.format(u'|'.join(_will_move)))
+    _re_wont_move = re.compile(u'({0})'.format(u'|'.join(_wont_move)))
 
     # static pattern matching for horizontal_distance(ucs, term)
     bnc = functools.partial(_build_numeric_capability, term)
@@ -397,8 +399,10 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         """
         lines = []
         if self.width <= 0 or not isinstance(self.width, int):
-            raise ValueError("invalid width %r(%s) (must be integer > 0)" % (
-                self.width, type(self.width)))
+            raise ValueError(
+                "invalid width {self.width} (width_type) (must be integer > 0)"
+                .format(self=self, width_type=type(self.width)))
+
         term = self.term
         drop_whitespace = not hasattr(self, 'drop_whitespace'
                                       ) or self.drop_whitespace
@@ -763,12 +767,12 @@ def termcap_distance(ucs, cap, unit, term):
     assert cap in ('cuf', 'cub'), cap
     assert unit in (1, -1), unit
     # match cub1(left), cuf1(right)
-    one = getattr(term, '_%s1' % (cap,))
+    one = getattr(term, '_{0}1'.format(cap))
     if one and ucs.startswith(one):
         return unit
 
     # match cub(n), cuf(n) using regular expressions
-    re_pattern = getattr(term, '_re_%s' % (cap,))
+    re_pattern = getattr(term, '_re_{0}'.format(cap))
     _dist = re_pattern and re_pattern.match(ucs)
     if _dist:
         return unit * int(_dist.group(1))
