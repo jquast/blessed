@@ -200,29 +200,8 @@ all this mashing.
 
 This compound notation comes in handy if you want to allow users to customize
 formatting, just allow compound formatters, like *bold_green*, as a command
-line argument or configuration item::
-
-    #!/usr/bin/env python
-    import argparse
-    from blessed import Terminal
-
-    parser = argparse.ArgumentParser(
-        description='displays argument as specified style')
-    parser.add_argument('style', type=str, help='style formatter')
-    parser.add_argument('text', type=str, nargs='+')
-
-    term = Terminal()
-
-    args = parser.parse_args()
-
-    style = getattr(term, args.style)
-
-    print(style(' '.join(args.text)))
-
-Saved as **tprint.py**, this could be used like::
-
-    $ ./tprint.py bright_blue_reverse Blue Skies
-
+line argument or configuration item such as in the tprint.py_ demonstration
+script.
 
 Moving The Cursor
 -----------------
@@ -238,6 +217,25 @@ When you want to move the cursor, you have a few choices:
    positional order *(x, y)*, whereas the ``move()`` capability receives
    arguments in order *(y, x)*.  Please use keyword arguments as a later
    release may correct the argument order of :meth:`~.Terminal.location`.
+
+Finding The Cursor
+------------------
+
+We can determine the cursor's current position at anytime using
+:meth:`~.get_location`, returning the current (y, x) location.  This uses a
+kind of "answer back" sequence that your terminal emulator responds to.  If
+the terminal may not respond, the :paramref:`~.get_location.timeout` keyword
+argument can be specified to return coordinates (-1, -1) after a blocking
+timeout::
+
+    from blessed import Terminal
+
+    term = Terminal()
+
+    row, col = term.get_location(timeout=5)
+
+    if row < term.height:
+        print(term.move_y(term.height) + 'Get down there!')
 
 Moving Temporarily
 ~~~~~~~~~~~~~~~~~~
