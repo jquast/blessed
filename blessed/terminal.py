@@ -261,11 +261,9 @@ class Terminal(object):
         if not self.does_styling:
             return NullCallableString()
         val = resolve_attribute(self, attr)
-        # Cache capability codes.
-        try:
-            setattr(self, attr, val)
-        except AttributeError:
-            assert False, (attr, val)
+        # Cache capability resolution: note this will prevent this
+        # __getattr__ method for being called again.  That's the idea!
+        setattr(self, attr, val)
         return val
 
     @property

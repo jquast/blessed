@@ -122,7 +122,7 @@ def _alternative_left_right(term):
     r"""
     Determine and return mapping of left and right arrow keys sequences.
 
-    :param blessed.Terminal term: :class:`~.Terminal` instance.
+    :arg blessed.Terminal term: :class:`~.Terminal` instance.
     :rtype: dict
 
     This function supports :func:`get_terminal_sequences` to discover
@@ -146,7 +146,7 @@ def get_keyboard_sequences(term):
     r"""
     Return mapping of keyboard sequences paired by keycodes.
 
-    :param blessed.Terminal term: :class:`~.Terminal` instance.
+    :arg blessed.Terminal term: :class:`~.Terminal` instance.
     :returns: mapping of keyboard unicode sequences paired by keycodes
         as integer.  This is used as the argument ``mapper`` to
         the supporting function :func:`resolve_sequence`.
@@ -196,7 +196,7 @@ def get_leading_prefixes(sequences):
     """
     Return a set of proper prefixes for given sequence of strings.
 
-    :param iterable sequences
+    :arg iterable sequences
     :rtype: set
 
     Given an iterable of strings, all textparts leading up to the final
@@ -219,10 +219,10 @@ def resolve_sequence(text, mapper, codes):
     :attr:`Keystroke.sequence` valued only ``u\x1b[D``.  It is up to
     determine that ``xxx`` remains unresolved.
 
-    :param text: string of characters received from terminal input stream.
-    :param OrderedDict mapper: an OrderedDict of unicode multibyte sequences,
+    :arg text: string of characters received from terminal input stream.
+    :arg OrderedDict mapper: an OrderedDict of unicode multibyte sequences,
         such as u'\x1b[D' paired by their integer value (260)
-    :param dict codes: a :type:`dict` of integer values (such as 260) paired
+    :arg dict codes: a :type:`dict` of integer values (such as 260) paired
         by their mnemonic name, such as ``'KEY_LEFT'``.
     :rtype: Keystroke
     """

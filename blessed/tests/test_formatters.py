@@ -22,18 +22,18 @@ def test_parameterizing_string_args_unspecified(monkeypatch):
     # given,
     pstr = ParameterizingString(u'')
 
-    # excersize __new__
+    # exercise __new__
     assert str(pstr) == u''
     assert pstr._normal == u''
     assert pstr._name == u'<not specified>'
 
-    # excersize __call__
+    # exercise __call__
     zero = pstr(0)
     assert type(zero) is FormattingString
     assert zero == u'~0'
     assert zero('text') == u'~0text'
 
-    # excersize __call__ with multiple args
+    # exercise __call__ with multiple args
     onetwo = pstr(1, 2)
     assert type(onetwo) is FormattingString
     assert onetwo == u'~1~2'
@@ -55,18 +55,18 @@ def test_parameterizing_string_args(monkeypatch):
     # given,
     pstr = ParameterizingString(u'cap', u'norm', u'seq-name')
 
-    # excersize __new__
+    # exercise __new__
     assert str(pstr) == u'cap'
     assert pstr._normal == u'norm'
     assert pstr._name == u'seq-name'
 
-    # excersize __call__
+    # exercise __call__
     zero = pstr(0)
     assert type(zero) is FormattingString
     assert zero == u'cap~0'
     assert zero('text') == u'cap~0textnorm'
 
-    # excersize __call__ with multiple args
+    # exercise __call__ with multiple args
     onetwo = pstr(1, 2)
     assert type(onetwo) is FormattingString
     assert onetwo == u'cap~1~2'
@@ -116,7 +116,7 @@ def test_formattingstring(monkeypatch):
     # given, with arg
     pstr = FormattingString(u'attr', u'norm')
 
-    # excersize __call__,
+    # exercise __call__,
     assert pstr._normal == u'norm'
     assert str(pstr) == u'attr'
     assert pstr('text') == u'attrtextnorm'
@@ -193,7 +193,7 @@ def test_resolve_capability(monkeypatch):
     term = mock.Mock()
     term._sugar = dict(mnemonic='xyz')
 
-    # excersize
+    # exercise
     assert resolve_capability(term, 'mnemonic') == u'seq-xyz'
     assert resolve_capability(term, 'natural') == u'seq-natural'
 
@@ -201,7 +201,7 @@ def test_resolve_capability(monkeypatch):
     tigetstr_none = lambda attr: None
     monkeypatch.setattr(curses, 'tigetstr', tigetstr_none)
 
-    # excersize,
+    # exercise,
     assert resolve_capability(term, 'natural') == u''
 
     # given, where does_styling is False
@@ -210,7 +210,7 @@ def test_resolve_capability(monkeypatch):
     term.does_styling = False
     monkeypatch.setattr(curses, 'tigetstr', raises_exception)
 
-    # excersize,
+    # exercise,
     assert resolve_capability(term, 'natural') == u''
 
 
@@ -230,13 +230,13 @@ def test_resolve_color(monkeypatch):
     term.number_of_colors = -1
     term.normal = 'seq-normal'
 
-    # excersize,
+    # exercise,
     red = resolve_color(term, 'red')
     assert type(red) == FormattingString
     assert red == u'seq-1984'
     assert red('text') == u'seq-1984textseq-normal'
 
-    # excersize bold, +8
+    # exercise bold, +8
     bright_red = resolve_color(term, 'bright_red')
     assert type(bright_red) == FormattingString
     assert bright_red == u'seq-1992'
@@ -245,13 +245,13 @@ def test_resolve_color(monkeypatch):
     # given, terminal without color
     term.number_of_colors = 0
 
-    # excersize,
+    # exercise,
     red = resolve_color(term, 'red')
     assert type(red) == NullCallableString
     assert red == u''
     assert red('text') == u'text'
 
-    # excesize bold,
+    # exercise bold,
     bright_red = resolve_color(term, 'bright_red')
     assert type(bright_red) == NullCallableString
     assert bright_red == u''
@@ -349,7 +349,7 @@ def test_resolve_attribute_recursive_compoundables(monkeypatch):
     # given,
     pstr = resolve_attribute(term, 'bright_blue_on_red')
 
-    # excersize,
+    # exercise,
     assert type(pstr) == FormattingString
     assert str(pstr) == 'seq-6808seq-6502'
     assert pstr('text') == 'seq-6808seq-6502textseq-normal'
@@ -378,13 +378,13 @@ def test_pickled_parameterizing_string(monkeypatch):
     # multiprocessing Pipe implicitly pickles.
     r, w = Pipe()
 
-    # excersize picklability of ParameterizingString
+    # exercise picklability of ParameterizingString
     for proto_num in range(pickle.HIGHEST_PROTOCOL):
         assert pstr == pickle.loads(pickle.dumps(pstr, protocol=proto_num))
     w.send(pstr)
     r.recv() == pstr
 
-    # excersize picklability of FormattingString
+    # exercise picklability of FormattingString
     # -- the return value of calling ParameterizingString
     zero = pstr(0)
     for proto_num in range(pickle.HIGHEST_PROTOCOL):

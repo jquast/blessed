@@ -115,10 +115,13 @@ def test_emit_warnings_about_binpacked():
     # that cause false negatives, because their underlying curses library emits
     # some kind of "warning" to stderr, which our @as_subprocess decorator
     # determines to be noteworthy enough to fail the test:
+    #
     #     https://gist.github.com/jquast/7b90af251fe4000baa09
     #
-    # so we chose only one of beautiful lineage:
+    # so we chose only one, known good value, of beautiful lineage:
+    #
     #    http://terminals.classiccmp.org/wiki/index.php/Tektronix_4207
+
     child(kind='tek4207-s')
 
 
@@ -560,7 +563,7 @@ def test_bnc_parameter_emits_warning():
     fake_cap = lambda *args: u'NO-DIGIT'
     term.fake_cap = fake_cap
 
-    # excersize,
+    # exercise,
     try:
         _build_numeric_capability(term, 'fake_cap', base_num=1984)
     except UserWarning:
@@ -582,7 +585,7 @@ def test_bna_parameter_emits_warning():
     fake_cap = lambda *args: 'NO-DIGIT'
     term.fake_cap = fake_cap
 
-    # excersize,
+    # exercise,
     try:
         _build_any_numeric_capability(term, 'fake_cap')
     except UserWarning:

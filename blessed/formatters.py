@@ -23,7 +23,7 @@ def _make_compoundables(colors):
     """
     Return given set ``colors`` along with all "compoundable" attributes.
 
-    :param set colors: set of color names as string.
+    :arg set colors: set of color names as string.
     :rtype: set
     """
     _compoundables = set('bold underline reverse blink dim italic shadow '
@@ -163,8 +163,8 @@ def get_proxy_string(term, attr):
     """
     Proxy and return callable string for proxied attributes.
 
-    :param Terminal term: :class:`~.Terminal` instance.
-    :param str attr: terminal capability name that may be proxied.
+    :arg Terminal term: :class:`~.Terminal` instance.
+    :arg str attr: terminal capability name that may be proxied.
     :rtype: None or :class:`ParameterizingProxyString`.
     :returns: :class:`ParameterizingProxyString` for some attributes
         of some terminal types that support it, where the terminfo(5)
@@ -312,8 +312,8 @@ def split_compound(compound):
     >>> split_compound('bold_underline_bright_blue_on_red')
     ['bold', 'underline', 'bright_blue', 'on_red']
 
-    :param str compound: a string that may contain compounds,
-       separated by underline (``_``).
+    :arg str compound: a string that may contain compounds, separated by
+        underline (``_``).
     :rtype: list
     """
     merged_segs = []
@@ -331,8 +331,8 @@ def resolve_capability(term, attr):
     """
     Resolve a raw terminal capability using :func:`tigetstr`.
 
-    :param Terminal term: :class:`~.Terminal` instance.
-    :param str attr: terminal capability name.
+    :arg Terminal term: :class:`~.Terminal` instance.
+    :arg str attr: terminal capability name.
     :returns: string of the given terminal capability named by ``attr``,
        which may be empty (u'') if not found or not supported by the
        given :attr:`~.Terminal.kind`.
@@ -352,8 +352,8 @@ def resolve_color(term, color):
 
     This function supports :func:`resolve_attribute`.
 
-    :param Terminal term: :class:`~.Terminal` instance.
-    :param str color: any string found in set :const:`COLORS`.
+    :arg Terminal term: :class:`~.Terminal` instance.
+    :arg str color: any string found in set :const:`COLORS`.
     :returns: a string class instance which emits the terminal sequence
         for the given color, and may be used as a callable to wrap the
         given string with such sequence.
@@ -387,8 +387,8 @@ def resolve_attribute(term, attr):
     """
     Resolve a terminal attribute name into a capability class.
 
-    :param Terminal term: :class:`~.Terminal` instance.
-    :param str attr: Sugary, ordinary, or compound formatted terminal
+    :arg Terminal term: :class:`~.Terminal` instance.
+    :arg str attr: Sugary, ordinary, or compound formatted terminal
         capability, such as "red_on_white", "normal", "red", or
         "bold_on_black", respectively.
     :returns: a string class instance which emits the terminal sequence

@@ -22,7 +22,7 @@ def _sort_sequences(regex_seqlist):
     """
     Sort, filter, and return ``regex_seqlist`` in ascending order of length.
 
-    :param list regex_seqlist: list of strings.
+    :arg list regex_seqlist: list of strings.
     :rtype: list
     :returns: given list filtered and sorted.
 
@@ -54,10 +54,10 @@ def _build_numeric_capability(term, cap, optional=False,
     by regular expression pattern ``\d``.  Any other digits found are
     *not* replaced.
 
-    :param blessed.Terminal term: :class:`~.Terminal` instance.
-    :param str cap: terminal capability name.
-    :param int num: the numeric to use for parameterized capability.
-    :param int nparams: the number of parameters to use for capability.
+    :arg blessed.Terminal term: :class:`~.Terminal` instance.
+    :arg str cap: terminal capability name.
+    :arg int num: the numeric to use for parameterized capability.
+    :arg int nparams: the number of parameters to use for capability.
     :rtype: str
     :returns: regular expression for the given capability.
     """
@@ -80,10 +80,10 @@ def _build_any_numeric_capability(term, cap, num=99, nparams=1):
     r"""
     Return regular expression for capabilities containing any numerics.
 
-    :param blessed.Terminal term: :class:`~.Terminal` instance.
-    :param str cap: terminal capability name.
-    :param int num: the numeric to use for parameterized capability.
-    :param int nparams: the number of parameters to use for capability.
+    :arg blessed.Terminal term: :class:`~.Terminal` instance.
+    :arg str cap: terminal capability name.
+    :arg int num: the numeric to use for parameterized capability.
+    :arg int nparams: the number of parameters to use for capability.
     :rtype: str
     :returns: regular expression for the given capability.
 
@@ -104,7 +104,7 @@ def get_movement_sequence_patterns(term):
     """
     Get list of regular expressions for sequences that cause movement.
 
-    :param blessed.Terminal term: :class:`~.Terminal` instance.
+    :arg blessed.Terminal term: :class:`~.Terminal` instance.
     :rtype: list
     """
     bnc = functools.partial(_build_numeric_capability, term)
@@ -148,7 +148,7 @@ def get_wontmove_sequence_patterns(term):
     """
     Get list of regular expressions for sequences not causing movement.
 
-    :param blessed.Terminal term: :class:`~.Terminal` instance.
+    :arg blessed.Terminal term: :class:`~.Terminal` instance.
     :rtype: list
     """
     bnc = functools.partial(_build_numeric_capability, term)
@@ -278,7 +278,7 @@ def init_sequence_patterns(term):
     returns a dictionary database of regular expressions, which is
     re-attached to the terminal by attributes of the same key-name.
 
-    :param blessed.Terminal term: :class:`~.Terminal` instance.
+    :arg blessed.Terminal term: :class:`~.Terminal` instance.
     :rtype: dict
     :returns: dictionary containing mappings of sequence "groups",
         containing a compiled regular expression which it matches:
@@ -499,8 +499,8 @@ class Sequence(six.text_type):
         """
         Class constructor.
 
-        :param sequence_text: A string that may contain sequences.
-        :param blessed.Terminal term: :class:`~.Terminal` instance.
+        :arg sequence_text: A string that may contain sequences.
+        :arg blessed.Terminal term: :class:`~.Terminal` instance.
         """
         new = six.text_type.__new__(cls, sequence_text)
         new._term = term
@@ -510,9 +510,9 @@ class Sequence(six.text_type):
         """
         Return string containing sequences, left-adjusted.
 
-        :param int width: Total width given to right-adjust ``text``.  If
+        :arg int width: Total width given to right-adjust ``text``.  If
             unspecified, the width of the attached terminal is used (default).
-        :param str fillchar: String for padding right-of ``text``.
+        :arg str fillchar: String for padding right-of ``text``.
         :returns: String of ``text``, right-aligned by ``width``.
         :rtype: str
         """
@@ -524,9 +524,9 @@ class Sequence(six.text_type):
         """
         Return string containing sequences, right-adjusted.
 
-        :param int width: Total width given to right-adjust ``text``.  If
+        :arg int width: Total width given to right-adjust ``text``.  If
             unspecified, the width of the attached terminal is used (default).
-        :param str fillchar: String for padding left-of ``text``.
+        :arg str fillchar: String for padding left-of ``text``.
         :returns: String of ``text``, right-aligned by ``width``.
         :rtype: str
         """
@@ -538,9 +538,9 @@ class Sequence(six.text_type):
         """
         Return string containing sequences, centered.
 
-        :param int width: Total width given to center ``text``.  If
+        :arg int width: Total width given to center ``text``.  If
             unspecified, the width of the attached terminal is used (default).
-        :param str fillchar: String for padding left and right-of ``text``.
+        :arg str fillchar: String for padding left and right-of ``text``.
         :returns: String of ``text``, centered by ``width``.
         :rtype: str
         """
@@ -589,7 +589,7 @@ class Sequence(six.text_type):
         """
         Return string of sequences, leading, and trailing whitespace removed.
 
-        :param str chars: Remove characters in chars instead of whitespace.
+        :arg str chars: Remove characters in chars instead of whitespace.
         :rtype: str
         """
         return self.strip_seqs().strip(chars)
@@ -598,7 +598,7 @@ class Sequence(six.text_type):
         """
         Return string of all sequences and leading whitespace removed.
 
-        :param str chars: Remove characters in chars instead of whitespace.
+        :arg str chars: Remove characters in chars instead of whitespace.
         :rtype: str
         """
         return self.strip_seqs().lstrip(chars)
@@ -607,7 +607,7 @@ class Sequence(six.text_type):
         """
         Return string of all sequences and trailing whitespace removed.
 
-        :param str chars: Remove characters in chars instead of whitespace.
+        :arg str chars: Remove characters in chars instead of whitespace.
         :rtype: str
         """
         return self.strip_seqs().rstrip(chars)
@@ -689,8 +689,8 @@ def measure_length(ucs, term):
     r"""
     Return non-zero for string ``ucs`` that begins with a terminal sequence.
 
-    :param str ucs: String that may begin with a terminal sequence.
-    :param blessed.Terminal term: :class:`~.Terminal` instance.
+    :arg str ucs: String that may begin with a terminal sequence.
+    :arg blessed.Terminal term: :class:`~.Terminal` instance.
     :rtype: int
     :returns: length of the sequence beginning at ``ucs``, if any.
         Otherwise 0 if ``ucs`` does not begin with a terminal
@@ -737,11 +737,11 @@ def termcap_distance(ucs, cap, unit, term):
     r"""
     Return distance of capabilities ``cub``, ``cub1``, ``cuf``, and ``cuf1``.
 
-    :param str ucs: Terminal sequence created using any of ``cub(n)``,
-        ``cub1``, ``cuf(n)``, or ``cuf1``.
-    :param str cap: ``cub`` or ``cuf`` only.
-    :param int unit: Unit multiplier, should always be ``1`` or ``-1``.
-    :param blessed.Terminal term: :class:`~.Terminal` instance.
+    :arg str ucs: Terminal sequence created using any of ``cub(n)``, ``cub1``,
+        ``cuf(n)``, or ``cuf1``.
+    :arg str cap: ``cub`` or ``cuf`` only.
+    :arg int unit: Unit multiplier, should always be ``1`` or ``-1``.
+    :arg blessed.Terminal term: :class:`~.Terminal` instance.
     :rtype: int
     :returns: the printable distance determined by the given sequence.  If
         the given sequence does not match any of the ``cub`` or ``cuf``
@@ -780,14 +780,14 @@ def horizontal_distance(ucs, term):
     r"""
     Determine the horizontal distance of single terminal sequence, ``ucs``.
 
-    :param ucs: terminal sequence, which may be any of the following:
+    :arg ucs: terminal sequence, which may be any of the following:
 
         - move_right (fe. ``<ESC>[<n>C``): returns value ``(n)``.
         - move left (fe. ``<ESC>[<n>D``): returns value ``-(n)``.
         - backspace (``\b``) returns value -1.
         - tab (``\t``) returns value 8.
 
-    :param blessed.Terminal term: :class:`~.Terminal` instance.
+    :arg blessed.Terminal term: :class:`~.Terminal` instance.
     :rtype: int
 
     .. note:: Tabstop (``\t``) cannot be correctly calculated, as the relative
