@@ -425,8 +425,8 @@ class Terminal(object):
         :returns: cursor position as tuple in form of (row, column).
 
         The location of the cursor is determined by emitting the ``u7``
-        terminal capability, or VT100 `<Query Cursor Position>
-        http://www.termsys.demon.co.uk/vtansi.htm#status`_ when such
+        terminal capability, or VT100 `Query Cursor Position
+        <http://www.termsys.demon.co.uk/vtansi.htm#status>`_ when such
         capability is undefined, which elicits a response from a reply string
         described by capability ``u6``, or again VT100's definition of
         ``\x1b[%i%d;%dR`` when undefined.
@@ -439,14 +439,9 @@ class Terminal(object):
             >>> term.move(*term.get_location()))
 
          .. warning:: You might first test that a terminal is capable of
-             informing you of its location before calling it in a non-blocking
-             manner.  If a timeout is specified, always ensure the return
-             value is conditionally checked for values ``(-1, -1)``.
-
-        ::
-            can_locate = bool(term.get_location() != (-1, -1))
-            if can_locate:
-                print(, end='', flush=True)
+             informing you of its location, while using a timeout, before
+             later calling.  When a timeout is specified, always ensure the
+             return value is conditionally checked for ``(-1, -1)``.
         """
         # Local lines attached by termios and remote login protocols such as
         # ssh and telnet both provide a means to determine the window
