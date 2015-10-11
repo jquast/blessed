@@ -35,12 +35,12 @@ def main():
     print("combining coverage: {0}".format(data_paths))
     cov.combine(data_paths=data_paths)
     cov.load()
-    cov.html_report()
+    cov.html_report(ignore_errors=True)
     print("--> open {0}/htmlcov/index.html for review."
           .format(os.path.relpath(PROJ_ROOT)))
 
     fout = six.StringIO()
-    cov.report(file=fout)
+    cov.report(file=fout, ignore_errors=True)
     for line in fout.getvalue().splitlines():
         if u'TOTAL' in line:
             total_line = line
