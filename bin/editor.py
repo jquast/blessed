@@ -62,7 +62,7 @@ def echo_yx(cursor, text):
     """Move to ``cursor`` and display ``text``."""
     echo(cursor.term.move(cursor.y, cursor.x) + text)
 
-Cursor = collections.namedtuple('Point', ('y', 'x', 'term'))
+Cursor = collections.namedtuple('Cursor', ('y', 'x', 'term'))
 
 def readline(term, width=20):
     """A rudimentary readline implementation."""
