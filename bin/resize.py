@@ -7,22 +7,23 @@ determine the screen margins.  Calls to reset(1) do not resolve the
 issue.
 
 This may often happen because the transport is incapable of communicating
-the terminal size, such as over a serial line.  To resolve the issue,
-simply call this program:
+the terminal size, such as over a serial line.  This demonstration program
+determines true screen dimensions and produces output suitable for evaluation
+by a bourne-like shell::
 
-This demonstration program produces output that must be evaluated as
-part of a bourne-like shell command::
+        $ eval `./resize.py`
 
-        $ eval `$HOME/bin/resize.py`
+The following remote login protocols communicate window size:
 
-The following remote login protocols communicate the connecting window size:
-
- - ssh protocol reserves on the session channel, such as in
+ - ssh: notifies on dedicated session channel, see for example,
    ``paramiko.ServerInterface.check_channel_window_change_request``.
- - telnet protocol sends window size through NAWS
-   (negotiate about window size, RFC 1073), such as in
+
+ - telnet: sends window size through NAWS (negotiate about window
+   size, RFC 1073), see for example,
    ``telnetlib3.TelnetServer.naws_receive``.
- - the rlogin protocol may only send initial window size.
+
+ - rlogin: protocol sends only initial window size, and does not notify
+   about size changes.
 
 This is a simplified version of `resize.c
 <https://github.com/joejulian/xterm/blob/master/resize.c>`_ provided by the
