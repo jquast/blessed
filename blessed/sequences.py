@@ -73,7 +73,7 @@ def _build_numeric_capability(term, cap, optional=False,
                 cap_re = cap_re.replace(str(num), r'(\d+){0}'.format(opt))
                 return cap_re
         warnings.warn('Unknown parameter in {0!r}, {1!r}: {2!r})'
-                      .format(cap, _cap, cap_re), RuntimeWarning)
+                      .format(cap, _cap, cap_re), UserWarning)
     return None  # no such capability
 
 
@@ -98,7 +98,7 @@ def _build_any_numeric_capability(term, cap, num=99, nparams=1):
         if r'(\d+)' in cap_re:
             return cap_re
         warnings.warn('Missing numerics in {0!r}: {1!r}'
-                      .format(cap, cap_re), RuntimeWarning)
+                      .format(cap, cap_re), UserWarning)
     return None  # no such capability
 
 
