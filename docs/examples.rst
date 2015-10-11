@@ -66,3 +66,20 @@ with blessed.  It is designed after the class game of WORMS.BAS,
 distributed with early Microsoft Q-BASIC for PC-DOS, and later
 more popularly known as "snake" as it was named on early mobile
 platforms.
+
+resize.py
+---------
+https://github.com/jquast/blessed/blob/master/bin/resize.py
+
+This program demonstrates the :meth:`~.get_location` method,
+providing a slimmed pythonic version of the xterm `
+resize(1) <https://github.com/joejulian/xterm/blob/master/resize.c>`_
+program: set environment and terminal settings to current window size.
+
+detect-multibyte.py
+-------------------
+https://github.com/jquast/blessed/blob/master/bin/detect-multibyte.py
+
+This program also demonstrates how the :meth:`~.get_location` method
+can be used to reliably test whether the terminal emulator of the connecting
+client is capable of rendering multibyte characters.
