@@ -72,7 +72,7 @@ def _build_numeric_capability(term, cap, optional=False,
                 # modify & return n to matching digit expression
                 cap_re = cap_re.replace(str(num), r'(\d+){0}'.format(opt))
                 return cap_re
-        warnings.warn('Unknown parameter in {0:!r}, {1:!r}: {2:!r})'
+        warnings.warn('Unknown parameter in {0!r}, {1!r}: {2!r})'
                       .format(cap, _cap, cap_re), RuntimeWarning)
     return None  # no such capability
 
@@ -97,7 +97,7 @@ def _build_any_numeric_capability(term, cap, num=99, nparams=1):
         cap_re = re.sub(r'(\d+)', r'(\d+)', cap_re)
         if r'(\d+)' in cap_re:
             return cap_re
-        warnings.warn('Missing numerics in {0:!r}: {1:!r}'
+        warnings.warn('Missing numerics in {0!r}: {1!r}'
                       .format(cap, cap_re), RuntimeWarning)
     return None  # no such capability
 
@@ -400,8 +400,8 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         lines = []
         if self.width <= 0 or not isinstance(self.width, int):
             raise ValueError(
-                "invalid width {self.width} ({width_type}) (must be int > 0)"
-                .format(self=self, width_type=type(self.width)))
+                "invalid width {0!r} ({1!r}) (must be int > 0)"
+                .format(self.width, type(self.width)))
 
         term = self.term
         drop_whitespace = not hasattr(self, 'drop_whitespace'
