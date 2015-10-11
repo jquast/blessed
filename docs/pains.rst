@@ -251,43 +251,10 @@ emulators? <http://www.cl.cam.ac.uk/~mgk25/unicode.html#term>`_ by
 `Markus Kuhn <http://www.cl.cam.ac.uk/~mgk25/>`_ of the University of
 Cambridge.
 
-Detecting multibyte
-~~~~~~~~~~~~~~~~~~~
-
 One can be assured that the connecting client is capable of representing
 UTF-8 and other multibyte character encodings by the Environment variable
-``LANG``.  If this is not possible, there is an alternative method:
-
-  - Emit Report Cursor Position (CPR), ``\x1b[6n`` and store response.
-  - Emit a multibyte UTF-8 character, such as ⦰ (``\x29\xb0``).
-  - Emit Report Cursor Position (CPR), ``\x1b[6n`` and store response.
-  - Determine the difference of the *(y, x)* location of the response.
-    If it is *1*, then the client decoded the two UTF-8 bytes as a
-    single character, and can be considered capable.  If it is *2*,
-    the client is using a `code page`_ and is incapable of decoding
-    a UTF-8 bytestream.
-
-Note that both SSH and Telnet protocols provide means for forwarding
-the ``LANG`` environment variable.  However, some transports such as
-a link by serial cable is incapable of forwarding Environment variables.
-
-Detecting screen size
-~~~~~~~~~~~~~~~~~~~~~
-
-While we're on the subject, there are times when :attr:`height` and
-:attr:`width` are not accurate -- when a transport does not provide the means
-to propagate the COLUMNS and ROWS Environment values, or propagate the
-SIGWINCH signals, such as through a serial link.
-
-The same means described above for multibyte encoding detection may be used to
-detect the remote client's window size:
-
-  - Move cursor to row 999, 999.
-  - Emit Report Cursor Position (CPR), ``\x1b[6n`` and store response.
-  - The return value is the window dimensions of the client.
-
-This is the method used by the program ``resize`` provided in the Xorg
-distribution, and its source may be viewed as file `resize.c`_.
+``LANG``.  If this is not possible or reliable, there is an method
+demonstrated in the example program detect-multibyte.py_.
 
 Alt or meta sends Escape
 ------------------------
@@ -371,6 +338,5 @@ When people say 'ANSI Sequence', they are discussing:
 .. _f.lux: https://justgetflux.com/
 .. _ZX Spectrum: https://en.wikipedia.org/wiki/List_of_8-bit_computer_hardware_palettes#ZX_Spectrum
 .. _Control-Sequence-Inducer: http://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Controls-beginning-with-ESC
-.. _resize.c: http://www.opensource.apple.com/source/X11apps/X11apps-13/xterm/xterm-207/resize.c
 .. _ANSI.SYS: http://www.kegel.com/nansi/
 .. _ECMA-48: http://www.ecma-international.org/publications/standards/Ecma-048.htm
