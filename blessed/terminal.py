@@ -966,6 +966,7 @@ class Terminal(object):
         if HAS_TTY and self._keyboard_fd is not None:
             # Save current terminal mode:
             save_mode = termios.tcgetattr(self._keyboard_fd)
+            save_line_buffered = self._line_buffered
             tty.setraw(self._keyboard_fd, termios.TCSANOW)
             try:
                 self._line_buffered = False
