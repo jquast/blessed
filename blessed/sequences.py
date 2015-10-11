@@ -400,7 +400,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         lines = []
         if self.width <= 0 or not isinstance(self.width, int):
             raise ValueError(
-                "invalid width {0!r} ({1!r}) (must be int > 0)"
+                "invalid width {0!r}({1!r}) (must be integer > 0)"
                 .format(self.width, type(self.width)))
 
         term = self.term
