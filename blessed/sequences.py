@@ -72,7 +72,7 @@ def _build_numeric_capability(term, cap, optional=False,
                 # modify & return n to matching digit expression
                 cap_re = cap_re.replace(str(num), r'(\d+){0}'.format(opt))
                 return cap_re
-        warnings.warn('Unknown parameter in {0:!r}, {1!r}: {2!r})'
+        warnings.warn('Unknown parameter in {0:!r}, {1:!r}: {2:!r})'
                       .format(cap, _cap, cap_re), RuntimeWarning)
     return None  # no such capability
 
@@ -400,7 +400,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         lines = []
         if self.width <= 0 or not isinstance(self.width, int):
             raise ValueError(
-                "invalid width {self.width} (width_type) (must be integer > 0)"
+                "invalid width {self.width} ({width_type}) (must be int > 0)"
                 .format(self=self, width_type=type(self.width)))
 
         term = self.term
