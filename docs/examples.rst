@@ -62,19 +62,20 @@ worms.py
 https://github.com/jquast/blessed/blob/master/bin/worms.py
 
 This program demonstrates how an interactive game could be made
-with blessed.  It is designed after the class game of WORMS.BAS,
-distributed with early Microsoft Q-BASIC for PC-DOS, and later
-more popularly known as "snake" as it was named on early mobile
-platforms.
+with blessed.  It is similar to `NIBBLES.BAS
+<https://github.com/tangentstorm/tangentlabs/blob/master/qbasic/NIBBLES.BAS>`_
+or "snake" of early mobile platforms.
 
 resize.py
 ---------
 https://github.com/jquast/blessed/blob/master/bin/resize.py
 
 This program demonstrates the :meth:`~.get_location` method,
-providing a slimmed pythonic version of the xterm `
-resize(1) <https://github.com/joejulian/xterm/blob/master/resize.c>`_
-program: set environment and terminal settings to current window size.
+behaving similar to `resize(1)
+<https://github.com/joejulian/xterm/blob/master/resize.c>`_
+: set environment and terminal settings to current window size.
+The window size is determined by eliciting an answerback
+sequence from the connecting terminal emulator.
 
 detect-multibyte.py
 -------------------
@@ -82,4 +83,4 @@ https://github.com/jquast/blessed/blob/master/bin/detect-multibyte.py
 
 This program also demonstrates how the :meth:`~.get_location` method
 can be used to reliably test whether the terminal emulator of the connecting
-client is capable of rendering multibyte characters.
+client is capable of rendering multibyte characters as a single cell.
