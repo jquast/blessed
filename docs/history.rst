@@ -1,5 +1,9 @@
 Version History
 ===============
+1.12
+  * enhancement: :meth:`~.Terminal.get_location` returns the ``(row, col)``
+    position of the cursor at the time of call for attached terminal.
+
 1.11
   * enhancement: :meth:`~.Terminal.inkey` can return more quickly for
     combinations such as ``Alt + Z`` when ``MetaSendsEscape`` is enabled,
