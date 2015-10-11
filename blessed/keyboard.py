@@ -3,6 +3,8 @@
 # std imports
 import curses.has_key
 import curses
+import time
+import re
 
 # 3rd party
 import six
@@ -228,6 +230,65 @@ def resolve_sequence(text, mapper, codes):
         if text.startswith(sequence):
             return Keystroke(ucs=sequence, code=code, name=codes[code])
     return Keystroke(ucs=text and text[0] or u'')
+
+
+def time_left(stime, timeout):
+    """
+    Return time remaining since ``stime`` before given ``timeout``.
+
+    This function assists determining the value of ``timeout`` for
+    class method :meth:`~.Terminal.kbhit` and similar functions.
+
+    :arg float stime: starting time for measurement
+    :arg float timeout: timeout period, may be set to None to
+       indicate no timeout (where None is always returned).
+    :rtype: float or int
+    :returns: time remaining as float. If no time is remaining,
+       then the integer ``0`` is returned.
+    """
+    if timeout is not None:
+        if timeout == 0:
+            return 0
+        return max(0, timeout - (time.time() - stime))
+
+
+def _read_until(term, pattern, timeout):
+    """
+    Convenience function, supporting :meth:`~.get_location`.
+
+    :arg blessed.Terminal term: :class:`~.Terminal` instance.
+    :arg float timeout: timeout period, may be set to None to indicate no
+        timeout (where 0 is always returned).
+    :arg str pattern: target regular expression pattern to seek.
+    :rtype: tuple
+    :returns: tuple in form of ``(match, str)``, *match*
+        may be :class:`re.MatchObject` if pattern is discovered
+        in input stream before timeout has elapsed, otherwise
+        None. ``str`` is any remaining text received exclusive
+        of the matching pattern).
+
+    The reason a tuple containing non-matching data is returned, is that the
+    consumer should push such data back into the input buffer by
+    :meth:`~.Terminal.ungetch` if any was received.
+
+    For example, when a user is performing rapid input keystrokes while its
+    terminal emulator surreptitiously responds to this in-band sequence, we
+    must ensure any such keyboard data is well-received by the next call to
+    term.inkey() without delay.
+    """
+    stime = time.time()
+    match, buf = None, u''
+    while True:
+        buf += term.inkey(timeout=time_left(stime, timeout))
+        match = re.search(pattern=pattern, string=buf)
+        if match is not None:
+            # trim buf to exclude match result
+            buf = (buf[:match.start()] + buf[match.end():])
+            break
+        if timeout is not None and not time_left(stime, timeout):
+            # timeout
+            break
+    return match, buf
 
 
 def _inject_curses_keynames():
