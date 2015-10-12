@@ -200,8 +200,8 @@ all this mashing.
 
 This compound notation comes in handy if you want to allow users to customize
 formatting, just allow compound formatters, like *bold_green*, as a command
-line argument or configuration item such as in the :ref:`tprint.py` demonstration
-script.
+line argument or configuration item such as in the :ref:`tprint.py`
+demonstration script.
 
 Moving The Cursor
 -----------------

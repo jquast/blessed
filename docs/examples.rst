@@ -79,7 +79,7 @@ behaving similar to `resize(1)
 The window size is determined by eliciting an answerback
 sequence from the connecting terminal emulator.
 
-.. _detect-multibyte.py: 
+.. _detect-multibyte.py:
 
 detect-multibyte.py
 -------------------
