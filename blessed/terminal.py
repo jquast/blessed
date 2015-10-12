@@ -141,9 +141,10 @@ class Terminal(object):
         self._keyboard_fd = None
 
         # Default stream is stdout, keyboard valid as stdin only when
-        # output stream is stdout is a tty.
-        if stream is None or stream == sys.__stdout__:
+        # output stream is stdout or stderr and is a tty.
+        if stream is None:
             stream = sys.__stdout__
+        if stream in (sys.__stdout__, sys.__stderr__):
             self._keyboard_fd = sys.__stdin__.fileno()
 
         # we assume our input stream to be line-buffered until either the
@@ -410,10 +411,12 @@ class Terminal(object):
         elif y is not None:
             self.stream.write(self.move_y(y))
         try:
+            self.stream.flush()
             yield
         finally:
             # Restore original cursor position:
             self.stream.write(self.restore)
+            self.stream.flush()
 
     def get_location(self, timeout=None):
         r"""
