@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 """
+Determines whether the attached terminal supports multibyte encodings.
+
 Problem: A screen drawing application wants to detect whether the terminal
 client is capable of rendering utf-8.  Some transports, such as a serial link,
 often cannot forward their ``LANG`` environment preference, or protocols such
@@ -22,9 +24,11 @@ As an exercise, it may be possible to use this technique to accurately
 determine to the remote encoding without protocol negotiation using cursor
 positioning alone, as demonstrated by the following diagram,
 
-.. image:: https://github.com/jquast/blessed/blob/master/docs/_static/soulburner-ru-family-encodings.jpg
+.. image:: _static/soulburner-ru-family-encodings.jpg
     :alt: Cyrillic encodings flowchart
 """
+# pylint: disable=invalid-name
+#         Invalid module name "detect-multibyte"
 # std imports
 from __future__ import print_function
 import collections
@@ -33,11 +37,11 @@ import sys
 # local,
 from blessed import Terminal
 
-import time
 
 def get_pos(term):
     """Get cursor position, calling os.exit(2) if not determined."""
-
+    # pylint: disable=invalid-name
+    #         Invalid variable name "Position"
     Position = collections.namedtuple('Position', ('row', 'column'))
 
     pos = Position(*term.get_location(timeout=5.0))
@@ -51,13 +55,11 @@ def get_pos(term):
 
 def main():
     """Program entry point."""
-
     term = Terminal()
 
     # move to bottom of screen, temporarily, where we're likely to do
     # the least damage, as we are performing something of a "destructive
-    # write and erase" onto this screen location.  Furthermore, stderr is
-    # used to pre
+    # write and erase" onto this screen location.
     with term.cbreak(), term.location(y=term.height - 1, x=0):
 
         # store first position
@@ -85,5 +87,6 @@ def main():
 
     print('{checkbox} multibyte encoding supported!'
           .format(checkbox=term.bold_green(u'✓')))
+
 if __name__ == '__main__':
     exit(main())

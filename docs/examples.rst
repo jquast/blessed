@@ -46,6 +46,8 @@ to stderr, to avoid the need to "flush" or emit newlines, and makes
 use of the move_x (hpa) capability to "overstrike" the display a
 scrolling progress bar.
 
+.. _tprint.py:
+
 tprint.py
 ---------
 https://github.com/jquast/blessed/blob/master/bin/tprint.py
@@ -76,6 +78,8 @@ behaving similar to `resize(1)
 : set environment and terminal settings to current window size.
 The window size is determined by eliciting an answerback
 sequence from the connecting terminal emulator.
+
+.. _detect-multibyte.py: 
 
 detect-multibyte.py
 -------------------

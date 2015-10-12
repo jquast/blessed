@@ -200,7 +200,7 @@ all this mashing.
 
 This compound notation comes in handy if you want to allow users to customize
 formatting, just allow compound formatters, like *bold_green*, as a command
-line argument or configuration item such as in the tprint.py_ demonstration
+line argument or configuration item such as in the :ref:`tprint.py` demonstration
 script.
 
 Moving The Cursor
@@ -517,8 +517,8 @@ Its output might appear as::
 A :paramref:`~.Terminal.inkey.timeout` value of *None* (default) will block
 forever until a keypress is received. Any other value specifies the length of
 time to poll for input: if no input is received after the given time has
-elapsed, an empty string is returned. A
-:paramref:`~.Terminal.inkey.timeout` value of *0* is non-blocking.
+elapsed, an empty string is returned. A :paramref:`~.Terminal.inkey.timeout`
+value of *0* is non-blocking.
 
 keyboard codes
 ~~~~~~~~~~~~~~

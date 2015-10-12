@@ -27,7 +27,7 @@ def parse_args():
 
 
 def main(style, text):
-    """ Program entry point."""
+    """Program entry point."""
     term = Terminal()
     style = getattr(term, style)
     print(style(' '.join(text)))

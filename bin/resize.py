@@ -40,7 +40,8 @@ from blessed import Terminal
 
 def main():
     """Program entry point."""
-
+    # pylint: disable=invalid-name
+    #         Invalid variable name "Position"
     Position = collections.namedtuple('Position', ('row', 'column'))
 
     # particularly strange, we use sys.stderr as our output stream device,
