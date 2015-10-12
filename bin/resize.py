@@ -32,6 +32,7 @@ xterm package.
 # std imports
 from __future__ import print_function
 import collections
+import sys
 
 # local
 from blessed import Terminal
@@ -42,7 +43,15 @@ def main():
 
     Position = collections.namedtuple('Position', ('row', 'column'))
 
-    term = Terminal()
+    # particularly strange, we use sys.stderr as our output stream device,
+    # this 'stream' file descriptor is only used for side effects, of which
+    # this application uses two: the term.location() has an implied write,
+    # as does get_position().
+    #
+    # the reason we chose stderr is to ensure that the terminal emulator
+    # receives our bytes even when this program is wrapped by shell eval
+    # `resize.py`; backticks gather stdout but not stderr in this case.
+    term = Terminal(stream=sys.stderr)
 
     # Move the cursor to the farthest lower-right hand corner that is
     # reasonable.  Due to word size limitations in older protocols, 999,999
