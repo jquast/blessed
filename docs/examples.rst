@@ -16,8 +16,7 @@ https://github.com/jquast/blessed/blob/master/bin/editor.py
 
 This program demonstrates using the directional keys and noecho input
 mode. It acts as a (very dumb) fullscreen editor, with support for
-saving a file, which demonstrates how to provide a line-editor
-rudimentary line-editor as well.
+saving a file, as well as including a rudimentary line-editor.
 
 keymatrix.py
 ------------
