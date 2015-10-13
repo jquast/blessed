@@ -56,7 +56,7 @@ from .keyboard import (get_keyboard_sequences,
                        get_keyboard_codes,
                        resolve_sequence,
                        _read_until,
-                       time_left,
+                       _time_left,
                        )
 
 
@@ -473,17 +473,13 @@ class Terminal(object):
                     term=self, cap='u6', nparams=2
                 ) or response_re
 
-        # Avoid changing user's desired raw or cbreak mode if
-        # already entered, by entering cbreak mode ourselves.
-        #
-        # Such mode is necessary to receive user input with
-        # awaiting a human to press the return key, and such
-        # mode also disables echo, which we should also hide,
-        # as it would cause the cursor to advance after it
-        # has responded!
+        # Avoid changing user's desired raw or cbreak mode if already entered,
+        # by entering cbreak mode ourselves.  This is necessary to receive user
+        # input without awaiting a human to press the return key.   This mode
+        # also disables echo, which we should also hide, as our input is an
+        # sequence that is not meaningful for display as an output sequence.
 
         ctx = None
-
         try:
             if self._line_buffered:
                 ctx = self.cbreak()
@@ -498,10 +494,15 @@ class Terminal(object):
                                       pattern=response_re,
                                       timeout=timeout)
 
+            # ensure response sequence is excluded from subsequent input,
+            if match:
+                data = (data[:match.start()] + data[match.end():])
+
             # re-buffer keyboard data, if any
             self.ungetch(data)
 
             if match:
+                # return matching sequence response, the cursor location.
                 row, col = match.groups()
                 return int(row), int(col)
 
@@ -509,15 +510,9 @@ class Terminal(object):
             if ctx is not None:
                 ctx.__exit__(None, None, None)
 
-        # there is a split in design thoughts of return value on timeout:
-        #
-        # - custom TIMEOUT exception, such as in pexpect library.
-        # - legitimate default values, such as (1, 1)
-        # - an illegal value, such as -1, to indicate error.
-        #
-        # We chose the final, because a wrapping developer should define their
-        # own behavior when a terminal does not respond without having to
-        # catch exceptions.
+        # We chose to return an illegal value rather than an exception,
+        # favoring that users author function filters, such as max(0, y),
+        # rather than crowbarring such logic into an exception handler.
         return -1, -1
 
     @contextlib.contextmanager
@@ -1061,20 +1056,25 @@ class Terminal(object):
         # so long as the most immediately received or buffered keystroke is
         # incomplete, (which may be a multibyte encoding), block until until
         # one is received.
-        while not ks and self.kbhit(timeout=time_left(stime, timeout)):
+        while not ks and self.kbhit(timeout=_time_left(stime, timeout)):
             ucs += self.getch()
             ks = resolve(text=ucs)
 
         # handle escape key (KEY_ESCAPE) vs. escape sequence (like those
         # that begin with \x1b[ or \x1bO) up to esc_delay when
         # received. This is not optimal, but causes least delay when
-        # "meta sends escape" is used,
-        # or when an unsupported sequence is sent.
+        # "meta sends escape" is used, or when an unsupported sequence is
+        # sent.
+        #
+        # The statement, "ucs in self._keymap_prefixes" has an effect on
+        # keystrokes such as Alt + Z ("\x1b[z" with metaSendsEscape): because
+        # no known input sequences begin with such phrasing to allow it to be
+        # returned more quickly than esc_delay otherwise blocks for.
         if ks.code == self.KEY_ESCAPE:
             esctime = time.time()
             while (ks.code == self.KEY_ESCAPE and
                    ucs in self._keymap_prefixes and
-                   self.kbhit(timeout=time_left(esctime, esc_delay))):
+                   self.kbhit(timeout=_time_left(esctime, esc_delay))):
                 ucs += self.getch()
                 ks = resolve(text=ucs)
 

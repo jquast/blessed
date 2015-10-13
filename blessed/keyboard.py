@@ -220,8 +220,8 @@ def resolve_sequence(text, mapper, codes):
     determine that ``xxx`` remains unresolved.
 
     :arg text: string of characters received from terminal input stream.
-    :arg OrderedDict mapper: an OrderedDict of unicode multibyte sequences,
-        such as u'\x1b[D' paired by their integer value (260)
+    :arg OrderedDict mapper: unicode multibyte sequences, such as ``u'\x1b[D'``
+        paired by their integer value (260)
     :arg dict codes: a :type:`dict` of integer values (such as 260) paired
         by their mnemonic name, such as ``'KEY_LEFT'``.
     :rtype: Keystroke
@@ -232,7 +232,7 @@ def resolve_sequence(text, mapper, codes):
     return Keystroke(ucs=text and text[0] or u'')
 
 
-def time_left(stime, timeout):
+def _time_left(stime, timeout):
     """
     Return time remaining since ``stime`` before given ``timeout``.
 
@@ -254,7 +254,7 @@ def time_left(stime, timeout):
 
 def _read_until(term, pattern, timeout):
     """
-    Convenience function, supporting :meth:`~.get_location`.
+    Convenience read-until-pattern function, supporting :meth:`~.get_location`.
 
     :arg blessed.Terminal term: :class:`~.Terminal` instance.
     :arg float timeout: timeout period, may be set to None to indicate no
@@ -278,16 +278,38 @@ def _read_until(term, pattern, timeout):
     """
     stime = time.time()
     match, buf = None, u''
+
+    # first, buffer all pending data. pexpect library provides a
+    # 'searchwindowsize' attribute that limits this memory region.  We're not
+    # concerned about OOM conditions: only (human) keyboard input and terminal
+    # response sequences are expected.
+
     while True:
-        buf += term.inkey(timeout=time_left(stime, timeout))
+        # block as long as necessary to ensure at least one character is
+        # received on input or remaining timeout has elapsed.
+        ucs = term.inkey(timeout=_time_left(stime, timeout))
+        if ucs:
+            buf += ucs
+            # while the keyboard buffer is "hot" (has input), we continue to
+            # aggregate all awaiting data.  We do this to ensure slow I/O
+            # calls do not unnecessarily give up within the first 'while' loop
+            # for short timeout periods.
+            while True:
+                ucs = term.inkey(timeout=0)
+                if not ucs:
+                    break
+                buf += ucs
+
         match = re.search(pattern=pattern, string=buf)
         if match is not None:
-            # trim buf to exclude match result
-            buf = (buf[:match.start()] + buf[match.end():])
+            # match
             break
-        if timeout is not None and not time_left(stime, timeout):
-            # timeout
-            break
+
+        if timeout is not None:
+            if not _time_left(stime, timeout):
+                # timeout
+                break
+
     return match, buf
 
 
@@ -301,7 +323,7 @@ def _inject_curses_keynames():
     curses module, and is called from the global namespace at time of
     import.
 
-    Though we may determine keynames and codes for keyboard input that
+    Though we may determine *keynames* and codes for keyboard input that
     generate multibyte sequences, it is also especially useful to aliases
     a few basic ASCII characters such as ``KEY_TAB`` instead of ``u'\t'`` for
     uniformity.

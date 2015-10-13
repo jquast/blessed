@@ -6,6 +6,8 @@ import collections
 import warnings
 import platform
 import locale
+import time
+import math
 import sys
 import imp
 import os
@@ -449,3 +451,24 @@ def test_win32_missing_tty_modules(monkeypatch):
             imp.reload(blessed.terminal)
 
     child()
+
+
+def test_time_left():
+    """test '_time_left' routine returns correct positive delta difference."""
+    from blessed.keyboard import _time_left
+
+    # given stime =~ "10 seconds ago"
+    stime = (time.time() - 10)
+
+    # timeleft(now, 15s) = 5s remaining
+    timeout = 15
+    result = _time_left(stime=stime, timeout=timeout)
+
+    # we expect roughly 4.999s remain
+    assert math.ceil(result) == 5.0
+
+
+def test_time_left_infinite_None():
+    """keyboard '_time_left' routine returns None when given None."""
+    from blessed.keyboard import _time_left
+    assert _time_left(stime=time.time(), timeout=None) is None
