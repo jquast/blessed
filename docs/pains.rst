@@ -253,8 +253,8 @@ Cambridge.
 
 One can be assured that the connecting client is capable of representing
 UTF-8 and other multibyte character encodings by the Environment variable
-``LANG``.  If this is not possible or reliable, there is an method
-demonstrated in the example program :ref:`detect-multibyte.py`.
+``LANG``.  If this is not possible or reliable, there is an intrusive detection
+method demonstrated in the example program :ref:`detect-multibyte.py`.
 
 Alt or meta sends Escape
 ------------------------
