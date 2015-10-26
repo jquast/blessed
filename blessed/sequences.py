@@ -2,11 +2,12 @@
 """This module provides 'sequence awareness'."""
 
 # std imports
+import collections
 import functools
-import textwrap
-import warnings
 import math
 import re
+import textwrap
+import warnings
 
 # local
 from blessed._binterms import BINARY_TERMINALS, BINTERM_UNSUPPORTED_MSG
@@ -15,7 +16,10 @@ from blessed._binterms import BINARY_TERMINALS, BINTERM_UNSUPPORTED_MSG
 import wcwidth
 import six
 
-__all__ = ('init_sequence_patterns', 'Sequence', 'SequenceTextWrapper',)
+__all__ = ('init_sequence_patterns', 'Sequence', 'SequenceTextWrapper', 'iter_parse')
+
+
+TextFragment = collections.namedtuple('TextFragment', ['ucs', 'is_sequence', 'capname', 'params'])
 
 
 def _sort_sequences(regex_seqlist):
@@ -40,7 +44,9 @@ def _sort_sequences(regex_seqlist):
     # types, it is feasible.
     # pylint: disable=bad-builtin
     #         Used builtin function 'filter'
-    return sorted(list(filter(None, regex_seqlist)), key=len, reverse=True)
+    for el in regex_seqlist:
+        assert isinstance(el, tuple)
+    return sorted(list(filter(lambda x: x and x[1], regex_seqlist)), key=lambda x: len(x[1]), reverse=True)
 
 
 def _build_numeric_capability(term, cap, optional=False,
@@ -71,7 +77,7 @@ def _build_numeric_capability(term, cap, optional=False,
             if str(num) in cap_re:
                 # modify & return n to matching digit expression
                 cap_re = cap_re.replace(str(num), r'(\d+){0}'.format(opt))
-                return cap_re
+                return cap, cap_re
         warnings.warn('Unknown parameter in {0!r}, {1!r}: {2!r})'
                       .format(cap, _cap, cap_re), UserWarning)
     return None  # no such capability
@@ -96,10 +102,19 @@ def _build_any_numeric_capability(term, cap, num=99, nparams=1):
         cap_re = re.escape(_cap(*((num,) * nparams)))
         cap_re = re.sub(r'(\d+)', r'(\d+)', cap_re)
         if r'(\d+)' in cap_re:
-            return cap_re
+            return cap, cap_re
         warnings.warn('Missing numerics in {0!r}: {1!r}'
                       .format(cap, cap_re), UserWarning)
     return None  # no such capability
+
+
+def _build_simple_capability(term, cap):
+    """Build terminal capability for capname"""
+    _cap = getattr(term, cap)
+    if _cap:
+        return cap, re.escape(_cap)
+    return None
+
 
 
 def get_movement_sequence_patterns(term):
@@ -110,10 +125,11 @@ def get_movement_sequence_patterns(term):
     :rtype: list
     """
     bnc = functools.partial(_build_numeric_capability, term)
+    bsc = functools.partial(_build_simple_capability, term)
 
     return set(filter(None, [
         # carriage_return
-        re.escape(term.cr),
+        bsc(cap='cr'),
         # column_address: Horizontal position, absolute
         bnc(cap='hpa'),
         # row_address: Vertical position #1 absolute
@@ -121,28 +137,28 @@ def get_movement_sequence_patterns(term):
         # cursor_address: Move to row #1 columns #2
         bnc(cap='cup', nparams=2),
         # cursor_down: Down one line
-        re.escape(term.cud1),
+        bsc(cap='ud1'),
         # cursor_home: Home cursor (if no cup)
-        re.escape(term.home),
+        bsc(cap='home'),
         # cursor_left: Move left one space
-        re.escape(term.cub1),
+        bsc(cap='cub1'),
         # cursor_right: Non-destructive space (move right one space)
-        re.escape(term.cuf1),
+        bsc(cap='cuf1'),
         # cursor_up: Up one line
-        re.escape(term.cuu1),
+        bsc(cap='cuu1'),
         # param_down_cursor: Down #1 lines
         bnc(cap='cud', optional=True),
         # restore_cursor: Restore cursor to position of last save_cursor
-        re.escape(term.rc),
+        bsc(cap='rc'),
         # clear_screen: clear screen and home cursor
-        re.escape(term.clear),
+        bsc(cap='clear'),
         # enter/exit_fullscreen: switch to alternate screen buffer
-        re.escape(term.enter_fullscreen),
-        re.escape(term.exit_fullscreen),
+        bsc(cap='enter_fullscreen'),
+        bsc(cap='exit_fullscreen'),
         # forward cursor
-        term._cuf,
+        ('_cuf', term._cuf),
         # backward cursor
-        term._cub,
+        ('_cub', term._cub),
     ]))
 
 
@@ -155,90 +171,92 @@ def get_wontmove_sequence_patterns(term):
     """
     bnc = functools.partial(_build_numeric_capability, term)
     bna = functools.partial(_build_any_numeric_capability, term)
+    bsc = functools.partial(_build_simple_capability, term)
+
 
     # pylint: disable=bad-builtin
     #         Used builtin function 'map'
     return set(filter(None, [
         # print_screen: Print contents of screen
-        re.escape(term.mc0),
+        bsc(cap='mc0'),
         # prtr_off: Turn off printer
-        re.escape(term.mc4),
+        bsc(cap='mc4'),
         # prtr_on: Turn on printer
-        re.escape(term.mc5),
+        bsc(cap='mc5'),
         # save_cursor: Save current cursor position (P)
-        re.escape(term.sc),
+        bsc(cap='sc'),
         # set_tab: Set a tab in every row, current columns
-        re.escape(term.hts),
+        bsc(cap='hts'),
         # enter_bold_mode: Turn on bold (extra bright) mode
-        re.escape(term.bold),
+        bsc(cap='bold'),
         # enter_standout_mode
-        re.escape(term.standout),
+        bsc(cap='standout'),
         # enter_subscript_mode
-        re.escape(term.subscript),
+        bsc(cap='subscript'),
         # enter_superscript_mode
-        re.escape(term.superscript),
+        bsc(cap='superscript'),
         # enter_underline_mode: Begin underline mode
-        re.escape(term.underline),
+        bsc(cap='underline'),
         # enter_blink_mode: Turn on blinking
-        re.escape(term.blink),
+        bsc(cap='blink'),
         # enter_dim_mode: Turn on half-bright mode
-        re.escape(term.dim),
+        bsc(cap='dim'),
         # cursor_invisible: Make cursor invisible
-        re.escape(term.civis),
+        bsc(cap='civis'),
         # cursor_visible: Make cursor very visible
-        re.escape(term.cvvis),
+        bsc(cap='cvvis'),
         # cursor_normal: Make cursor appear normal (undo civis/cvvis)
-        re.escape(term.cnorm),
+        bsc(cap='cnorm'),
         # clear_all_tabs: Clear all tab stops
-        re.escape(term.tbc),
+        bsc(cap='tbc'),
         # change_scroll_region: Change region to line #1 to line #2
         bnc(cap='csr', nparams=2),
         # clr_bol: Clear to beginning of line
-        re.escape(term.el1),
+        bsc(cap='el1'),
         # clr_eol: Clear to end of line
-        re.escape(term.el),
+        bsc(cap='el'),
         # clr_eos: Clear to end of screen
-        re.escape(term.clear_eos),
+        bsc(cap='clear_eos'),
         # delete_character: Delete character
-        re.escape(term.dch1),
+        bsc(cap='dch1'),
         # delete_line: Delete line (P*)
-        re.escape(term.dl1),
+        bsc(cap='dl1'),
         # erase_chars: Erase #1 characters
         bnc(cap='ech'),
         # insert_line: Insert line (P*)
-        re.escape(term.il1),
+        bsc(cap='il1'),
         # parm_dch: Delete #1 characters
         bnc(cap='dch'),
         # parm_delete_line: Delete #1 lines
         bnc(cap='dl'),
         # exit_alt_charset_mode: End alternate character set (P)
-        re.escape(term.rmacs),
+        bsc(cap='rmacs'),
         # exit_am_mode: Turn off automatic margins
-        re.escape(term.rmam),
+        bsc(cap='rmam'),
         # exit_attribute_mode: Turn off all attributes
-        re.escape(term.sgr0),
+        bsc(cap='sgr0'),
         # exit_ca_mode: Strings to end programs using cup
-        re.escape(term.rmcup),
+        bsc(cap='rmcup'),
         # exit_insert_mode: Exit insert mode
-        re.escape(term.rmir),
+        bsc(cap='rmir'),
         # exit_standout_mode: Exit standout mode
-        re.escape(term.rmso),
+        bsc(cap='rmso'),
         # exit_underline_mode: Exit underline mode
-        re.escape(term.rmul),
+        bsc(cap='rmul'),
         # flash_hook: Flash switch hook
-        re.escape(term.hook),
+        bsc(cap='hook'),
         # flash_screen: Visible bell (may not move cursor)
-        re.escape(term.flash),
+        bsc(cap='flash'),
         # keypad_local: Leave 'keyboard_transmit' mode
-        re.escape(term.rmkx),
+        bsc(cap='rmkx'),
         # keypad_xmit: Enter 'keyboard_transmit' mode
-        re.escape(term.smkx),
+        bsc(cap='smkx'),
         # meta_off: Turn off meta mode
-        re.escape(term.rmm),
+        bsc(cap='rmm'),
         # meta_on: Turn on meta mode (8th-bit on)
-        re.escape(term.smm),
+        bsc(cap='smm'),
         # orig_pair: Set default pair to its original value
-        re.escape(term.op),
+        bsc(cap='op'),
         # parm_ich: Insert #1 characters
         bnc(cap='ich'),
         # parm_index: Scroll forward #1
@@ -252,11 +270,11 @@ def get_wontmove_sequence_patterns(term):
         # parm_up_cursor: Up #1 lines
         bnc(cap='cuu'),
         # scroll_forward: Scroll text up (P)
-        re.escape(term.ind),
+        bsc(cap='ind'),
         # scroll_reverse: Scroll text down (P)
-        re.escape(term.rev),
+        bsc(cap='rev'),
         # tab: Tab to next 8-space hardware tab stop
-        re.escape(term.ht),
+        bsc(cap='ht'),
         # set_a_background: Set background color to #1, using ANSI escape
         bna(cap='setab', num=1),
         bna(cap='setab', num=(term.number_of_colors - 1)),
@@ -268,7 +286,7 @@ def get_wontmove_sequence_patterns(term):
         # ( not *exactly* legal, being extra forgiving. )
         bna(cap='sgr', nparams=_num) for _num in range(1, 10)
         # reset_{1,2,3}string: Reset string
-    ] + list(map(re.escape, (term.r1, term.r2, term.r3,)))))
+    ] + list(map(bsc, ('r1', 'r2', 'r3')))))
 
 
 def init_sequence_patterns(term):
@@ -339,36 +357,38 @@ def init_sequence_patterns(term):
             # recognize blue_on_red, even if it didn't cause it to be
             # generated.  These are final "ok, i will match this, anyway" for
             # basic SGR sequences.
-            re.escape(u'\x1b') + r'\[(\d+)\;(\d+)\;(\d+)\;(\d+)m',
-            re.escape(u'\x1b') + r'\[(\d+)\;(\d+)\;(\d+)m',
-            re.escape(u'\x1b') + r'\[(\d+)\;(\d+)m',
-            re.escape(u'\x1b') + r'\[(\d+)?m',
-            re.escape(u'\x1b(B'),
+            ('?', re.escape(u'\x1b') + r'\[(\d+)\;(\d+)\;(\d+)\;(\d+)m'),
+            ('?', re.escape(u'\x1b') + r'\[(\d+)\;(\d+)\;(\d+)m'),
+            ('?', re.escape(u'\x1b') + r'\[(\d+)\;(\d+)m'),
+            ('?', re.escape(u'\x1b') + r'\[(\d+)?m'),
+            ('?', re.escape(u'\x1b(B')),
         ]
 
     # compile as regular expressions, OR'd.
-    _re_will_move = re.compile(u'({0})'.format(u'|'.join(_will_move)))
-    _re_wont_move = re.compile(u'({0})'.format(u'|'.join(_wont_move)))
+    _re_will_move = re.compile(u'({0})'.format(u'|'.join(s for c, s in _will_move if s)))
+    _re_wont_move = re.compile(u'({0})'.format(u'|'.join(s for c, s in _wont_move if s)))
 
     # static pattern matching for horizontal_distance(ucs, term)
     bnc = functools.partial(_build_numeric_capability, term)
 
     # parm_right_cursor: Move #1 characters to the right
-    _cuf = bnc(cap='cuf', optional=True)
-    _re_cuf = re.compile(_cuf) if _cuf else None
+    _cuf_pair = bnc(cap='cuf', optional=True)
+    _re_cuf = re.compile(_cuf_pair[1]) if _cuf_pair else None
 
     # cursor_right: Non-destructive space (move right one space)
     _cuf1 = term.cuf1
 
     # parm_left_cursor: Move #1 characters to the left
-    _cub = bnc(cap='cub', optional=True)
-    _re_cub = re.compile(_cub) if _cub else None
+    _cub_pair = bnc(cap='cub', optional=True)
+    _re_cub = re.compile(_cub_pair[1]) if _cub_pair else None
 
     # cursor_left: Move left one space
     _cub1 = term.cub1
 
     return {'_re_will_move': _re_will_move,
             '_re_wont_move': _re_wont_move,
+            '_will_move': _will_move,
+            '_wont_move': _wont_move,
             '_re_cuf': _re_cuf,
             '_re_cub': _re_cub,
             '_cuf1': _cuf1,
@@ -452,24 +472,17 @@ class SequenceTextWrapper(textwrap.TextWrapper):
 
         # If we're allowed to break long words, then do so: put as much
         # of the next chunk onto the current line as will fit.
+
         if self.break_long_words:
             term = self.term
             chunk = reversed_chunks[-1]
-            nxt = 0
-            for idx in range(0, len(chunk)):
-                if idx == nxt:
-                    # at sequence, point beyond it,
-                    nxt = idx + measure_length(chunk[idx:], term)
-                if nxt <= idx:
-                    # point beyond next sequence, if any,
-                    # otherwise point to next character
-                    nxt = idx + measure_length(chunk[idx:], term) + 1
-                if Sequence(chunk[:nxt], term).length() > space_left:
+            for idx, part in i_and_split_nonsequences(iter_parse(term, chunk)):
+                if Sequence(chunk[:idx + len(part.ucs)], term).length() > space_left:
                     break
             else:
                 # our text ends with a sequence, such as in text
                 # u'!\x1b(B\x1b[m', set index at at end (nxt)
-                idx = nxt
+                idx = idx + len(part.ucs)
 
             cur_line.append(chunk[:idx])
             reversed_chunks[-1] = chunk[idx:]
@@ -638,19 +651,8 @@ class Sequence(six.text_type):
         # nxt: points to first character beyond current escape sequence.
         # width: currently estimated display length.
         inp = self.padd()
-        outp = u''
-        nxt = 0
-        for idx in range(0, len(inp)):
-            if idx == nxt:
-                # at sequence, point beyond it,
-                nxt = idx + measure_length(inp[idx:], self._term)
-            if nxt <= idx:
-                # append non-sequence to outp,
-                outp += inp[idx]
-                # point beyond next sequence, if any,
-                # otherwise point to next character
-                nxt = idx + measure_length(inp[idx:], self._term) + 1
-        return outp
+        return ''.join(f.ucs for f in iter_parse(self._term, inp) if not f.is_sequence)
+        # this implementation is slow because we have to build the sequences
 
     def padd(self):
         r"""
@@ -674,18 +676,19 @@ class Sequence(six.text_type):
         detected, those last-most characters are destroyed.
         """
         outp = u''
-        nxt = 0
-        for idx in range(0, six.text_type.__len__(self)):
-            width = horizontal_distance(self[idx:], self._term)
-            if width != 0:
-                nxt = idx + measure_length(self[idx:], self._term)
-                if width > 0:
-                    outp += u' ' * width
-                elif width < 0:
-                    outp = outp[:width]
-            if nxt <= idx:
-                outp += self[idx]
-                nxt = idx + 1
+        for ucs, is_sequence, _, _ in iter_parse(self._term, self):
+            width = horizontal_distance(ucs, self._term)
+            #TODO this fails on a tab in a test
+            #assert not (width and not is_sequence), (
+            #    'only sequences should have non-zero width, but nonsequence ' +
+            #    repr((ucs, is_sequence)) + ' has width of ' + str(width) +
+            #    ' while parsing ' + repr(self))
+            if width > 0:
+                outp += u' ' * width
+            elif width < 0:
+                outp = outp[:width]
+            else:
+                outp += ucs
         return outp
 
 
@@ -731,6 +734,7 @@ def measure_length(ucs, term):
 
     if matching_seq:
         _, end = matching_seq.span()
+        assert identify_fragment(term, ucs[:end])
         return end
 
     # none found, must be printable!
@@ -816,3 +820,73 @@ def horizontal_distance(ucs, term):
     return (termcap_distance(ucs, 'cub', -1, term) or
             termcap_distance(ucs, 'cuf', 1, term) or
             0)
+
+
+def identify_fragment(term, ucs):
+    # simple terminal control characters,
+    ctrl_seqs = u'\a\b\r\n\x0e\x0f'
+
+    if any([ucs.startswith(_ch) for _ch in ctrl_seqs]):
+        return TextFragment(ucs[:1], True, '?', None)
+
+    ret = term and (
+        regex_or_match(term._will_move, ucs) or
+        regex_or_match(term._wont_move, ucs)
+    )
+    if ret:
+        return ret
+
+    # known multibyte sequences,
+    matching_seq = term and (
+        term._re_cub and term._re_cub.match(ucs) or
+        term._re_cuf and term._re_cuf.match(ucs)
+    )
+
+    if matching_seq:
+        return TextFragment(matching_seq.group(), True, '?', None)
+
+    raise ValueError("not a sequence!: "+repr(ucs))
+
+
+def regex_or_match(patterns, ucs):
+    for cap, pat in patterns:
+        matching_seq = re.match(pat, ucs)
+        if matching_seq is None:
+            continue
+        params = matching_seq.groups()[1:]
+        return TextFragment(matching_seq.group(), True, cap, params if params else None)
+    return None
+
+def i_and_split_nonsequences(fragments):
+    """Yields simple unicode characters or sequences with index"""
+    idx = 0
+    for part in fragments:
+        if part.is_sequence:
+            yield idx, part
+            idx += len(part.ucs)
+        else:
+            for c in part.ucs:
+                yield idx, TextFragment(c, False, None, None)
+                idx += 1
+
+def iter_parse(term, ucs):
+    r"""
+
+
+    """
+    outp = u''
+    nxt = 0
+    for idx in range(0, six.text_type.__len__(ucs)):
+        if idx == nxt:
+            l = measure_length(ucs[idx:], term)
+            if l == 0:
+                outp += ucs[idx]
+                nxt += 1
+            else:
+                if outp:
+                    yield TextFragment(outp, False, None, None)
+                    outp = u''
+                yield identify_fragment(term, ucs[idx:idx+l])
+                nxt += l
+    if outp:
+        yield TextFragment(outp, False, None, None)

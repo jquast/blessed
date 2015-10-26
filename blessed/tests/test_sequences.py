@@ -144,11 +144,11 @@ def test_unit_binpacked_unittest():
     warnings.resetwarnings()
 
 
-def test_sort_sequences():
+def test_sort_sequence_pairs():
     """Test sequences are filtered and ordered longest-first."""
     from blessed.sequences import _sort_sequences
-    input_list = [u'a', u'aa', u'aaa', u'']
-    output_expected = [u'aaa', u'aa', u'a']
+    input_list = [(1, u'a'), (2, u'aa'), (3, u'aaa'), (4, u'')]
+    output_expected = [(3, u'aaa'), (2, u'aa'), (1, u'a')]
     assert (_sort_sequences(input_list) == output_expected)
 
 

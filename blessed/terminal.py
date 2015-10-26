@@ -49,6 +49,7 @@ from .sequences import (init_sequence_patterns,
                         _build_any_numeric_capability,
                         SequenceTextWrapper,
                         Sequence,
+                        iter_parse,
                         )
 
 from .keyboard import (get_keyboard_sequences,
@@ -1081,6 +1082,9 @@ class Terminal(object):
         # buffer any remaining text received
         self.ungetch(ucs[len(ks):])
         return ks
+
+    def iter_parse(self, text):
+        return iter_parse(self, text)
 
 
 class WINSZ(collections.namedtuple('WINSZ', (
