@@ -490,7 +490,21 @@ The mode entered using :meth:`~.Terminal.cbreak` is called
   character-processing (interrupt and flow control characters are unaffected),
   making characters typed by the user immediately available to the program.
 
-:meth:`~.Terminal.raw` is similar to cbreak, but not recommended.
+raw
+~~~
+
+:meth:`~.Terminal.raw` is similar to cbreak, except that control-C and
+other keystrokes are "ignored", and received as their keystroke value
+rather than interrupting the program with signals.
+
+Output processing is also disabled, you must print phrases with carriage
+return after newline. Without raw mode::
+
+    print("hello, world.")
+
+With raw mode::
+
+    print("hello, world.", endl="\r\n")
 
 inkey
 ~~~~~

@@ -1016,9 +1016,9 @@ class Terminal(object):
         interpreted by the terminal driver and excluded from the stdin stream.
         In raw mode these values are receive by the :meth:`inkey` method.
 
-        In cbreak mode, the newline ``\n`` implicitly returns the carriage.
-        In raw mode, carriage return must be explicitly printed to return the
-        carraige::
+        Because output processing is not done, the newline ``'\n'`` is not
+        enough, you must also print carriage return to ensure that the cursor
+        is returned to the first column::
 
             with term.raw():
                 print("printing in raw mode", end="\r\n")
