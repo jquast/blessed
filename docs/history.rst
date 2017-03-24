@@ -5,6 +5,10 @@ Version History
     :ghissue:`74`.
   * bugfix: TypeError when using ``PYTHONOPTIMIZE=2`` environment variable,
     :ghissue:`84`.
+  * bugfix: define ``blessed.__version__`` value,
+    :ghissue:`92`.
+  * bugfix: detect sequences ``\x1b[0K`` and ``\x1b2K``,
+    :ghissue:`95`.
 
 1.13
   * enhancement: :meth:`~.Terminal.split_seqs` introduced, and 4x cost
