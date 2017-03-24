@@ -142,6 +142,10 @@ CAPABILITIES_ADDITIVES = {
     'sgr0': ('sgr0', re.escape('\x1b') + r'\[m'),
     'backspace': ('', re.escape('\b')),
     'ascii_tab': ('', re.escape('\t')),
+    'clr_eol': ('', re.escape('\x1b[K')),
+    'clr_eol0': ('', re.escape('\x1b[0K')),
+    'clr_bol': ('', re.escape('\x1b[1K')),
+    'clr_eosK': ('', re.escape('\x1b[2K')),
 }
 
 CAPABILITIES_CAUSE_MOVEMENT = (

@@ -222,9 +222,8 @@ class Terminal(object):
                         ' returned for the remainder of this process.' % (
                             self._kind, _CUR_TERM,))
 
-        # initialize capabilities database
+        # initialize capabilities and terminal keycodes database
         self.__init__capabilities()
-
         self.__init__keycodes()
 
     def __init__capabilities(self):
@@ -274,17 +273,24 @@ class Terminal(object):
 
         # Build database of sequence <=> KEY_NAME.
         self._keymap = get_keyboard_sequences(self)
+
         # build set of prefixes of sequences
         self._keymap_prefixes = get_leading_prefixes(self._keymap)
 
+        # keyboard stream buffer
         self._keyboard_buf = collections.deque()
+
         if self._keyboard_fd is not None:
+            # set input encoding and initialize incremental decoder
             locale.setlocale(locale.LC_ALL, '')
             self._encoding = locale.getpreferredencoding() or 'ascii'
+
             try:
                 self._keyboard_decoder = codecs.getincrementaldecoder(
                     self._encoding)()
+
             except LookupError as err:
+                # encoding is illegal or unsupported, use 'ascii'
                 warnings.warn('LookupError: {0}, fallback to ASCII for '
                               'keyboard.'.format(err))
                 self._encoding = 'ascii'
@@ -1002,21 +1008,20 @@ class Terminal(object):
         r"""
         A context manager for :func:`tty.setraw`.
 
-        Raw mode differs from :meth:`cbreak` mode in that input and output
-        processing of characters is disabled, in similar in that they both
-        allow each keystroke to be read immediately after it is pressed.
+        Although both :meth:`break` and :meth:`raw` modes allow each keystroke
+        to be read immediately after it is pressed, Raw mode disables processing
+        of input and output.
 
-        For input, the interrupt, quit, suspend, and flow control characters
-        are received as their raw control character values rather than
-        generating a signal.
+        In cbreak mode, special input characters such as ``^C`` or ``^S`` are
+        interpreted by the terminal driver and excluded from the stdin stream.
+        In raw mode these values are receive by the :meth:`inkey` method.
 
-        For output, the newline ``chr(10)`` is not sufficient enough to return
-        the carriage, requiring ``chr(13)`` printed explicitly by your
-        program::
+        In cbreak mode, the newline ``\n`` implicitly returns the carriage.
+        In raw mode, carriage return must be explicitly printed to return the
+        carraige::
 
             with term.raw():
-                   print("printing in raw mode", end="\r\n")
-
+                print("printing in raw mode", end="\r\n")
         """
         if HAS_TTY and self._keyboard_fd is not None:
             # Save current terminal mode:
