@@ -12,8 +12,6 @@ unsafe-load-any-extension = yes
 
 [MESSAGES CONTROL]
 disable=
-    missing-return-type-doc,
-    missing-type-doc,
     I,
     fixme,
     c-extension-no-member,
@@ -21,7 +19,7 @@ disable=
 
 [FORMAT]
 max-line-length: 100
-good-names=cd,ip,_,s3,df
+good-names=ks,fd,_
 
 [PARAMETER_DOCUMENTATION]
 default-docstring-type=sphinx
