@@ -16,6 +16,12 @@ matrix:
       env: TOXENV=py38 COVERAGE_ID=travis-ci
     - python: 3.9-dev
       env: TOXENV=py39 COVERAGE_ID=travis-ci
+    - env: TOXENV=about
+    - env: TOXENV=pylint
+    - env: TOXENV=flake8
+    - env: TOXENV=pycodestyle
+    - env: TOXENV=sphinx
+    - env: TOXENV=sa
 
 jobs:
   allow_failures:
