@@ -1,0 +1,50 @@
+[MASTER]
+load-plugins=
+    pylint.extensions.mccabe,
+    pylint.extensions.check_elif,
+    pylint.extensions.docparams,
+    pylint.extensions.overlapping_exceptions,
+    pylint.extensions.redefined_variable_type
+
+persistent = no
+jobs = 0
+unsafe-load-any-extension = yes
+
+[MESSAGES CONTROL]
+disable=
+    missing-return-type-doc,
+    missing-type-doc,
+    I,
+    fixme,
+    c-extension-no-member,
+    ungrouped-imports
+
+[FORMAT]
+max-line-length: 100
+good-names=cd,ip,_,s3,df
+
+[PARAMETER_DOCUMENTATION]
+default-docstring-type=sphinx
+accept-no-raise-doc=no
+accept-no-param-doc=yes
+accept-no-return-doc=yes
+
+[DESIGN]
+max-args=10
+max-attributes=7
+max-branches=12
+max-complexity=11
+max-locals=15
+max-module-lines=1000
+max-parents=7
+max-public-methods=20
+max-returns=6
+max-statements=50
+
+[SIMILARITIES]
+ignore-imports=yes
+min-similarity-lines=8
+
+[REPORTS]
+reports=no
+msg-template={path}:{line}: [{msg_id}({symbol}), {obj}] {msg}
