@@ -46,10 +46,8 @@ def input_filter(keystroke):
     """
     For given keystroke, return whether it should be allowed as input.
 
-    This somewhat requires that the interface use special
-    application keys to perform functions, as alphanumeric
-    input intended for persisting could otherwise be interpreted as a
-    command sequence.
+    This somewhat requires that the interface use special application keys to perform functions, as
+    alphanumeric input intended for persisting could otherwise be interpreted as a command sequence.
     """
     if keystroke.is_sequence:
         # Namely, deny multi-byte sequences (such as '\x1b[A'),

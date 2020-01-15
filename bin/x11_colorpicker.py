@@ -6,13 +6,14 @@ hsv_sorted_colors = sorted(
     key=lambda rgb: colorsys.rgb_to_hsv(*rgb[1]),
     reverse=True)
 
+
 def render(term, idx):
     color_name, rgb_color = hsv_sorted_colors[idx]
     result = term.home + term.normal + ''.join(
         getattr(term, hsv_sorted_colors[i][0]) + '◼'
         for i in range(len(hsv_sorted_colors))
     )
-    result += term.clear_eos+ '\n'
+    result += term.clear_eos + '\n'
     result += getattr(term, 'on_' + color_name) + term.clear_eos + '\n'
     result += term.normal + term.center(f'{color_name}: {rgb_color}') + '\n'
     result += term.normal + term.center(
@@ -22,6 +23,7 @@ def render(term, idx):
     result += term.move(idx // term.width, idx % term.width)
     result += term.on_color_rgb(*rgb_color)(' \b')
     return result
+
 
 def next_algo(algo, forward):
     algos = tuple(sorted(blessed.color.COLOR_DISTANCE_ALGORITHMS))
@@ -61,7 +63,7 @@ def main():
                 idx += 1
             elif inp.code in (term.KEY_TAB, term.KEY_BTAB):
                 term.number_of_colors = next_color(
-                    term.number_of_colors, inp.code==term.KEY_TAB)
+                    term.number_of_colors, inp.code == term.KEY_TAB)
             elif inp in ('[', ']'):
                 term.color_distance_algorithm = next_algo(
                     term.color_distance_algorithm, inp == '[')
@@ -74,6 +76,7 @@ def main():
                 idx += len(hsv_sorted_colors)
             while idx >= len(hsv_sorted_colors):
                 idx -= len(hsv_sorted_colors)
+
 
 if __name__ == '__main__':
     main()

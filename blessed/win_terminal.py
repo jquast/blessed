@@ -3,13 +3,16 @@
 
 from __future__ import absolute_import
 
-import contextlib
-import msvcrt  # pylint: disable=import-error
+# std imports
 import time
+import msvcrt  # pylint: disable=import-error
+import contextlib
 
+# 3rd party
 import jinxed.win32 as win32  # pylint: disable=import-error
 
-from .terminal import WINSZ, Terminal as _Terminal
+from .terminal import WINSZ
+from .terminal import Terminal as _Terminal
 
 
 class Terminal(_Terminal):

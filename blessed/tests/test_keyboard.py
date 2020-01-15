@@ -1,43 +1,41 @@
 # -*- coding: utf-8 -*-
-"Tests for keyboard support."
+"""Tests for keyboard support."""
 # std imports
-import functools
-import tempfile
-import signal
-import curses
-#import time
-import math
-import tty   # NOQA
+import os
 import pty
 import sys
-import os
+import tty  # NOQA
+#import time
+import math
+import curses
+import signal
+import tempfile
+import functools
 
-# local
-from .accessories import (
-    init_subproc_coverage,
-    read_until_eof,
-    read_until_semaphore,
-    SEND_SEMAPHORE,
-    RECV_SEMAPHORE,
-    as_subprocess,
-    TestTerminal,
-    SEMAPHORE,
-    all_terms,
-    echo_off,
-)
-
+# 3rd party
+import six
+import mock
 # 3rd-party
 import pytest
-import mock
-import six
+
+from .accessories import (SEMAPHORE,
+                          RECV_SEMAPHORE,
+                          SEND_SEMAPHORE,
+                          TestTerminal,
+                          echo_off,
+                          all_terms,
+                          as_subprocess,
+                          read_until_eof,
+                          read_until_semaphore,
+                          init_subproc_coverage)
 
 if sys.version_info[0] == 3:
     unichr = chr
 
 
-#@pytest.mark.skipif(os.environ.get('TEST_QUICK', None) is not None,
+# @pytest.mark.skipif(os.environ.get('TEST_QUICK', None) is not None,
 #                    reason="TEST_QUICK specified")
-#def test_kbhit_interrupted():
+# def test_kbhit_interrupted():
 #    "kbhit() should not be interrupted with a signal handler."
 #    pid, master_fd = pty.fork()
 #    if pid == 0:
@@ -77,9 +75,9 @@ if sys.version_info[0] == 3:
 #    assert math.floor(time.time() - stime) == 1.0
 #
 #
-#@pytest.mark.skipif(os.environ.get('TEST_QUICK', None) is not None,
+# @pytest.mark.skipif(os.environ.get('TEST_QUICK', None) is not None,
 #                    reason="TEST_QUICK specified")
-#def test_kbhit_interrupted_nonetype():
+# def test_kbhit_interrupted_nonetype():
 #    "kbhit() should also allow interruption with timeout of None."
 #    pid, master_fd = pty.fork()
 #    if pid == 0:
@@ -121,7 +119,7 @@ if sys.version_info[0] == 3:
 
 
 def test_break_input_no_kb():
-    "cbreak() should not call tty.setcbreak() without keyboard."
+    """cbreak() should not call tty.setcbreak() without keyboard."""
     @as_subprocess
     def child():
         with tempfile.NamedTemporaryFile() as stream:
@@ -134,7 +132,7 @@ def test_break_input_no_kb():
 
 
 def test_raw_input_no_kb():
-    "raw should not call tty.setraw() without keyboard."
+    """raw should not call tty.setraw() without keyboard."""
     @as_subprocess
     def child():
         with tempfile.NamedTemporaryFile() as stream:
@@ -147,7 +145,7 @@ def test_raw_input_no_kb():
 
 
 def test_raw_input_with_kb():
-    "raw should call tty.setraw() when with keyboard."
+    """raw should call tty.setraw() when with keyboard."""
     @as_subprocess
     def child():
         term = TestTerminal()
@@ -159,7 +157,7 @@ def test_raw_input_with_kb():
 
 
 def test_notty_kb_is_None():
-    "term._keyboard_fd should be None when os.isatty returns False."
+    """term._keyboard_fd should be None when os.isatty returns False."""
     # in this scenerio, stream is sys.__stdout__,
     # but os.isatty(0) is False,
     # such as when piping output to less(1)
@@ -172,7 +170,7 @@ def test_notty_kb_is_None():
     child()
 
 
-#def test_kbhit_no_kb():
+# def test_kbhit_no_kb():
 #    "kbhit() always immediately returns False without a keyboard."
 #    @as_subprocess
 #    def child():
@@ -184,7 +182,7 @@ def test_notty_kb_is_None():
 #    child()
 #
 #
-#def test_keystroke_0s_cbreak_noinput():
+# def test_keystroke_0s_cbreak_noinput():
 #    "0-second keystroke without input; '' should be returned."
 #    @as_subprocess
 #    def child():
@@ -197,7 +195,7 @@ def test_notty_kb_is_None():
 #    child()
 #
 #
-#def test_keystroke_0s_cbreak_noinput_nokb():
+# def test_keystroke_0s_cbreak_noinput_nokb():
 #    "0-second keystroke without data in input stream and no keyboard/tty."
 #    @as_subprocess
 #    def child():
@@ -210,9 +208,9 @@ def test_notty_kb_is_None():
 #    child()
 #
 #
-#@pytest.mark.skipif(os.environ.get('TEST_QUICK', None) is not None,
+# @pytest.mark.skipif(os.environ.get('TEST_QUICK', None) is not None,
 #                    reason="TEST_QUICK specified")
-#def test_keystroke_1s_cbreak_noinput():
+# def test_keystroke_1s_cbreak_noinput():
 #    "1-second keystroke without input; '' should be returned after ~1 second."
 #    @as_subprocess
 #    def child():
@@ -225,9 +223,9 @@ def test_notty_kb_is_None():
 #    child()
 #
 #
-#@pytest.mark.skipif(os.environ.get('TEST_QUICK', None) is not None,
+# @pytest.mark.skipif(os.environ.get('TEST_QUICK', None) is not None,
 #                    reason="TEST_QUICK specified")
-#def test_keystroke_1s_cbreak_noinput_nokb():
+# def test_keystroke_1s_cbreak_noinput_nokb():
 #    "1-second keystroke without input or keyboard."
 #    @as_subprocess
 #    def child():
@@ -240,7 +238,7 @@ def test_notty_kb_is_None():
 #    child()
 #
 #
-#def test_keystroke_0s_cbreak_with_input():
+# def test_keystroke_0s_cbreak_with_input():
 #    "0-second keystroke with input; Keypress should be immediately returned."
 #    pid, master_fd = pty.fork()
 #    if pid == 0:
@@ -270,7 +268,7 @@ def test_notty_kb_is_None():
 #    assert math.floor(time.time() - stime) == 0.0
 #
 #
-#def test_keystroke_cbreak_with_input_slowly():
+# def test_keystroke_cbreak_with_input_slowly():
 #    "0-second keystroke with input; Keypress should be immediately returned."
 #    pid, master_fd = pty.fork()
 #    if pid == 0:
@@ -309,7 +307,7 @@ def test_notty_kb_is_None():
 #    assert math.floor(time.time() - stime) == 0.0
 #
 #
-#def test_keystroke_0s_cbreak_multibyte_utf8():
+# def test_keystroke_0s_cbreak_multibyte_utf8():
 #    "0-second keystroke with multibyte utf-8 input; should decode immediately."
 #    # utf-8 bytes represent "latin capital letter upsilon".
 #    pid, master_fd = pty.fork()
@@ -338,9 +336,9 @@ def test_notty_kb_is_None():
 #    assert math.floor(time.time() - stime) == 0.0
 #
 #
-#@pytest.mark.skipif(os.environ.get('TRAVIS', None) is not None,
+# @pytest.mark.skipif(os.environ.get('TRAVIS', None) is not None,
 #                    reason="travis-ci does not handle ^C very well.")
-#def test_keystroke_0s_raw_input_ctrl_c():
+# def test_keystroke_0s_raw_input_ctrl_c():
 #    "0-second keystroke with raw allows receiving ^C."
 #    pid, master_fd = pty.fork()
 #    if pid == 0:  # child
@@ -370,7 +368,7 @@ def test_notty_kb_is_None():
 #    assert math.floor(time.time() - stime) == 0.0
 #
 #
-#def test_keystroke_0s_cbreak_sequence():
+# def test_keystroke_0s_cbreak_sequence():
 #    "0-second keystroke with multibyte sequence; should decode immediately."
 #    pid, master_fd = pty.fork()
 #    if pid == 0:  # child
@@ -397,9 +395,9 @@ def test_notty_kb_is_None():
 #    assert math.floor(time.time() - stime) == 0.0
 #
 #
-#@pytest.mark.skipif(os.environ.get('TEST_QUICK', None) is not None,
+# @pytest.mark.skipif(os.environ.get('TEST_QUICK', None) is not None,
 #                    reason="TEST_QUICK specified")
-#def test_keystroke_1s_cbreak_with_input():
+# def test_keystroke_1s_cbreak_with_input():
 #    "1-second keystroke w/multibyte sequence; should return after ~1 second."
 #    pid, master_fd = pty.fork()
 #    if pid == 0:  # child
@@ -428,9 +426,9 @@ def test_notty_kb_is_None():
 #    assert math.floor(time.time() - stime) == 1.0
 #
 #
-#@pytest.mark.skipif(os.environ.get('TEST_QUICK', None) is not None,
+# @pytest.mark.skipif(os.environ.get('TEST_QUICK', None) is not None,
 #                    reason="TEST_QUICK specified")
-#def test_esc_delay_cbreak_035():
+# def test_esc_delay_cbreak_035():
 #    "esc_delay will cause a single ESC (\\x1b) to delay for 0.35."
 #    pid, master_fd = pty.fork()
 #    if pid == 0:  # child
@@ -462,9 +460,9 @@ def test_notty_kb_is_None():
 #    assert 34 <= int(duration_ms) <= 45, duration_ms
 #
 #
-#@pytest.mark.skipif(os.environ.get('TEST_QUICK', None) is not None,
+# @pytest.mark.skipif(os.environ.get('TEST_QUICK', None) is not None,
 #                    reason="TEST_QUICK specified")
-#def test_esc_delay_cbreak_135():
+# def test_esc_delay_cbreak_135():
 #    "esc_delay=1.35 will cause a single ESC (\\x1b) to delay for 1.35."
 #    pid, master_fd = pty.fork()
 #    if pid == 0:  # child
@@ -496,7 +494,7 @@ def test_notty_kb_is_None():
 #    assert 134 <= int(duration_ms) <= 145, int(duration_ms)
 #
 #
-#def test_esc_delay_cbreak_timout_0():
+# def test_esc_delay_cbreak_timout_0():
 #    """esc_delay still in effect with timeout of 0 ("nonblocking")."""
 #    pid, master_fd = pty.fork()
 #    if pid == 0:  # child
@@ -528,7 +526,7 @@ def test_notty_kb_is_None():
 #    assert 34 <= int(duration_ms) <= 45, int(duration_ms)
 #
 #
-#def test_esc_delay_cbreak_nonprefix_sequence():
+# def test_esc_delay_cbreak_nonprefix_sequence():
 #    "ESC a (\\x1ba) will return an ESC immediately"
 #    pid, master_fd = pty.fork()
 #    if pid is 0:  # child
@@ -562,7 +560,7 @@ def test_notty_kb_is_None():
 #    assert -1 <= int(duration_ms) <= 15, duration_ms
 #
 #
-#def test_esc_delay_cbreak_prefix_sequence():
+# def test_esc_delay_cbreak_prefix_sequence():
 #    "An unfinished multibyte sequence (\\x1b[) will delay an ESC by .35 "
 #    pid, master_fd = pty.fork()
 #    if pid is 0:  # child
@@ -596,7 +594,7 @@ def test_notty_kb_is_None():
 #    assert 34 <= int(duration_ms) <= 45, duration_ms
 #
 #
-#def test_get_location_0s():
+# def test_get_location_0s():
 #    "0-second get_location call without response."
 #    @as_subprocess
 #    def child():
@@ -608,7 +606,7 @@ def test_notty_kb_is_None():
 #    child()
 #
 #
-#def test_get_location_0s_under_raw():
+# def test_get_location_0s_under_raw():
 #    "0-second get_location call without response under raw mode."
 #    @as_subprocess
 #    def child():
@@ -621,7 +619,7 @@ def test_notty_kb_is_None():
 #    child()
 #
 #
-#def test_get_location_0s_reply_via_ungetch():
+# def test_get_location_0s_reply_via_ungetch():
 #    "0-second get_location call with response."
 #    @as_subprocess
 #    def child():
@@ -636,7 +634,7 @@ def test_notty_kb_is_None():
 #    child()
 #
 #
-#def test_get_location_0s_reply_via_ungetch_under_raw():
+# def test_get_location_0s_reply_via_ungetch_under_raw():
 #    "0-second get_location call with response under raw mode."
 #    @as_subprocess
 #    def child():
@@ -653,7 +651,7 @@ def test_notty_kb_is_None():
 
 
 def test_keystroke_default_args():
-    "Test keyboard.Keystroke constructor with default arguments."
+    """Test keyboard.Keystroke constructor with default arguments."""
     from blessed.keyboard import Keystroke
     ks = Keystroke()
     assert ks._name is None
@@ -667,7 +665,7 @@ def test_keystroke_default_args():
 
 
 def test_a_keystroke():
-    "Test keyboard.Keystroke constructor with set arguments."
+    """Test keyboard.Keystroke constructor with set arguments."""
     from blessed.keyboard import Keystroke
     ks = Keystroke(ucs=u'x', code=1, name=u'the X')
     assert ks._name == u'the X'
@@ -680,7 +678,7 @@ def test_a_keystroke():
 
 
 def test_get_keyboard_codes():
-    "Test all values returned by get_keyboard_codes are from curses."
+    """Test all values returned by get_keyboard_codes are from curses."""
     from blessed.keyboard import (
         get_keyboard_codes,
         CURSES_KEYCODE_OVERRIDE_MIXIN,
@@ -695,7 +693,7 @@ def test_get_keyboard_codes():
 
 
 def test_alternative_left_right():
-    "Test _alternative_left_right behavior for space/backspace."
+    """Test _alternative_left_right behavior for space/backspace."""
     from blessed.keyboard import _alternative_left_right
     term = mock.Mock()
     term._cuf1 = u''
@@ -712,7 +710,7 @@ def test_alternative_left_right():
 
 
 def test_cuf1_and_cub1_as_RIGHT_LEFT(all_terms):
-    "Test that cuf1 and cub1 are assigned KEY_RIGHT and KEY_LEFT."
+    """Test that cuf1 and cub1 are assigned KEY_RIGHT and KEY_LEFT."""
     from blessed.keyboard import get_keyboard_sequences
 
     @as_subprocess
@@ -733,7 +731,7 @@ def test_cuf1_and_cub1_as_RIGHT_LEFT(all_terms):
 
 
 def test_get_keyboard_sequences_sort_order():
-    "ordereddict ensures sequences are ordered longest-first."
+    """ordereddict ensures sequences are ordered longest-first."""
     @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
@@ -747,7 +745,7 @@ def test_get_keyboard_sequences_sort_order():
 
 
 def test_get_keyboard_sequence(monkeypatch):
-    "Test keyboard.get_keyboard_sequence. "
+    """Test keyboard.get_keyboard_sequence."""
     import blessed.keyboard
 
     (KEY_SMALL, KEY_LARGE, KEY_MIXIN) = range(3)
@@ -788,7 +786,7 @@ def test_get_keyboard_sequence(monkeypatch):
 
 
 def test_resolve_sequence():
-    "Test resolve_sequence for order-dependent mapping."
+    """Test resolve_sequence for order-dependent mapping."""
     from blessed.keyboard import resolve_sequence, OrderedDict
     mapper = OrderedDict(((u'SEQ1', 1),
                           (u'SEQ2', 2),
@@ -808,7 +806,7 @@ def test_resolve_sequence():
     ks = resolve_sequence(u'', mapper, codes)
     assert ks == u''
     assert ks.name is None
-    assert ks.code == None
+    assert ks.code is None
     assert not ks.is_sequence
     assert repr(ks) in ("u''",  # py26, 27
                         "''",)  # py33
@@ -850,7 +848,7 @@ def test_resolve_sequence():
 
 
 def test_keyboard_prefixes():
-    "Test keyboard.prefixes"
+    """Test keyboard.prefixes."""
     from blessed.keyboard import get_leading_prefixes
     keys = ['abc', 'abdf', 'e', 'jkl']
     pfs = get_leading_prefixes(keys)
@@ -858,7 +856,7 @@ def test_keyboard_prefixes():
 
 
 def test_keypad_mixins_and_aliases():
-    """ Test PC-Style function key translations when in ``keypad`` mode."""
+    """Test PC-Style function key translations when in ``keypad`` mode."""
     # Key     plain   app     modified
     # Up      ^[[A    ^[OA    ^[[1;mA
     # Down    ^[[B    ^[OB    ^[[1;mB

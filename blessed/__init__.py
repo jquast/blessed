@@ -6,7 +6,6 @@ http://pypi.python.org/pypi/blessed
 # std imports
 import platform as _platform
 
-# local
 if _platform.system() == 'Windows':
     from blessed.win_terminal import Terminal
 else:
@@ -19,4 +18,4 @@ if ('3', '0', '0') <= _platform.python_version_tuple() < ('3', '2', '2+'):
                       'support due to http://bugs.python.org/issue10570.')
 
 __all__ = ('Terminal',)
-__version__ = '2.0.0'
+__version__ = '1.17.0'

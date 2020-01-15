@@ -1,4 +1,0 @@
-pytest-xdist
-pytest-cov
-pytest
-mock

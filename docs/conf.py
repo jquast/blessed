@@ -1,4 +1,7 @@
 # std imports
+from blessed.terminal import *
+import contextlib
+import functools
 import sys
 import os
 import json
@@ -33,27 +36,30 @@ github_project_url = "https://github.com/jquast/blessed"
 def _warn_node(self, msg, node):
     if not msg.startswith('nonlocal image URI found:'):
         self._warnfunc(msg, '%s:%s' % get_source_line(node))
+
+
 sphinx.environment.BuildEnvironment.warn_node = _warn_node
 
 # Monkey-patch functools.wraps and contextlib.wraps
 # https://github.com/sphinx-doc/sphinx/issues/1711#issuecomment-93126473
-import functools
+
+
 def no_op_wraps(func):
-    """
-    Replaces functools.wraps in order to undo wrapping when generating Sphinx documentation
-    """
+    """Replaces functools.wraps in order to undo wrapping when generating Sphinx documentation."""
     import sys
     if func.__module__ is None or 'blessed' not in func.__module__:
         return functools.orig_wraps(func)
+
     def wrapper(decorator):
-        sys.stderr.write('patched for function signature: {0!r}\n'.format(func))
+        sys.stderr.write(
+            'patched for function signature: {0!r}\n'.format(func))
         return func
     return wrapper
+
+
 functools.orig_wraps = functools.wraps
 functools.wraps = no_op_wraps
-import contextlib
 contextlib.wraps = no_op_wraps
-from blessed.terminal import *
 
 # -- General configuration ----------------------------------------------------
 

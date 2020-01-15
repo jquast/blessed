@@ -1,16 +1,12 @@
 # std
+# std imports
 import os
 import textwrap
 
-# local
-from .accessories import (
-    as_subprocess,
-    TestTerminal,
-    many_columns,
-)
-
 # 3rd party
 import pytest
+
+from .accessories import TestTerminal, many_columns, as_subprocess
 
 TEXTWRAP_KEYWORD_COMBINATIONS = [
     dict(break_long_words=False,
@@ -48,7 +44,7 @@ if os.environ.get('TEST_QUICK', None) is not None:
 
 
 def test_SequenceWrapper_invalid_width():
-    """Test exception thrown from invalid width"""
+    """Test exception thrown from invalid width."""
     WIDTH = -3
 
     @as_subprocess
@@ -109,7 +105,7 @@ def test_SequenceWrapper(many_columns, kwargs):
         assert (len(internal_wrapped) == len(my_wrapped_colored))
 
     child(width=many_columns, kwargs=kwargs,
-          pgraph=u' Z! a bc defghij klmnopqrstuvw<<>>xyz012345678900 '*2)
+          pgraph=u' Z! a bc defghij klmnopqrstuvw<<>>xyz012345678900 ' * 2)
     child(width=many_columns, kwargs=kwargs, pgraph=u'a bb ccc')
 
 

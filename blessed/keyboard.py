@@ -1,9 +1,9 @@
 """Sub-module providing 'keyboard awareness'."""
 
 # std imports
-import platform
-import time
 import re
+import time
+import platform
 
 # 3rd party
 import six
@@ -329,9 +329,25 @@ def _read_until(term, pattern, timeout):
 #: Furthermore, many key-names for application keys enabled only by context
 #: manager :meth:`~.Terminal.keypad` are surprisingly absent.  We inject them
 #: here directly into the curses module.
-_CURSES_KEYCODE_ADDINS = ('TAB', 'KP_MULTIPLY', 'KP_ADD', 'KP_SEPARATOR', 'KP_SUBTRACT', 'KP_DECIMAL',
-                         'KP_DIVIDE', 'KP_EQUAL', 'KP_0', 'KP_1', 'KP_2', 'KP_3', 'KP_4', 'KP_5', 'KP_6',
-                         'KP_7', 'KP_8', 'KP_9')
+_CURSES_KEYCODE_ADDINS = (
+    'TAB',
+    'KP_MULTIPLY',
+    'KP_ADD',
+    'KP_SEPARATOR',
+    'KP_SUBTRACT',
+    'KP_DECIMAL',
+    'KP_DIVIDE',
+    'KP_EQUAL',
+    'KP_0',
+    'KP_1',
+    'KP_2',
+    'KP_3',
+    'KP_4',
+    'KP_5',
+    'KP_6',
+    'KP_7',
+    'KP_8',
+    'KP_9')
 
 _lastval = max(get_curses_keycodes().values())
 for keycode_name in _CURSES_KEYCODE_ADDINS:

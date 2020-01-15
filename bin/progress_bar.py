@@ -2,11 +2,10 @@
 """
 Example application for the 'blessed' Terminal library for python.
 
-This isn't a real progress bar, just a sample "animated prompt" of sorts
-that demonstrates the separate move_x() and move_y() functions, made
-mainly to test the `hpa' compatibility for 'screen' terminal type which
-fails to provide one, but blessed recognizes that it actually does, and
-provides a proxy.
+This isn't a real progress bar, just a sample "animated prompt" of sorts that demonstrates the
+separate move_x() and move_y() functions, made mainly to test the `hpa' compatibility for 'screen'
+terminal type which fails to provide one, but blessed recognizes that it actually does, and provides
+a proxy.
 """
 from __future__ import print_function
 import sys

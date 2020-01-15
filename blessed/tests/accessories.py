@@ -1,24 +1,27 @@
 # -*- coding: utf-8 -*-
 """Accessories for automated py.test runner."""
 # standard imports
-from __future__ import with_statement, print_function
-import contextlib
-import subprocess
-import functools
-import traceback
-import termios
+from __future__ import print_function, with_statement
+
+# std imports
+import os
+import pty
+import sys
 import codecs
 import curses
-import sys
-import pty
-import os
+import termios
+import functools
+import traceback
+import contextlib
+import subprocess
+
+# 3rd party
+import six
+# 3rd-party
+import pytest
 
 # local
 from blessed import Terminal
-
-# 3rd-party
-import pytest
-import six
 
 TestTerminal = functools.partial(Terminal, kind='xterm-256color')
 SEND_SEMAPHORE = SEMAPHORE = b'SEMAPHORE\n'
@@ -28,8 +31,8 @@ many_lines_params = [40, 80]
 many_columns_params = [1, 10]
 
 if os.environ.get('TEST_QUICK'):
-    many_lines_params = [80,]
-    many_columns_params = [25,]
+    many_lines_params = [80, ]
+    many_columns_params = [25, ]
 
 all_terms_params = 'xterm screen ansi vt220 rxvt cons25 linux'.split()
 
@@ -49,25 +52,23 @@ elif os.environ.get('TEST_QUICK'):
 
 
 def init_subproc_coverage(run_note):
-        try:
-            import coverage
-        except ImportError:
-            return None
-        _coveragerc = os.path.join(
-            os.path.dirname(__file__),
-            os.pardir, os.pardir,
-            '.coveragerc')
-        cov = coverage.Coverage(config_file=_coveragerc)
-        cov.set_option("run:note", run_note)
-        cov.start()
-        return cov
+    try:
+        import coverage
+    except ImportError:
+        return None
+    _coveragerc = os.path.join(
+        os.path.dirname(__file__),
+        os.pardir, os.pardir,
+        '.coveragerc')
+    cov = coverage.Coverage(config_file=_coveragerc)
+    cov.set_option("run:note", run_note)
+    cov.start()
+    return cov
 
 
 class as_subprocess(object):
-    """This helper executes test cases in a child process,
-       avoiding a python-internal bug of _curses: setupterm()
-       may not be called more than once per process.
-    """
+    """This helper executes test cases in a child process, avoiding a python-internal bug of
+    _curses: setupterm() may not be called more than once per process."""
     _CHILD_PID = 0
     encoding = 'utf8'
 
@@ -147,12 +148,12 @@ class as_subprocess(object):
 
 def read_until_semaphore(fd, semaphore=RECV_SEMAPHORE,
                          encoding='utf8', timeout=10):
-    """Read file descriptor ``fd`` until ``semaphore`` is found.
+    """
+    Read file descriptor ``fd`` until ``semaphore`` is found.
 
-    Used to ensure the child process is awake and ready. For timing
-    tests; without a semaphore, the time to fork() would be (incorrectly)
-    included in the duration of the test, which can be very length on
-    continuous integration servers (such as Travis-CI).
+    Used to ensure the child process is awake and ready. For timing tests; without a semaphore, the
+    time to fork() would be (incorrectly) included in the duration of the test, which can be very
+    length on continuous integration servers (such as Travis-CI).
     """
     # note that when a child process writes xyz\\n, the parent
     # process will read xyz\\r\\n -- this is how pseudo terminals
@@ -176,7 +177,11 @@ def read_until_semaphore(fd, semaphore=RECV_SEMAPHORE,
 
 
 def read_until_eof(fd, encoding='utf8'):
-    """Read file descriptor ``fd`` until EOF. Return decoded string."""
+    """
+    Read file descriptor ``fd`` until EOF.
+
+    Return decoded string.
+    """
     decoder = codecs.getincrementaldecoder(encoding)()
     outp = six.text_type()
     while True:

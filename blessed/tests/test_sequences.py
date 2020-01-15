@@ -1,25 +1,22 @@
 # -*- coding: utf-8 -*-
 """Tests for Terminal() sequences and sequence-awareness."""
 # std imports
-import platform
-import random
-import sys
 import os
-
-# local
-from .accessories import (
-    all_terms,
-    as_subprocess,
-    TestTerminal,
-    unicode_parm,
-    many_columns,
-    unicode_cap,
-)
+import sys
+import random
+import platform
 
 # 3rd party
-import pytest
-import mock
 import six
+import mock
+import pytest
+
+from .accessories import (TestTerminal,
+                          all_terms,
+                          unicode_cap,
+                          many_columns,
+                          unicode_parm,
+                          as_subprocess)
 
 
 def test_capability():
@@ -400,7 +397,7 @@ def test_nested_formatting(all_terms):
                         ' off')
         expected = u''.join((
             t.green, 'off ', t.underline, 'ON',
-            t.normal, t.green , ' off ', t.underline, 'ON',
+            t.normal, t.green, ' off ', t.underline, 'ON',
             t.normal, t.green, ' off', t.normal))
         assert given == expected
 
@@ -487,7 +484,7 @@ def test_null_callable_string(all_terms):
 
 
 def test_padd():
-    """ Test Terminal.padd(seq). """
+    """Test Terminal.padd(seq)."""
     @as_subprocess
     def child():
         from blessed.sequences import Sequence
@@ -499,6 +496,7 @@ def test_padd():
         assert Sequence('\x1b[3D', term).padd() == u''  # "Trim left"
 
     child()
+
 
 def test_split_seqs(all_terms):
     """Test Terminal.split_seqs."""

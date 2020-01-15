@@ -1,21 +1,40 @@
 # encoding: utf-8
 """Module containing :class:`Terminal`, the primary API entry point."""
+# std imports
+import io
+import os
+import re
+import sys
+import time
 # pylint: disable=too-many-lines
 #         Too many lines in module (1027/1000)
 import codecs
-import collections
-import contextlib
-import functools
-import io
 import locale
-import os
-import platform
 import select
 import struct
-import sys
-import time
+import platform
 import warnings
-import re
+import functools
+import contextlib
+import collections
+
+from .color import COLOR_DISTANCE_ALGORITHMS
+from .keyboard import (_time_left,
+                       _read_until,
+                       resolve_sequence,
+                       get_keyboard_codes,
+                       get_leading_prefixes,
+                       get_keyboard_sequences)
+from .sequences import Termcap, Sequence, SequenceTextWrapper
+from .colorspace import RGB_256TABLE
+# local imports
+from .formatters import (COLORS,
+                         FormattingString,
+                         NullCallableString,
+                         ParameterizingString,
+                         resolve_attribute,
+                         resolve_capability)
+from ._capabilities import CAPABILITY_DATABASE, CAPABILITIES_ADDITIVES, CAPABILITIES_RAW_MIXIN
 
 try:
     InterruptedError
@@ -33,36 +52,6 @@ except ImportError:
     #         Unable to import 'ordereddict'
     from ordereddict import OrderedDict
 
-# local imports
-from .formatters import (ParameterizingString,
-                         NullCallableString,
-                         resolve_capability,
-                         resolve_attribute,
-                         FormattingString,
-                         COLORS,
-                         )
-
-from ._capabilities import (
-    CAPABILITIES_RAW_MIXIN,
-    CAPABILITIES_ADDITIVES,
-    CAPABILITY_DATABASE,
-)
-
-from .sequences import (SequenceTextWrapper,
-                        Sequence,
-                        Termcap,
-                        )
-
-from .keyboard import (get_keyboard_sequences,
-                       get_leading_prefixes,
-                       get_keyboard_codes,
-                       resolve_sequence,
-                       _read_until,
-                       _time_left,
-                       )
-
-from .color import COLOR_DISTANCE_ALGORITHMS
-from .colorspace import RGB_256TABLE
 
 if platform.system() == 'Windows':
     import jinxed as curses  # pylint: disable=import-error
@@ -85,17 +74,15 @@ else:
         warnings.warn(_MSG_NOSUPPORT)
         HAS_TTY = False
 
-_CUR_TERM = None  # See comments at end of file
-
 
 class Terminal(object):
     """
     An abstraction for color, style, positioning, and input in the terminal.
 
-    This keeps the endless calls to ``tigetstr()`` and ``tparm()`` out of your
-    code, acts intelligently when somebody pipes your output to a non-terminal,
-    and abstracts over the complexity of unbuffered keyboard input. It uses the
-    terminfo database to remain portable across terminal types.
+    This keeps the endless calls to ``tigetstr()`` and ``tparm()`` out of your code, acts
+    intelligently when somebody pipes your output to a non-terminal, and abstracts over the
+    complexity of unbuffered keyboard input. It uses the terminfo database to remain portable across
+    terminal types.
     """
     # pylint: disable=too-many-instance-attributes,too-many-public-methods
     #         Too many public methods (28/20)
@@ -212,7 +199,8 @@ class Terminal(object):
             self._kind = kind or os.environ.get('TERM', 'unknown')
 
         if self.does_styling:
-            # Initialize curses (call setupterm), so things like tigetstr() work.
+            # Initialize curses (call setupterm), so things like tigetstr()
+            # work.
             try:
                 curses.setupterm(kind, open(os.devnull).fileno())
             except curses.error as err:
@@ -456,7 +444,6 @@ class Terminal(object):
             - ``ws_col``: height of terminal by its number of character cells.
             - ``ws_xpixel``: width of terminal by pixels (not accurate).
             - ``ws_ypixel``: height of terminal by pixels (not accurate).
-
         """
         for fd in (self._init_descriptor, sys.__stdout__):
             try:
@@ -705,7 +692,8 @@ class Terminal(object):
         :arg int red: RGB value of Red (0-255).
         :arg int green: RGB value of Green (0-255).
         :arg int blue: RGB value of Blue (0-255).
-        :rtype: int """
+        :rtype: int
+        """
         # Though pre-computing all 1 << 24 options is memory-intensive, a pre-computed
         # "k-d tree" of 256 (x,y,z) vectors of a colorspace in 3 dimensions, such as a
         # cone of HSV, or simply 255x255x255 RGB square, any given rgb value is just a
@@ -769,14 +757,13 @@ class Terminal(object):
         self._number_of_colors = value
         self.__clear_color_capabilities()
 
-
     @property
     def color_distance_algorithm(self):
         """
         Color distance algorithm used by :meth:`rgb_downconvert`.
 
-        The slowest, but most accurate, 'cie94', is default. Other
-        available options are 'rgb', 'rgb-weighted', and 'cie76'.
+        The slowest, but most accurate, 'cie94', is default. Other available options are 'rgb',
+        'rgb-weighted', and 'cie76'.
         """
         return self._color_distance_algorithm
 
@@ -786,16 +773,14 @@ class Terminal(object):
         self._color_distance_algorithm = value
         self.__clear_color_capabilities()
 
-
     @property
     def _foreground_color(self):
         """
         Convenience capability to support :attr:`~.on_color`.
 
-        Prefers returning sequence for capability ``setaf``, "Set foreground
-        color to #1, using ANSI escape". If the given terminal does not
-        support such sequence, fallback to returning attribute ``setf``,
-        "Set foreground color #1".
+        Prefers returning sequence for capability ``setaf``, "Set foreground color to #1, using ANSI
+        escape". If the given terminal does not support such sequence, fallback to returning
+        attribute ``setf``, "Set foreground color #1".
         """
         return self.setaf or self.setf
 
@@ -804,10 +789,9 @@ class Terminal(object):
         """
         Convenience capability to support :attr:`~.on_color`.
 
-        Prefers returning sequence for capability ``setab``, "Set background
-        color to #1, using ANSI escape". If the given terminal does not
-        support such sequence, fallback to returning attribute ``setb``,
-        "Set background color #1".
+        Prefers returning sequence for capability ``setab``, "Set background color to #1, using ANSI
+        escape". If the given terminal does not support such sequence, fallback to returning
+        attribute ``setb``, "Set background color #1".
         """
         return self.setab or self.setb
 
@@ -1269,7 +1253,6 @@ class WINSZ(collections.namedtuple('WINSZ', (
     _BUF = '\x00' * struct.calcsize(_FMT)
 
 
-#: _CUR_TERM = None
 #: From libcurses/doc/ncurses-intro.html (ESR, Thomas Dickey, et. al)::
 #:
 #:   "After the call to setupterm(), the global variable cur_term is set to
@@ -1289,3 +1272,4 @@ class WINSZ(collections.namedtuple('WINSZ', (
 #: Therefore, the :attr:`Terminal.kind` of each :class:`Terminal` is
 #: essentially a singleton. This global variable reflects that, and a warning
 #: is emitted if somebody expects otherwise.
+_CUR_TERM = None

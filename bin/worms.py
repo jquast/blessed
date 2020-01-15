@@ -82,8 +82,7 @@ def next_bearing(term, inp_code, bearing):
     """
     Return direction function for new bearing by inp_code.
 
-    If no inp_code matches a bearing direction, return
-    a function for the current bearing.
+    If no inp_code matches a bearing direction, return a function for the current bearing.
     """
     return {
         term.KEY_LEFT: left_of,
@@ -156,9 +155,8 @@ def next_nibble(term, nibble, head, worm):
     """
     Provide the next nibble.
 
-    continuously generate a random new nibble so long as the current nibble
-    hits any location of the worm.  Otherwise, return a nibble of the same
-    location and value as provided.
+    continuously generate a random new nibble so long as the current nibble hits any location of the
+    worm.  Otherwise, return a nibble of the same location and value as provided.
     """
     loc, val = nibble.location, nibble.value
     while hit_vany([head] + worm, nibble_locations(loc, val)):

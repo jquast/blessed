@@ -1,30 +1,25 @@
 # -*- coding: utf-8 -*-
-"Core blessed Terminal() tests."
+"""Core blessed Terminal() tests."""
 
+# std imports
+import io
+import os
+import sys
+import math
+import time
+import locale
+import platform
+import warnings
 # std
 import collections
-import warnings
-import platform
-import locale
-import time
-import math
-import sys
-import os
-import io
-
-# local
-from .accessories import (
-    as_subprocess,
-    TestTerminal,
-    unicode_cap,
-    all_terms
-)
 
 # 3rd party
+import six
 import mock
 import pytest
-import six
 from six.moves import reload_module
+
+from .accessories import TestTerminal, all_terms, unicode_cap, as_subprocess
 
 
 def test_export_only_Terminal():
@@ -34,7 +29,7 @@ def test_export_only_Terminal():
 
 
 def test_null_location(all_terms):
-    "Make sure ``location()`` with no args just does position restoration."
+    """Make sure ``location()`` with no args just does position restoration."""
     @as_subprocess
     def child(kind):
         t = TestTerminal(stream=six.StringIO(), force_styling=True)
@@ -48,7 +43,7 @@ def test_null_location(all_terms):
 
 
 def test_flipped_location_move(all_terms):
-    "``location()`` and ``move()`` receive counter-example arguments."
+    """``location()`` and ``move()`` receive counter-example arguments."""
     @as_subprocess
     def child(kind):
         buf = six.StringIO()
@@ -63,7 +58,7 @@ def test_flipped_location_move(all_terms):
 
 
 def test_yield_keypad():
-    "Ensure ``keypad()`` writes keyboard_xmit and keyboard_local."
+    """Ensure ``keypad()`` writes keyboard_xmit and keyboard_local."""
     @as_subprocess
     def child(kind):
         # given,
@@ -81,7 +76,7 @@ def test_yield_keypad():
 
 
 def test_null_fileno():
-    "Make sure ``Terminal`` works when ``fileno`` is ``None``."
+    """Make sure ``Terminal`` works when ``fileno`` is ``None``."""
     @as_subprocess
     def child():
         # This simulates piping output to another program.
@@ -94,7 +89,7 @@ def test_null_fileno():
 
 
 def test_number_of_colors_without_tty():
-    "``number_of_colors`` should return 0 when there's no tty."
+    """``number_of_colors`` should return 0 when there's no tty."""
     @as_subprocess
     def child_256_nostyle():
         t = TestTerminal(stream=six.StringIO())
@@ -129,7 +124,7 @@ def test_number_of_colors_without_tty():
 
 
 def test_number_of_colors_with_tty():
-    "test ``number_of_colors`` 0, 8, and 256."
+    """test ``number_of_colors`` 0, 8, and 256."""
     @as_subprocess
     def child_256():
         t = TestTerminal()
@@ -156,7 +151,7 @@ def test_number_of_colors_with_tty():
 
 
 def test_init_descriptor_always_initted(all_terms):
-    "Test height and width with non-tty Terminals."
+    """Test height and width with non-tty Terminals."""
     @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind, stream=six.StringIO())
@@ -170,7 +165,7 @@ def test_init_descriptor_always_initted(all_terms):
 
 
 def test_force_styling_none(all_terms):
-    "If ``force_styling=None`` is used, don't ever do styling."
+    """If ``force_styling=None`` is used, don't ever do styling."""
     @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind, force_styling=None)
@@ -182,7 +177,7 @@ def test_force_styling_none(all_terms):
 
 
 def test_setupterm_singleton_issue33():
-    "A warning is emitted if a new terminal ``kind`` is used per process."
+    """A warning is emitted if a new terminal ``kind`` is used per process."""
     @as_subprocess
     def child():
         warnings.filterwarnings("error", category=UserWarning)
@@ -209,7 +204,7 @@ def test_setupterm_singleton_issue33():
 
 
 def test_setupterm_invalid_issue39():
-    "A warning is emitted if TERM is invalid."
+    """A warning is emitted if TERM is invalid."""
     # https://bugzilla.mozilla.org/show_bug.cgi?id=878089
     #
     # if TERM is unset, defaults to 'unknown', which should
@@ -236,7 +231,7 @@ def test_setupterm_invalid_issue39():
 
 
 def test_setupterm_invalid_has_no_styling():
-    "An unknown TERM type does not perform styling."
+    """An unknown TERM type does not perform styling."""
     # https://bugzilla.mozilla.org/show_bug.cgi?id=878089
 
     # if TERM is unset, defaults to 'unknown', which should
@@ -255,7 +250,7 @@ def test_setupterm_invalid_has_no_styling():
 
 
 def test_missing_ordereddict_uses_module(monkeypatch):
-    "ordereddict module is imported when without collections.OrderedDict."
+    """ordereddict module is imported when without collections.OrderedDict."""
     import blessed.keyboard
 
     if hasattr(collections, 'OrderedDict'):
@@ -278,7 +273,7 @@ def test_missing_ordereddict_uses_module(monkeypatch):
 
 
 def test_python3_2_raises_exception(monkeypatch):
-    "Test python version 3.0 through 3.2 raises an exception."
+    """Test python version 3.0 through 3.2 raises an exception."""
     import blessed
 
     monkeypatch.setattr('platform.python_version_tuple',
@@ -297,13 +292,13 @@ def test_python3_2_raises_exception(monkeypatch):
 
 
 def test_without_dunder():
-    "Ensure dunder does not remain in module (py2x InterruptedError test."
+    """Ensure dunder does not remain in module (py2x InterruptedError test."""
     import blessed.terminal
     assert '_' not in dir(blessed.terminal)
 
 
 def test_IOUnsupportedOperation():
-    "Ensure stream that throws IOUnsupportedOperation results in non-tty."
+    """Ensure stream that throws IOUnsupportedOperation results in non-tty."""
     @as_subprocess
     def child():
         import blessed.terminal
@@ -340,7 +335,7 @@ def test_winsize_IOError_returns_environ():
 
 
 def test_yield_fullscreen(all_terms):
-    "Ensure ``fullscreen()`` writes enter_fullscreen and exit_fullscreen."
+    """Ensure ``fullscreen()`` writes enter_fullscreen and exit_fullscreen."""
     @as_subprocess
     def child(kind):
         t = TestTerminal(stream=six.StringIO(), force_styling=True)
@@ -355,7 +350,7 @@ def test_yield_fullscreen(all_terms):
 
 
 def test_yield_hidden_cursor(all_terms):
-    "Ensure ``hidden_cursor()`` writes hide_cursor and normal_cursor."
+    """Ensure ``hidden_cursor()`` writes hide_cursor and normal_cursor."""
     @as_subprocess
     def child(kind):
         t = TestTerminal(stream=six.StringIO(), force_styling=True)
@@ -370,7 +365,7 @@ def test_yield_hidden_cursor(all_terms):
 
 
 def test_no_preferredencoding_fallback_ascii():
-    "Ensure empty preferredencoding value defaults to ascii."
+    """Ensure empty preferredencoding value defaults to ascii."""
     @as_subprocess
     def child():
         with mock.patch('locale.getpreferredencoding') as get_enc:
@@ -398,7 +393,7 @@ def test_unknown_preferredencoding_warned_and_fallback_ascii():
 
 
 def test_win32_missing_tty_modules(monkeypatch):
-    "Ensure dummy exception is used when io is without UnsupportedOperation."
+    """Ensure dummy exception is used when io is without UnsupportedOperation."""
     @as_subprocess
     def child():
         OLD_STYLE = False
@@ -475,9 +470,9 @@ def test_time_left_infinite_None():
 
 
 def test_termcap_repr():
-    "Ensure ``hidden_cursor()`` writes hide_cursor and normal_cursor."
+    """Ensure ``hidden_cursor()`` writes hide_cursor and normal_cursor."""
 
-    given_ttype='vt220'
+    given_ttype = 'vt220'
     given_capname = 'cursor_up'
     expected = [r"<Termcap cursor_up:'\x1b\\[A'>",
                 r"<Termcap cursor_up:'\\\x1b\\[A'>",

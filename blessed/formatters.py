@@ -1,18 +1,21 @@
 """Sub-module providing sequence-formatting functions."""
+# std imports
 # standard imports
 import platform
 
-# local
-from blessed.colorspace import X11_COLORNAMES_TO_RGB, CGA_COLORS
-
+# 3rd party
 # 3rd-party
 import six
+
+# local
+from blessed.colorspace import CGA_COLORS, X11_COLORNAMES_TO_RGB
 
 # curses
 if platform.system() == 'Windows':
     import jinxed as curses   # pylint: disable=import-error
 else:
     import curses
+
 
 def _make_colors():
     """
@@ -35,6 +38,7 @@ def _make_colors():
         colors.add('on_' + vga_color)
     return colors
 
+
 #: Valid colors and their background (on), bright, and bright-background
 #: derivatives.
 COLORS = _make_colors()
@@ -42,6 +46,7 @@ COLORS = _make_colors()
 #: Attributes that may be compounded with colors, by underscore, such as
 #: 'reverse_indigo'.
 COMPOUNDABLES = set('bold underline reverse blink italic standout'.split())
+
 
 class ParameterizingString(six.text_type):
     r"""
@@ -263,8 +268,8 @@ class NullCallableString(six.text_type):
     """
     A dummy callable Unicode alternative to :class:`FormattingString`.
 
-    This is used for colors on terminals that do not support colors,
-    it is just a basic form of unicode that may also act as a callable.
+    This is used for colors on terminals that do not support colors, it is just a basic form of
+    unicode that may also act as a callable.
     """
 
     def __new__(cls):
