@@ -9,25 +9,21 @@ matrix:
     - python: 3.5
       env: TOXENV=py35,coveralls TEST_QUICK=1 COVERAGE_ID=travis-ci
     - python: 3.6
-      env: TOXENV=py36,coveralls COVERAGE_ID=travis-ci
+      env: TOXENV=py36,coveralls TEST_QUICK=1 COVERAGE_ID=travis-ci
     - python: 3.7
-      env: TOXENV=py37,coveralls COVERAGE_ID=travis-ci
+      env: TOXENV=py37,coveralls TEST_QUICK=1 COVERAGE_ID=travis-ci
     - python: 3.8
-      env: TOXENV=about,pylint,flake8,sphinx,py38 COVERAGE_ID=travis-ci
+      env: TOXENV=py38,coveralls COVERAGE_ID=travis-ci
     - python: 3.9-dev
-      env: TOXENV=py39,coveralls COVERAGE_ID=travis-ci
+      env: TOXENV=py39,coveralls TEST_QUICK=1 COVERAGE_ID=travis-ci
     - python: 3.8
-      env: TOXENV=about
-    - python: 3.8
-      env: TOXENV=pylint
-    - python: 3.8
-      env: TOXENV=flake8
-    - python: 3.8
-      env: TOXENV=sphinx
+      env: TOXENV=about,pylint,flake8,sphinx
 
 jobs:
   allow_failures:
   - python: 3.9-dev
+  # disabled until subsequent cleanup PR
+  - env: TOXENV=about,pylint,flake8,sphinx
 
 install:
   - pip install tox
