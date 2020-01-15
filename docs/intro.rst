@@ -1,22 +1,46 @@
-.. image:: https://img.shields.io/travis/jquast/blessed/master.svg
+| |docs| |travis| |coveralls|
+| |pypi| |downloads| |gitter|
+| |linux| |windows| |mac| |bsd|
+
+.. |docs| image:: https://img.shields.io/readthedocs/blessed.svg?logo=read-the-docs
+    :target: https://blessed.readthedocs.org
+    :alt: Documentation Status
+
+.. |travis| image:: https://img.shields.io/travis/jquast/blessed/master.svg?logo=travis
     :alt: Travis Continuous Integration
     :target: https://travis-ci.org/jquast/blessed/
 
-.. image:: https://coveralls.io/repos/jquast/blessed/badge.svg?branch=master&service=github
+.. |coveralls| image:: https://img.shields.io/coveralls/github/jquast/blessed/master?logo=coveralls
     :alt: Coveralls Code Coverage
     :target: https://coveralls.io/github/jquast/blessed?branch=master
 
-.. image:: https://img.shields.io/pypi/v/blessed.svg
+.. |pypi| image:: https://img.shields.io/pypi/v/blessed.svg?logo=pypi
     :alt: Latest Version
     :target: https://pypi.python.org/pypi/blessed
 
-.. image:: https://img.shields.io/pypi/dm/blessed.svg
+.. |downloads| image:: https://img.shields.io/pypi/dm/blessed.svg?logo=pypi
     :alt: Downloads
     :target: https://pypi.python.org/pypi/blessed
 
-.. image:: https://badges.gitter.im/Join%20Chat.svg
+.. |gitter| image:: https://img.shields.io/badge/gitter-Join%20Chat-mediumaquamarine?logo=gitter
     :alt: Join Chat
     :target: https://gitter.im/jquast/blessed
+
+.. |linux| image:: https://img.shields.io/badge/Linux-yes-success?logo=linux
+    :alt: Linux supported
+    :target: https://pypi.python.org/pypi/enlighten
+
+.. |windows| image:: https://img.shields.io/badge/Windows-NEW-success?logo=windows
+    :alt: Windows supported
+    :target: https://pypi.python.org/pypi/enlighten
+
+.. |mac| image:: https://img.shields.io/badge/MacOS-yes-success?logo=apple
+    :alt: MacOS supported
+    :target: https://pypi.python.org/pypi/enlighten
+
+.. |bsd| image:: https://img.shields.io/badge/BSD-yes-success?logo=freebsd
+    :alt: BSD supported
+    :target: https://pypi.python.org/pypi/enlighten
 
 Introduction
 ============
@@ -157,6 +181,19 @@ Forked
 
 *Blessed* is a fork of `blessings <https://github.com/erikrose/blessings>`_.
 Changes since 1.7 have all been proposed but unaccepted upstream.
+
+Enhancements only in *Blessed*:
+  * 24-bit color support with :meth:`~Terminal.color_rgb` and :meth:`~Terminal.on_color_rgb` methods
+  * X11 color name attributes
+  * Windows support
+  * :meth:`~.Terminal.length` to determine printable length of text containing sequences
+  * :meth:`~.Terminal.strip`, :meth:`~.Terminal.rstrip`, :meth:`~.Terminal.rstrip`,
+    and :meth:`~.Terminal.strip_seqs` for removing sequences from text
+  * :meth:`Terminal.wrap` for wrapping text containing sequences at a specified width
+  * :meth:`~.Terminal.center`, :meth:`~.Terminal.rjust`, and :meth:`~.Terminal.ljust`
+    for alignment of text containing sequences
+  * :meth:`~.cbreak` and :meth:`~.raw` context managers for keyboard input
+  * :meth:`~.inkey` for keyboard event detection
 
 Furthermore, a project in the node.js language of the `same name
 <https://github.com/chjj/blessed>`_ is **not** related, or a fork

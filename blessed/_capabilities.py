@@ -125,7 +125,7 @@ CAPABILITIES_RAW_MIXIN = {
 
 
 CAPABILITIES_ADDITIVES = {
-    'color256': ('color', re.escape('\x1b') + r'\[38;5;(\d+)m'),
+    'color256': ('color', re.escape('\x1b') + r'\[38;5;\d+m'),
     'shift_in': ('', re.escape('\x0f')),
     'shift_out': ('', re.escape('\x0e')),
     # sgr(...) outputs strangely, use the basic ANSI/EMCA-48 codes here.

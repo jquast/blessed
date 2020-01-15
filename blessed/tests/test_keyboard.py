@@ -688,8 +688,13 @@ def test_get_keyboard_codes():
         if keycode in exemptions:
             assert value == exemptions[keycode]
             continue
-        assert hasattr(curses, keycode)
-        assert getattr(curses, keycode) == value
+        if keycode[4:] in blessed.keyboard._CURSES_KEYCODE_ADDINS:
+            assert not hasattr(curses, keycode)
+            assert hasattr(blessed.keyboard, keycode)
+            assert getattr(blessed.keyboard, keycode) == value
+        else:
+            assert hasattr(curses, keycode)
+            assert getattr(curses, keycode) == value
 
 
 def test_alternative_left_right():

@@ -229,7 +229,7 @@ class Terminal(object):
         self.__init__keycodes()
 
     def __init__color_capabilities(self):
-        self._color_distance_algorithm = 'cie94'
+        self._color_distance_algorithm = 'cie2000'
         if not self.does_styling:
             self.number_of_colors = 0
         elif platform.system() == 'Windows' or (
@@ -579,8 +579,19 @@ class Terminal(object):
 
             if match:
                 # return matching sequence response, the cursor location.
-                row, col = match.groups()
-                return int(row), int(col)
+                row, col = (int(val) for val in match.groups())
+
+                # Per https://invisible-island.net/ncurses/terminfo.src.html
+                # The cursor position report (<u6>) string must contain two
+                # scanf(3)-style %d format elements.  The first of these must
+                # correspond to the Y coordinate and the second to the %d.
+                # If the string contains the sequence %i, it is taken as an
+                # instruction to decrement each value after reading it (this is
+                # the inverse sense from the cup string).
+                if '%i' in self.cursor_report:
+                    row -= 1
+                    col -= 1
+                return row, col
 
         finally:
             if ctx is not None:
@@ -762,8 +773,8 @@ class Terminal(object):
         """
         Color distance algorithm used by :meth:`rgb_downconvert`.
 
-        The slowest, but most accurate, 'cie94', is default. Other available options are 'rgb',
-        'rgb-weighted', and 'cie76'.
+        The slowest, but most accurate, 'cie2000', is default. Other available options are
+        'rgb', 'rgb-weighted', 'cie76', and 'cie94'.
         """
         return self._color_distance_algorithm
 

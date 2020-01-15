@@ -71,16 +71,13 @@ def test_SequenceWrapper(many_columns, kwargs):
         # build a test paragraph, along with a very colorful version
         term = TestTerminal()
         attributes = ('bright_red', 'on_bright_blue', 'underline', 'reverse',
-                      'red_reverse', 'red_on_white', 'superscript',
-                      'subscript', 'on_bright_white')
+                      'red_reverse', 'red_on_white', 'on_bright_white')
         term.bright_red('x')
         term.on_bright_blue('x')
         term.underline('x')
         term.reverse('x')
         term.red_reverse('x')
         term.red_on_white('x')
-        term.superscript('x')
-        term.subscript('x')
         term.on_bright_white('x')
 
         pgraph_colored = u''.join([

@@ -12,8 +12,14 @@ matrix:
       env: TOXENV=py36 COVERAGE_ID=travis-ci
     - python: 3.7
       env: TOXENV=py37 COVERAGE_ID=travis-ci
-    - python: 3.8-dev
+    - python: 3.8
       env: TOXENV=py38 COVERAGE_ID=travis-ci
+    - python: 3.9-dev
+      env: TOXENV=py39 COVERAGE_ID=travis-ci
+
+jobs:
+  allow_failures:
+  - python: 3.9-dev
 
 install:
   - pip install tox

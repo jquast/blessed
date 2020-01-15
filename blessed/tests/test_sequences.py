@@ -342,13 +342,6 @@ def test_formatting_functions(all_terms):
             expected_output = u'boö'
         assert (t.underline(u'boö') == expected_output)
 
-        if t.subscript:
-            expected_output = u''.join((t.subscript, u'[1]', t.normal))
-        else:
-            expected_output = u'[1]'
-
-        assert (t.subscript(u'[1]') == expected_output)
-
     child(all_terms)
 
 
