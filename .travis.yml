@@ -2,12 +2,6 @@ language: python
 matrix:
   fast_finish: true
   include:
-    - python: 3.7
-      env: TOXENV=about
-    - python: 3.7
-      env: TOXENV=sa
-    - python: 3.7
-      env: TOXENV=sphinx
     - python: 2.7
       env: TOXENV=py27 TEST_QUICK=1 COVERAGE_ID=travis-ci
     - python: 3.4
@@ -39,11 +33,3 @@ notifications:
       - contact@jeffquast.com
     on_success: change
     on_failure: change
-#  irc:
-#    channels:
-#      - "irc.servercentral.net#1984"
-#    template:
-#      - "%{repository}(%{branch}): %{message} (%{duration}) %{build_url}"
-#    skip_join: true
-#    on_success: change
-#    on_failure: change

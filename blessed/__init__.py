@@ -19,4 +19,4 @@ if ('3', '0', '0') <= _platform.python_version_tuple() < ('3', '2', '2+'):
                       'support due to http://bugs.python.org/issue10570.')
 
 __all__ = ('Terminal',)
-__version__ = '2.0.0'
+__version__ = '1.17.0'
