@@ -16,12 +16,16 @@ matrix:
       env: TOXENV=py38 COVERAGE_ID=travis-ci
     - python: 3.9-dev
       env: TOXENV=py39 COVERAGE_ID=travis-ci
-    - env: TOXENV=about
-    - env: TOXENV=pylint
-    - env: TOXENV=flake8
-    - env: TOXENV=pycodestyle
-    - env: TOXENV=sphinx
-    - env: TOXENV=sa
+    - python: 3.8
+      env: TOXENV=about
+    - python: 3.8
+      env: TOXENV=pylint
+    - python: 3.8
+      env: TOXENV=flake8
+    - python: 3.8
+      env: TOXENV=pycodestyle
+    - python: 3.8
+      env: TOXENV=sphinx
 
 jobs:
   allow_failures:
@@ -31,6 +35,8 @@ install:
   - pip install tox
 script:
   - tox
+after_success:
+  - tox -e coveralls
 sudo: false
 
 notifications:
