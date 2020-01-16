@@ -5,7 +5,7 @@ import platform
 # local
 from blessed.colorspace import X11_COLORNAMES_TO_RGB, CGA_COLORS
 
-# 3rd-party
+# 3rd party
 import six
 
 # curses

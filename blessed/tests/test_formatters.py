@@ -3,7 +3,7 @@
 # std
 import curses
 
-# 3rd-party
+# 3rd party
 import mock
 import pytest
 

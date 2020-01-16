@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 """Distutils setup script."""
+# std imports
 import os
+
+# 3rd party
 import setuptools
 
 

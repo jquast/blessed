@@ -26,7 +26,7 @@ from .accessories import (
     echo_off,
 )
 
-# 3rd-party
+# 3rd party
 import pytest
 import mock
 import six

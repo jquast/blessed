@@ -3,7 +3,7 @@ import sys
 import os
 import json
 
-# 3rd-party
+# 3rd party
 import sphinx_rtd_theme
 import sphinx.environment
 from docutils.utils import get_source_line

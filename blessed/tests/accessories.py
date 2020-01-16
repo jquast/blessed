@@ -16,11 +16,10 @@ import contextlib
 import subprocess
 
 # 3rd party
+import pytest
 import six
 
 # local
-# 3rd-party
-import pytest
 from blessed import Terminal
 
 TestTerminal = functools.partial(Terminal, kind='xterm-256color')

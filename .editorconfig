@@ -1,9 +1,7 @@
 root = true
 
-[*]
+[*.json]
 charset = utf-8
-
-[*.sh,*.json,*.ini]
 tab_width = 4
 indent_size = tab
 indent_space = space
@@ -11,21 +9,9 @@ trim_trailing_whitespace = true
 insert_final_newline = true
 
 [*.py]
+charset = utf-8
 tab_width = 4
 indent_size = tab
 indent_space = space
 trim_trailing_whitespace = true
 insert_final_newline = true
-
-# isort
-# https://github.com/timothycrosley/isort/wiki/isort-Settings
-line_length = 100
-indent = '    '
-multi_line_output = 1
-length_sort = 1
-sections = FUTURE,STDLIB,THIRDPARTY,FIRSTPARTY,LOCALFOLDER
-import_heading_stdlib = std imports
-import_heading_thirdparty = 3rd party
-import_heading_firstparty = local
-atomic = true
-known_third_party=rapidjson
