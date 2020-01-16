@@ -9,6 +9,7 @@ References,
 - https://devblogs.microsoft.com/commandline/24-bit-color-in-the-windows-console/
 - http://jdebp.eu/Softwares/nosh/guide/TerminalCapabilities.html
 """
+# std imports
 import collections
 
 __all__ = (

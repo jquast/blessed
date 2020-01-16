@@ -1,24 +1,17 @@
 # encoding: utf-8
 # std imports
-import itertools
-import termios
-import struct
-import fcntl
-import sys
 import os
-
-# local
-from blessed.tests.accessories import (
-    all_terms,
-    as_subprocess,
-    TestTerminal,
-    many_columns,
-    many_lines,
-)
+import sys
+import fcntl
+import struct
+import termios
+import itertools
 
 # 3rd party
-import pytest
 import six
+
+# local
+from blessed.tests.accessories import TestTerminal, as_subprocess
 
 
 def test_length_cjk():
@@ -40,7 +33,6 @@ def test_length_ansiart():
     @as_subprocess
     def child():
         import codecs
-        from blessed.sequences import Sequence
         term = TestTerminal(kind='xterm-256color')
         # this 'ansi' art contributed by xzip!impure for another project,
         # unlike most CP-437 DOS ansi art, this is actually utf-8 encoded.

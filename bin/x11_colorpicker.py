@@ -1,5 +1,9 @@
+# std imports
 import colorsys
+
+# local
 import blessed
+
 
 def sort_colors():
     colors = {}

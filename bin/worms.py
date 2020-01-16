@@ -6,12 +6,14 @@ It is also an experiment in functional programming.
 """
 
 from __future__ import division, print_function
-from collections import namedtuple
-from functools import partial
+
+# std imports
 from random import randrange
+from functools import partial
+from collections import namedtuple
 
+# local
 from blessed import Terminal
-
 
 # python 2/3 compatibility, provide 'echo' function as an
 # alias for "print without newline and flush"

@@ -6,7 +6,6 @@ http://pypi.python.org/pypi/blessed
 # std imports
 import platform as _platform
 
-# local
 if _platform.system() == 'Windows':
     from blessed.win_terminal import Terminal
 else:

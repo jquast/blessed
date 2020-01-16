@@ -6,9 +6,12 @@ Display all known key capabilities that may match the terminal.
 As each key is pressed on input, it is lit up and points are scored.
 """
 from __future__ import division, print_function
-import functools
-import sys
 
+# std imports
+import sys
+import functools
+
+# local
 from blessed import Terminal
 
 # python 2/3 compatibility, provide 'echo' function as an

@@ -1,30 +1,25 @@
 # -*- coding: utf-8 -*-
 "Core blessed Terminal() tests."
 
-# std
-import collections
-import warnings
-import platform
-import locale
-import time
-import math
-import sys
-import os
+# std imports
 import io
-
-# local
-from .accessories import (
-    as_subprocess,
-    TestTerminal,
-    unicode_cap,
-    all_terms
-)
+import os
+import sys
+import math
+import time
+import locale
+import platform
+import warnings
+import collections
 
 # 3rd party
+import six
 import mock
 import pytest
-import six
 from six.moves import reload_module
+
+# local
+from .accessories import TestTerminal, all_terms, unicode_cap, as_subprocess
 
 
 def test_export_only_Terminal():

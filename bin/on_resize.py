@@ -8,8 +8,11 @@ If a resize event is discovered, an empty string is returned by
 term.inkey().
 """
 from __future__ import print_function
+
+# std imports
 import signal
 
+# local
 from blessed import Terminal
 
 

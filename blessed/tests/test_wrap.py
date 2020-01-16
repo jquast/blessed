@@ -1,16 +1,12 @@
-# std
+# std imports
 import os
 import textwrap
 
-# local
-from .accessories import (
-    as_subprocess,
-    TestTerminal,
-    many_columns,
-)
-
 # 3rd party
 import pytest
+
+# local
+from .accessories import TestTerminal, many_columns, as_subprocess
 
 TEXTWRAP_KEYWORD_COMBINATIONS = [
     dict(break_long_words=False,

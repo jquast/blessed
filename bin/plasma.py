@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # std imports
-import math
-import colorsys
-import collections
-import contextlib
-import timeit
-import time
 import sys
+import math
+import time
+import timeit
+import colorsys
+import contextlib
+import collections
 
 # local
 import blessed

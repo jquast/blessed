@@ -1,17 +1,17 @@
 # encoding: utf-8
 """Module providing 'sequence awareness'."""
 # std imports
-import functools
-import textwrap
-import math
 import re
+import math
+import textwrap
+import functools
+
+# 3rd party
+import six
+import wcwidth
 
 # local
 from blessed._capabilities import CAPABILITIES_CAUSE_MOVEMENT
-
-# 3rd party
-import wcwidth
-import six
 
 __all__ = ('Sequence', 'SequenceTextWrapper', 'iter_parse', 'measure_length')
 

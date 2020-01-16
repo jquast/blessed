@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Example scrip that strips input of terminal sequences."""
+# std imports
 import sys
 
+# local
 import blessed
 
 

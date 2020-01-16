@@ -3,10 +3,12 @@
 # pylint: disable=invalid-name
 #         Invalid module name "display-terminalinfo"
 from __future__ import print_function
-import termios
-import locale
-import sys
+
+# std imports
 import os
+import sys
+import locale
+import termios
 
 BITMAP_IFLAG = {
     'IGNBRK': 'ignore BREAK condition',

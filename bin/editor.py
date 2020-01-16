@@ -20,9 +20,12 @@ any serious editor would make liberal use of special modes.
   save
 """
 from __future__ import division, print_function
-import collections
-import functools
 
+# std imports
+import functools
+import collections
+
+# local
 from blessed import Terminal
 
 # python 2/3 compatibility, provide 'echo' function as an

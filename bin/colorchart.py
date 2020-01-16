@@ -1,8 +1,9 @@
+# std imports
 import re
 
+# local
 import blessed
 from blessed.colorspace import X11_COLORNAMES_TO_RGB
-
 
 RE_NATURAL = re.compile(r'(dark|light|)(.+?)(\d*)$')
 

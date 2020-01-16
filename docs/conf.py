@@ -1,9 +1,10 @@
 # std imports
-import sys
 import os
+import sys
 import json
+import functools
 
-# 3rd party
+# local
 import sphinx_rtd_theme
 import sphinx.environment
 from docutils.utils import get_source_line
@@ -37,23 +38,22 @@ sphinx.environment.BuildEnvironment.warn_node = _warn_node
 
 # Monkey-patch functools.wraps and contextlib.wraps
 # https://github.com/sphinx-doc/sphinx/issues/1711#issuecomment-93126473
-import functools
 def no_op_wraps(func):
     """
     Replaces functools.wraps in order to undo wrapping when generating Sphinx documentation
     """
-    import sys
     if func.__module__ is None or 'blessed' not in func.__module__:
         return functools.orig_wraps(func)
     def wrapper(decorator):
         sys.stderr.write('patched for function signature: {0!r}\n'.format(func))
         return func
     return wrapper
+
 functools.orig_wraps = functools.wraps
 functools.wraps = no_op_wraps
-import contextlib
+import contextlib  # isort:skip
 contextlib.wraps = no_op_wraps
-from blessed.terminal import *
+from blessed.terminal import *  # isort:skip
 
 # -- General configuration ----------------------------------------------------
 

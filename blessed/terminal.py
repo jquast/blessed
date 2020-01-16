@@ -1,21 +1,38 @@
 # encoding: utf-8
 """Module containing :class:`Terminal`, the primary API entry point."""
-# pylint: disable=too-many-lines
-#         Too many lines in module (1027/1000)
-import codecs
-import collections
-import contextlib
-import functools
+# std imports
 import io
-import locale
 import os
-import platform
-import select
-import struct
+import re
 import sys
 import time
+import codecs
+import locale
+import select
+import struct
+import platform
 import warnings
-import re
+import functools
+import contextlib
+import collections
+
+# local
+from .color import COLOR_DISTANCE_ALGORITHMS
+from .keyboard import (_time_left,
+                       _read_until,
+                       resolve_sequence,
+                       get_keyboard_codes,
+                       get_leading_prefixes,
+                       get_keyboard_sequences)
+from .sequences import Termcap, Sequence, SequenceTextWrapper
+from .colorspace import RGB_256TABLE
+from .formatters import (COLORS,
+                         FormattingString,
+                         NullCallableString,
+                         ParameterizingString,
+                         resolve_attribute,
+                         resolve_capability)
+from ._capabilities import CAPABILITY_DATABASE, CAPABILITIES_ADDITIVES, CAPABILITIES_RAW_MIXIN
 
 try:
     InterruptedError
@@ -33,36 +50,10 @@ except ImportError:
     #         Unable to import 'ordereddict'
     from ordereddict import OrderedDict
 
-# local imports
-from .formatters import (ParameterizingString,
-                         NullCallableString,
-                         resolve_capability,
-                         resolve_attribute,
-                         FormattingString,
-                         COLORS,
-                         )
 
-from ._capabilities import (
-    CAPABILITIES_RAW_MIXIN,
-    CAPABILITIES_ADDITIVES,
-    CAPABILITY_DATABASE,
-)
 
-from .sequences import (SequenceTextWrapper,
-                        Sequence,
-                        Termcap,
-                        )
 
-from .keyboard import (get_keyboard_sequences,
-                       get_leading_prefixes,
-                       get_keyboard_codes,
-                       resolve_sequence,
-                       _read_until,
-                       _time_left,
-                       )
 
-from .color import COLOR_DISTANCE_ALGORITHMS
-from .colorspace import RGB_256TABLE
 
 if platform.system() == 'Windows':
     import jinxed as curses  # pylint: disable=import-error

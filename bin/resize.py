@@ -29,10 +29,11 @@ This is a simplified version of `resize.c
 <https://github.com/joejulian/xterm/blob/master/resize.c>`_ provided by the
 xterm package.
 """
-# std imports
 from __future__ import print_function
-import collections
+
+# std imports
 import sys
+import collections
 
 # local
 from blessed import Terminal

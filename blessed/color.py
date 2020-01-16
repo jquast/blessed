@@ -9,7 +9,8 @@ References,
 
 """
 
-from math import atan2, cos, exp, sin, sqrt
+# std imports
+from math import cos, exp, sin, sqrt, atan2
 
 try:
     from functools import lru_cache

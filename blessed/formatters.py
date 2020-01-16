@@ -1,12 +1,12 @@
 """Sub-module providing sequence-formatting functions."""
-# standard imports
+# std imports
 import platform
-
-# local
-from blessed.colorspace import X11_COLORNAMES_TO_RGB, CGA_COLORS
 
 # 3rd party
 import six
+
+# local
+from blessed.colorspace import CGA_COLORS, X11_COLORNAMES_TO_RGB
 
 # curses
 if platform.system() == 'Windows':

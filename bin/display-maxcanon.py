@@ -24,10 +24,11 @@ system definitions are misleading on some operating systems.
 """
 # pylint: disable=invalid-name
 #         Invalid module name "display-sighandlers"
-# std import
 from __future__ import print_function
-import sys
+
+# std imports
 import os
+import sys
 
 
 def detect_maxcanon():

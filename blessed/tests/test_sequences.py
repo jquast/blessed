@@ -1,25 +1,23 @@
 # -*- coding: utf-8 -*-
 """Tests for Terminal() sequences and sequence-awareness."""
 # std imports
-import platform
-import random
-import sys
 import os
-
-# local
-from .accessories import (
-    all_terms,
-    as_subprocess,
-    TestTerminal,
-    unicode_parm,
-    many_columns,
-    unicode_cap,
-)
+import sys
+import random
+import platform
 
 # 3rd party
-import pytest
-import mock
 import six
+import mock
+import pytest
+
+# local
+from .accessories import (TestTerminal,
+                          all_terms,
+                          unicode_cap,
+                          many_columns,
+                          unicode_parm,
+                          as_subprocess)
 
 
 def test_capability():

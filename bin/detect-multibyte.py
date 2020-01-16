@@ -28,14 +28,17 @@ by the following diagram:
 .. image:: _static/soulburner-ru-family-encodings.jpg
     :alt: Cyrillic encodings flowchart
 """
+
+
 # pylint: disable=invalid-name
 #         Invalid module name "detect-multibyte"
-# std imports
 from __future__ import print_function
-import collections
-import sys
 
-# local,
+# std imports
+import sys
+import collections
+
+# local
 from blessed import Terminal
 
 

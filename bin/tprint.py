@@ -9,6 +9,8 @@ For example::
 """
 # std
 from __future__ import print_function
+
+# std imports
 import argparse
 
 # local

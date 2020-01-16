@@ -9,8 +9,11 @@ fails to provide one, but blessed recognizes that it actually does, and
 provides a proxy.
 """
 from __future__ import print_function
+
+# std imports
 import sys
 
+# local
 from blessed import Terminal
 
 

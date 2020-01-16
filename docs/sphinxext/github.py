@@ -17,11 +17,10 @@ Authors
 # Original Copyright (c) 2010 Doug Hellmann.  All rights reserved.
 #
 
+# local
 from docutils import nodes, utils
-from docutils.parsers.rst.roles import set_classes
-
 from sphinx.util import logging
-
+from docutils.parsers.rst.roles import set_classes
 
 LOGGER = logging.getLogger(__name__)
 

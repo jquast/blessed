@@ -3,8 +3,10 @@
 # pylint: disable=invalid-name
 #         Invalid module name "display-sighandlers"
 from __future__ import print_function
-import sys
+
+# std imports
 import os
+import sys
 
 
 def display_fpathconf():

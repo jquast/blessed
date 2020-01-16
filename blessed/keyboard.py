@@ -1,9 +1,9 @@
 """Sub-module providing 'keyboard awareness'."""
 
 # std imports
-import platform
-import time
 import re
+import time
+import platform
 
 # 3rd party
 import six

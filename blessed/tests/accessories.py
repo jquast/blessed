@@ -16,8 +16,8 @@ import contextlib
 import subprocess
 
 # 3rd party
-import pytest
 import six
+import pytest
 
 # local
 from blessed import Terminal
