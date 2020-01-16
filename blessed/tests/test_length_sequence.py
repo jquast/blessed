@@ -12,7 +12,7 @@ import six
 
 # local
 from blessed.tests.accessories import (  # isort:skip
-    TestTerminal, as_subprocess, all_terms, many_lines
+    TestTerminal, as_subprocess, all_terms, many_lines, many_columns
 )
 
 
