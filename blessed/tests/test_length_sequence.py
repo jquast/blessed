@@ -11,7 +11,9 @@ import itertools
 import six
 
 # local
-from blessed.tests.accessories import TestTerminal, as_subprocess
+from blessed.tests.accessories import (  # isort:skip
+    TestTerminal, as_subprocess, all_terms
+)
 
 
 def test_length_cjk():
