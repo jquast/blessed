@@ -385,7 +385,7 @@ def test_no_preferredencoding_fallback_ascii():
 
 
 @pytest.mark.skipif(platform.system() == 'Windows', reason="requires fcntl")
-#@pytest.mark.filterwarnings("ignore:LookupError")
+# @pytest.mark.filterwarnings("ignore:LookupError")
 def test_unknown_preferredencoding_warned_and_fallback_ascii():
     """Ensure a locale without a codec emits a warning."""
     @as_subprocess

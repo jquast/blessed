@@ -10,7 +10,6 @@ import itertools
 import six
 import pytest
 
-# local
 from blessed.tests.accessories import (  # isort:skip
     TestTerminal, as_subprocess, all_terms, many_lines, many_columns
 )
@@ -18,6 +17,7 @@ from blessed.tests.accessories import (  # isort:skip
 if platform.system() != 'Windows':
     import fcntl
     import termios
+
 
 def test_length_cjk():
     @as_subprocess
@@ -178,7 +178,6 @@ def test_sequence_length(all_terms):
 
         if term.cub:
             assert (term.length((u'_' * 10) + term.cub(10)) == 0)
-
 
         if term.cuf:
             assert (term.length(term.cuf(10)) == 10)

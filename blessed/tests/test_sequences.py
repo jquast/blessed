@@ -9,11 +9,7 @@ import six
 import pytest
 
 # local
-from .accessories import (TestTerminal,
-                          all_terms,
-                          unicode_cap,
-                          unicode_parm,
-                          as_subprocess)
+from .accessories import TestTerminal, all_terms, unicode_cap, unicode_parm, as_subprocess
 
 
 @pytest.mark.skipif(platform.system() == 'Windows', reason="requires real tty")

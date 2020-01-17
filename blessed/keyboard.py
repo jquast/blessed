@@ -412,7 +412,7 @@ DEFAULT_SEQUENCE_MIXIN = (
     (u"\x1bOv", KEY_KP_6),          # noqa 6
     (u"\x1bOw", KEY_KP_7),          # noqa 7
     (u"\x1bOx", KEY_KP_8),          # noqa 8
-    (u"\x1bOy", KEY_KP_9),          # noqa 9  
+    (u"\x1bOy", KEY_KP_9),          # noqa 9
 
     # keypad, numlock off
     (u"\x1b[1~", curses.KEY_FIND),         # find

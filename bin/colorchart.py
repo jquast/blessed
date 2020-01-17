@@ -1,13 +1,11 @@
 # encoding: utf-8
-"""
-Utility to show X11 colors in 24-bit and down-converted to 256, 16, and 8 color
-The time to generate the table is displayed to give an indication of how long each
-algorithm takes compared to the others.
-"""
+"""Utility to show X11 colors in 24-bit and down-converted to 256, 16, and 8 color The time to
+generate the table is displayed to give an indication of how long each algorithm takes compared to
+the others."""
 # std imports
-import colorsys
 import sys
 import timeit
+import colorsys
 
 # local
 import blessed
@@ -16,9 +14,7 @@ from blessed.colorspace import X11_COLORNAMES_TO_RGB
 
 
 def sort_colors():
-    """
-    Sort colors by HSV value and remove duplicates
-    """
+    """Sort colors by HSV value and remove duplicates."""
     colors = {}
     for color_name, rgb_color in X11_COLORNAMES_TO_RGB.items():
         if rgb_color not in colors:
@@ -34,10 +30,8 @@ SORTED_COLORS = sort_colors()
 
 
 def draw_chart(term):
-    """
-    Draw a chart of each X11 color represented as in 24-bit and as down-converted
-    to 256, 16, and 8 color with the currently configured algorithm.
-    """
+    """Draw a chart of each X11 color represented as in 24-bit and as down-converted to 256, 16, and
+    8 color with the currently configured algorithm."""
     term.move(0, 0)
     sys.stdout.write(term.home)
     width = term.width
@@ -73,9 +67,7 @@ def draw_chart(term):
 
 
 def color_chart(term):
-    """
-    Main color chart application
-    """
+    """Main color chart application."""
     term = blessed.Terminal()
     algo_idx = 0
     dirty = True
