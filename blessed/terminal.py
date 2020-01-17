@@ -175,7 +175,9 @@ class Terminal(object):
         try:
             stream_fd = (stream.fileno() if hasattr(stream, 'fileno') and
                          callable(stream.fileno) else None)
-        except io.UnsupportedOperation:
+        except (io.UnsupportedOperation, ValueError):
+            # The stream is not a file, such as the case of StringIO, or, when it has been
+            # "detached", such as might be the case of stdout in some test scenarios.
             stream_fd = None
 
         self._stream = stream
