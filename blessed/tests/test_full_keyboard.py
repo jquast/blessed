@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # std imports
 import os
 import pty
