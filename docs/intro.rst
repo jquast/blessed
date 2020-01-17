@@ -14,6 +14,10 @@
     :alt: Coveralls Code Coverage
     :target: https://coveralls.io/github/jquast/blessed?branch=master
 
+.. |codecov| image:: https://codecov.io/gh/jquast/blessed/branch/master/graph/badge.svg
+    :alt: codecov.io Code Coverage
+    :target: https://codecov.io/gh/jquast/blessed
+
 .. |pypi| image:: https://img.shields.io/pypi/v/blessed.svg?logo=pypi
     :alt: Latest Version
     :target: https://pypi.python.org/pypi/blessed
