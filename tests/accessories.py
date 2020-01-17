@@ -68,8 +68,7 @@ def init_subproc_coverage(run_note):
         return None
     _coveragerc = os.path.join(
         os.path.dirname(__file__),
-        os.pardir, os.pardir,
-        'tox.ini')
+        os.pardir, 'tox.ini')
     cov = coverage.Coverage(config_file=_coveragerc)
     cov.set_option("run:note", run_note)
     cov.start()
