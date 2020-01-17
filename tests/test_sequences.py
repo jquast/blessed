@@ -47,13 +47,12 @@ def test_capability_with_forced_tty():
     child()
 
 
-@pytest.mark.skipif(platform.system() == 'Windows',
-                    reason='https://github.com/jquast/blessed/issues/122')
 def test_parametrization():
     """Test parameterizing a capability."""
     @as_subprocess
     def child():
-        assert TestTerminal().cup(3, 4) == unicode_parm('cup', 3, 4)
+        term = TestTerminal(force_styling=True)
+        assert term.cup(3, 4) == unicode_parm('cup', 3, 4)
 
     child()
 

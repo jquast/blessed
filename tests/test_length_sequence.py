@@ -55,13 +55,11 @@ def test_length_ansiart():
     child(kind)
 
 
-@pytest.mark.skipif(platform.system() == 'Windows',
-                    reason='https://github.com/jquast/blessed/issues/122')
 def test_sequence_length(all_terms):
     """Ensure T.length(string containing sequence) is correcterm."""
     @as_subprocess
     def child(kind):
-        term = TestTerminal(kind=kind)
+        term = TestTerminal(kind=kind, force_styling=True)
         # Create a list of ascii characters, to be separated
         # by word, to be zipped up with a cycling list of
         # terminal sequences. Then, compare the length of
@@ -401,14 +399,12 @@ def test_sequence_is_movement_true(all_terms):
     child(all_terms)
 
 
-@pytest.mark.skipif(platform.system() == 'Windows',
-                    reason='https://github.com/jquast/blessed/issues/122')
 def test_termcap_will_move_true(all_terms):
     """Test parser about sequences that move the cursor."""
     @as_subprocess
     def child(kind):
         from blessed.sequences import iter_parse
-        term = TestTerminal(kind=kind)
+        term = TestTerminal(kind=kind, force_styling=True)
         assert next(iter_parse(term, term.move(98, 76)))[1].will_move
         assert next(iter_parse(term, term.move(54)))[1].will_move
         assert next(iter_parse(term, term.cud1))[1].will_move
