@@ -17,7 +17,7 @@ matrix:
     - python: 3.9-dev
       env: TOXENV=py39,coveralls TEST_QUICK=1 COVERAGE_ID=travis-ci
     - python: 3.8
-      env: TOXENV=about,pylint,flake8,flake8_tests,sphinx COVERAGE_ID=travis-ci TEST_KEYBOARD=yes
+      env: TOXENV=about,pylint,flake8,flake8_tests,sphinx COVERAGE_ID=travis-ci
     - python: 3.8
       os: windows
       language: shell
@@ -25,7 +25,7 @@ matrix:
          - choco install python --version 3.8.0
          - python -m pip install --upgrade pip
          - python -m pip install tox
-      env: PATH=/c/Python38:/c/Python38/Scripts:$PATH TOXENV=py38,coveralls COVERAGE_ID=travis-ci
+      env: PATH=/c/Python38:/c/Python38/Scripts:$PATH TOXENV=py38,coveralls COVERAGE_ID=travis-ci TEST_KEYBOARD=no
 
 jobs:
   allow_failures:
