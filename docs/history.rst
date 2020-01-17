@@ -4,6 +4,8 @@ Version History
   * introduced: 24-bit color support, detected by ``term.number_of_colors == 1 << 24``,
     and 24-bit color foreground method :meth:`~Terminal.color_rgb` and background method
     :meth:`~Terminal.on_color_rgb`.
+  * bugfix: prevent error condition, ``ValueError: underlying buffer has been detached`` in rare
+    conditions where sys.__stdout__ has been detached in test frameworks. :ghissue:`126`.
   * bugfix: off-by-one error in :meth:`~.Terminal.get_location`, now accounts for
     ``%i`` in cursor_report, :ghissue:`94`.
   * bugfix :meth:`~Terminal.split_seqs` and related functions failed to match when the
