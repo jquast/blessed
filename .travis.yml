@@ -17,7 +17,7 @@ matrix:
     - python: 3.9-dev
       env: TOXENV=py39,coveralls TEST_QUICK=1 COVERAGE_ID=travis-ci
     - python: 3.8
-      env: TOXENV=about,pylint,flake8,flake8_tests,sphinx COVERAGE_ID=travis-ci
+      env: TOXENV=about,pylint,flake8,flake8_tests,sphinx COVERAGE_ID=travis-ci TEST_KEYBOARD=yes
     - python: 3.8
       os: windows
       language: shell

@@ -22,6 +22,7 @@ else:
 if sys.version_info[0] == 3:
     unichr = chr
 
+
 @pytest.mark.skipif(platform.system() == 'Windows', reason="?")
 def test_break_input_no_kb():
     """cbreak() should not call tty.setcbreak() without keyboard."""
