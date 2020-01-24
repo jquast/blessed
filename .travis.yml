@@ -2,6 +2,9 @@ language: python
 matrix:
   fast_finish: true
   include:
+    - python: 2.6
+      env: TOXENV=py26,codecov TEST_QUICK=1 COVERAGE_ID=travis-ci
+      dist: trusty
     - python: 2.7
       env: TOXENV=py27,codecov TEST_QUICK=1 COVERAGE_ID=travis-ci
     - python: 3.4
@@ -18,6 +21,14 @@ matrix:
       env: TOXENV=py39,codecov TEST_QUICK=1 COVERAGE_ID=travis-ci
     - python: 3.8
       env: TOXENV=about,pylint,flake8,flake8_tests,sphinx COVERAGE_ID=travis-ci
+    - python: 2.7
+      os: windows
+      language: shell
+      before_install:
+         - choco install python2
+         - python -m pip install --upgrade pip
+         - python -m pip install tox
+      env: PATH=/c/Python27:/c/Python27/Scripts:$PATH TOXENV=py27,codecov COVERAGE_ID=travis-ci TEST_KEYBOARD=no
     - python: 3.8
       os: windows
       language: shell
