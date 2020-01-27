@@ -6,10 +6,7 @@ try:
     from collections import OrderedDict
 except ImportError:
     # python 2.6 requires 3rd party library (backport)
-    #
-    # pylint: disable=import-error
-    #         Unable to import 'ordereddict'
-    from ordereddict import OrderedDict
+    from ordereddict import OrderedDict  # pylint: disable=import-error
 
 __all__ = (
     'CAPABILITY_DATABASE',

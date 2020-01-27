@@ -14,6 +14,7 @@ from math import cos, exp, sin, sqrt, atan2
 try:
     from functools import lru_cache
 except ImportError:
+    # lru_cache was added in Python 3.2
     from backports.functools_lru_cache import lru_cache
 
 

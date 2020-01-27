@@ -12,7 +12,7 @@ try:
     from collections import OrderedDict
 except ImportError:
     # python 2.6 requires 3rd party library (backport)
-    from ordereddict import OrderedDict # pylint: disable=import-error
+    from ordereddict import OrderedDict  # pylint: disable=import-error
 
 # curses
 if platform.system() == 'Windows':
