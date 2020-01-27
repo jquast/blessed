@@ -28,7 +28,7 @@ matrix:
          - choco install python2
          - python -m pip install --upgrade pip
          - python -m pip install tox
-      env: PATH=/c/Python27:/c/Python27/Scripts:$PATH TOXENV=py27,codecov COVERAGE_ID=travis-ci TEST_KEYBOARD=no
+      env: PATH=/c/Python27:/c/Python27/Scripts:$PATH TRAVIS_PYTHON_VERSION=2.7 TOXENV=py27,codecov COVERAGE_ID=travis-ci TEST_KEYBOARD=no
     - python: 3.8
       os: windows
       language: shell
