@@ -3,7 +3,7 @@ matrix:
   fast_finish: true
   include:
     - python: 3.8
-      env: TOXENV=about,pylint,flake8,flake8_tests,sphinx COVERAGE_ID=travis-ci
+      env: TOXENV=about,pydocstyle,pylint,flake8,flake8_tests,sphinx COVERAGE_ID=travis-ci
     - python: 2.6
       env: TOXENV=py26,codecov TEST_QUICK=1 COVERAGE_ID=travis-ci
       dist: trusty
