@@ -38,7 +38,7 @@ def main():
             for (seq, value) in DEFAULT_SEQUENCE_MIXIN:
                 if value == code:
                     repr_sequences.append(repr(seq))
-            txt_sequences = ', '.join(repr_sequences)
+            txt_sequences = ', '.join(repr_sequences).replace('\\', '\\\\')
             fout.write(f'    {key_attr_name} | {code}')
             if txt_sequences:
                 fout.write(f'| {txt_sequences}')
