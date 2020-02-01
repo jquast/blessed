@@ -3,8 +3,8 @@
 Introduction
 ============
 
-Blessed is an easy, practical library for making terminal apps, by providing Colors_, interactive
-Keyboard_ input, and screen Positioning_ capabilities.
+Blessed is an easy, practical *library* for making *terminal* apps, by providing an elegant,
+well-documented interface to Colors_, Keyboard_ input, and screen Positioning_ capabilities.
 
 .. code-block:: python
 
