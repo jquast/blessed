@@ -41,7 +41,7 @@ def main():
             txt_sequences = ', '.join(repr_sequences)
             fout.write(f'    {key_attr_name} | {code}')
             if txt_sequences:
-                fout.write('| {txt_sequences}')
+                fout.write(f'| {txt_sequences}')
             fout.write('\n')
 
 
