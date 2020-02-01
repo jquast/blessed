@@ -10,6 +10,8 @@ results*.xml
 build
 dist
 docs/_build
+docs/all_the_colors.txt
+docs/all_the_keys.txt
 docs/_static/rgb
 htmlcov
 .coveralls.yml

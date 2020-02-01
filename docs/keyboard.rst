@@ -47,13 +47,12 @@ will return as soon as input is available, as explained in :linuxman:`cbreak(3)`
 combined with :meth:`~.Terminal.inkey` to decode multibyte sequences, such as ``\0x1bOA``, into
 a unicode-derived :class:`~.Keystroke` instance.
 
-The return value of :meth:`~.Terminal.inkey` may be printed, joined with, or compared to
-any other unicode strings. In addition to being a basic unicode string, it provides the special
-attributes:
+The :class:`~.Keystrok` returned by :meth:`~.Terminal.inkey` is unicode -- it may be printed, joined
+with, or compared to any other unicode strings. It also has these provides the special attributes:
 
-- :attr:`~.Keystroke.is_sequence`: Whether this is a "multibyte" or "application" key
-- :attr:`~.Keystroke.code`: the keycode, for use as comparator
-- :attr:`~.Keystroke.name`: a human-readable representation of the keypress.
+- :attr:`~.Keystroke.is_sequence` (bool): Whether it is an "application" key.
+- :attr:`~.Keystroke.code` (int): the keycode, for equality testing.
+- :attr:`~.Keystroke.name` (str): a human-readable name of any "application" key.
 
 keycode
 -------
@@ -68,43 +67,12 @@ When the :attr:`~.Keystroke.is_sequence` property tests *True*, the value of
 :attr:`~.Keystroke.code` may then be compared with attributes of :class:`~.Terminal`,
 which are duplicated from those found in :linuxman:`curs_getch(3)`, or those `constants
 <https://docs.python.org/3/library/curses.html#constants>`_ in :mod:`curses` beginning with phrase
-*KEY_*.
+*KEY_*, as follows:
 
-All such keystrokes can be decoded by blessed. Some of these are shorthand or legacy terms and are
-difficult to recall, so the following aliases are provided:
+.. include:: all_the_keys.txt
 
-=================== ============= ====================
-blessed             curses        note
-=================== ============= ====================
-``KEY_DELETE``      ``KEY_DC``    chr(127).
-``KEY_TAB``                       chr(9)
-``KEY_INSERT``      ``KEY_IC``
-``KEY_PGUP``        ``KEY_PPAGE``
-``KEY_PGDOWN``      ``KEY_NPAGE``
-``KEY_ESCAPE``      ``KEY_EXIT``
-``KEY_SUP``         ``KEY_SR``    (shift + up)
-``KEY_SDOWN``       ``KEY_SF``    (shift + down)
-``KEY_DOWN_LEFT``   ``KEY_C1``    (keypad lower-left)
-``KEY_UP_RIGHT``    ``KEY_A1``    (keypad upper-left)
-``KEY_DOWN_RIGHT``  ``KEY_C3``    (keypad lower-left)
-``KEY_UP_RIGHT``    ``KEY_A3``    (keypad lower-right)
-``KEY_CENTER``      ``KEY_B2``    (keypad center)
-``KEY_BEGIN``       ``KEY_BEG``
-=================== ============= ====================
-
-The following are **not** available in the :mod:`curses` module, but **are** decoded, especially
-where the :meth:`~.Terminal.keypad` context manager is used with a numpad, with numlock on:
-
-* ``KEY_KP_MULTIPLY``
-* ``KEY_KP_ADD``
-* ``KEY_KP_SEPARATOR``
-* ``KEY_KP_SUBTRACT``
-* ``KEY_KP_DECIMAL``
-* ``KEY_KP_DIVIDE``
-* ``KEY_KP_0`` through ``KEY_KP_9``
-
-.. _`curs_getch(3)`: http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man3/curs_getch.3
-.. _curses: https://docs.python.org/3/library/curses.html
+All such keystrokes can be decoded by blessed, there is a demonstration program, :ref:`keymatrix.py`
+that tests how many of them you can find !
 
 delete
 ------

@@ -58,9 +58,9 @@ def main():
     aliases, csv_rows = '', ''
     for rgb, x11_colors in sort_colors():
         x11_color = sorted(x11_colors)[0]
-        img = Image.new('RGB', (1, 1), color=rgb)
         fname = os.path.join(rgb_folder, f'{x11_color}.png')
         if not os.path.exists(os.path.join(fname)):
+            img = Image.new('RGB', (1, 1), color=rgb)
             img.save(fname)
             print(f'write: {fname}')
         aliases += color_alias_fmt.format(color_name=x11_color)
@@ -74,6 +74,7 @@ def main():
     filepath_txt = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir, 'docs',
                                                 'all_the_colors.txt'))
     with open(filepath_txt, 'w') as fout:
+        print(f'write: {fout.name}')
         fout.write(output.lstrip())
 
 

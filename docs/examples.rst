@@ -8,11 +8,15 @@ These examples are not distributed with the package -- they are only available i
 repository.  You can retrieve them by cloning the repository, or simply downloading the "raw" file
 link.
 
-
-.. note: Made using the following CLI example:
+.. note: animations are made using the following CLI example:
 
    ffmpeg -i blessed_demo_6.mov -pix_fmt rgb8 -r 24 -f gif - \
       | gifsicle --optimize=3 --delay=3 --resize-width 800 > blessed_demo_6.gif
+
+.. figure:: https://dxtz6bzwq9sxx.cloudfront.net/blessed_demo_intro.gif
+   :alt: Animations of x11-colorpicker.py, bounce.py, worms.py, and plasma.py
+
+   :ref:`x11-colorpicker.py`, :ref:`bounce.py`, :ref:`worms.py`, and :ref:`plasma.py`.
 
 .. _bounce.py:
 
@@ -23,6 +27,16 @@ https://github.com/jquast/blessed/blob/master/bin/editor.py
 
 This is a very brief, basic primitive non-interactive version of a "classic tennis" video game. It
 demonstrates basic timed refresh of a bouncing terminal cell.
+
+.. _detect-multibyte.py:
+
+detect-multibyte.py
+-------------------
+https://github.com/jquast/blessed/blob/master/bin/detect-multibyte.py
+
+This program also demonstrates how the :meth:`~.get_location` method
+can be used to reliably test whether the terminal emulator of the connecting
+client is capable of rendering multibyte characters as a single cell.
 
 .. _editor.py:
 
@@ -56,6 +70,14 @@ screen resizes while also polling for input, displaying keypresses.
 
 This demonstrates how a program can react to screen resize events.
 
+plasma.py
+---------
+https://github.com/jquast/blessed/blob/master/bin/plasma.py
+
+This demonstrates using only :meth:`~.Terminal.on_color_rgb` and the built-in :mod:`colorsys`
+module to quickly display all of the colors of a rainbow in a classic demoscene `plasma effect
+<https://lodev.org/cgtutor/plasma.html>`_
+
 .. _progress_bar.py:
 
 progress_bar.py
@@ -66,6 +88,19 @@ This program demonstrates a simple progress bar. All text is written
 to stderr, to avoid the need to "flush" or emit newlines, and makes
 use of the move_x (hpa) capability to "overstrike" the display a
 scrolling progress bar.
+
+.. _resize.py:
+
+resize.py
+---------
+https://github.com/jquast/blessed/blob/master/bin/resize.py
+
+This program demonstrates the :meth:`~.get_location` method,
+behaving similar to `resize(1)
+<https://github.com/joejulian/xterm/blob/master/resize.c>`_
+: set environment and terminal settings to current window size.
+The window size is determined by eliciting an answerback
+sequence from the connecting terminal emulator.
 
 .. _tprint.py:
 
@@ -91,30 +126,7 @@ with blessed.  It is similar to `NIBBLES.BAS
 <https://github.com/tangentstorm/tangentlabs/blob/master/qbasic/NIBBLES.BAS>`_
 or "snake" of early mobile platforms.
 
-.. _resize.py:
-
-resize.py
----------
-https://github.com/jquast/blessed/blob/master/bin/resize.py
-
-This program demonstrates the :meth:`~.get_location` method,
-behaving similar to `resize(1)
-<https://github.com/joejulian/xterm/blob/master/resize.c>`_
-: set environment and terminal settings to current window size.
-The window size is determined by eliciting an answerback
-sequence from the connecting terminal emulator.
-
-.. _detect-multibyte.py:
-
-detect-multibyte.py
--------------------
-https://github.com/jquast/blessed/blob/master/bin/detect-multibyte.py
-
-This program also demonstrates how the :meth:`~.get_location` method
-can be used to reliably test whether the terminal emulator of the connecting
-client is capable of rendering multibyte characters as a single cell.
-
-.. _x11_colorpicker.py:
+.. _x11-colorpicker.py:
 
 x11_colorpicker.py
 ------------------

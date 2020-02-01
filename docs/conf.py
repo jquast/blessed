@@ -56,10 +56,11 @@ from blessed.terminal import *  # isort:skip # noqa
 
 # and finally, don't you just wish readthedocs.org could run tox? :) it can't,
 # so we do a bit of script injection, here.
-script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir, 'bin',
-                                           'generate-x11-colorchart.py'))
-print(f"Run {script_path}")
-runpy.run_path(script_path)['main']()
+for script in ('generate-x11-colorchart.py', 'generate-keycodes.py'):
+    script_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), os.path.pardir, 'bin', script))
+    print(f"Run {script_path}")
+    runpy.run_path(script_path)['main']()
 
 
 # -- General configuration ----------------------------------------------------
