@@ -33,8 +33,7 @@ SORTED_COLORS = sort_colors()
 
 
 def draw_chart(term):
-    """
-    Draw a chart of each color downconverted with selected distance algorithm."""
+    """Draw a chart of each color downconverted with selected distance algorithm."""
     sys.stdout.write(term.home)
     width = term.width
     line = ''

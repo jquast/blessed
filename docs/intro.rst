@@ -20,9 +20,12 @@ Keyboard_ input, and screen Positioning_ capabilities.
 
     print(t.move_down(2) + 'You pressed ' + t.bold(repr(inp)))
 
-It's meant to be *fun* and *easy*, to do basic terminal graphics and styling with Python, making CLI
-applications, games, editors, or other terminal utilities easy. Whatever it is, we hope you have
-a blast making it!
+It's meant to be *fun* and *easy*, to do basic terminal graphics and styling with Python.  Whether
+you want to improve CLI apps with colors, or making fullscreen applications or games, *blessed*
+should help get you started quickly. Your users will love it because it works on Windows, Mac, and
+Linux, and has plenty of documentation and examples.
+
+Full documentation at http://blessed.readthedocs.org/en/latest/
 
 Examples
 --------
@@ -158,14 +161,6 @@ The same program with *Blessed* is simply:
     term = Terminal()
     with term.location(0, term.height - 1):
         print('This is' + term.underline('underlined') + '!')
-
-
-
-
-Further Documentation
----------------------
-
-Full documentation at http://blessed.readthedocs.org/en/latest/
 
 .. _curses: https://docs.python.org/3/library/curses.html
 .. _tigetstr: http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man3/tigetstr.3
