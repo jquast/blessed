@@ -15,8 +15,8 @@ But it has drawbacks -- it's no good for interactive apps!  This function will n
 until the return key is pressed, or understand or detect arrow keys and others required to make
 awesome games!
 
-inkey
------
+inkey()
+-------
 
 The method :meth:`~.Terminal.inkey`, combined with :meth:`~.Terminal.cbreak` is a solution.
 
@@ -54,8 +54,8 @@ with, or compared to any other unicode strings. It also has these provides the s
 - :attr:`~.Keystroke.code` (int): the keycode, for equality testing.
 - :attr:`~.Keystroke.name` (str): a human-readable name of any "application" key.
 
-keycode
--------
+Keycodes
+--------
 
 .. note(jquast): a graphical chart of the keyboard, with KEY_CODE names on the labels, maybe?  at
    least, just a table of all the keys would be better, we should auto-generate it though, like the
