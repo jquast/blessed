@@ -39,7 +39,10 @@ def main():
                 if value == code:
                     repr_sequences.append(repr(seq))
             txt_sequences = ', '.join(repr_sequences)
-            fout.write(f'    {key_attr_name} | {code} | {txt_sequences}\n')
+            fout.write(f'    {key_attr_name} | {code}')
+            if txt_sequences:
+                fout.write('| {txt_sequences}')
+            fout.write('\n')
 
 
 if __name__ == '__main__':
