@@ -106,7 +106,8 @@ help you along:
 - `Thomas E. Dickey <http://invisible-island.net/>`_ has been maintaining `xterm
   <http://invisible-island.net/xterm/xterm.html>`_, as well as a primary maintainer of many related
   packages such as `ncurses <http://invisible-island.net/ncurses/ncurses.html>`_ for quite a long
-  while.
+  while. His consistent, well-documented, long-term dedication to xterm, curses, and the many
+  related projects is world-renown.
 
 - `termcap & terminfo (O'Reilly Nutshell)
   <http://www.amazon.com/termcap-terminfo-OReilly-Nutshell-Linda/dp/0937175226>`_ by Linda Mui, Tim
