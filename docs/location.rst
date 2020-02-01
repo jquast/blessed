@@ -5,9 +5,9 @@ If you just want to move and aren't worried about returning, do something like
 this:
 
     >>> print(term.home + term.clear)
-    >>> print(term.down + term.move_right(10) + 'upside-down up-left!')
-    >>> print(term.move_xy(10, 1) + term.bold('Direct hit!'))
-    >>> print(term.move_y(term.height - 1))
+    >>> print(term.down(2) + term.move_right(20) + term.bright_red('fire!'))
+    >>> print(term.move_xy(20, 7) + term.bold('Direct hit!'))
+    >>> print(term.move_y(term.height - 3))
 
 There are four direct movement capabilities:
 
