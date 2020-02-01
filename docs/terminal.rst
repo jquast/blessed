@@ -33,11 +33,12 @@ When printed, these codes make your terminal go to work:
 
     >>> print(term.white_on_firebrick3('SYSTEM OFFLINE'))
 
-And thanks to the string interpolation support in python 3.6, it's very easy to
-mix attributes and strings together:
+And thanks to `f-strings`_ since python 3.6, it's very easy to mix attributes and strings together:
 
     >>> print(f"{term.yellow}Yellow is brown, {term.bright_yellow}"
               f"Bright yellow is actually yellow!{term.normal}")
+
+.. _f-strings: https://docs.python.org/3/reference/lexical_analysis.html#f-strings
 
 Capabilities
 ------------
