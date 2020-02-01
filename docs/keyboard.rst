@@ -65,7 +65,7 @@ When the :attr:`~.Keystroke.is_sequence` property tests *True*, the value of
 :attr:`~.Keystroke.code` represents a unique application key of the keyboard.
 
 :attr:`~.Keystroke.code` may then be compared with attributes of :class:`~.Terminal`,
-which are duplicated from those found in :linuxman:`curs_getch(3)`, or those `constants
+which are duplicated from those found in :linuxman:`curses(3)`, or those `constants
 <https://docs.python.org/3/library/curses.html#constants>`_ in :mod:`curses` beginning with phrase
 *KEY_*, as follows:
 
