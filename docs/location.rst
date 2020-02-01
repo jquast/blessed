@@ -33,11 +33,11 @@ And four relative capabilities:
     characters to end of line. ``move_down(1)`` is always a safe non-destructive one-notch movement
     in the downward direction.
 
-context manager
+Context Manager
 ---------------
 
-A context manager, :meth:`~.Terminal.location` is provided to move the cursor
-to an *(x, y)* screen position and *restore the previous position* on exit:
+A :func:`contextlib.contextmanager`, :meth:`~.Terminal.location` is provided to move the cursor to
+an *(x, y)* screen position and *restore the previous position* on exit:
 
 .. code-block:: python
 
