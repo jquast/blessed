@@ -3,7 +3,7 @@
 import os
 
 # local
-from blessed.keyboard import CURSES_KEYCODE_OVERRIDE_MIXIN, DEFAULT_SEQUENCE_MIXIN
+from blessed.keyboard import DEFAULT_SEQUENCE_MIXIN, CURSES_KEYCODE_OVERRIDE_MIXIN
 
 
 def is_override(key_attr_name, code):
