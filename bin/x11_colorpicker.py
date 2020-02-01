@@ -1,29 +1,43 @@
 # std imports
+import re
+import math
 import colorsys
+from functools import reduce
 
 # local
 import blessed
+from blessed.colorspace import X11_COLORNAMES_TO_RGB
 
 
 def sort_colors():
     colors = {}
-    for color_name, rgb_color in blessed.colorspace.X11_COLORNAMES_TO_RGB.items():
+    for color_name, rgb_color in X11_COLORNAMES_TO_RGB.items():
         if rgb_color in colors:
             colors[rgb_color].append(color_name)
         else:
             colors[rgb_color] = [color_name]
 
     def sortby_hv(rgb_item):
-        # sort by hue, then value, except shades of grey -- by value, only
+        # sort by hue rounded to nearest %,
+        # then by color name & number
+        # except shades of grey -- by name & number, only
         rgb, name = rgb_item
+        digit = 0
+        match = re.match(r'(.*)(\d+)', name[0])
+        if match is not None:
+            name = match.group(1)
+            digit = int(match.group(2))
+        else:
+            name = name[0]
+        hash_name = reduce(int.__mul__, map(ord, name))
+
         hsv = colorsys.rgb_to_hsv(*rgb)
         if rgb[0] == rgb[1] == rgb[2]:
-            return -1, hsv[2]
-        return hsv[0], hsv[2]
+            return 100, hsv[2], hash_name, digit
 
-    return sorted(colors.items(),
-                  key=sortby_hv,
-                  reverse=True)
+        return int(math.floor(hsv[0] * 100)), hash_name, digit, hsv[2]
+
+    return sorted(colors.items(), key=sortby_hv)
 
 
 HSV_SORTED_COLORS = sort_colors()

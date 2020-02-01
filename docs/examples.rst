@@ -70,6 +70,8 @@ screen resizes while also polling for input, displaying keypresses.
 
 This demonstrates how a program can react to screen resize events.
 
+.. _plasma.py:
+
 plasma.py
 ---------
 https://github.com/jquast/blessed/blob/master/bin/plasma.py

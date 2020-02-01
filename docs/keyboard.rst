@@ -42,7 +42,7 @@ what key we pressed.
 .. image:: https://dxtz6bzwq9sxx.cloudfront.net/demo_cbreak_inkey.gif
     :alt: A visual example of interacting with the Terminal.inkey() and cbreak() methods.
 
-:meth:`~.Terminal.cbreak` enters a special mode_ that ensures :func:`os.read` on an input stream 
+:meth:`~.Terminal.cbreak` enters a special mode_ that ensures :func:`os.read` on an input stream
 will return as soon as input is available, as explained in :linuxman:`cbreak(3)`. This mode is
 combined with :meth:`~.Terminal.inkey` to decode multibyte sequences, such as ``\0x1bOA``, into
 a unicode-derived :class:`~.Keystroke` instance.

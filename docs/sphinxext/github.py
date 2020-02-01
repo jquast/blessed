@@ -17,7 +17,7 @@ Authors
 # Original Copyright (c) 2010 Doug Hellmann.  All rights reserved.
 #
 
-# local
+# 3rd party
 from docutils import nodes, utils
 from sphinx.util import logging
 from docutils.parsers.rst.roles import set_classes

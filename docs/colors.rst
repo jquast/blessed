@@ -4,7 +4,9 @@ Colors
 Doing colors with blessed is easy, pick a color name from the Color chart below, any of these named
 are also attributes of the :doc:`terminal`!
 
-These attributes can be printed directly, causing the terminal to switch into the given color.  Or, as a callable, which terminates the string with the ``normal`` attribute.  The following three statements are equivalent:
+These attributes can be printed directly, causing the terminal to switch into the given color.  Or,
+as a callable, which terminates the string with the ``normal`` attribute.  The following three
+statements are equivalent:
 
     >>> print(term.orangered + 'All systems are offline' + term.normal)
     >>> print(f'{term.orangered}All systems are offline{term.normal}')

@@ -1,13 +1,15 @@
 # generate images and tables for inclusion in docs/colors.rst
 # std imports
 import os
+import re
 import math
 import colorsys
 from functools import reduce
-import re
+
+# 3rd party
+from PIL import Image
 
 # local
-from PIL import Image
 from blessed.colorspace import X11_COLORNAMES_TO_RGB
 
 rgb_folder = os.path.abspath(
@@ -49,7 +51,7 @@ def sort_colors():
         if rgb[0] == rgb[1] == rgb[2]:
             return 100, hsv[2], hash_name, digit
 
-        return int(math.floor(hsv[0]*100)), hash_name, digit, hsv[2]
+        return int(math.floor(hsv[0] * 100)), hash_name, digit, hsv[2]
 
     return sorted(colors.items(), key=sortby_hv)
 
