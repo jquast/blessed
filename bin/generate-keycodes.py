@@ -1,4 +1,4 @@
-# generate images and tables for inclusion in docs/colors.rst
+# generate keycodes for the tables in docs/keyboard.rst
 # std imports
 import os
 
