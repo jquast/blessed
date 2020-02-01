@@ -2,8 +2,6 @@
 Welcome to Blessed documentation!
 =================================
 
-Contents:
-
 .. toctree::
    :maxdepth: 3
    :glob:
