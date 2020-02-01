@@ -4,7 +4,10 @@ Location
 If you just want to move and aren't worried about returning, do something like
 this:
 
-    >>> print(term.move_xy(10, 1) + 'Hi, mom!')
+    >>> print(term.home + term.clear)
+    >>> print(term.down + term.move_right(10) + 'upside-down up-left!')
+    >>> print(term.move_xy(10, 1) + term.bold('Direct hit!'))
+    >>> print(term.move_y(term.height - 1))
 
 There are four direct movement capabilities:
 
@@ -27,8 +30,6 @@ And four relative capabilities:
   Position cursor 1 or **x** cells left of the current position.
 ``move_right`` or ``move_right(x)``
   Position cursor 1 or **x** cells right of the current position.
-
-    >>> print(term.up + term.move_left(10) + 'Up & to the left!')
 
 .. note:: ``move_down``, if printed directly, is often valued as *\\n*, which additionally returns
     the carriage to column 0, and, depending on your terminal emulator, may also destroy any
