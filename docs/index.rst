@@ -4,7 +4,6 @@ Welcome to Blessed documentation!
 
 .. toctree::
    :maxdepth: 3
-   :glob:
 
    intro
    terminal
