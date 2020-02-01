@@ -2,9 +2,10 @@
 import os
 import sys
 import json
+import runpy
 import functools
 
-# local
+# 3rd party
 import sphinx_rtd_theme
 import sphinx.environment
 from docutils.utils import get_source_line
@@ -52,6 +53,14 @@ functools.wraps = no_op_wraps
 import contextlib  # isort:skip # noqa
 contextlib.wraps = no_op_wraps
 from blessed.terminal import *  # isort:skip # noqa
+
+# and finally, don't you just wish readthedocs.org could run tox? :) it can't,
+# so we do a bit of script injection, here.
+script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir, 'bin',
+                                           'generate-x11-colorchart.py'))
+print(f"Run {script_path}")
+runpy.run_path(script_path)['main']()
+
 
 # -- General configuration ----------------------------------------------------
 

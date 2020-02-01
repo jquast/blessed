@@ -10,7 +10,8 @@ import re
 from PIL import Image
 from blessed.colorspace import X11_COLORNAMES_TO_RGB
 
-rgb_folder = os.path.join('docs', '_static', 'rgb')
+rgb_folder = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), os.pardir, 'docs', '_static', 'rgb'))
 
 color_alias_fmt = """
 .. |{color_name}| image:: _static/rgb/{color_name}.png
@@ -70,7 +71,9 @@ def main():
                      f'{hsv[0]:0.1%}, {hsv[1]:0.1%}, {hsv[2]/255:0.1%}\n')
 
     output = aliases + '\n\n' + csv_table + '\n' + csv_rows
-    with open(os.path.join('docs', 'all_the_colors.txt'), 'w') as fout:
+    filepath_txt = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir, 'docs',
+                                                'all_the_colors.txt'))
+    with open(filepath_txt, 'w') as fout:
         fout.write(output.lstrip())
 
 
