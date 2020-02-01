@@ -34,8 +34,9 @@ setuptools.setup(
         fname=os.path.join(HERE, 'requirements.txt')),
     long_description=_get_long_description(
         fname=os.path.join(HERE, 'docs', 'intro.rst')),
-    description=('Easy, practical library for making terminal apps, an elegant, well-documented '
-                 'interface to Colors, Keyboard input, and screen Positioning capabilities.'),
+    description=('Easy, practical library for making terminal apps, by providing an elegant, '
+                 'well-documented interface to Colors, Keyboard input, and screen Positioning '
+                 'capabilities.'),
     author='Jeff Quast, Erik Rose, Avram Lubkin',
     author_email='contact@jeffquast.com',
     license='MIT',
