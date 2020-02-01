@@ -28,6 +28,8 @@ And four relative capabilities:
 ``move_right`` or ``move_right(x)``
   Position cursor 1 or **x** cells right of the current position.
 
+    >>> print(term.up + term.move_left(10) + 'Up & to the left!')
+
 .. note:: ``move_down``, if printed directly, is often valued as *\\n*, which additionally returns
     the carriage to column 0, and, depending on your terminal emulator, may also destroy any
     characters to end of line. ``move_down(1)`` is always a safe non-destructive one-notch movement
