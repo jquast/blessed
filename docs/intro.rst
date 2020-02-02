@@ -84,7 +84,8 @@ Brief Overview
 
 *Blessed* is more than just a Python wrapper around curses_:
 
-* Styles_, Colors_, and maybe a little positioning without necessarily clearing the whole screen first.
+* Styles_, Colors_, and maybe a little positioning without necessarily clearing the whole screen
+  first.
 * Works great with Python's new f-strings_ or any other kind of string formatting.
 * Provides up-to-the-moment Location_ and terminal height and width, so you can respond to terminal
   size changes.
