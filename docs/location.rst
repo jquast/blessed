@@ -1,10 +1,7 @@
 Location
 ========
 
-    Can you comprehend everything in the four directions
-
-    And still do nothing? 
-     
+    
 If you just want to move the location of the cursor before writing text, and aren't worried about
 returning, do something like this:
 
