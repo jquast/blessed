@@ -10,7 +10,6 @@ import pytest
 # local
 from blessed.color import COLOR_DISTANCE_ALGORITHMS
 from blessed.colorspace import RGBColor
-
 # local
 from .accessories import TestTerminal, as_subprocess
 

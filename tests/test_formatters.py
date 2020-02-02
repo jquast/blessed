@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """Tests string formatting functions."""
 # std imports
+import pickle
 import platform
 import multiprocessing
-import pickle
 
 # 3rd party
 import mock
