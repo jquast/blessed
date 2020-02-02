@@ -87,8 +87,8 @@ It is highly recommend to accept **both** ``KEY_DELETE`` and ``KEY_BACKSPACE`` a
 meaning except when implementing full screen editors, and provide a choice to enable the delete mode
 by configuration.
 
-Alt/meta sends Escape
----------------------
+Alt/meta
+--------
 
 Programs with GNU readline, like bash, have *Alt* combinators, such as *ALT+u* to uppercase the word
 after cursor.  This is achieved by the configuration option altSendsEscape or `metaSendsEscape

@@ -10,20 +10,23 @@ well-documented interface to Colors_, Keyboard_ input, and screen Positioning_ c
 
     from blessed import Terminal
 
-    t = Terminal()
+    term = Terminal()
 
-    print(t.home + t.clear + t.move_y(t.height // 2))
-    print(t.black_on_darkkhaki(t.center('press any key to continue.')))
+    print(term.home + term.clear + term.move_y(term.height // 2))
+    print(term.black_on_darkkhaki(term.center('press any key to continue.')))
 
-    with t.cbreak(), t.hidden_cursor():
-        inp = t.inkey()
+    with term.cbreak(), term.hidden_cursor():
+        inp = term.inkey()
 
-    print(t.move_down(2) + 'You pressed ' + t.bold(repr(inp)))
+    print(term.move_down(2) + 'You pressed ' + term.bold(repr(inp)))
 
-It's meant to be *fun* and *easy*, to do basic terminal graphics and styling with Python.  Whether
-you want to improve CLI apps with colors, or making fullscreen applications or games, *blessed*
-should help get you started quickly. Your users will love it because it works on Windows, Mac, and
-Linux, and has plenty of documentation and examples.
+It's meant to be *fun* and *easy*, to do basic terminal graphics and styling with Python using
+*blessed*. Terminal_ is the only class you need to import and the only object you should need for
+Terminal capabilities.
+
+Whether you want to improve CLI apps with colors, or making fullscreen applications or games,
+*blessed* should help get you started quickly. Your users will love it because it works on Windows,
+Mac, and Linux, and you will love it because it has plenty of documentation and examples!
 
 Full documentation at http://blessed.readthedocs.org/en/latest/
 
@@ -78,36 +81,38 @@ Brief Overview
 *Blessed* is more than just a Python wrapper around curses_:
 
 * Styles, color, and maybe a little positioning without necessarily clearing the whole screen first.
-* Works great with standard Python string formatting.
+* Works great with Python's new f-strings_ or any other kind of string formatting.
 * Provides up-to-the-moment terminal height and width, so you can respond to terminal size changes.
-* Avoids making a mess if the output gets piped to a non-terminal: outputs to any file-like object
-  such as *StringIO*, files, or pipes.
-* Uses the `terminfo(5)`_ database so it works with any terminal type and supports any terminal
-  capability: No more C-like calls to tigetstr_ and tparm_.
-* Keeps a minimum of internal state, so you can feel free to mix and match with calls to curses or
-  whatever other terminal libraries you like.
-* Provides context managers to safely express terminal modes `Terminal.fullscreen()`
-  and `Terminal.hidden_cursor()`.
-* Act intelligently when somebody redirects your output to a file, omitting all of the terminal
-  sequences such as styling, colors, or positioning.
-* Dead-simple keyboard handling: safely decoding unicode input in your system's preferred locale and
-  supports application/arrow keys.
+* Avoids making a mess if the output gets piped to a non-terminal, you can output sequences to any
+  file-like object such as *StringIO*, files, pipes or sockets.
+ Allows sequences to be removed from strings that contain them, using `Terminal.strip_seqs()`_ or
+  sequences and whitespace using `Terminal.strip()`_.
+* Uses `terminfo(5)`_ so it works with any terminal type and capability: No more C-like calls to
+  tigetstr_ and tparm_.
+* Non-obtrusive calls to only the capabilities database ensures that you are free to mix and match
+  with calls to any other curses application code or library you like.
+* Provides context managers `Terminal.fullscreen()` and `Terminal.hidden_cursor()` to safely express
+  terminal modes, curses development will no longer fudge up your shell.
+* Act intelligently when somebody redirects your output to a file, omitting all of the special
+  sequences colors, but still containing all of the text.
 
 *Blessed* is a fork of `blessings <https://github.com/erikrose/blessings>`_, which does all of
 the same above with the same API, as well as following **enhancements**:
 
 * Windows support, new since Dec. 2019!
-* Allows sequences to be removed from strings that contain them, using `Terminal.strip_seqs()`_ or
-  sequences and whitespace using `Terminal.strip()`_.
-* Allows the *printable length* of strings that contain sequences to be determined by
-  `Terminal.length()`_, supporting additional methods `Terminal.wrap()`_ and `Terminal.center()`_,
-  terminal-aware variants of the built-in function `textwrap.wrap()`_ and method `str.center()`_,
-  respectively.
+* Dead-simple keyboard handling: safely decoding unicode input in your system's preferred locale and
+  supports application/arrow keys.
 * 24-bit color support, using `Terminal.color_rgb()`_ and `Terminal.on_color_rgb()`_ and all X11
   Colors_ by name, and not by number.
 * Determine cursor location using `Terminal.location()`, enter key-at-a-time input mode using
   `Terminal.cbreak()`_ or `Terminal.raw()`_ context managers, and read timed key presses using
   `Terminal.inkey()`_.
+* Allows the *printable length* of strings that contain sequences to be determined by
+  `Terminal.length()`_, supporting additional methods `Terminal.wrap()`_ and `Terminal.center()`_,
+  terminal-aware variants of the built-in function `textwrap.wrap()`_ and method `str.center()`_,
+  respectively.
+* Allows sequences to be removed from strings that contain them, using `Terminal.strip_seqs()`_ or
+  sequences and whitespace using `Terminal.strip()`_.
 
 Before And After
 ----------------
@@ -168,6 +173,7 @@ The same program with *Blessed* is simply:
 .. _`terminfo(5)`: http://invisible-island.net/ncurses/man/terminfo.5.html
 .. _str.center(): https://docs.python.org/3/library/stdtypes.html#str.center
 .. _textwrap.wrap(): https://docs.python.org/3/library/textwrap.html#textwrap.wrap
+.. _Terminal: https://blessed.readthedocs.io/en/stable/terminal.html
 .. _`Terminal.color_rgb()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.color_rgb
 .. _`Terminal.on_color_rgb()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.on_color_rgb
 .. _`Terminal.length()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.length
@@ -196,6 +202,7 @@ The same program with *Blessed* is simply:
 .. _Dashing: https://github.com/FedericoCeratto/dashing
 .. _Enlighten: https://github.com/Rockhopper-Technologies/enlighten
 .. _macht: https://github.com/rolfmorel/macht
+.. _f-strings: https://docs.python.org/3/reference/lexical_analysis.html#f-strings
 .. |pypi_downloads| image:: https://img.shields.io/pypi/dm/blessed.svg?logo=pypi
     :alt: Downloads
     :target: https://pypi.python.org/pypi/blessed
