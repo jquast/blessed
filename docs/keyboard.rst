@@ -11,33 +11,35 @@ The built-in function :func:`input` (or :func:`raw_input`) is pretty good for a 
     else:
         print(f"How interesting, {name} you say?")
 
-But it has drawbacks -- it's no good for interactive apps!  This function will not return a value
-until the return key is pressed, or understand or detect arrow keys and others required to make
-awesome games!
+But it has drawbacks -- it's no good for interactive apps!  This function **will not return until
+the return key is pressed**, so we can't do any exciting animations, and we can't understand or
+detect arrow keys and others required to make awesome, interactive apps and games!
+
+*Blessed* fixes this issue with a context manager, :meth:`~Terminal.cbreak`, and a single
+function for all keyboard input, :meth:`~.Terminal.inkey`.
 
 inkey()
 -------
-
-The method :meth:`~.Terminal.inkey`, combined with :meth:`~.Terminal.cbreak` is a solution.
 
 Let's just dive right into a rich "event loop", that awaits a keypress for 3 seconds and tells us
 what key we pressed.
 
 .. code-block:: python
+   :emphasize-lines: 3,6
 
-    print(f"{term.home}{term.black_on_skyblue}{term.clear}")
-    print("press 'q' to quit.")
-    with term.cbreak():
-        val = ''
-        while val.lower() != 'q':
-            val = term.inkey(timeout=3)
-            if not val:
-               print("It sure is quiet in here ...")
-            elif val.is_sequence:
-               print("got sequence: {0}.".format((str(val), val.name, val.code)))
-            elif val:
-               print("got {0}.".format(val))
-        print(f'bye!{term.normal}')
+   print(f"{term.home}{term.black_on_skyblue}{term.clear}")
+   print("press 'q' to quit.")
+   with term.cbreak():
+       val = ''
+       while val.lower() != 'q':
+           val = term.inkey(timeout=3)
+           if not val:
+              print("It sure is quiet in here ...")
+           elif val.is_sequence:
+              print("got sequence: {0}.".format((str(val), val.name, val.code)))
+           elif val:
+              print("got {0}.".format(val))
+       print(f'bye!{term.normal}')
 
 .. image:: https://dxtz6bzwq9sxx.cloudfront.net/demo_cbreak_inkey.gif
     :alt: A visual example of interacting with the Terminal.inkey() and cbreak() methods.

@@ -77,7 +77,7 @@ color!
 ----------
 
 The built-in capability :meth:`~.Terminal.color` accepts a numeric index of any value
-between 0 and 256, I guess you could call this "Color by number...", it not recommended, there are
+between 0 and 254, I guess you could call this "Color by number...", it not recommended, there are
 many common cases where the colors do not match across terminals!
 
 16 Colors

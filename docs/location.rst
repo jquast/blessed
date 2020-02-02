@@ -1,8 +1,12 @@
 Location
 ========
 
-If you just want to move and aren't worried about returning, do something like
-this:
+    Can you comprehend everything in the four directions
+
+    And still do nothing? 
+     
+If you just want to move the location of the cursor before writing text, and aren't worried about
+returning, do something like this:
 
     >>> print(term.home + term.clear)
     >>> print(term.down(2) + term.move_right(20) + term.bright_red('fire!'))
