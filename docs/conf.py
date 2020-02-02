@@ -13,7 +13,6 @@ from docutils.utils import get_source_line
 # for github.py
 HERE = os.path.dirname(__file__)
 sys.path.insert(0, os.path.abspath('sphinxext'))
-sys.path.insert(0, os.path.abspath(os.path.join(HERE, os.pardir)))
 github_project_url = "https://github.com/jquast/blessed"
 
 
