@@ -47,6 +47,47 @@ def test_capability_with_forced_tty():
     child()
 
 
+def test_basic_url():
+    """force styling should return sequences even for non-ttys."""
+    @as_subprocess
+    def child():
+        # given
+        t = TestTerminal(stream=six.StringIO(), force_styling=True)
+        given_url = 'https://blessed.readthedocs.org'
+        given_text = 'documentation'
+        expected_output = ('\x1b]8;;{0}\x1b\\{1}\x1b]8;;\x1b\\'
+                           .format(given_url, given_text))
+
+        # exercise
+        result = t.link(given_url, 'documentation')
+
+        # verify
+        assert repr(result) == repr(expected_output)
+
+    child()
+
+
+def test_url_with_id():
+    """force styling should return sequences even for non-ttys."""
+    @as_subprocess
+    def child():
+        # given
+        t = TestTerminal(stream=six.StringIO(), force_styling=True)
+        given_url = 'https://blessed.readthedocs.org'
+        given_text = 'documentation'
+        given_url_id = '123'
+        expected_output = ('\x1b]8;id={0};{1}\x1b\\{2}\x1b]8;;\x1b\\'
+                           .format(given_url_id, given_url, given_text))
+
+        # exercise
+        result = t.link(given_url, 'documentation', given_url_id)
+
+        # verify
+        assert repr(result) == repr(expected_output)
+
+    child()
+
+
 def test_parametrization():
     """Test parameterizing a capability."""
     @as_subprocess

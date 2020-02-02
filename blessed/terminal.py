@@ -834,6 +834,28 @@ class Terminal(object):
         self._normal = resolve_capability(self, 'normal')
         return self._normal
 
+    def link(self, url, text, url_id=''):
+        """
+        Display ``text`` that when touched or clicked, navigates to ``url``.
+
+        Optional ``url_id`` may be specified, so that non-adjacent cells can reference a single
+        target, all cells painted with the same "id" will highlight on hover, rather than any
+        individual one, as described in "Hovering and underlining the id parameter of gist
+        https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda.
+
+        :param str url: Hyperlink URL.
+        :param str text: Clickable text.
+        :param str url_id: Optional 'id', any random text or number will do.
+        """
+        assert len(url) < 2000, (len(url), url)
+        if url_id:
+            assert len(str(url_id)) < 250, (len(str(url_id)), url_id)
+            params = 'id={0}'.format(url_id)
+        else:
+            params = ''
+        return ('\x1b]8;{0};{1}\x1b\\{2}'
+                '\x1b]8;;\x1b\\'.format(params, url, text))
+
     @property
     def stream(self):
         """

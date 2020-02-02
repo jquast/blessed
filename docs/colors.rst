@@ -20,6 +20,17 @@ And combine two colors using "``_on_``", as in "``foreground_on_background``":
 
     >>> print(term.peru_on_seagreen('All systems functioning within defined parameters.'))
 
+Hyperlinks
+----------
+
+A recent addition to many modern terminals is support for hyperlinks, like HTML,
+allows creating clickable links of text.
+
+    >>> print(f"blessed {term.link('https://blessed.readthedocs.org', 'documentation')}")
+    blessed documentation
+
+Hover your cursor over ``documentation``, and it should highlight as a clickable URL.
+
 Styles
 ------
 

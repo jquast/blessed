@@ -393,6 +393,20 @@ def test_Sequence_alignment(all_terms):
     child(kind=all_terms)
 
 
+def test_basic_hyperlinks():
+    """Test length our of hyperlink URL's."""
+    @as_subprocess
+    def child():
+        term = TestTerminal()
+        given_basic_url = term.link(
+            'https://blessed.readthedocs.org', 'blessed')
+        given_advanced_urltext = term.link(
+            'https://blessed.readthedocs.org', 'blessed', 'with_id')
+        assert False, repr(term.split_seqs(given_basic_url))
+
+    child()
+
+
 def test_sequence_is_movement_false(all_terms):
     """Test parser about sequences that do not move the cursor."""
     @as_subprocess
