@@ -48,6 +48,9 @@ a classic game of tennis:
    :lines: 3-
    :emphasize-lines: 17,22,25,27,34
 
+.. figure:: https://dxtz6bzwq9sxx.cloudfront.net/demo_basic_bounce.gif
+   :alt: Animated screenshot of :ref:`bounce.py`
+
 Context Manager
 ---------------
 
