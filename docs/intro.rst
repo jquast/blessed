@@ -169,7 +169,7 @@ The same program with *Blessed* is simply:
 
     term = Terminal()
     with term.location(0, term.height - 1):
-        print('This is' + term.underline('underlined') + '!')
+        print('This is ' + term.underline('underlined') + '!')
 
 .. _curses: https://docs.python.org/3/library/curses.html
 .. _tigetstr: http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man3/tigetstr.3
