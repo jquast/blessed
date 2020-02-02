@@ -4,7 +4,8 @@ Introduction
 ============
 
 Blessed is an easy, practical *library* for making *terminal* apps, by providing an elegant,
-well-documented interface to Colors_, Keyboard_ input, and screen Positioning_ capabilities.
+well-documented interface to Colors_, Keyboard_ input, and screen position and Location_
+capabilities.
 
 .. code-block:: python
 
@@ -80,13 +81,12 @@ Brief Overview
 
 *Blessed* is more than just a Python wrapper around curses_:
 
-* Styles, color, and maybe a little positioning without necessarily clearing the whole screen first.
+* Styles_, Color_, and maybe a little positioning without necessarily clearing the whole screen first.
 * Works great with Python's new f-strings_ or any other kind of string formatting.
-* Provides up-to-the-moment terminal height and width, so you can respond to terminal size changes.
+* Provides up-to-the-moment Location_ and terminal height and width, so you can respond to terminal
+  size changes.
 * Avoids making a mess if the output gets piped to a non-terminal, you can output sequences to any
   file-like object such as *StringIO*, files, pipes or sockets.
- Allows sequences to be removed from strings that contain them, using `Terminal.strip_seqs()`_ or
-  sequences and whitespace using `Terminal.strip()`_.
 * Uses `terminfo(5)`_ so it works with any terminal type and capability: No more C-like calls to
   tigetstr_ and tparm_.
 * Non-obtrusive calls to only the capabilities database ensures that you are free to mix and match
@@ -189,8 +189,9 @@ The same program with *Blessed* is simply:
 .. _`Terminal.raw()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.raw
 .. _`Terminal.inkey()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.inkey
 .. _Colors: https://blessed.readthedocs.io/en/stable/colors.html
+.. _Styles: https://blessed.readthedocs.io/en/stable/colors.html#style
+.. _Location: https://blessed.readthedocs.io/en/stable/location.html
 .. _Keyboard: https://blessed.readthedocs.io/en/stable/keyboard.html
-.. _Positioning: https://blessed.readthedocs.io/en/stable/positioning.html
 .. _Examples: https://blessed.readthedocs.io/en/stable/examples.html
 .. _x11-colorpicker.py: https://blessed.readthedocs.io/en/stable/examples.html#x11-colorpicker-py
 .. _bounce.py: https://blessed.readthedocs.io/en/stable/examples.html#bounce-py

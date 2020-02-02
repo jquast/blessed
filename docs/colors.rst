@@ -1,8 +1,8 @@
 Colors
 ======
 
-Doing colors with blessed is easy, pick a color name from the Color chart below, any of these named
-are also attributes of the :doc:`terminal`!
+Doing colors with blessed is easy, pick a color name from the :ref:`Color chart` below, any of these
+named are also attributes of the :doc:`terminal`!
 
 These attributes can be printed directly, causing the terminal to switch into the given color.  Or,
 as a callable, which terminates the string with the ``normal`` attribute.  The following three
@@ -16,7 +16,7 @@ To use a background color, prefix any color with ``on_``:
 
     >>> print(term.on_darkolivegreen('welcome to the army'))
 
-And combine colors with ``_on_``, as ``foreground_on_background``:
+And combine two colors using "``_on_``", as in "``foreground_on_background``":
 
     >>> print(term.peru_on_seagreen('All systems functioning within defined parameters.'))
 
@@ -68,6 +68,8 @@ the terminal is automatically mapped:
 And finally, the direct ``(r, g, b)`` values of 0-255 can be used for :meth:`~.Terminal.color_rgb`
 and :meth:`~.Terminal.on_color_rgb` for foreground and background colors, to access each and every
 color!
+
+.. _Color chart:
 
 .. include:: all_the_colors.txt
 

@@ -24,7 +24,7 @@ Support for :doc:`colors`:
     >>> term.number_of_colors
     256
 
-And create printable strings containing sequences for :doc:`colors`:
+And create printable strings containing sequences_ for :doc:`colors`:
 
     >>> term.green_reverse('ALL SYSTEMS GO')
     '\x1b[32m\x1b[7mALL SYSTEMS GO\x1b[m'
@@ -39,6 +39,7 @@ And thanks to `f-strings`_ since python 3.6, it's very easy to mix attributes an
               f"Bright yellow is actually yellow!{term.normal}")
 
 .. _f-strings: https://docs.python.org/3/reference/lexical_analysis.html#f-strings
+.. _sequences: https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_sequences
 
 Capabilities
 ------------
@@ -85,10 +86,10 @@ of the screen:
 Full-Screen Mode
 ----------------
 
-If you've ever noticed how a program like 'vi' restores you to your unix shell history after
-exiting, it's actually a pretty basic trick that all terminal emulators support, that
-*blessed* provides using the :meth:`~Terminal.fullscreen` context manager over these
-two basic capabilities:
+If you've ever noticed how a program like :linuxman:`vim(1)` restores you to your unix shell history
+after exiting, it's actually a pretty basic trick that all terminal emulators support, that
+*blessed* provides using the :meth:`~Terminal.fullscreen` context manager over these two basic
+capabilities:
 
 ``enter_fullscreen``
     Switch to alternate screen, previous screen is stored by terminal driver.
