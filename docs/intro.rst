@@ -21,6 +21,9 @@ capabilities.
 
     print(term.move_down(2) + 'You pressed ' + term.bold(repr(inp)))
 
+.. figure:: https://dxtz6bzwq9sxx.cloudfront.net/demo_basic_intro.gif
+   :alt: Animation of running the code example
+
 It's meant to be *fun* and *easy*, to do basic terminal graphics and styling with Python using
 *blessed*. Terminal_ is the only class you need to import and the only object you should need for
 Terminal capabilities.

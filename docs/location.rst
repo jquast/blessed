@@ -1,7 +1,6 @@
 Location
 ========
 
-    
 If you just want to move the location of the cursor before writing text, and aren't worried about
 returning, do something like this:
 
@@ -36,6 +35,18 @@ And four relative capabilities:
     the carriage to column 0, and, depending on your terminal emulator, may also destroy any
     characters to end of line. ``move_down(1)`` is always a safe non-destructive one-notch movement
     in the downward direction.
+
+Example
+-------
+
+The source code of :ref:`bounce.py` combines a small bit of :doc:`keyboard` input with many of the
+Terminal location capabilities, ``home``, ``width``, ``height``, and ``move_xy`` are used to create
+a classic game of tennis:
+
+.. literalinclude:: ../bin/bounce.py
+   :language: python
+   :lines: 3-
+   :emphasize-lines: 17,22,25,27,34
 
 Context Manager
 ---------------
