@@ -83,6 +83,8 @@ of the screen:
 
     >>> print(term.home + term.on_blue + term.clear)
 
+.. _hyperlinks:
+
 Hyperlinks
 ----------
 
