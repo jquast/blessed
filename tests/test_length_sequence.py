@@ -398,7 +398,7 @@ def test_hyperlink_nostyling():
     @as_subprocess
     def child():
         # given,
-        term = TestTerminal(force_styling=False)
+        term = TestTerminal(force_styling=None)
         given_basic_url = term.link(
             'https://blessed.readthedocs.org', 'blessed')
         assert given_basic_url == 'blessed'
