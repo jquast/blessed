@@ -414,12 +414,17 @@ def test_basic_hyperlinks():
         term = TestTerminal()
         given_basic_url = term.link(
             'https://blessed.readthedocs.org', 'blessed')
+        # exercise,
         split_parts = term.split_seqs(given_basic_url)
-        assert split_parts[0] == '\x1b]8;;https://blessed.readthedocs.org\x1b\\'
-        assert term.length(split_parts[0]) == 0
-        assert ''.join(split_parts[1:8]) == 'blessed'
-        assert split_parts[8] == '\x1b]8;;\x1b\\'
-        assert len(split_parts) == 9
+        # verify
+        if term.does_styling:
+            assert split_parts[0] == '\x1b]8;;https://blessed.readthedocs.org\x1b\\'
+            assert term.length(split_parts[0]) == 0
+            assert ''.join(split_parts[1:8]) == 'blessed'
+            assert split_parts[8] == '\x1b]8;;\x1b\\'
+            assert len(split_parts) == 9
+        else:
+            assert ''.join(split_parts) == 'blessed'
 
     child()
 
@@ -435,11 +440,14 @@ def test_hyperlink_with_id():
         # exercise,
         split_parts = term.split_seqs(given_advanced_urltext)
         # verify,
-        assert split_parts[0] == '\x1b]8;id=123;https://blessed.readthedocs.org\x1b\\'
-        assert term.length(split_parts[0]) == 0
-        assert ''.join(split_parts[1:8]) == 'blessed'
-        assert split_parts[8] == '\x1b]8;;\x1b\\'
-        assert len(split_parts) == 9
+        if term.does_styling:
+            assert split_parts[0] == '\x1b]8;id=123;https://blessed.readthedocs.org\x1b\\'
+            assert term.length(split_parts[0]) == 0
+            assert ''.join(split_parts[1:8]) == 'blessed'
+            assert split_parts[8] == '\x1b]8;;\x1b\\'
+            assert len(split_parts) == 9
+        else:
+            assert ''.join(split_parts) == 'blessed'
 
     child()
 
