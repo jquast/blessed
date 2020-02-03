@@ -845,7 +845,9 @@ class Terminal(object):
 
         :param str url: Hyperlink URL.
         :param str text: Clickable text.
-        :param str url_id: Optional 'id', any random text or number will do.
+        :param str url_id: Optional 'id'.
+        :rtype: str
+        :returns: String of ``text`` as a hyperlink to ``url``.
         """
         assert len(url) < 2000, (len(url), url)
         if url_id:
@@ -853,6 +855,8 @@ class Terminal(object):
             params = 'id={0}'.format(url_id)
         else:
             params = ''
+        if not self.does_styling:
+            return text
         return ('\x1b]8;{0};{1}\x1b\\{2}'
                 '\x1b]8;;\x1b\\'.format(params, url, text))
 

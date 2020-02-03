@@ -102,7 +102,6 @@ CAPABILITY_DATABASE = OrderedDict((
 ))
 
 CAPABILITIES_RAW_MIXIN = {
-    'link': re.escape('\x1b') + r'\]8;;.*' + re.escape('\x1b') + '\\\\',
     'bell': re.escape('\a'),
     'carriage_return': re.escape('\r'),
     'cursor_left': re.escape('\b'),
@@ -116,13 +115,13 @@ CAPABILITIES_RAW_MIXIN = {
     'scroll_forward': re.escape('\n'),
     'set0_des_seq': re.escape('\x1b(B'),
     'tab': re.escape('\t'),
-    # one could get carried away, such as by adding '\x1b#8' (dec tube
-    # alignment test) by reversing basic vt52, ansi, and xterm sequence
-    # parsers, we'll turn them in as folks demand them, I guess.
 }
-
+_ANY_NOTESC = '[^' + re.escape('\x1b') + ']*'
 
 CAPABILITIES_ADDITIVES = {
+    'link': ('link',
+             re.escape('\x1b') + r'\]8;' + _ANY_NOTESC + ';' +
+             _ANY_NOTESC + re.escape('\x1b') + '\\\\'),
     'color256': ('color', re.escape('\x1b') + r'\[38;5;\d+m'),
     'on_color256': ('on_color', re.escape('\x1b') + r'\[48;5;\d+m'),
     'color_rgb': ('color_rgb', re.escape('\x1b') + r'\[38;2;\d+;\d+;\d+m'),

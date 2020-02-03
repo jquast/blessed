@@ -95,8 +95,8 @@ Brief Overview
   tigetstr_ and tparm_.
 * Non-obtrusive calls to only the capabilities database ensures that you are free to mix and match
   with calls to any other curses application code or library you like.
-* Provides context managers `Terminal.fullscreen()` and `Terminal.hidden_cursor()` to safely express
-  terminal modes, curses development will no longer fudge up your shell.
+* Provides context managers `Terminal.fullscreen()`_ and `Terminal.hidden_cursor()`_ to safely
+  express terminal modes, curses development will no longer fudge up your shell.
 * Act intelligently when somebody redirects your output to a file, omitting all of the special
   sequences colors, but still containing all of the text.
 
@@ -178,20 +178,22 @@ The same program with *Blessed* is simply:
 .. _str.center(): https://docs.python.org/3/library/stdtypes.html#str.center
 .. _textwrap.wrap(): https://docs.python.org/3/library/textwrap.html#textwrap.wrap
 .. _Terminal: https://blessed.readthedocs.io/en/stable/terminal.html
-.. _`Terminal.color_rgb()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.color_rgb
-.. _`Terminal.on_color_rgb()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.on_color_rgb
-.. _`Terminal.length()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.length
-.. _`Terminal.strip()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.strip
-.. _`Terminal.rstrip()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.rstrip
-.. _`Terminal.lstrip()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.lstrip
-.. _`Terminal.strip_seqs()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.strip_seqs
-.. _`Terminal.wrap()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.wrap
-.. _`Terminal.center()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.center
-.. _`Terminal.rjust()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.rjust
-.. _`Terminal.ljust()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.ljust
-.. _`Terminal.cbreak()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.cbreak
-.. _`Terminal.raw()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.raw
-.. _`Terminal.inkey()`: https://blessed.readthedocs.io/en/stable/api.html#blessed.terminal.Terminal.inkey
+.. _`Terminal.fullscreen()`: https://blessed.readthedocs.io/en/latest/api/terminal.html#blessed.terminal.Terminal.fullscreen
+.. _`Terminal.color_rgb()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.color_rgb
+.. _`Terminal.hidden_cursor()`: https://blessed.readthedocs.io/en/latest/api/terminal.html#blessed.terminal.Terminal.hidden_cursor
+.. _`Terminal.on_color_rgb()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.on_color_rgb
+.. _`Terminal.length()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.length
+.. _`Terminal.strip()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.strip
+.. _`Terminal.rstrip()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.rstrip
+.. _`Terminal.lstrip()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.lstrip
+.. _`Terminal.strip_seqs()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.strip_seqs
+.. _`Terminal.wrap()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.wrap
+.. _`Terminal.center()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.center
+.. _`Terminal.rjust()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.rjust
+.. _`Terminal.ljust()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.ljust
+.. _`Terminal.cbreak()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.cbreak
+.. _`Terminal.raw()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.raw
+.. _`Terminal.inkey()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.inkey
 .. _Colors: https://blessed.readthedocs.io/en/stable/colors.html
 .. _Styles: https://blessed.readthedocs.io/en/stable/colors.html#style
 .. _Location: https://blessed.readthedocs.io/en/stable/location.html

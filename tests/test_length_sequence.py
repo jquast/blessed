@@ -393,16 +393,52 @@ def test_Sequence_alignment(all_terms):
     child(kind=all_terms)
 
 
+def test_hyperlink_nostyling():
+    """Test length our of hyperlink URL's."""
+    @as_subprocess
+    def child():
+        # given,
+        term = TestTerminal(force_styling=False)
+        given_basic_url = term.link(
+            'https://blessed.readthedocs.org', 'blessed')
+        assert given_basic_url == 'blessed'
+
+    child()
+
+
 def test_basic_hyperlinks():
     """Test length our of hyperlink URL's."""
     @as_subprocess
     def child():
+        # given,
         term = TestTerminal()
         given_basic_url = term.link(
             'https://blessed.readthedocs.org', 'blessed')
+        split_parts = term.split_seqs(given_basic_url)
+        assert split_parts[0] == '\x1b]8;;https://blessed.readthedocs.org\x1b\\'
+        assert term.length(split_parts[0]) == 0
+        assert ''.join(split_parts[1:8]) == 'blessed'
+        assert split_parts[8] == '\x1b]8;;\x1b\\'
+        assert len(split_parts) == 9
+
+    child()
+
+def test_hyperlink_with_id():
+    """Test length our of hyperlink URL's with ID."""
+    @as_subprocess
+    def child():
+        # given,
+        term = TestTerminal()
         given_advanced_urltext = term.link(
-            'https://blessed.readthedocs.org', 'blessed', 'with_id')
-        assert False, repr(term.split_seqs(given_basic_url))
+            'https://blessed.readthedocs.org', 'blessed', '123')
+        # exercise,
+        split_parts = term.split_seqs(given_advanced_urltext)
+        # verify,
+        assert split_parts[0] == '\x1b]8;id=123;https://blessed.readthedocs.org\x1b\\'
+        assert term.length(split_parts[0]) == 0
+        assert ''.join(split_parts[1:8]) == 'blessed'
+        assert split_parts[8] == '\x1b]8;;\x1b\\'
+        assert len(split_parts) == 9
 
     child()
 
