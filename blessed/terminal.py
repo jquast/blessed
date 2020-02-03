@@ -234,7 +234,10 @@ class Terminal(object):
 
         # Keyboard valid as stdin only when output stream is stdout or stderr and is a tty.
         if self._stream in (sys.__stdout__, sys.__stderr__):
-            self._keyboard_fd = sys.__stdin__.fileno()
+            try:
+                self._keyboard_fd = sys.__stdin__.fileno()
+            except ValueError:
+                pass
 
         # _keyboard_fd only non-None if both stdin and stdout is a tty.
         self._keyboard_fd = (self._keyboard_fd
