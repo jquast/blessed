@@ -34,9 +34,8 @@ cnn.py
 -------------------
 https://github.com/jquast/blessed/blob/master/bin/cnn.py
 
-This program uses BeautifulSoup_ and requests_ to fetch the cnn website
-and display news article titles using the :meth:`~.Terminal.link` method,
-so that they may be clicked.
+This program uses 3rd-party BeautifulSoup and requests library to fetch the cnn website and display
+news article titles using the :meth:`~.Terminal.link` method, so that they may be clicked.
 
 .. _detect-multibyte.py:
 
