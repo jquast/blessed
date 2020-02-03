@@ -83,6 +83,41 @@ of the screen:
 
     >>> print(term.home + term.on_blue + term.clear)
 
+Hyperlinks
+----------
+
+Maybe you haven't noticed, because it's a recent addition to terminal emulators, is
+that they can now support hyperlinks, like to HTML, or even ``file://`` URLs, which
+allows creating clickable links of text.
+
+    >>> print(f"blessed {term.link('https://blessed.readthedocs.org', 'documentation')}")
+    blessed documentation
+
+Hover your cursor over ``documentation``, and it should highlight as a clickable URL.
+
+.. figure:: https://dxtz6bzwq9sxx.cloudfront.net/demo_basic_hyperlink.gif
+   :alt: Animation of running code example and clicking a hyperlink
+
+Styles
+------
+
+In addition to :doc:`colors`, blessed also supports the limited amount of *styles* that terminals
+can do. These are:
+
+``bold``
+  Turn on 'extra bright' mode.
+``reverse``
+  Switch fore and background attributes.
+``normal``
+  Reset attributes to default.
+``underline``
+  Enable underline mode.
+``no_underline``
+  Disable underline mode.
+
+.. note:: While the inverse of *underline* is *no_underline*, the only way to turn off *bold* or
+    *reverse* is *normal*, which also cancels any custom colors.
+
 Full-Screen Mode
 ----------------
 
