@@ -23,13 +23,17 @@ And combine two colors using "``_on_``", as in "``foreground_on_background``":
 Hyperlinks
 ----------
 
-A recent addition to many modern terminals is support for hyperlinks, like HTML,
+Maybe you haven't noticed, because it's a recent addition to terminal emulators, is
+that they can now support hyperlinks, like to HTML, or even ``file://`` URLs, which
 allows creating clickable links of text.
 
     >>> print(f"blessed {term.link('https://blessed.readthedocs.org', 'documentation')}")
     blessed documentation
 
 Hover your cursor over ``documentation``, and it should highlight as a clickable URL.
+
+.. figure:: https://dxtz6bzwq9sxx.cloudfront.net/demo_basic_hyperlink.gif
+   :alt: Animation of running code example and clicking a hyperlink
 
 Styles
 ------
