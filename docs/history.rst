@@ -29,8 +29,8 @@ Version History
     typically supported, anyway.  Use Unicode text or 256 or 24-bit color codes instead.
   * deprecated: additional key names, such as ``KEY_TAB``, are no longer "injected" into the curses
     module namespace.
-  * deprecated: :func:`curses.setupterm` is now called with :attr:`os.devnull` as the file
-    descriptor, let us know if this causes any issues. :ghissue:`59`.
+  * bugfix: briefly tried calling :func:`curses.setupterm` with :attr:`os.devnull` as the file
+    descriptor, reverted. :ghissue:`59`.
   * deprecated: :meth:`~Terminal.inkey` no longer raises RuntimeError when :attr:`~Terminal.stream`
     is not a terminal, programs using :meth:`~Terminal.inkey` to block indefinitely if a keyboard is
     not attached. :ghissue:`69`.
