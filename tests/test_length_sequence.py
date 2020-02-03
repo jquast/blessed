@@ -423,6 +423,7 @@ def test_basic_hyperlinks():
 
     child()
 
+
 def test_hyperlink_with_id():
     """Test length our of hyperlink URL's with ID."""
     @as_subprocess
