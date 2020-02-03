@@ -210,6 +210,8 @@ class Terminal(object):
         self.__init__keycodes()
 
     def __init__streams(self):
+        # pylint: disable=too-complex
+        #         Agree to disagree !
         stream_fd = None
 
         # Default stream is stdout
