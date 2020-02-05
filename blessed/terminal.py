@@ -368,7 +368,7 @@ class Terminal(object):
             >>> term.move(line, column)
 
         See the manual page `terminfo(5)
-        <http://invisible-island.net/ncurses/man/terminfo.5.html>`_ for a
+        <https://invisible-island.net/ncurses/man/terminfo.5.html>`_ for a
         complete list of capabilities and their arguments.
         """
         if not self.does_styling:
@@ -566,7 +566,7 @@ class Terminal(object):
         # dimensions of a connected client, but **no means to determine the
         # location of the cursor**.
         #
-        # from http://invisible-island.net/ncurses/terminfo.src.html,
+        # from https://invisible-island.net/ncurses/terminfo.src.html,
         #
         # > The System V Release 4 and XPG4 terminfo format defines ten string
         # > capabilities for use by applications, <u0>...<u9>.   In this file,

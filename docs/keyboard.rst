@@ -94,7 +94,7 @@ Alt/meta
 
 Programs with GNU readline, like bash, have *Alt* combinators, such as *ALT+u* to uppercase the word
 after cursor.  This is achieved by the configuration option altSendsEscape or `metaSendsEscape
-<http://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Alt-and-Meta-Keys>`_ in xterm.
+<https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Alt-and-Meta-Keys>`_ in xterm.
 
 The default for most terminals, however, is for this key to be bound by the operating system, or,
 used for inserting international keys, (where the combination *ALT+u, a* is used to insert the

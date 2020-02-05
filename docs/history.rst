@@ -41,12 +41,12 @@ Version History
     though such value is always True since 1.9.
 
 1.16
-  * introduced: Windows support?! :ghissue:`110` by :ghuser:`avylove`.
+  * introduced: Windows support?! :ghpull:`110` by :ghuser:`avylove`.
 
 1.15
   * enhancement: disable timing integration tests for keyboard routines.
-  * enhancement: Support python 3.7. :ghissue:`102`.
-  * enhancement: Various fixes to test automation :ghissue:`108`
+  * enhancement: Support python 3.7. :ghpull:`102`.
+  * enhancement: Various fixes to test automation :ghpull:`108`
 
 1.14
   * bugfix: :meth:`~.Terminal.wrap` misbehaved for text containing newlines,
@@ -203,9 +203,9 @@ Version History
   * Make ``python setup.py test`` work without spurious errors on 2.6.
   * Work around a tox parsing bug in its config file.
   * Make context managers clean up after themselves even if there's an
-    exception (Vitja Makarov :ghpull:`29`).
+    exception (`Vitja Makarov #29 <https://github.com/erikrose/blessings/pull/29>`).
   * Parameterizing a capability no longer crashes when there is no tty
-    (Vitja Makarov :ghpull:`31`)
+    (`<Vitja Makarov #31 <https://github.com/erikrose/blessings/pull/31>`)
 
 1.5
   * Add syntactic sugar and documentation for ``enter_fullscreen``
@@ -244,7 +244,7 @@ Version History
 1.2
   * Added support for Python 3! We need 3.2.3 or greater, because the curses
     library couldn't decide whether to accept strs or bytes before that
-    (http://bugs.python.org/issue10570).
+    (https://bugs.python.org/issue10570).
   * Everything that comes out of the library is now unicode. This lets us
     support Python 3 without making a mess of the code, and Python 2 should
     continue to work unless you were testing types (and badly). Please file a
@@ -266,13 +266,13 @@ Version History
 1.0
   * Extracted Blessed from `nose-progressive`_.
 
-.. _`nose-progressive`: http://pypi.python.org/pypi/nose-progressive/
+.. _`nose-progressive`: https://pypi.org/project/nose-progressive/
 .. _`erikrose/blessings`: https://github.com/erikrose/blessings
 .. _`jquast/blessed`: https://github.com/jquast/blessed
 .. _`issue tracker`: https://github.com/jquast/blessed/issues/
 .. _curses: https://docs.python.org/library/curses.html
 .. _colorama: https://pypi.python.org/pypi/colorama
-.. _wcwidth: https://pypi.python.org/pypi/wcwidth
+.. _wcwidth: https://pypi.org/project/wcwidth/
 .. _`cbreak(3)`: http://www.openbsd.org/cgi-bin/man.cgi?query=cbreak&apropos=0&sektion=3
 .. _`curs_getch(3)`: http://www.openbsd.org/cgi-bin/man.cgi?query=curs_getch&apropos=0&sektion=3
 .. _`termios(4)`: http://www.openbsd.org/cgi-bin/man.cgi?query=termios&apropos=0&sektion=4
@@ -280,5 +280,5 @@ Version History
 .. _tigetstr: http://www.openbsd.org/cgi-bin/man.cgi?query=tigetstr&sektion=3
 .. _tparm: http://www.openbsd.org/cgi-bin/man.cgi?query=tparm&sektion=3
 .. _`API Documentation`: http://blessed.rtfd.org
-.. _`PDCurses`: http://www.lfd.uci.edu/~gohlke/pythonlibs/#curses
+.. _`PDCurses`: https://www.lfd.uci.edu/~gohlke/pythonlibs/#curses
 .. _`ansi`: https://github.com/tehmaze/ansi

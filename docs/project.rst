@@ -36,7 +36,7 @@ Install and run tox::
 
 Py.test is used as the test runner, and with the tox target supporting positional arguments, you may
 for example use `looponfailing
-<https://pytest.org/latest/xdist.html#running-tests-in-looponfailing-mode>`_ with python 3.7,
+<https://docs.pytest.org/en/3.0.1/xdist.html#running-tests-in-looponfailing-mode>`_ with python 3.7,
 stopping at the first failing test case, and looping (retrying) after a filesystem save is
 detected::
 
@@ -61,7 +61,7 @@ help you along:
   capabilities available as attributes of :class:`~.Terminal` are directly mapped to those listed in
   the column **Cap-name**.
 
-- The :linuxman:`termios(4)` of your preferred posix-like operating system.
+- The :linuxman:`termios(3)` of your preferred posix-like operating system.
 
 - `The TTY demystified <http://www.linusakesson.net/programming/tty/index.php>`_ by Linus Åkesson.
 
@@ -69,7 +69,7 @@ help you along:
   <https://blog.nelhage.com/2009/12/a-brief-introduction-to-termios/>`_ by Nelson Elhage.
 
 - Richard Steven's `Advance Unix Programming
-  <http://www.amazon.com/exec/obidos/ISBN=0201563177/wrichardstevensA/>`_ ("AUP") provides two very
+  <https://www.amazon.com/exec/obidos/ISBN=0201563177/wrichardstevensA/>`_ ("AUP") provides two very
   good chapters, "Terminal I/O" and "Pseudo Terminals".
 
 - GNU's `The Termcap Manual
@@ -81,7 +81,7 @@ help you along:
   CUNY's course material for *Introduction to System Programming*, by `Stewart Weiss
   <http://compsci.hunter.cuny.edu/~sweiss/>`_
 
-- `Chapter 11 <http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap11.html>`_ of the
+- `Chapter 11 <https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap11.html>`_ of the
   IEEE Open Group Base Specifications Issue 7, "General Terminal Interface"
 
 - The GNU C Library documentation, section `Low-Level Terminal Interface
@@ -91,7 +91,7 @@ help you along:
   of a terminal capability", or whether or not your preferred terminal emulator actually handles
   them, read the source! Many modern terminal emulators are now based on `libvte <https://github.com/GNOME/vte>`_.
 
-- The source code of the :linuxman:`tty(4)`, :linuxman:`pty(4)`, and the given "console driver" for
+- The source code of the :linuxman:`tty(4)`, :linuxman:`pty(7)`, and the given "console driver" for
   any posix-like operating system.  If you search thoroughly enough, you will eventually discover a
   terminal sequence decoder, usually a ``case`` switch that translates ``\x1b[0m`` into a "reset
   color" action towards the video driver.  Though ``tty.c`` linked here is probably not the most
@@ -100,23 +100,23 @@ help you along:
      - `FreeBSD <https://github.com/freebsd/freebsd/blob/master/sys/kern/tty.c>`_
      - `OpenBSD <http://cvsweb.openbsd.org/cgi-bin/cvsweb/~checkout~/src/sys/kern/tty.c?content-type=text/plain>`_
      - `Illumos (Solaris) <https://github.com/illumos/illumos-gate/blob/master/usr/src/uts/common/io/tty_common.c>`_
-     - `Minix <https://github.com/minix3/minix/blob/master/minix/drivers/tty/tty/tty.c>`_
+     - `Minix <https://github.com/Stichting-MINIX-Research-Foundation/minix/blob/master/minix/drivers/tty/tty/tty.c>`_
      - `Linux <https://github.com/torvalds/linux/blob/master/drivers/tty/n_tty.c>`_
 
-- `Thomas E. Dickey <http://invisible-island.net/>`_ has been maintaining `xterm
-  <http://invisible-island.net/xterm/xterm.html>`_, as well as a primary maintainer of many related
-  packages such as `ncurses <http://invisible-island.net/ncurses/ncurses.html>`_ for quite a long
+- `Thomas E. Dickey <https://invisible-island.net/>`_ has been maintaining `xterm
+  <https://invisible-island.net/xterm/xterm.html>`_, as well as a primary maintainer of many related
+  packages such as `ncurses <https://invisible-island.net/ncurses/ncurses.html>`_ for quite a long
   while. His consistent, well-documented, long-term dedication to xterm, curses, and the many
   related projects is world-renown.
 
 - `termcap & terminfo (O'Reilly Nutshell)
-  <http://www.amazon.com/termcap-terminfo-OReilly-Nutshell-Linda/dp/0937175226>`_ by Linda Mui, Tim
+  <https://www.amazon.com/termcap-terminfo-OReilly-Nutshell-Linda/dp/0937175226>`_ by Linda Mui, Tim
   O'Reilly, and John Strang.
 
 - Note that System-V systems, also known as `Unix98
   <https://en.wikipedia.org/wiki/Single_UNIX_Specification>`_ (SunOS, HP-UX, AIX and others) use a
   `Streams <https://en.wikipedia.org/wiki/STREAMS>`_ interface.  On these systems, the `ioctl(2)
-  <http://pubs.opengroup.org/onlinepubs/009695399/functions/ioctl.html>`_ interface provides the
+  <https://pubs.opengroup.org/onlinepubs/009695399/functions/ioctl.html>`_ interface provides the
   ``PUSH`` and ``POP`` parameters to communicate with a Streams device driver, which differs
   significantly from Linux and BSD.
 
@@ -130,8 +130,8 @@ When people say 'ANSI', they are discussing:
 
 - Standard `ECMA-48`_: Control Functions for Coded Character Sets
 
-- `ANSI X3.64 <http://sydney.edu.au/engineering/it/~tapted/ansi.html>`_ from 1981, when the
-  `American National Standards Institute <http://www.ansi.org/>`_ adopted the `ECMA-48`_ as
+- `ANSI X3.64 <https://en.wikipedia.org/wiki/ANSI_escape_code#History>`_ from 1981, when the
+  `American National Standards Institute <https://www.ansi.org/>`_ adopted the `ECMA-48`_ as
   standard, which was later withdrawn in 1997 (so in this sense it is *not* an ANSI standard).
 
 - The `ANSI.SYS`_ driver provided in MS-DOS and clones.  The popularity of the IBM Personal Computer
@@ -140,14 +140,14 @@ When people say 'ANSI', they are discussing:
 
 - The various code pages used in MS-DOS Personal Computers, providing "block art" characters in the
   8th bit (int 127-255), paired with `ECMA-48`_ sequences supported by the MS-DOS `ANSI.SYS`_ driver
-  to create artwork, known as `ANSI art <http://pc.textmod.es/>`_.
+  to create artwork, known as `ANSI art <https://16colo.rs/>`_.
 
 - The ANSI terminal database entry and its many descendants in the `terminfo database
-  <http://invisible-island.net/ncurses/terminfo.src.html>`_.  This is mostly due to terminals
+  <https://invisible-island.net/ncurses/terminfo.src.html>`_.  This is mostly due to terminals
   compatible with SCO UNIX, which was the successor of Microsoft's Xenix, which brought some
   semblance of the Microsoft DOS `ANSI.SYS`_ driver capabilities.
 
-- `Select Graphics Rendition (SGR) <http://vt100.net/docs/vt510-rm/SGR>`_
+- `Select Graphics Rendition (SGR) <https://vt100.net/docs/vt510-rm/SGR>`_
   on vt100 clones, which include many of the common sequences in `ECMA-48`_.
 
 - Any sequence started by the `Control-Sequence-Inducer`_ is often mistakenly termed as an "ANSI
@@ -156,9 +156,9 @@ When people say 'ANSI', they are discussing:
   escape key (ESC, ``\x1b``).
 
 .. _`issue tracker`: https://github.com/jquast/blessed/issues/
-.. _`stackoverflow`: http://stackoverflow.com/
+.. _`stackoverflow`: https://stackoverflow.com/
 .. _code page: https://en.wikipedia.org/wiki/Code_page
 .. _IBM CP437: https://en.wikipedia.org/wiki/Code_page_437
-.. _Control-Sequence-Inducer: http://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Controls-beginning-with-ESC
+.. _Control-Sequence-Inducer: https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Controls-beginning-with-ESC
 .. _ANSI.SYS: http://www.kegel.com/nansi/
 .. _ECMA-48: http://www.ecma-international.org/publications/standards/Ecma-048.htm

@@ -32,7 +32,7 @@ Whether you want to improve CLI apps with colors, or making fullscreen applicati
 *blessed* should help get you started quickly. Your users will love it because it works on Windows,
 Mac, and Linux, and you will love it because it has plenty of documentation and examples!
 
-Full documentation at http://blessed.readthedocs.org/en/latest/
+Full documentation at https://blessed.readthedocs.io/en/latest/
 
 Examples
 --------
@@ -172,9 +172,9 @@ The same program with *Blessed* is simply:
         print('This is ' + term.underline('underlined') + '!')
 
 .. _curses: https://docs.python.org/3/library/curses.html
-.. _tigetstr: http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man3/tigetstr.3
-.. _tparm: http://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man3/tparm.3
-.. _`terminfo(5)`: http://invisible-island.net/ncurses/man/terminfo.5.html
+.. _tigetstr: http://man.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man3/tigetstr.3
+.. _tparm: http://man.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man3/tparm.3
+.. _`terminfo(5)`: https://invisible-island.net/ncurses/man/terminfo.5.html
 .. _str.center(): https://docs.python.org/3/library/stdtypes.html#str.center
 .. _textwrap.wrap(): https://docs.python.org/3/library/textwrap.html#textwrap.wrap
 .. _Terminal: https://blessed.readthedocs.io/en/stable/terminal.html
@@ -195,7 +195,7 @@ The same program with *Blessed* is simply:
 .. _`Terminal.raw()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.raw
 .. _`Terminal.inkey()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.inkey
 .. _Colors: https://blessed.readthedocs.io/en/stable/colors.html
-.. _Styles: https://blessed.readthedocs.io/en/stable/colors.html#style
+.. _Styles: https://blessed.readthedocs.io/en/stable/terminal.html#styles
 .. _Location: https://blessed.readthedocs.io/en/stable/location.html
 .. _Keyboard: https://blessed.readthedocs.io/en/stable/keyboard.html
 .. _Examples: https://blessed.readthedocs.io/en/stable/examples.html
@@ -212,10 +212,10 @@ The same program with *Blessed* is simply:
 .. _f-strings: https://docs.python.org/3/reference/lexical_analysis.html#f-strings
 .. |pypi_downloads| image:: https://img.shields.io/pypi/dm/blessed.svg?logo=pypi
     :alt: Downloads
-    :target: https://pypi.python.org/pypi/blessed
+    :target: https://pypi.org/project/blessed/
 .. |codecov| image:: https://codecov.io/gh/jquast/blessed/branch/master/graph/badge.svg
     :alt: codecov.io Code Coverage
-    :target: https://codecov.io/gh/jquast/blessed
+    :target: https://codecov.io/gh/jquast/blessed/
 .. |linux| image:: https://img.shields.io/badge/Linux-yes-success?logo=linux
     :alt: Linux supported
 .. |windows| image:: https://img.shields.io/badge/Windows-NEW-success?logo=windows
