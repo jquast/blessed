@@ -305,6 +305,8 @@ def test_keystroke_0s_cbreak_multibyte_utf8():
 # Avylove: Added delay which should account for race contition. Re-add skip if randomly fail
 # @pytest.mark.skipif(os.environ.get('TRAVIS', None) is not None,
 #                     reason="travis-ci does not handle ^C very well.")
+@pytest.mark.skipif(platform.system() == 'Darwin',
+                    reason='os.write() raises OSError: [Errno 5] Input/output error')
 def test_keystroke_0s_raw_input_ctrl_c():
     """0-second keystroke with raw allows receiving ^C."""
     import pty
