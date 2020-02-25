@@ -540,7 +540,8 @@ class Terminal(object):
         :arg float timeout: Return after time elapsed in seconds with value
             ``(-1, -1)`` indicating that the remote end did not respond.
         :rtype: tuple
-        :returns: cursor position as tuple in form of ``(x, y)``.
+        :returns: cursor position as tuple in form of ``(x, y)``.  When a timeout is specified,
+            always ensure the return value is conditionally checked for ``(-1, -1)``.
 
         The location of the cursor is determined by emitting the ``u7``
         terminal capability, or VT100 `Query Cursor Position
@@ -549,17 +550,11 @@ class Terminal(object):
         described by capability ``u6``, or again VT100's definition of
         ``\x1b[%i%d;%dR`` when undefined.
 
-        The ``(row, col)`` return value matches the parameter order of the
-        ``move`` capability, so that the following sequence should cause the
-        cursor to not move at all::
+        The ``(col, row)`` return value matches the parameter order of the ``move_xy`` capability,
+        so that the following sequence should cause the cursor to not move at all::
 
             >>> term = Terminal()
-            >>> term.move(*term.get_location()))
-
-        .. warning:: You might first test that a terminal is capable of
-           informing you of its location, while using a timeout, before
-           later calling.  When a timeout is specified, always ensure the
-           return value is conditionally checked for ``(-1, -1)``.
+            >>> term.move_xy(*term.get_location()))
         """
         # Local lines attached by termios and remote login protocols such as
         # ssh and telnet both provide a means to determine the window
