@@ -53,6 +53,7 @@ class ParameterizingString(six.text_type):
 
     For example::
 
+        >>> from blessed import Terminal
         >>> term = Terminal()
         >>> color = ParameterizingString(term.color, term.normal, 'color')
         >>> color(9)('color #9')
@@ -96,6 +97,7 @@ class ParameterizingString(six.text_type):
             # If the first non-int (i.e. incorrect) arg was a string, suggest
             # something intelligent:
             if args and isinstance(args[0], six.string_types):
+                # TODO(jq) better error msg, here
                 raise TypeError(
                     "A native or nonexistent capability template, %r received"
                     " invalid argument %r: %s. You probably misspelled a"
@@ -182,6 +184,8 @@ class FormattingString(six.text_type):
     given (string) argument with the 2nd argument used by the class
     constructor::
 
+        >>> from blessed import Terminal
+        >>> term = Terminal()
         >>> style = FormattingString(term.bright_blue, term.normal)
         >>> print(repr(style))
         u'\x1b[94m'
@@ -216,6 +220,7 @@ class FormattingString(six.text_type):
         # >>> t.red('This is ', t.bold('extremely'), ' dangerous!')
         for idx, ucs_part in enumerate(args):
             if not isinstance(ucs_part, six.string_types):
+                # TODO(jq): better error msg, here
                 raise TypeError("Positional argument #{idx} is {is_type} "
                                 "expected any of {expected_types}: "
                                 "{ucs_part!r}".format(
@@ -240,6 +245,8 @@ class FormattingOtherString(six.text_type):
     This is used for the :meth:`~.Terminal.move_up`, ``down``, ``left``, and ``right()``
     family of functions::
 
+        >>> from blessed import Terminal
+        >>> term = Terminal()
         >>> move_right = FormattingOtherString(term.cuf1, term.cuf)
         >>> print(repr(move_right))
         u'\x1b[C'
@@ -260,6 +267,10 @@ class FormattingOtherString(six.text_type):
         new = six.text_type.__new__(cls, direct)
         new._callable = target
         return new
+
+    def __getnewargs__(self):
+        # return arguments used for the __new__ method upon unpickling.
+        return six.text_type.__new__(six.text_type, self), self._callable
 
     def __call__(self, *args):
         """Return ``text`` by ``target``."""
@@ -382,11 +393,11 @@ def resolve_capability(term, attr):
        given :attr:`~.Terminal.kind`.
     :rtype: str
     """
-    # Decode sequences as latin1, as they are always 8-bit bytes, so when
-    # b'\xff' is returned, this must be decoded to u'\xff'.
     if not term.does_styling:
         return u''
     val = curses.tigetstr(term._sugar.get(attr, attr))  # pylint: disable=protected-access
+    # Decode sequences as latin1, as they are always 8-bit bytes, so when
+    # b'\xff' is returned, this is decoded as u'\xff'.
     return u'' if val is None else val.decode('latin1')
 
 

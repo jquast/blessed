@@ -385,6 +385,42 @@ def test_basic_pickling():
     child()
 
 
+def test_advanced_pickling():
+    """Test pickle-ability of XXX"""
+    @as_subprocess
+    def child():
+        from blessed.formatters import ParameterizingString
+        t = TestTerminal(force_styling=True)
+        # basic pickle
+        pickle.loads(pickle.dumps(t.move_left)) == t.move_left
+        pickle.loads(pickle.dumps(t.move_left(3))) == t.move_left(3)
+        pickle.loads(pickle.dumps(t.move_left))(3) == t.move_left(3)
+
+        color = ParameterizingString(t.color, t.normal, 'color')
+        pickle.loads(pickle.dumps(color)) == color
+        pickle.loads(pickle.dumps(color(3))) == color(3)
+        pickle.loads(pickle.dumps(color))(3) == color(3)
+
+        # pickle through multiprocessing
+        r, w = multiprocessing.Pipe()
+        w.send(t.move_left)
+        assert r.recv() == t.move_left
+        w.send(color)
+        assert r.recv() == color
+
+        w.send(t.move_left(3))
+        assert r.recv() == t.move_left(3)
+        w.send(color(3))
+        assert r.recv() == color(3)
+
+        w.send(t.move_left)
+        assert r.recv()(3) == t.move_left(3)
+        w.send(t.color)
+        assert r.recv()(3) == t.color(3)
+
+    child()
+
+
 def test_pickled_parameterizing_string(monkeypatch):
     """Test pickle-ability of a formatters.ParameterizingString."""
     from blessed.formatters import ParameterizingString

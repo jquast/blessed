@@ -123,7 +123,7 @@ class Terminal(object):
         terminal_enquire='u9',
     )
 
-    def __init__(self, kind=None, stream=None, force_styling=False):
+    def __init__(self, kind=None, stream=None, force_styling=False, on_resize=None):
         """
         Initialize the terminal.
 
@@ -149,6 +149,25 @@ class Terminal(object):
             This comes in handy if users are trying to pipe your output through
             something like ``less -r`` or build systems which support decoding
             of terminal sequences.
+
+        :arg on_resize: A function that is given the terminal as the first
+            positional argument, which is called each time terminal is resized.
+
+            .. note::
+
+               A GUI operation of "drag resize" with a mouse may flare hundreds
+               to thousands of calls per second, so a "dirty" flag or object
+               such as :class:`threading.Event` should be used to indicate your
+               event loop to refresh when set.
+
+            .. warning::
+
+               It is not safe to print from this function!
+
+               This callback must perform no I/O and be re-entrant. This
+               means **do not redraw the screen!** with the ``on_resize``
+               callback funnction. It is not safe to print or perform
+               any I/O, such as print. See https://bugs.python.org/issue24283
         """
         # pylint: disable=global-statement,too-many-branches
         global _CUR_TERM
@@ -371,7 +390,7 @@ class Terminal(object):
         <https://invisible-island.net/ncurses/man/terminfo.5.html>`_ for a
         complete list of capabilities and their arguments.
         """
-        if not self.does_styling:
+        if not self._does_styling:
             return NullCallableString()
         # Fetch the missing 'attribute' into some kind of curses-resolved
         # capability, and cache by attaching to this Terminal class instance.
@@ -426,6 +445,24 @@ class Terminal(object):
         :rtype: int
         """
         return self._height_and_width().ws_col
+
+    @property
+    def pixel_height(self):
+        """
+        Read-only property: Height ofthe terminal (in pixels).
+
+        :rtype: int
+        """
+        return self._height_and_width().ws_ypixel
+
+    @property
+    def pixel_width(self):
+        """
+        Read-only property: Width of terminal (in pixels).
+
+        :rtype: int
+        """
+        return self._height_and_width().ws_xpixel
 
     @staticmethod
     def _winsize(fd):
@@ -844,7 +881,7 @@ class Terminal(object):
 
         Optional ``url_id`` may be specified, so that non-adjacent cells can reference a single
         target, all cells painted with the same "id" will highlight on hover, rather than any
-        individual one, as described in "Hovering and underlining the id parameter of gist
+        individual one, as described in "Hovering and underlining the id parameter" of gist
         https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda.
 
         :param str url: Hyperlink URL.

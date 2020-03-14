@@ -218,7 +218,7 @@ def get_leading_prefixes(sequences):
 
 def resolve_sequence(text, mapper, codes):
     r"""
-    Return :class:`Keystroke` instance for given sequence ``text``.
+    Return a single :class:`Keystroke` instance for given sequence ``text``.
 
     :arg str text: string of characters received from terminal input stream.
     :arg OrderedDict mapper: unicode multibyte sequences, such as ``u'\x1b[D'``
@@ -231,7 +231,7 @@ def resolve_sequence(text, mapper, codes):
     The given ``text`` may extend beyond a matching sequence, such as
     ``u\x1b[Dxxx`` returns a :class:`Keystroke` instance of attribute
     :attr:`Keystroke.sequence` valued only ``u\x1b[D``.  It is up to
-    determine that ``xxx`` remains unresolved.
+    calls to determine that ``xxx`` remains unresolved.
     """
     for sequence, code in mapper.items():
         if text.startswith(sequence):
