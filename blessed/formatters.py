@@ -97,12 +97,9 @@ class ParameterizingString(six.text_type):
             # If the first non-int (i.e. incorrect) arg was a string, suggest
             # something intelligent:
             if args and isinstance(args[0], six.string_types):
-                # TODO(jq) better error msg, here
                 raise TypeError(
-                    "A native or nonexistent capability template, %r received"
-                    " invalid argument %r: %s. You probably misspelled a"
-                    " formatting call like `bright_red'" % (
-                        self._name, args, err))
+                    "Unknown terminal capability, {!r}, or, TypeError "
+                    "for argument {!r}: {}".format(self._name, args, err))
             # Somebody passed a non-string; I don't feel confident
             # guessing what they were trying to do.
             raise
@@ -220,14 +217,13 @@ class FormattingString(six.text_type):
         # >>> t.red('This is ', t.bold('extremely'), ' dangerous!')
         for idx, ucs_part in enumerate(args):
             if not isinstance(ucs_part, six.string_types):
-                # TODO(jq): better error msg, here
-                raise TypeError("Positional argument #{idx} is {is_type} "
-                                "expected any of {expected_types}: "
-                                "{ucs_part!r}".format(
-                                    idx=idx, ucs_part=ucs_part,
-                                    is_type=type(ucs_part),
-                                    expected_types=six.string_types,
-                                ))
+                expected_types = ', '.join([
+                    _type.__name__ for _type in six.string_types])
+                raise TypeError(
+                    "TypeError for FormattingString argument "
+                    "{!r} at position {}: expected {}, got {}".format(
+                        ucs_part, idx, expected_types,
+                        type(ucs_part).__name__))
         postfix = u''
         if self and self._normal:
             postfix = self._normal
