@@ -104,7 +104,7 @@ def test_parameterizing_string_type_error(monkeypatch):
             "for arguments ('XYZ',): custom_err"
         ) or err.args[0] == (
             "Unknown terminal capability, u'cap-name', or, TypeError "
-            "for arguments (u'XYZ',): custom_err" 
+            "for arguments (u'XYZ',): custom_err"
         ))
 
     # ensure TypeError when given an integer raises its natural exception
@@ -152,7 +152,7 @@ def test_nested_formattingstring_type_error(monkeypatch):
     pstr = FormattingString(u'a-', u'n-')
     expected_msgs = ((
         "TypeError for FormattingString argument, 291, at position 1: "
-        "expected type str, got int" # py3x
+        "expected type str, got int"  # py3x
     ), ("TypeError for FormattingString argument, 291, at position 1: "
         "expected type basestring, got int"
         ))  # py2
@@ -386,6 +386,7 @@ def test_formattingstring_picklability():
 
     child()
 
+
 def test_formattingotherstring_picklability():
     """Test pickle-ability of a FormattingOtherString."""
     @as_subprocess
@@ -405,6 +406,7 @@ def test_formattingotherstring_picklability():
         assert r.recv() == t.move_left(3)
 
     child()
+
 
 def test_paramterizingstring_picklability():
     """Test pickle-ability of ParameterizingString."""
