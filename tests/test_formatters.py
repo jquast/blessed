@@ -100,7 +100,7 @@ def test_parameterizing_string_type_error(monkeypatch):
         assert False, "previous call should have raised TypeError"
     except TypeError as err:
         assert (err.args[0] == (  # py3x
-            "Unknown terminal capability, 'cap-name', or, TypeError "
+            "Unknown terminal capability, u'cap-name', or, TypeError "
             "for arguments ('XYZ',): custom_err"
         ) or err.args[0] == (
             "Unknown terminal capability, u'cap-name', or, TypeError "
