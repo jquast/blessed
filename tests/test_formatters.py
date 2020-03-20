@@ -150,15 +150,19 @@ def test_nested_formattingstring_type_error(monkeypatch):
 
     # given,
     pstr = FormattingString(u'a-', u'n-')
-    expected_msg = ("TypeError for FormattingString argument, 291, at position 1: "
-                    "expected type str, got int")
+    expected_msgs = ((
+        "TypeError for FormattingString argument, 291, at position 1: "
+        "expected type str, got int" # py3x
+    ), ("TypeError for FormattingString argument, 291, at position 1: "
+        "expected type basestring, got int"
+        ))  # py2
 
     # exercise,
     with pytest.raises(TypeError) as err:
         pstr('text', 0x123, '...')
 
     # verify,
-    assert expected_msg in str(err.value)
+    assert str(err.value) in expected_msgs
 
 
 def test_nullcallablestring(monkeypatch):
