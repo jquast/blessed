@@ -366,7 +366,7 @@ def test_resolve_attribute_recursive_compoundables(monkeypatch):
     assert pstr('text') == 'seq-6808seq-6502textseq-normal'
 
 
-def test_basic_pickling():
+def test_formattingstring_picklability():
     """Test pickle-ability of a FormattingString."""
     @as_subprocess
     def child():
@@ -374,15 +374,16 @@ def test_basic_pickling():
         # basic pickle
         pickle.loads(pickle.dumps(t.red))('orange') == t.red('orange')
         pickle.loads(pickle.dumps(t.normal)) == t.normal
-        # pickle through multiprocessing
+
+        # and, pickle through multiprocessing
         r, w = multiprocessing.Pipe()
         w.send(t.normal)
         assert r.recv() == t.normal
     child()
 
 
-def test_advanced_pickling():
-    """Test pickle-ability of XXX"""
+def test_paramterizingstring_picklability():
+    """Test pickle-ability of ParameterizingString."""
     @as_subprocess
     def child():
         from blessed.formatters import ParameterizingString
@@ -397,7 +398,7 @@ def test_advanced_pickling():
         pickle.loads(pickle.dumps(color(3))) == color(3)
         pickle.loads(pickle.dumps(color))(3) == color(3)
 
-        # pickle through multiprocessing
+        # and, pickle through multiprocessing
         r, w = multiprocessing.Pipe()
         w.send(t.move_left)
         assert r.recv() == t.move_left
