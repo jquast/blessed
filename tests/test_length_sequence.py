@@ -324,10 +324,11 @@ def test_env_winsize():
 @pytest.mark.skipif(platform.system() == 'Windows', reason="requires fcntl")
 def test_winsize(many_lines, many_columns):
     """Test height and width is appropriately queried in a pty."""
+    pixel_width, pixel_height = 1024, 768
     @as_subprocess
     def child(lines=25, cols=80):
         # set the pty's virtual window size
-        val = struct.pack('HHHH', lines, cols, 0, 0)
+        val = struct.pack('HHHH', lines, cols, pixel_width, pixel_height)
         fcntl.ioctl(sys.__stdout__.fileno(), termios.TIOCSWINSZ, val)
         term = TestTerminal()
         winsize = term._height_and_width()
@@ -335,6 +336,8 @@ def test_winsize(many_lines, many_columns):
         assert term.height == lines
         assert winsize.ws_col == cols
         assert winsize.ws_row == lines
+        assert term.pixel_width == pixel_width
+        assert term.pixel_height == pixel_height
 
     child(lines=many_lines, cols=many_columns)
 
