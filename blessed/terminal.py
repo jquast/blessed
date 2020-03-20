@@ -519,6 +519,7 @@ class Terminal(object):
         :arg int x: horizontal position, from left, *0*, to right edge of screen, *self.width - 1*.
         :arg int y: vertical position, from top, *0*, to bottom of screen, *self.height - 1*.
         :return: a context manager.
+        :rtype: Iterator
 
         Move the cursor to a certain position on entry, do any kind of I/O, and upon exit
         let you print stuff there, then return the cursor to its original position:
