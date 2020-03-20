@@ -13,6 +13,8 @@ Version History
     :meth:`~Terminal.move_right` which are strings that move the cursor one cell in the respective
     direction, are now **also** callables for moving *n* cells to the given direction, such as
     ``term.move_right(9)``.
+  * introduced: :attr:`~Terminal.pixel_width` and :attr:`~Terminal.pixel_height` for libsixel
+    support or general curiosity.
   * bugfix: prevent ``ValueError: I/O operation on closed file`` on ``sys.stdin`` in multiprocessing
     environments, where the keyboard wouldn't work, anyway.
   * bugfix: prevent error condition, ``ValueError: underlying buffer has been detached`` in rare
@@ -25,6 +27,7 @@ Version History
     :meth:`~Terminal.keypad` now flush the stream after writing their sequences.
   * bugfix: ``chr(127)``, ``\x7f`` has changed from keycode ``term.DELETE`` to the more common
     match, ``term.BACKSPACE``, :ghissue:115` by :ghuser:`jwezel`.
+  * bugfix: ensure :class:`~.FormattingOtherString` may be pickled.
   * deprecated: the curses ``move()`` capability is no longer recommended, suggest to use
     :meth:`~.Terminal.move_xy()`, which matches the return value of :meth:`~.Terminal.get_location`.
   * deprecated: ``superscript``, ``subscript``, ``shadow``, and ``dim`` are no longer "compoundable"

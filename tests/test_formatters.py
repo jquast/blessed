@@ -379,11 +379,11 @@ def test_formattingstring_picklability():
         r, w = multiprocessing.Pipe()
         w.send(t.normal)
         assert r.recv() == t.normal
+
     child()
 
-
-def test_paramterizingstring_picklability():
-    """Test pickle-ability of ParameterizingString."""
+def test_formattingotherstring_picklability():
+    """Test pickle-ability of a FormattingOtherString."""
     @as_subprocess
     def child():
         from blessed.formatters import ParameterizingString
@@ -393,6 +393,22 @@ def test_paramterizingstring_picklability():
         pickle.loads(pickle.dumps(t.move_left(3))) == t.move_left(3)
         pickle.loads(pickle.dumps(t.move_left))(3) == t.move_left(3)
 
+        # and, pickle through multiprocessing
+        r, w = multiprocessing.Pipe()
+        w.send(t.move_left)
+        assert r.recv()(3) == t.move_left(3)
+        w.send(t.move_left(3))
+        assert r.recv() == t.move_left(3)
+
+    child()
+
+def test_paramterizingstring_picklability():
+    """Test pickle-ability of ParameterizingString."""
+    @as_subprocess
+    def child():
+        from blessed.formatters import ParameterizingString
+        t = TestTerminal(force_styling=True)
+
         color = ParameterizingString(t.color, t.normal, 'color')
         pickle.loads(pickle.dumps(color)) == color
         pickle.loads(pickle.dumps(color(3))) == color(3)
@@ -400,18 +416,10 @@ def test_paramterizingstring_picklability():
 
         # and, pickle through multiprocessing
         r, w = multiprocessing.Pipe()
-        w.send(t.move_left)
-        assert r.recv() == t.move_left
         w.send(color)
         assert r.recv() == color
-
-        w.send(t.move_left(3))
-        assert r.recv() == t.move_left(3)
         w.send(color(3))
         assert r.recv() == color(3)
-
-        w.send(t.move_left)
-        assert r.recv()(3) == t.move_left(3)
         w.send(t.color)
         assert r.recv()(3) == t.color(3)
 
