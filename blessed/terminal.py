@@ -577,7 +577,7 @@ class Terminal(object):
         capability is undefined, which elicits a response from a reply string described by
         capability ``u6``, or again VT100's definition of ``\x1b[%i%d;%dR`` when undefined.
 
-        The ``(y, x)` return value matches the parameter order of the :meth:`move_xy` capability.
+        The ``(y, x)`` return value matches the parameter order of the :meth:`move_xy` capability.
         The following sequence should cause the cursor to not move at all::
 
             >>> term = Terminal()
