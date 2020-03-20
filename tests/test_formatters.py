@@ -99,13 +99,12 @@ def test_parameterizing_string_type_error(monkeypatch):
         pstr('XYZ')
         assert False, "previous call should have raised TypeError"
     except TypeError as err:
-        assert (err.args[0] == (  # py3x
+        assert err.args[0] in ((
+            "Unknown terminal capability, 'cap-name', or, TypeError "
+            "for arguments ('XYZ',): custom_err"  # py3x
+        ), (
             "Unknown terminal capability, u'cap-name', or, TypeError "
-            "for arguments ('XYZ',): custom_err"
-        ) or err.args[0] == (
-            "Unknown terminal capability, u'cap-name', or, TypeError "
-            "for arguments (u'XYZ',): custom_err"
-        ))
+            "for arguments (u'XYZ',): custom_err"))  # py2
 
     # ensure TypeError when given an integer raises its natural exception
     try:
