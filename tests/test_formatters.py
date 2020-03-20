@@ -104,7 +104,7 @@ def test_parameterizing_string_type_error(monkeypatch):
             "for arguments ('XYZ',): custom_err"  # py3x
         ), (
             "Unknown terminal capability, u'cap-name', or, TypeError "
-            "for arguments (u'XYZ',): custom_err"))  # py2
+            "for arguments ('XYZ',): custom_err"))  # py2
 
     # ensure TypeError when given an integer raises its natural exception
     try:
