@@ -123,7 +123,7 @@ class Terminal(object):
         terminal_enquire='u9',
     )
 
-    def __init__(self, kind=None, stream=None, force_styling=False, on_resize=None):
+    def __init__(self, kind=None, stream=None, force_styling=False):
         """
         Initialize the terminal.
 
@@ -149,25 +149,6 @@ class Terminal(object):
             This comes in handy if users are trying to pipe your output through
             something like ``less -r`` or build systems which support decoding
             of terminal sequences.
-
-        :arg on_resize: A function that is given the terminal as the first
-            positional argument, which is called each time terminal is resized.
-
-            .. note::
-
-               A GUI operation of "drag resize" with a mouse may flare hundreds
-               to thousands of calls per second, so a "dirty" flag or object
-               such as :class:`threading.Event` should be used to indicate your
-               event loop to refresh when set.
-
-            .. warning::
-
-               It is not safe to print from this function!
-
-               This callback must perform no I/O and be re-entrant. This
-               means **do not redraw the screen!** with the ``on_resize``
-               callback funnction. It is not safe to print or perform
-               any I/O, such as print. See https://bugs.python.org/issue24283
         """
         # pylint: disable=global-statement,too-many-branches
         global _CUR_TERM
