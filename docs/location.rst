@@ -23,18 +23,21 @@ There are four direct movement capabilities:
 And four relative capabilities:
 
 ``move_up`` or ``move_up(y)``
-  Position cursor 1 or **y** cells above the current position.
-``move_down`` or ``move_down(y)``
-  Position cursor 1 or **y** cells below the current position.
-``move_left`` or ``move_left(x)``
-  Position cursor 1 or **x** cells left of the current position.
-``move_right`` or ``move_right(x)``
-  Position cursor 1 or **x** cells right of the current position.
+  Position cursor 1 or **y** row cells above the current position.
+``move_down(y)``
+  Position cursor 1 or **y** row cells below the current position.
 
-.. note:: ``move_down``, if printed directly, is often valued as *\\n*, which additionally returns
-    the carriage to column 0, and, depending on your terminal emulator, may also destroy any
-    characters to end of line. ``move_down(1)`` is always a safe non-destructive one-notch movement
-    in the downward direction.
+  .. note:: ``move_down`` or is often valued as *\\n*, which additionally returns the carriage to
+     column 0, and, depending on your terminal emulator, may also destroy any characters to end of
+     line.
+
+    ``move_down(1)`` is always a safe non-destructive one-notch movement in the downward direction.
+
+``move_left`` or ``move_left(x)``
+  Position cursor 1 or **x** column cells left of the current position.
+``move_right`` or ``move_right(x)``
+  Position cursor 1 or **x** column cells right of the current position.
+
 
 Example
 -------
