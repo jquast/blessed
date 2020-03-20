@@ -98,8 +98,8 @@ class ParameterizingString(six.text_type):
             # something intelligent:
             if args and isinstance(args[0], six.string_types):
                 raise TypeError(
-                    "Unknown terminal capability, {!r}, or, TypeError "
-                    "for arguments {!r}: {}".format(self._name, args, err))
+                    "Unknown terminal capability, %r, or, TypeError "
+                    "for arguments %r: %s" % (self._name, args, err))
             # Somebody passed a non-string; I don't feel confident
             # guessing what they were trying to do.
             raise
@@ -221,10 +221,9 @@ class FormattingString(six.text_type):
                     _type.__name__ for _type in six.string_types])
                 raise TypeError(
                     "TypeError for FormattingString argument, "
-                    "{!r}, at position {}: expected type {}, "
-                    "got {}".format(
-                        ucs_part, idx, expected_types,
-                        type(ucs_part).__name__))
+                    "%r, at position %s: expected type %s, "
+                    "got %s" % (ucs_part, idx, expected_types,
+                                type(ucs_part).__name__))
         postfix = u''
         if self and self._normal:
             postfix = self._normal
