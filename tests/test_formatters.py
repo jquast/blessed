@@ -100,15 +100,12 @@ def test_parameterizing_string_type_error(monkeypatch):
         assert False, "previous call should have raised TypeError"
     except TypeError as err:
         assert (err.args[0] == (  # py3x
-            "A native or nonexistent capability template, "
-            "'cap-name' received invalid argument ('XYZ',): "
-            "custom_err. You probably misspelled a "
-            "formatting call like `bright_red'") or
-            err.args[0] == (
-                "A native or nonexistent capability template, "
-                "u'cap-name' received invalid argument ('XYZ',): "
-                "custom_err. You probably misspelled a "
-                "formatting call like `bright_red'"))
+            "Unknown terminal capability, 'cap-name', or, TypeError "
+            "for arguments ('XYZ',): custom_err"
+        ) or err.args[0] == (
+            "Unknown terminal capability, u'cap-name', or, TypeError "
+            "for arguments (u'XYZ',): custom_err" 
+        ))
 
     # ensure TypeError when given an integer raises its natural exception
     try:
@@ -153,13 +150,12 @@ def test_nested_formattingstring_type_error(monkeypatch):
 
     # given,
     pstr = FormattingString(u'a-', u'n-')
-    expected_msg = (
-        "Positional argument #1 is {0} expected any of "
-        .format(type(1)))
+    expected_msg = ("TypeError for FormattingString argument, 291, at position 1: "
+                    "expected type str, got int")
 
     # exercise,
     with pytest.raises(TypeError) as err:
-        pstr('text', 1, '...')
+        pstr('text', 0x123, '...')
 
     # verify,
     assert expected_msg in str(err.value)
