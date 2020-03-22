@@ -526,6 +526,7 @@ def test_padd():
         assert Sequence('xyz\b-', term).padd() == u'xy-'
         assert Sequence('xxxx\x1b[3Dzz', term).padd() == u'xzz'
         assert Sequence('\x1b[3D', term).padd() == u''  # "Trim left"
+        assert Sequence(term.red('xxxx\x1b[3Dzz'), term).padd() == term.red(u'xzz')
 
     kind = 'xterm-256color'
     if platform.system() == 'Windows':
