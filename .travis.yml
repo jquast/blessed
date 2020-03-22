@@ -38,7 +38,6 @@ matrix:
          - python -m pip install tox
       env: PATH=/c/Python38:/c/Python38/Scripts:$PATH TOXENV=py38,codecov COVERAGE_ID=travis-ci TEST_KEYBOARD=no
 
-jobs:
   allow_failures:
     - python: 2.6
     - python: 3.9-dev
