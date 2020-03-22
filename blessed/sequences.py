@@ -4,11 +4,10 @@
 import re
 import math
 import textwrap
-import functools
 
 # 3rd party
 import six
-import wcwidth
+from wcwidth import wcwidth
 
 # local
 from blessed._capabilities import CAPABILITIES_CAUSE_MOVEMENT
@@ -334,8 +333,8 @@ class Sequence(six.text_type):
             >>> from blessed import Terminal
             >>> from blessed.sequences import Sequence
             >>> term = Terminal()
-            >>> msg = term.clear + term.red(u'コンニチハ'), term
-            >>> Sequence(msg).length()
+            >>> msg = term.clear + term.red(u'コンニチハ')
+            >>> Sequence(msg, term).length()
             10
 
         .. note:: Although accounted for, strings containing sequences such
@@ -343,9 +342,7 @@ class Sequence(six.text_type):
             considered lengthy (a length of 0).
         """
         # because control characters may return -1, "clip" their length to 0.
-        clip = functools.partial(max, 0)
-        return sum(clip(wcwidth.wcwidth(w_char))
-                   for w_char in self.strip_seqs())
+        return sum(max(wcwidth(w_char), 0) for w_char in self.padd(strip=True))
 
     def strip(self, chars=None):
         """
@@ -384,13 +381,13 @@ class Sequence(six.text_type):
         :rtype: str
         :returns: Text with terminal sequences removed
         """
-        gen = iter_parse(self._term, self.padd())
-        return u''.join(text for text, cap in gen if not cap)
+        return self.padd(strip=True)
 
-    def padd(self):
+    def padd(self, strip=False):
         """
         Return non-destructive horizontal movement as destructive spacing.
 
+        :arg bool strip: Strip terminal sequences
         :rtype: str
         :returns: Text adjusted for horizontal movement
         """
@@ -405,7 +402,7 @@ class Sequence(six.text_type):
                 outp += ' ' * value
             elif value < 0:
                 outp = outp[:value]
-            else:
+            elif not strip:
                 outp += text
         return outp
 
@@ -418,7 +415,7 @@ def iter_parse(term, text):
     :class:`str` of length 1.  Otherwise, ``text`` is a full
     matching sequence of given capability.
     """
-    for match in re.finditer(term._caps_compiled_any, text):  # pylint: disable=protected-access
+    for match in term._caps_compiled_any.finditer(text):  # pylint: disable=protected-access
         name = match.lastgroup
         value = match.group(name)
         if name == 'MISMATCH':
