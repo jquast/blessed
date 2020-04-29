@@ -51,10 +51,10 @@ a unicode-derived :class:`~.Keystroke` instance.
 
 The :class:`~.Keystroke` returned by :meth:`~.Terminal.inkey` is unicode -- it may be printed,
 joined with, or compared to any other unicode strings.
-It also has these provides the special attributes:
+It also has these special attributes:
 
 - :attr:`~.Keystroke.is_sequence` (bool): Whether it is an "application" key.
-- :attr:`~.Keystroke.code` (int): the keycode, for equality testing.
+- :attr:`~.Keystroke.code` (int): The keycode, for equality testing.
 - :attr:`~.Keystroke.name` (str): a human-readable name of any "application" key.
 
 Keycodes
