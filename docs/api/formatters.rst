@@ -6,5 +6,3 @@ formatters.py
    :undoc-members:
    :private-members:
    :special-members: __call__
-.. autodata:: COLORS
-.. autodata:: COMPOUNDABLES
