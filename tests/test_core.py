@@ -372,20 +372,20 @@ def test_yield_hidden_cursor(all_terms):
 
 
 @pytest.mark.skipif(platform.system() == 'Windows', reason="windows doesn't work like this")
-def test_no_preferredencoding_fallback_ascii():
+def test_no_preferredencoding_fallback():
     """Ensure empty preferredencoding value defaults to ascii."""
     @as_subprocess
     def child():
         with mock.patch('locale.getpreferredencoding') as get_enc:
             get_enc.return_value = u''
             t = TestTerminal()
-            assert t._encoding == 'ascii'
+            assert t._encoding == 'UTF-8'
 
     child()
 
 
 @pytest.mark.skipif(platform.system() == 'Windows', reason="requires fcntl")
-def test_unknown_preferredencoding_warned_and_fallback_ascii():
+def test_unknown_preferredencoding_warned_and_fallback():
     """Ensure a locale without a codec emits a warning."""
     @as_subprocess
     def child():
@@ -393,9 +393,9 @@ def test_unknown_preferredencoding_warned_and_fallback_ascii():
             get_enc.return_value = '---unknown--encoding---'
             with pytest.warns(UserWarning, match=(
                     'LookupError: unknown encoding: ---unknown--encoding---, '
-                    'fallback to ASCII for keyboard.')):
+                    'defaulting to UTF-8 for keyboard.')):
                 t = TestTerminal()
-                assert t._encoding == 'ascii'
+                assert t._encoding == 'UTF-8'
 
     child()
 

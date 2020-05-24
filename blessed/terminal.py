@@ -329,24 +329,14 @@ class Terminal(object):
 
         if self._keyboard_fd is not None:
             # set input encoding and initialize incremental decoder
-            if platform.system() == 'Windows' and sys.version_info[0] < 3:
-                # Default for setlocale() has side effects for PY2 on Windows
-                pass
-            else:
-                locale.setlocale(locale.LC_ALL, '')
-            self._encoding = locale.getpreferredencoding() or 'ascii'
-
+            self._encoding = locale.getpreferredencoding() or 'UTF-8'
             try:
-                self._keyboard_decoder = codecs.getincrementaldecoder(
-                    self._encoding)()
-
+                self._keyboard_decoder = codecs.getincrementaldecoder(self._encoding)()
             except LookupError as err:
-                # encoding is illegal or unsupported, use 'ascii'
-                warnings.warn('LookupError: {0}, fallback to ASCII for '
-                              'keyboard.'.format(err))
-                self._encoding = 'ascii'
-                self._keyboard_decoder = codecs.getincrementaldecoder(
-                    self._encoding)()
+                # encoding is illegal or unsupported, use 'UTF-8'
+                warnings.warn('LookupError: {0}, defaulting to UTF-8 for keyboard.'.format(err))
+                self._encoding = 'UTF-8'
+                self._keyboard_decoder = codecs.getincrementaldecoder(self._encoding)()
 
     def __getattr__(self, attr):
         r"""
