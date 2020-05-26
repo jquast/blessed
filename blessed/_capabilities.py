@@ -2,11 +2,7 @@
 # std imports
 import re
 
-try:
-    from collections import OrderedDict
-except ImportError:
-    # python 2.6 requires 3rd party library (backport)
-    from ordereddict import OrderedDict  # pylint: disable=import-error
+from collections import OrderedDict
 
 __all__ = (
     'CAPABILITY_DATABASE',

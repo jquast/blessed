@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # std imports
+import io
 import os
 import sys
 import struct
@@ -7,7 +8,6 @@ import platform
 import itertools
 
 # 3rd party
-import six
 import pytest
 
 from .accessories import (  # isort:skip
@@ -303,7 +303,7 @@ def test_env_winsize():
         # set the pty's virtual window size
         os.environ['COLUMNS'] = '99'
         os.environ['LINES'] = '11'
-        term = TestTerminal(stream=six.StringIO())
+        term = TestTerminal(stream=io.StringIO())
         save_init = term._init_descriptor
         save_stdout = sys.__stdout__
         try:

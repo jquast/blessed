@@ -1,8 +1,3 @@
 wcwidth>=0.1.4
-six>=1.9.0
-# support python2.6 by using backport of 'orderedict'
-ordereddict==1.1; python_version < "2.7"
-# support python2.7 by using backport of 'functools.lru_cache'
-backports.functools-lru-cache>=1.2.1; python_version < "3.2"
 # Windows requires jinxed
 jinxed>=0.5.4; platform_system == "Windows"

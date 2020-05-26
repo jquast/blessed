@@ -42,13 +42,6 @@ except NameError:
     # pylint: disable=redefined-builtin
     InterruptedError = select.error
 
-try:
-    from collections import OrderedDict
-except ImportError:
-    # python 2.6 requires 3rd party library (backport)
-    from ordereddict import OrderedDict  # pylint: disable=import-error
-
-
 HAS_TTY = True
 if platform.system() == 'Windows':
     import jinxed as curses  # pylint: disable=import-error
@@ -74,7 +67,7 @@ else:
 _CUR_TERM = None  # See comments at end of file
 
 
-class Terminal(object):
+class Terminal:
     """
     An abstraction for color, style, positioning, and input in the terminal.
 
@@ -276,7 +269,7 @@ class Terminal(object):
     def __init__capabilities(self):
         # important that we lay these in their ordered direction, so that our
         # preferred, 'color' over 'set_a_attributes1', for example.
-        self.caps = OrderedDict()
+        self.caps = collections.OrderedDict()
 
         # some static injected patterns, esp. without named attribute access.
         for name, (attribute, pattern) in CAPABILITIES_ADDITIVES.items():

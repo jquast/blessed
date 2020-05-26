@@ -5,8 +5,6 @@ Example application for the 'blessed' Terminal library for python.
 It is also an experiment in functional programming.
 """
 
-from __future__ import division, print_function
-
 # std imports
 from random import randrange
 from functools import partial

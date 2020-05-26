@@ -6,7 +6,6 @@ import math
 import textwrap
 
 # 3rd party
-import six
 from wcwidth import wcwidth
 
 # local
@@ -15,7 +14,7 @@ from blessed._capabilities import CAPABILITIES_CAUSE_MOVEMENT
 __all__ = ('Sequence', 'SequenceTextWrapper', 'iter_parse', 'measure_length')
 
 
-class Termcap(object):
+class Termcap:
     """Terminal capability of given variable name and pattern."""
 
     def __init__(self, name, pattern, attribute):
@@ -249,7 +248,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
 SequenceTextWrapper.__doc__ = textwrap.TextWrapper.__doc__
 
 
-class Sequence(six.text_type):
+class Sequence(str):
     """
     A "sequence-aware" version of the base :class:`str` class.
 
@@ -266,7 +265,7 @@ class Sequence(six.text_type):
         :arg str sequence_text: A string that may contain sequences.
         :arg blessed.Terminal term: :class:`~.Terminal` instance.
         """
-        new = six.text_type.__new__(cls, sequence_text)
+        new = str.__new__(cls, sequence_text)
         new._term = term
         return new
 

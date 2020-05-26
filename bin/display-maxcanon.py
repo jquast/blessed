@@ -24,7 +24,6 @@ system definitions are misleading on some operating systems.
 """
 # pylint: disable=invalid-name
 #         Invalid module name "display-sighandlers"
-from __future__ import print_function
 
 # std imports
 import os

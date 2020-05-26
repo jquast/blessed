@@ -32,7 +32,6 @@ by the following diagram:
 
 # pylint: disable=invalid-name
 #         Invalid module name "detect-multibyte"
-from __future__ import print_function
 
 # std imports
 import sys

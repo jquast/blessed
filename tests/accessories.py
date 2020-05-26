@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 """Accessories for automated py.test runner."""
-# standard imports
-from __future__ import print_function, with_statement
 
 # std imports
 import os
@@ -14,7 +12,6 @@ import contextlib
 import subprocess
 
 # 3rd party
-import six
 import pytest
 
 # local
@@ -130,7 +127,7 @@ class as_subprocess(object):
                   .format(pid_testrunner, os.getpid()), file=sys.stderr)
             os._exit(1)
 
-        exc_output = six.text_type()
+        exc_output = str()
         decoder = codecs.getincrementaldecoder(self.encoding)()
         while True:
             try:
@@ -171,7 +168,7 @@ def read_until_semaphore(fd, semaphore=RECV_SEMAPHORE,
     # process will read xyz\\r\\n -- this is how pseudo terminals
     # behave; a virtual terminal requires both carriage return and
     # line feed, it is only for convenience that \\n does both.
-    outp = six.text_type()
+    outp = str()
     decoder = codecs.getincrementaldecoder(encoding)()
     semaphore = semaphore.decode('ascii')
     while not outp.startswith(semaphore):
@@ -195,7 +192,7 @@ def read_until_eof(fd, encoding='utf8'):
     Return decoded string.
     """
     decoder = codecs.getincrementaldecoder(encoding)()
-    outp = six.text_type()
+    outp = str()
     while True:
         try:
             _exc = os.read(fd, 100)

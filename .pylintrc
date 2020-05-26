@@ -14,9 +14,9 @@ unsafe-load-any-extension = yes
 disable=
     I,
     fixme,
+    no-member,
     c-extension-no-member,
-    ungrouped-imports,
-    useless-object-inheritance  # Python 2
+    ungrouped-imports
 
 [FORMAT]
 max-line-length: 100

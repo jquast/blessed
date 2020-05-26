@@ -5,7 +5,6 @@ A simple "game": hit all application keys to win.
 Display all known key capabilities that may match the terminal. As each key is pressed on input, it
 is lit up and points are scored.
 """
-from __future__ import division, print_function
 
 # std imports
 import sys

@@ -2,7 +2,6 @@
 """Display known information about our terminal."""
 # pylint: disable=invalid-name
 #         Invalid module name "display-terminalinfo"
-from __future__ import print_function
 
 # std imports
 import os

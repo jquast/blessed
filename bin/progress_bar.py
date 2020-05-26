@@ -7,7 +7,6 @@ separate move_x() and move_yx() capabilities, made mainly to test the `hpa' comp
 'screen' terminal type which fails to provide one, but blessed recognizes that it actually does, and
 provides a proxy.
 """
-from __future__ import print_function
 
 # std imports
 import sys

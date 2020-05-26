@@ -19,7 +19,6 @@ any serious editor would make liberal use of special modes.
 ``Ctrl - S``
   save
 """
-from __future__ import division, print_function
 
 # std imports
 import functools
