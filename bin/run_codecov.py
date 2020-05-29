@@ -6,7 +6,7 @@ import sys
 import codecov
 import tenacity
 
-tenacity.retry(wait=tenacity.wait_random(min=1, max=5),
+@tenacity.retry(wait=tenacity.wait_random(min=1, max=5),
                stop=tenacity.stop_after_delay(60))
 def main():
     codecov.main(sys.argv[1:])
