@@ -9,7 +9,7 @@ import tenacity
 tenacity.retry(wait=tenacity.wait_random(min=1, max=5),
                stop=tenacity.stop_after_delay(60))
 def main():
-    codecov.main(*args)
+    codecov.main(sys.argv[1:])
 
 
 if __name__ == '__main__':
