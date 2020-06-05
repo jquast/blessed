@@ -45,7 +45,6 @@ COLORS = _make_colors()
 #: Attributes that may be compounded with colors, by underscore, such as
 #: 'reverse_indigo'.
 COMPOUNDABLES = set('bold underline reverse blink italic standout'.split())
-FORMATTERS = COLORS | COMPOUNDABLES
 
 
 class ParameterizingString(six.text_type):
@@ -465,7 +464,7 @@ def resolve_compound_colors(term, color):
     :rtype: :class:`NullCallableString` or :class:`FormattingString`
     """
     formatters = split_compound(color)
-    if all(fmt in FORMATTERS for fmt in formatters):
+    if all((fmt in COLORS or fmt in COMPOUNDABLES) for fmt in formatters):
         resolution = (resolve_attribute(term, fmt) for fmt in formatters)
         return FormattingString(u''.join(resolution), term.normal)
 
