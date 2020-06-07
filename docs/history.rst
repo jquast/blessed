@@ -1,8 +1,5 @@
 Version History
 ===============
-
-
-
 1.17
   * introduced: :ref:`hyperlinks`, method :meth:`~Terminal.link`, :ghissue:`116`.
   * introduced: 24-bit color support, detected by ``term.number_of_colors == 1 << 24``, and 24-bit
