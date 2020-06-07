@@ -27,10 +27,12 @@ from .keyboard import (_time_left,
 from .sequences import Termcap, Sequence, SequenceTextWrapper
 from .colorspace import RGB_256TABLE
 from .formatters import (COLORS,
+                         COMPOUNDABLES,
                          FormattingString,
                          NullCallableString,
                          ParameterizingString,
                          FormattingOtherString,
+                         split_compound,
                          resolve_attribute,
                          resolve_capability)
 from ._capabilities import CAPABILITY_DATABASE, CAPABILITIES_ADDITIVES, CAPABILITIES_RAW_MIXIN
@@ -823,6 +825,26 @@ class Terminal(object):
 
         color_idx = self.rgb_downconvert(red, green, blue)
         return FormattingString(self._background_color(color_idx), self.normal)
+
+    def formatter(self, value):
+        """
+        Provides callable formatting string to set color and other text formatting options.
+
+        :arg str value: Sugary, ordinary, or compound formatted terminal capability,
+            such as "red_on_white", "normal", "red", or "bold_on_black".
+        :rtype: :class:`FormattingString` or :class:`NullCallableString`
+        :returns: Callable string that sets color and other text formatting options
+
+        Calling ``term.formatter('bold_on_red')`` is equivalent to ``term.bold_on_red``, but a
+        string that is not a valid text formatter will return a :class:`NullCallableString`.
+        This is intended to allow validation of text formatters without the possibility of
+        inadvertently returning another terminal capability.
+        """
+        formatters = split_compound(value)
+        if all((fmt in COLORS or fmt in COMPOUNDABLES) for fmt in formatters):
+            return getattr(self, value)
+
+        return NullCallableString()
 
     def rgb_downconvert(self, red, green, blue):
         """

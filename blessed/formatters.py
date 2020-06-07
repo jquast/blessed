@@ -450,27 +450,6 @@ def resolve_color(term, color):
     return FormattingString(fmt_attr.format(*rgb), term.normal)
 
 
-def resolve_compound_colors(term, color):
-    """
-    Resolve a compound color such as `bold_on_red`.
-
-    :arg Terminal term: :class:`~.Terminal` instance.
-    :arg str color: any string found in set :const:`COLORS` or a
-        compound string such as "red_on_white" or "bold_on_black".
-    :returns: a string class instance which emits the terminal sequence for the given color,
-        and may be used as a callable to wrap the given string with such sequence.
-    :returns: :class:`NullCallableString` when :attr:`~.Terminal.number_of_colors` is 0
-        or color is invalid, otherwise :class:`FormattingString`.
-    :rtype: :class:`NullCallableString` or :class:`FormattingString`
-    """
-    formatters = split_compound(color)
-    if all((fmt in COLORS or fmt in COMPOUNDABLES) for fmt in formatters):
-        resolution = (resolve_attribute(term, fmt) for fmt in formatters)
-        return FormattingString(u''.join(resolution), term.normal)
-
-    return NullCallableString()
-
-
 def resolve_attribute(term, attr):
     """
     Resolve a terminal attribute name into a capability class.
@@ -478,7 +457,7 @@ def resolve_attribute(term, attr):
     :arg Terminal term: :class:`~.Terminal` instance.
     :arg str attr: Sugary, ordinary, or compound formatted terminal
         capability, such as "red_on_white", "normal", "red", or
-        "bold_on_black", respectively.
+        "bold_on_black".
     :returns: a string class instance which emits the terminal sequence
         for the given terminal capability, or may be used as a callable to
         wrap the given string with such sequence.
@@ -495,10 +474,13 @@ def resolve_attribute(term, attr):
         sequence = resolve_capability(term, attr)
         return FormattingString(sequence, term.normal)
 
-    # A compound color such as bold_on_red
-    resolved_color = resolve_compound_colors(term, attr)
-    if resolved_color:
-        return resolved_color
+    # Given `bold_on_red', resolve to ('bold', 'on_red'), RECURSIVE
+    # call for each compounding section, joined and returned as
+    # a completed completed FormattingString.
+    formatters = split_compound(attr)
+    if all((fmt in COLORS or fmt in COMPOUNDABLES) for fmt in formatters):
+        resolution = (resolve_attribute(term, fmt) for fmt in formatters)
+        return FormattingString(u''.join(resolution), term.normal)
 
     # otherwise, this is our end-game: given a sequence such as 'csr'
     # (change scrolling region), return a ParameterizingString instance,

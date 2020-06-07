@@ -10,6 +10,7 @@ import pytest
 # local
 from blessed.color import COLOR_DISTANCE_ALGORITHMS
 from blessed.colorspace import RGBColor
+from blessed.formatters import FormattingString, NullCallableString
 # local
 from .accessories import TestTerminal, as_subprocess
 
@@ -115,3 +116,40 @@ def test_RGBColor():
     """Ensure string is hex color representation"""
     color = RGBColor(0x5a, 0x05, 0xcb)
     assert str(color) == '#5a05cb'
+
+
+def test_formatter():
+    """Ensure return values match terminal attributes"""
+    @as_subprocess
+    def child():
+        t = TestTerminal(force_styling=True)
+        t.number_of_colors = 1 << 24
+        bold_on_seagreen = t.formatter('bold_on_seagreen')
+        assert isinstance(bold_on_seagreen, FormattingString)
+        assert bold_on_seagreen == t.bold_on_seagreen
+
+        t.number_of_colors = 0
+        bold_on_seagreen = t.formatter('bold_on_seagreen')
+        assert isinstance(bold_on_seagreen, FormattingString)
+        assert bold_on_seagreen == t.bold_on_seagreen
+
+        bold = t.formatter('bold')
+        assert isinstance(bold, FormattingString)
+        assert bold == t.bold
+
+        t = TestTerminal()
+        t._does_styling = False
+        t.number_of_colors = 0
+        bold_on_seagreen = t.formatter('bold_on_seagreen')
+        assert isinstance(bold_on_seagreen, NullCallableString)
+        assert bold_on_seagreen == t.bold_on_seagreen
+    child()
+
+
+def test_formatter_invalid():
+    """Ensure NullCallableString for invalid formatters"""
+    @as_subprocess
+    def child():
+        t = TestTerminal(force_styling=True)
+        assert isinstance(t.formatter('csr'), NullCallableString)
+    child()
