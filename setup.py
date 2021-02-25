@@ -81,6 +81,7 @@ setuptools.setup(
         'Topic :: Software Development :: Libraries',
         'Topic :: Software Development :: User Interfaces',
         'Topic :: Terminals'
+        'Typing :: Typed',
     ],
     keywords=['terminal', 'sequences', 'tty', 'curses', 'ncurses',
               'formatting', 'style', 'color', 'console', 'keyboard',
