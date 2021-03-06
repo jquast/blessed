@@ -1,5 +1,7 @@
 # std imports
 import os
+import platform
+import subprocess
 
 # 3rd party
 import pytest
@@ -8,6 +10,23 @@ all_terms_params = 'xterm screen ansi vt220 rxvt cons25 linux'.split()
 many_lines_params = [40, 80]
 # we must test a '1' column for conditional in _handle_long_word
 many_columns_params = [1, 10]
+
+if os.environ.get('TEST_FULL'):
+    try:
+        all_terms_params = [
+            # use all values of the first column of data in output of 'toe -a'
+            _term.split(None, 1)[0] for _term in
+            subprocess.Popen(('toe', '-a'),
+                             stdout=subprocess.PIPE,
+                             close_fds=True)
+            .communicate()[0].splitlines()]
+    except OSError:
+        pass
+elif platform.system() == 'Windows':
+    all_terms_params = ['vtwin10', ]
+elif os.environ.get('TEST_QUICK'):
+    all_terms_params = 'xterm screen ansi linux'.split()
+
 
 if os.environ.get('TEST_QUICK'):
     many_lines_params = [80, ]

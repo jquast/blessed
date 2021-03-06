@@ -40,23 +40,6 @@ TestTerminal = functools.partial(Terminal, kind=test_kind)  # type: Callable[...
 SEND_SEMAPHORE = SEMAPHORE = b'SEMAPHORE\n'
 RECV_SEMAPHORE = b'SEMAPHORE\r\n'
 
-if os.environ.get('TEST_FULL'):
-    try:
-        all_terms_params = [
-            # use all values of the first column of data in output of 'toe -a'
-            _term.split(None, 1)[0] for _term in
-            subprocess.Popen(('toe', '-a'),
-                             stdout=subprocess.PIPE,
-                             close_fds=True)
-            .communicate()[0].splitlines()]
-    except OSError:
-        pass
-elif platform.system() == 'Windows':
-    all_terms_params = ['vtwin10', ]
-elif os.environ.get('TEST_QUICK'):
-    all_terms_params = 'xterm screen ansi linux'.split()
-
-
 def init_subproc_coverage(run_note):
     try:
         import coverage
