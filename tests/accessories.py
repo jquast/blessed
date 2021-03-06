@@ -10,11 +10,9 @@ import platform
 import functools
 import traceback
 import contextlib
-import subprocess
 
 # 3rd party
 import six
-import pytest
 
 # local
 from blessed import Terminal
@@ -39,6 +37,7 @@ if platform.system() == 'Windows':
 TestTerminal = functools.partial(Terminal, kind=test_kind)  # type: Callable[..., Terminal]
 SEND_SEMAPHORE = SEMAPHORE = b'SEMAPHORE\n'
 RECV_SEMAPHORE = b'SEMAPHORE\r\n'
+
 
 def init_subproc_coverage(run_note):
     try:
