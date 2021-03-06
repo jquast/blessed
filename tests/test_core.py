@@ -253,29 +253,6 @@ def test_setupterm_invalid_has_no_styling():
     child()
 
 
-def test_missing_ordereddict_uses_module(monkeypatch):
-    """ordereddict module is imported when without collections.OrderedDict."""
-    import blessed.keyboard
-
-    if hasattr(collections, 'OrderedDict'):
-        monkeypatch.delattr('collections.OrderedDict')
-
-    try:
-        reload_module(blessed.keyboard)
-    except ImportError as err:
-        assert err.args[0] in ("No module named ordereddict",  # py2
-                               "No module named 'ordereddict'")  # py3
-        sys.modules['ordereddict'] = mock.Mock()
-        sys.modules['ordereddict'].OrderedDict = -1
-        reload_module(blessed.keyboard)
-        assert blessed.keyboard.OrderedDict == -1
-        del sys.modules['ordereddict']
-        monkeypatch.undo()
-        reload_module(blessed.keyboard)
-    else:
-        assert platform.python_version_tuple() < ('2', '7')  # reached by py2.6
-
-
 def test_python3_2_raises_exception(monkeypatch):
     """Test python version 3.0 through 3.2 raises an exception."""
     import blessed

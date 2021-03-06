@@ -4,9 +4,6 @@ matrix:
   include:
     - python: 3.8
       env: TOXENV=about,pydocstyle,pylint,flake8,flake8_tests,mypy,sphinx COVERAGE_ID=travis-ci
-    - python: 2.6
-      env: TOXENV=py26,codecov TEST_QUICK=1 COVERAGE_ID=travis-ci
-      dist: trusty
     - python: 2.7
       env: TOXENV=py27,codecov COVERAGE_ID=travis-ci TEST_KEYBOARD=yes TEST_RAW=yes
     - python: 3.4
@@ -41,7 +38,6 @@ matrix:
       env: PATH=/c/Python38:/c/Python38/Scripts:$PATH TOXENV=py38,codecov COVERAGE_ID=travis-ci TEST_KEYBOARD=no
 
   allow_failures:
-    - python: 2.6
     - python: 3.9-dev
     - python: 3.10-dev
 
