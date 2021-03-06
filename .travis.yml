@@ -16,7 +16,7 @@ matrix:
       env: TOXENV=py37,codecov TEST_QUICK=1 COVERAGE_ID=travis-ci
     - python: 3.8
       env: TOXENV=py38,codecov COVERAGE_ID=travis-ci TEST_RAW=yes
-    - python: 3.9-dev
+    - python: 3.9
       env: TOXENV=py39,codecov TEST_QUICK=1 COVERAGE_ID=travis-ci TOXPYTHON=3.9
     - python: 3.10-dev
       env: TOXENV=py310,codecov TEST_QUICK=1 COVERAGE_ID=travis-ci TOXPYTHON=3.10
