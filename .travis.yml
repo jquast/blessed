@@ -38,7 +38,6 @@ matrix:
       env: PATH=/c/Python38:/c/Python38/Scripts:$PATH TOXENV=py38,codecov COVERAGE_ID=travis-ci TEST_KEYBOARD=no
 
   allow_failures:
-    - python: 3.9-dev
     - python: 3.10-dev
 
 install:
