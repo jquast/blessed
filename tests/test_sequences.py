@@ -9,7 +9,7 @@ import six
 import pytest
 
 # local
-from .accessories import TestTerminal, all_terms, unicode_cap, unicode_parm, as_subprocess
+from .accessories import TestTerminal, unicode_cap, unicode_parm, as_subprocess
 
 
 @pytest.mark.skipif(platform.system() == 'Windows', reason="requires real tty")
@@ -543,9 +543,57 @@ def test_split_seqs(all_terms):
             result = list(term.split_seqs(given_text))
             assert result == expected
 
+    child(all_terms)
+
+
+def test_split_seqs_maxsplit1(all_terms):
+    """Test Terminal.split_seqs with maxsplit=1."""
+    @as_subprocess
+    def child(kind):
+        from blessed import Terminal
+        term = Terminal(kind)
+
         if term.bold:
             given_text = term.bold + 'bbq'
-            expected = [term.bold, 'b', 'b', 'q']
+            expected = [term.bold, 'bbq']
+            result = list(term.split_seqs(given_text, 1))
+            assert result == expected
+
+    child(all_terms)
+
+
+def test_split_seqs_term_right(all_terms):
+    """Test Terminal.split_seqs with parameterized sequence"""
+    @as_subprocess
+    def child(kind):
+        from blessed import Terminal
+        term = Terminal(kind)
+
+        if term.move_up:
+            given_text = 'XY' + term.move_right + 'VK'
+            expected = ['X', 'Y', term.move_right, 'V', 'K']
+            result = list(term.split_seqs(given_text))
+            assert result == expected
+
+    child(all_terms)
+
+
+def test_split_seqs_maxsplit3_and_term_right(all_terms):
+    """Test Terminal.split_seqs with parameterized sequence."""
+    @as_subprocess
+    def child(kind):
+        from blessed import Terminal
+        term = Terminal(kind)
+
+        if term.move_right(32):
+            given_text = 'PQ' + term.move_right(32) + 'RS'
+            expected = ['P', 'Q', term.move_right(32), 'RS']
+            result = list(term.split_seqs(given_text, 3))
+            assert result == expected
+
+        if term.move_up(45):
+            given_text = 'XY' + term.move_up(45) + 'VK'
+            expected = ['X', 'Y', term.move_up(45), 'V', 'K']
             result = list(term.split_seqs(given_text))
             assert result == expected
 

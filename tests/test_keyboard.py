@@ -11,7 +11,7 @@ import mock
 import pytest
 
 # local
-from .accessories import TestTerminal, all_terms, as_subprocess
+from .accessories import TestTerminal, as_subprocess
 
 if platform.system() != 'Windows':
     import curses

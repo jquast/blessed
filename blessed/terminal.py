@@ -1106,20 +1106,36 @@ class Terminal(object):
         """
         return Sequence(text, self).strip_seqs()
 
-    def split_seqs(self, text, **kwds):
+    def split_seqs(self, text, maxsplit=0, flags=0):
         r"""
         Return ``text`` split by individual character elements and sequences.
 
         :arg str text: String containing sequences
-        :arg kwds: remaining keyword arguments for :func:`re.split`.
+        :arg int maxsplit: When maxsplit is nonzero, at most maxsplit splits
+            occur, and the remainder of the string is returned as the final element
+            of the list (same meaning is argument for :func:`re.split`).
+        :arg int flags: regex flags, combined integer flag attributes documented
+            beginning with flag attribute :attr:`re.A` (same meaning is argument
+            for :func:`re.split`).
         :rtype: list[str]
         :returns: List of sequences and individual characters
 
         >>> term.split_seqs(term.underline(u'xyz'))
         ['\x1b[4m', 'x', 'y', 'z', '\x1b(B', '\x1b[m']
+
+        >>> term.split_seqs(term.underline(u'xyz'), 1)
+        ['\x1b[4m', r'xyz\x1b(B\x1b[m']
         """
         pattern = self._caps_unnamed_any
-        return list(filter(None, re.split(pattern, text, **kwds)))
+        result = []
+        for idx, match in enumerate(re.finditer(pattern, text, flags)):
+            result.append(match.group())
+            if maxsplit and idx == maxsplit:
+                remaining = text[match.end():]
+                if remaining:
+                    result[-1] += remaining
+                break
+        return result
 
     def wrap(self, text, width=None, **kwargs):
         """

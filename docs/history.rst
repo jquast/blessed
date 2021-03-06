@@ -1,6 +1,8 @@
 Version History
 ===============
 1.18
+  * bugfix: :meth:`~Terminal.split_seqs` for some sequences
+    like ``term.move_left(3)``, :ghissue:`197`.
   * introduced: type annotations, :ghissue:`192` by :ghuser:`dlax`.
   * bugfix: do not fail when ``sys.stdin`` is unset, :ghissue:`195` by
     :ghuser:`Olen`

@@ -10,8 +10,8 @@ import itertools
 import six
 import pytest
 
-from .accessories import (  # isort:skip
-    TestTerminal, as_subprocess, all_terms, many_lines, many_columns)
+# local
+from .accessories import TestTerminal, as_subprocess
 
 if platform.system() != 'Windows':
     import fcntl

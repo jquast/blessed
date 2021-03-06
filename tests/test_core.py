@@ -18,7 +18,7 @@ import pytest
 from six.moves import reload_module
 
 # local
-from .accessories import TestTerminal, all_terms, unicode_cap, as_subprocess
+from .accessories import TestTerminal, unicode_cap, as_subprocess
 
 
 def test_export_only_Terminal():

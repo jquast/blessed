@@ -6,7 +6,7 @@ import textwrap
 import pytest
 
 # local
-from .accessories import TestTerminal, many_columns, as_subprocess
+from .accessories import TestTerminal, as_subprocess
 
 TEXTWRAP_KEYWORD_COMBINATIONS = [
     dict(break_long_words=False,
