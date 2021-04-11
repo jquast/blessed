@@ -3,7 +3,6 @@
 import re
 from collections import OrderedDict
 
-
 __all__ = (
     'CAPABILITY_DATABASE',
     'CAPABILITIES_RAW_MIXIN',

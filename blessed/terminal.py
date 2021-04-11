@@ -47,8 +47,11 @@ except NameError:
 
 HAS_TTY = True
 if platform.system() == 'Windows':
+    IS_WINDOWS = True
     import jinxed as curses  # pylint: disable=import-error
+    from jinxed.win32 import get_console_input_encoding  # pylint: disable=import-error
 else:
+    IS_WINDOWS = False
     import curses
 
     try:
@@ -161,7 +164,7 @@ class Terminal(object):
         self._is_a_tty = False
         self.__init__streams()
 
-        if platform.system() == 'Windows' and self._init_descriptor is not None:
+        if IS_WINDOWS and self._init_descriptor is not None:
             self._kind = kind or curses.get_term(self._init_descriptor)
         else:
             self._kind = kind or os.environ.get('TERM', 'dumb') or 'dumb'
@@ -325,7 +328,13 @@ class Terminal(object):
 
         if self._keyboard_fd is not None:
             # set input encoding and initialize incremental decoder
-            self._encoding = locale.getpreferredencoding() or 'UTF-8'
+
+            if IS_WINDOWS:
+                self._encoding = get_console_input_encoding() \
+                    or locale.getpreferredencoding() or 'UTF-8'
+            else:
+                self._encoding = locale.getpreferredencoding() or 'UTF-8'
+
             try:
                 self._keyboard_decoder = codecs.getincrementaldecoder(self._encoding)()
             except LookupError as err:
