@@ -69,6 +69,7 @@ class Terminal(_Terminal):
             if timeout is not None and end < time.time():
                 break
 
+            time.sleep(0.01)
         return False
 
     @staticmethod
