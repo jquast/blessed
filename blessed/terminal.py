@@ -1363,6 +1363,8 @@ class Terminal(object):
 
         Generally, this should be used inside the :meth:`raw` context manager.
 
+        On windows, a delay of 0.01 seconds is applied between detection of key presses.
+
         :arg float timeout: Number of seconds to wait for a keystroke before
             returning.  When ``None`` (default), this method may block
             indefinitely.

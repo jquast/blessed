@@ -69,6 +69,7 @@ class Terminal(_Terminal):
             if timeout is not None and end < time.time():
                 break
 
+            # sleep for a bit to prevent the busy waiting consuming all CPU time
             time.sleep(0.01)
         return False
 
