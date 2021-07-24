@@ -1,0 +1,116 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  release:
+  schedule:
+    # Every Thursday at 1 AM
+    - cron: '0 1 * * 4'
+
+jobs:
+
+  Tests-required:
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+
+        include:
+          - python-version: 3.9
+            os: ubuntu-latest
+            toxenv: about,pydocstyle,pylint,flake8,flake8_tests,mypy,sphinx
+
+          - python-version: 3.9
+            os:  ubuntu-latest
+            toxenv: py39,codecov
+            test_keyboard: 'yes'
+            test_raw: 'yes'
+
+          - python-version: 3.9
+            os: windows-latest
+            toxenv: py39,codecov
+
+          - python-version: 3.8
+            os:  ubuntu-latest
+            toxenv: py38,codecov
+            test_quick: 1
+
+          - python-version: 3.7
+            os:  ubuntu-latest
+            toxenv: py37,codecov
+            test_quick: 1
+
+          - python-version: 3.6
+            os:  ubuntu-latest
+            toxenv: py36,codecov
+            test_quick: 1
+
+          - python-version: 3.5
+            os:  ubuntu-latest
+            toxenv: py35,codecov
+            test_quick: 1
+
+          - python-version: 2.7
+            os:  ubuntu-latest
+            toxenv: py27,codecov
+            test_keyboard: 'yes'
+            test_raw: 'yes'
+
+          - python-version: 2.7
+            os: windows-latest
+            toxenv: py27,codecov
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install tox
+        run: pip install tox
+
+      - name: Run tox
+        env:
+          TOXENV: ${{ matrix.toxenv }}
+          TEST_QUICK: ${{ matrix.test_quick }}
+          TEST_KEYBOARD: ${{ matrix.test_keyboard }}
+          TEST_RAW: ${{ matrix.test_raw }}
+
+        run: tox
+
+
+  Tests-optional:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+
+        include:
+          - python-version: '3.10-dev'
+            toxenv: py310,codecov
+            test_quick: 1
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install tox
+        run: pip install tox
+
+      - name: Run tox
+        env:
+          TOXENV: ${{ matrix.toxenv }}
+          TEST_QUICK: ${{ matrix.test_quick }}
+          TEST_KEYBOARD: ${{ matrix.test_keyboard }}
+          TEST_RAW: ${{ matrix.test_raw }}
+
+        run: tox
