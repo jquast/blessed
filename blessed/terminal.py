@@ -37,6 +37,8 @@ from .formatters import (COLORS,
                          resolve_capability)
 from ._capabilities import CAPABILITY_DATABASE, CAPABILITIES_ADDITIVES, CAPABILITIES_RAW_MIXIN
 
+# isort: off
+
 try:
     InterruptedError
 except NameError:
@@ -55,8 +57,8 @@ else:
     import curses
 
     try:
-        import termios
         import fcntl
+        import termios
         import tty
     except ImportError:
         _TTY_METHODS = ('setraw', 'cbreak', 'kbhit', 'height', 'width')

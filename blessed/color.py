@@ -12,6 +12,7 @@ References,
 # std imports
 from math import cos, exp, sin, sqrt, atan2
 
+# isort: off
 try:
     from functools import lru_cache
 except ImportError:

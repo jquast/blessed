@@ -7,6 +7,7 @@ http://pypi.python.org/pypi/blessed
 import sys as _sys
 import platform as _platform
 
+# isort: off
 if _platform.system() == 'Windows':
     from blessed.win_terminal import Terminal
 else:

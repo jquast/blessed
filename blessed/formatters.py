@@ -8,6 +8,7 @@ import six
 # local
 from blessed.colorspace import CGA_COLORS, X11_COLORNAMES_TO_RGB
 
+# isort: off
 # curses
 if platform.system() == 'Windows':
     import jinxed as curses   # pylint: disable=import-error

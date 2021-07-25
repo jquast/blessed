@@ -9,6 +9,7 @@ from collections import OrderedDict
 # 3rd party
 import six
 
+# isort: off
 # curses
 if platform.system() == 'Windows':
     # pylint: disable=import-error
