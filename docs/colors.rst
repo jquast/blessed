@@ -113,9 +113,9 @@ intensity:
 .. warning::
 
     Terminal emulators use different values for any of these 16 colors, the most common of these are
-    displayed at https://en.wikipedia.org/wiki/ANSI_escape_code#3/4_bit. Users can customize these
-    16 colors as a common "theme", so that one CLI application appears of the same color theme as
-    the next.
+    displayed at https://en.wikipedia.org/wiki/ANSI_escape_code#3-bit_and_4-bit. Users can customize
+    these 16 colors as a common "theme", so that one CLI application appears of the same color theme
+    as the next.
 
     When exact color values are needed, `24-bit Colors`_ should be preferred, by their name or RGB
     value.

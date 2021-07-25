@@ -9,7 +9,7 @@ References,
 - https://en.wikipedia.org/wiki/ANSI_escape_code#Colors
 - https://gist.github.com/XVilka/8346728
 - https://devblogs.microsoft.com/commandline/24-bit-color-in-the-windows-console/
-- http://jdebp.eu/Softwares/nosh/guide/TerminalCapabilities.html
+- http://jdebp.uk/Softwares/nosh/guide/TerminalCapabilities.html
 """
 # std imports
 import collections

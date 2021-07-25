@@ -282,3 +282,6 @@ intersphinx_mapping = {'https://docs.python.org/3/': None}
 # Both the class’ and the __init__ method’s docstring are concatenated and
 # inserted.
 autoclass_content = "both"
+
+# Retry linkchecker
+linkcheck_retries = 2

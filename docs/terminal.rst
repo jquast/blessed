@@ -39,7 +39,7 @@ And thanks to `f-strings`_ since python 3.6, it's very easy to mix attributes an
               f"Bright yellow is actually yellow!{term.normal}")
 
 .. _f-strings: https://docs.python.org/3/reference/lexical_analysis.html#f-strings
-.. _sequences: https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_sequences
+.. _sequences: https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_(Control_Sequence_Introducer)_sequences
 
 Capabilities
 ------------

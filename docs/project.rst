@@ -35,12 +35,10 @@ Install and run tox::
     tox
 
 Py.test is used as the test runner, and with the tox target supporting positional arguments, you may
-for example use `looponfailing
-<https://docs.pytest.org/en/3.0.1/xdist.html#running-tests-in-looponfailing-mode>`_ with python 3.7,
-stopping at the first failing test case, and looping (retrying) after a filesystem save is
-detected::
+for example use `--looponfail`, stopping at the first failing test case, and looping (retrying)
+after a filesystem save is detected::
 
-    tox -epy37 -- -fx
+    tox -e py39 -- --looponfail --exitfirst
 
 The test runner (``tox``) ensures all code and documentation complies with standard python style
 guides, pep8 and pep257, as well as various static analysis tools.
@@ -159,6 +157,6 @@ When people say 'ANSI', they are discussing:
 .. _`stackoverflow`: https://stackoverflow.com/
 .. _code page: https://en.wikipedia.org/wiki/Code_page
 .. _IBM CP437: https://en.wikipedia.org/wiki/Code_page_437
-.. _Control-Sequence-Inducer: https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Controls-beginning-with-ESC
+.. _Control-Sequence-Inducer: https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Controls-beginning-with-ESC
 .. _ANSI.SYS: http://www.kegel.com/nansi/
 .. _ECMA-48: http://www.ecma-international.org/publications/standards/Ecma-048.htm
