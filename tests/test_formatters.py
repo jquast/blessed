@@ -6,11 +6,15 @@ import platform
 import multiprocessing
 
 # 3rd party
-import mock
 import pytest
 
 # local
 from .accessories import TestTerminal, as_subprocess
+
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 if platform.system() != 'Windows':
     import curses

@@ -13,12 +13,16 @@ import collections
 
 # 3rd party
 import six
-import mock
 import pytest
 from six.moves import reload_module
 
 # local
 from .accessories import TestTerminal, unicode_cap, as_subprocess
+
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 
 def test_export_only_Terminal():

@@ -9,7 +9,6 @@ import platform
 
 # 3rd party
 import six
-import mock
 import pytest
 
 # local
@@ -22,6 +21,11 @@ from .accessories import (SEMAPHORE,
                           read_until_eof,
                           read_until_semaphore,
                           init_subproc_coverage)
+
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 pytestmark = pytest.mark.skipif(
     os.environ.get('TEST_KEYBOARD', None) != 'yes' or platform.system() == 'Windows',
