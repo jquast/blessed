@@ -1216,7 +1216,7 @@ class Terminal(object):
         ready_r = [None, ]
         check_r = [self._keyboard_fd] if self._keyboard_fd is not None else []
 
-        while HAS_TTY and True:
+        while HAS_TTY:
             try:
                 ready_r, _, _ = select.select(check_r, [], [], timeout)
             except InterruptedError:

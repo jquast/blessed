@@ -9,7 +9,7 @@ import msvcrt  # pylint: disable=import-error
 import contextlib
 
 # 3rd party
-import jinxed.win32 as win32  # pylint: disable=import-error
+from jinxed import win32  # pylint: disable=import-error
 
 # local
 from .terminal import WINSZ
