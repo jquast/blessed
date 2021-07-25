@@ -52,6 +52,11 @@ jobs:
             toxenv: py35,codecov
             test_quick: 1
 
+          - python-version: 3.4
+            os:  ubuntu-18.04
+            toxenv: py34,codecov
+            test_quick: 1
+
           - python-version: 2.7
             os:  ubuntu-latest
             toxenv: py27,codecov
