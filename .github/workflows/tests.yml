@@ -10,15 +10,18 @@ on:
 
 jobs:
 
-  Tests-required:
+  Tests:
 
     runs-on: ${{ matrix.os }}
+    name: ${{ matrix.label || matrix.python-version }} ${{ startsWith(matrix.os, 'windows') && '(Windows)' || '' }} ${{ matrix.optional && '[OPTIONAL]' }}
 
     strategy:
+      fail-fast: false
       matrix:
 
         include:
           - python-version: 3.9
+            label: Linting
             os: ubuntu-latest
             toxenv: about,pydocstyle,pylint,flake8,flake8_tests,mypy,sphinx
 
@@ -67,35 +70,9 @@ jobs:
             os: windows-latest
             toxenv: py27,codecov
 
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install tox
-        run: pip install tox
-
-      - name: Run tox
-        env:
-          TOXENV: ${{ matrix.toxenv }}
-          TEST_QUICK: ${{ matrix.test_quick }}
-          TEST_KEYBOARD: ${{ matrix.test_keyboard }}
-          TEST_RAW: ${{ matrix.test_raw }}
-
-        run: tox
-
-
-  Tests-optional:
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-
-        include:
           - python-version: '3.10-dev'
+            optional: true
+            os:  ubuntu-latest
             toxenv: py310,codecov
             test_quick: 1
 
