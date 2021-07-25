@@ -325,6 +325,7 @@ def test_env_winsize():
 def test_winsize(many_lines, many_columns):
     """Test height and width is appropriately queried in a pty."""
     pixel_width, pixel_height = 1024, 768
+
     @as_subprocess
     def child(lines=25, cols=80):
         # set the pty's virtual window size

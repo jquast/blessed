@@ -31,6 +31,7 @@ pytestmark = pytest.mark.skipif(
     os.environ.get('TEST_KEYBOARD', None) != 'yes' or platform.system() == 'Windows',
     reason="Timing-sensitive tests please do not run on build farms.")
 
+
 @pytest.mark.skipif(os.environ.get('TEST_QUICK', None) is not None,
                     reason="TEST_QUICK specified")
 def test_kbhit_interrupted():
@@ -139,6 +140,7 @@ def test_kbhit_no_kb():
 def test_kbhit_no_tty():
     """kbhit() returns False immediately if HAS_TTY is False"""
     import blessed.terminal
+
     @as_subprocess
     def child():
         with mock.patch('blessed.terminal.HAS_TTY', False):
@@ -662,6 +664,7 @@ def test_get_location_0s_reply_via_ungetch():
 def test_get_location_0s_nonstandard_u6():
     """u6 without %i should not be decremented."""
     from blessed.formatters import ParameterizingString
+
     @as_subprocess
     def child():
         term = TestTerminal(stream=six.StringIO())

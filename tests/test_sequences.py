@@ -628,6 +628,7 @@ def test_formatting_other_string(all_terms):
 def test_termcap_match_optional():
     """When match_optional is given, numeric matches are optional"""
     from blessed.sequences import Termcap
+
     @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
