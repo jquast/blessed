@@ -572,7 +572,8 @@ class Terminal(object):
             always ensure the return value is checked for ``(-1, -1)``.
 
         The location of the cursor is determined by emitting the ``u7`` terminal capability, or
-        VT100 `Query Cursor Position <https://www2.ccs.neu.edu/research/gpc/VonaUtils/vona/terminal/vtansi.htm#status>`_
+        VT100 `Query Cursor Position
+        <https://www2.ccs.neu.edu/research/gpc/VonaUtils/vona/terminal/vtansi.htm#status>`_
         when such capability is undefined, which elicits a response from a reply string described by
         capability ``u6``, or again VT100's definition of ``\x1b[%i%d;%dR`` when undefined.
 
