@@ -78,6 +78,12 @@ jobs:
             toxenv: py310
             test_quick: 1
 
+    env:
+      TOXENV: ${{ matrix.toxenv }}
+      TEST_QUICK: ${{ matrix.test_quick }}
+      TEST_KEYBOARD: ${{ matrix.test_keyboard }}
+      TEST_RAW: ${{ matrix.test_raw }}
+
     steps:
       - uses: actions/checkout@v2
 
@@ -90,12 +96,6 @@ jobs:
         run: pip install tox
 
       - name: Run tox
-        env:
-          TOXENV: ${{ matrix.toxenv }}
-          TEST_QUICK: ${{ matrix.test_quick }}
-          TEST_KEYBOARD: ${{ matrix.test_keyboard }}
-          TEST_RAW: ${{ matrix.test_raw }}
-
         run: tox
 
       - name: Upload to Codecov
