@@ -1,3 +1,5 @@
+"""Configure test fixtures based"""
+
 # std imports
 import os
 import platform
@@ -16,7 +18,7 @@ if os.environ.get('TEST_FULL'):
         all_terms_params = [
             # use all values of the first column of data in output of 'toe -a'
             _term.split(None, 1)[0] for _term in
-            subprocess.Popen(('toe', '-a'),
+            subprocess.Popen(('toe', '-a'),  # pylint: disable=consider-using-with
                              stdout=subprocess.PIPE,
                              close_fds=True)
             .communicate()[0].splitlines()]

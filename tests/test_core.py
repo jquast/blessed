@@ -9,7 +9,6 @@ import math
 import time
 import platform
 import warnings
-import collections
 
 # 3rd party
 import six
@@ -203,7 +202,7 @@ def test_setupterm_singleton_issue_33():
                     'continue to be returned' in err.args[0]), err.args[0]
         else:
             # unless term is not a tty and setupterm() is not called
-            assert not term.is_a_tty or False, 'Should have thrown exception'
+            assert not term.is_a_tty, 'Should have thrown exception'
         warnings.resetwarnings()
 
     child()
@@ -285,7 +284,6 @@ def test_IOUnsupportedOperation():
     """Ensure stream that throws IOUnsupportedOperation results in non-tty."""
     @as_subprocess
     def child():
-        import blessed.terminal
 
         def side_effect():
             raise io.UnsupportedOperation
@@ -392,7 +390,7 @@ def test_win32_missing_tty_modules(monkeypatch):
 
         tty_modules = ('termios', 'fcntl', 'tty')
 
-        def __import__(name, *args, **kwargs):
+        def __import__(name, *args, **kwargs):  # pylint: disable=redefined-builtin
             if name in tty_modules:
                 raise ImportError
             return original_import(name, *args, **kwargs)

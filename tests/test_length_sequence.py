@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+"""Tests for Terminal methods that account for sequences in strings"""
+
 # std imports
 import os
 import sys
@@ -19,6 +21,7 @@ if platform.system() != 'Windows':
 
 
 def test_length_cjk():
+    """Test length of East Asian characters"""
     @as_subprocess
     def child():
         term = TestTerminal()
@@ -34,6 +37,7 @@ def test_length_cjk():
 
 
 def test_length_ansiart():
+    """Test length of ANSI art"""
     @as_subprocess
     def child(kind):
         import codecs
@@ -41,7 +45,8 @@ def test_length_ansiart():
         # this 'ansi' art contributed by xzip!impure for another project,
         # unlike most CP-437 DOS ansi art, this is actually utf-8 encoded.
         fname = os.path.join(os.path.dirname(__file__), 'wall.ans')
-        lines = codecs.open(fname, 'r', 'utf-8').readlines()
+        with codecs.open(fname, 'r', 'utf-8') as ansiart:
+            lines = ansiart.readlines()
         assert term.length(lines[0]) == 67  # ^[[64C^[[34m▄▓▄
         assert term.length(lines[1]) == 75
         assert term.length(lines[2]) == 78
@@ -57,6 +62,7 @@ def test_length_ansiart():
 
 def test_sequence_length(all_terms):
     """Ensure T.length(string containing sequence) is correcterm."""
+    # pylint: disable=too-complex,too-many-statements
     @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
@@ -344,14 +350,14 @@ def test_winsize(many_lines, many_columns):
 
 
 def test_Sequence_alignment_fixed_width(all_terms):
+    """Test alignment methods with width provided"""
     @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind)
         pony_msg = 'pony express, all aboard, choo, choo!'
         pony_len = len(pony_msg)
-        pony_colored = u''.join(
-            ['%s%s' % (term.color(n % 7), ch,)
-             for n, ch in enumerate(pony_msg)])
+        pony_colored = u''.join('%s%s' % (term.color(n % 7), ch,)
+                                for n, ch in enumerate(pony_msg))
         pony_colored += term.normal
         ladjusted = term.ljust(pony_colored, 88)
         radjusted = term.rjust(pony_colored, 88)
@@ -379,9 +385,8 @@ def test_Sequence_alignment(all_terms):
 
         pony_msg = 'pony express, all aboard, choo, choo!'
         pony_len = len(pony_msg)
-        pony_colored = u''.join(
-            ['%s%s' % (term.color(n % 7), ch,)
-             for n, ch in enumerate(pony_msg)])
+        pony_colored = u''.join('%s%s' % (term.color(n % 7), ch,)
+                                for n, ch in enumerate(pony_msg))
         pony_colored += term.normal
         ladjusted = term.ljust(pony_colored)
         radjusted = term.rjust(pony_colored)
@@ -462,12 +467,12 @@ def test_sequence_is_movement_false(all_terms):
     def child(kind):
         from blessed.sequences import measure_length
         term = TestTerminal(kind=kind)
-        assert (0 == measure_length(u'', term))
+        assert measure_length(u'', term) == 0
         # not even a mbs
-        assert (0 == measure_length(u'xyzzy', term))
+        assert measure_length(u'xyzzy', term) == 0
         # negative numbers, though printable as %d, do not result
         # in movement; just garbage. Also not a valid sequence.
-        assert (0 == measure_length(term.cuf(-333), term))
+        assert measure_length(term.cuf(-333), term) == 0
         assert (len(term.clear_eol) == measure_length(term.clear_eol, term))
         # various erases don't *move*
         assert (len(term.clear_bol) == measure_length(term.clear_bol, term))
@@ -494,7 +499,7 @@ def test_sequence_is_movement_false(all_terms):
     child(all_terms)
 
 
-def test_termcap_will_move_false(all_terms):
+def test_termcap_will_move_false(all_terms):  # pylint: disable=too-complex,too-many-branches
     """Test parser about sequences that do not move the cursor."""
     @as_subprocess
     def child(kind):

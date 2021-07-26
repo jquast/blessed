@@ -19,7 +19,7 @@ except ImportError:
 
 if platform.system() != 'Windows':
     import curses
-    import tty  # NOQA
+    import tty  # pylint: disable=unused-import  # NOQA
 else:
     import jinxed as curses
 
@@ -90,7 +90,7 @@ def test_keystroke_default_args():
     assert ks.name == ks._name
     assert ks._code is None
     assert ks.code == ks._code
-    assert u'x' == u'x' + ks
+    assert u'x' + ks == u'x'
     assert not ks.is_sequence
     assert repr(ks) in ("u''",  # py26, 27
                         "''",)  # py33
@@ -104,7 +104,7 @@ def test_a_keystroke():
     assert ks.name == ks._name
     assert ks._code == 1
     assert ks.code == ks._code
-    assert u'xx' == u'x' + ks
+    assert u'x' + ks == u'xx'
     assert ks.is_sequence
     assert repr(ks) == "the X"
 
@@ -170,7 +170,7 @@ def test_get_keyboard_sequences_sort_order():
     def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
         maxlen = None
-        for sequence, code in term._keymap.items():
+        for sequence in term._keymap:
             if maxlen is not None:
                 assert len(sequence) <= maxlen
             assert sequence

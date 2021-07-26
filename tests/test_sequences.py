@@ -280,6 +280,8 @@ def test_zero_location(all_terms):
 
 def test_mnemonic_colors(all_terms):
     """Make sure color shortcuts work."""
+    # pylint:  disable=consider-using-ternary
+
     @as_subprocess
     def child(kind):
         def color(t, num):
@@ -470,18 +472,18 @@ def test_nice_formatting_errors(all_terms):
         t = TestTerminal(kind=kind)
         try:
             t.bold_misspelled('hey')
-            assert not t.is_a_tty or False, 'Should have thrown exception'
+            assert not t.is_a_tty, 'Should have thrown exception'
         except TypeError as e:
             assert 'Unknown terminal capability,' in e.args[0]
         try:
             t.bold_misspelled(u'hey')  # unicode
-            assert not t.is_a_tty or False, 'Should have thrown exception'
+            assert not t.is_a_tty, 'Should have thrown exception'
         except TypeError as e:
             assert 'Unknown terminal capability,' in e.args[0]
 
         try:
             t.bold_misspelled(None)  # an arbitrary non-string
-            assert not t.is_a_tty or False, 'Should have thrown exception'
+            assert not t.is_a_tty, 'Should have thrown exception'
         except TypeError as e:
             assert 'Unknown terminal capability,' not in e.args[0]
 
@@ -489,7 +491,7 @@ def test_nice_formatting_errors(all_terms):
             # PyPy fails to toss an exception, Why?!
             try:
                 t.bold_misspelled('a', 'b')  # >1 string arg
-                assert not t.is_a_tty or False, 'Should have thrown exception'
+                assert not t.is_a_tty, 'Should have thrown exception'
             except TypeError as e:
                 assert 'Unknown terminal capability,' in e.args[0], e.args
 

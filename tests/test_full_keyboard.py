@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+"""Tests for capturing keyboard input"""
+
 # std imports
 import os
 import sys
@@ -27,6 +29,8 @@ try:
 except ImportError:
     import mock
 
+got_sigwinch = False
+
 pytestmark = pytest.mark.skipif(
     os.environ.get('TEST_KEYBOARD', None) != 'yes' or platform.system() == 'Windows',
     reason="Timing-sensitive tests please do not run on build farms.")
@@ -36,6 +40,8 @@ pytestmark = pytest.mark.skipif(
                     reason="TEST_QUICK specified")
 def test_kbhit_interrupted():
     """kbhit() should not be interrupted with a signal handler."""
+    # pylint: disable=global-statement
+
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:
@@ -80,6 +86,8 @@ def test_kbhit_interrupted():
                     reason="TEST_QUICK specified")
 def test_kbhit_interrupted_nonetype():
     """kbhit() should also allow interruption with timeout of None."""
+    # pylint: disable=global-statement
+
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:
@@ -139,8 +147,6 @@ def test_kbhit_no_kb():
 
 def test_kbhit_no_tty():
     """kbhit() returns False immediately if HAS_TTY is False"""
-    import blessed.terminal
-
     @as_subprocess
     def child():
         with mock.patch('blessed.terminal.HAS_TTY', False):
@@ -597,7 +603,7 @@ def test_get_location_0s():
 def test_get_location_0s_under_raw():
     """0-second get_location call without response under raw mode."""
     import pty
-    pid, master_fd = pty.fork()
+    pid, _ = pty.fork()
     if pid == 0:
         cov = init_subproc_coverage('test_get_location_0s_under_raw')
         term = TestTerminal()
@@ -622,7 +628,7 @@ def test_get_location_0s_under_raw():
 def test_get_location_0s_reply_via_ungetch_under_raw():
     """0-second get_location call with response under raw mode."""
     import pty
-    pid, master_fd = pty.fork()
+    pid, _ = pty.fork()
     if pid == 0:
         cov = init_subproc_coverage('test_get_location_0s_reply_via_ungetch_under_raw')
         term = TestTerminal()
@@ -716,7 +722,7 @@ def test_get_location_timeout():
 def test_detached_stdout():
     """Ensure detached __stdout__ does not raise an exception"""
     import pty
-    pid, master_fd = pty.fork()
+    pid, _ = pty.fork()
     if pid == 0:
         cov = init_subproc_coverage('test_detached_stdout')
         sys.__stdout__.detach()

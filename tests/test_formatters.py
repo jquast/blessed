@@ -23,6 +23,7 @@ else:
 
 
 def fn_tparm(*args):
+    """Mock tparm function"""
     return u'~'.join(
         arg.decode('latin1') if not num else '%s' % (arg,)
         for num, arg in enumerate(args)
@@ -379,8 +380,8 @@ def test_formattingstring_picklability():
     def child():
         t = TestTerminal(force_styling=True)
         # basic pickle
-        pickle.loads(pickle.dumps(t.red))('orange') == t.red('orange')
-        pickle.loads(pickle.dumps(t.normal)) == t.normal
+        assert pickle.loads(pickle.dumps(t.red))('orange') == t.red('orange')
+        assert pickle.loads(pickle.dumps(t.normal)) == t.normal
 
         # and, pickle through multiprocessing
         r, w = multiprocessing.Pipe()
@@ -394,12 +395,11 @@ def test_formattingotherstring_picklability():
     """Test pickle-ability of a FormattingOtherString."""
     @as_subprocess
     def child():
-        from blessed.formatters import ParameterizingString
         t = TestTerminal(force_styling=True)
         # basic pickle
-        pickle.loads(pickle.dumps(t.move_left)) == t.move_left
-        pickle.loads(pickle.dumps(t.move_left(3))) == t.move_left(3)
-        pickle.loads(pickle.dumps(t.move_left))(3) == t.move_left(3)
+        assert pickle.loads(pickle.dumps(t.move_left)) == t.move_left
+        assert pickle.loads(pickle.dumps(t.move_left(3))) == t.move_left(3)
+        assert pickle.loads(pickle.dumps(t.move_left))(3) == t.move_left(3)
 
         # and, pickle through multiprocessing
         r, w = multiprocessing.Pipe()
@@ -419,9 +419,9 @@ def test_paramterizingstring_picklability():
         t = TestTerminal(force_styling=True)
 
         color = ParameterizingString(t.color, t.normal, 'color')
-        pickle.loads(pickle.dumps(color)) == color
-        pickle.loads(pickle.dumps(color(3))) == color(3)
-        pickle.loads(pickle.dumps(color))(3) == color(3)
+        assert pickle.loads(pickle.dumps(color)) == color
+        assert pickle.loads(pickle.dumps(color(3))) == color(3)
+        assert pickle.loads(pickle.dumps(color))(3) == color(3)
 
         # and, pickle through multiprocessing
         r, w = multiprocessing.Pipe()
