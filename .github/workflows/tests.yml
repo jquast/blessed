@@ -34,7 +34,6 @@ jobs:
           - python-version: 3.9
             os: windows-latest
             toxenv: py39
-            test_keyboard: 'no'
 
           - python-version: 3.8
             os:  ubuntu-latest
@@ -70,7 +69,6 @@ jobs:
           - python-version: 2.7
             os: windows-latest
             toxenv: py27
-            test_keyboard: 'no'
 
           - python-version: '3.10-dev'
             optional: true
@@ -80,9 +78,9 @@ jobs:
 
     env:
       TOXENV: ${{ matrix.toxenv }}
-      TEST_QUICK: ${{ matrix.test_quick }}
-      TEST_KEYBOARD: ${{ matrix.test_keyboard }}
-      TEST_RAW: ${{ matrix.test_raw }}
+      TEST_QUICK: ${{ matrix.test_quick || 0 }}
+      TEST_KEYBOARD: ${{ matrix.test_keyboard || 'no' }}
+      TEST_RAW: ${{ matrix.test_raw || 'no' }}
 
     steps:
       - uses: actions/checkout@v2
