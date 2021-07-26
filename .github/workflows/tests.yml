@@ -23,7 +23,7 @@ jobs:
           - python-version: 3.9
             label: Linting
             os: ubuntu-latest
-            toxenv: about,pydocstyle,pylint,flake8,flake8_tests,mypy,sphinx
+            toxenv: about,docformatter_check,flake8,flake8_tests,isort_check,mypy,sphinx,pydocstyle,pylint,pylint_tests
 
           - python-version: 3.9
             os:  ubuntu-latest
