@@ -27,53 +27,53 @@ jobs:
 
           - python-version: 3.9
             os:  ubuntu-latest
-            toxenv: py39,codecov
+            toxenv: py39
             test_keyboard: 'yes'
             test_raw: 'yes'
 
           - python-version: 3.9
             os: windows-latest
-            toxenv: py39,codecov
+            toxenv: py39
 
           - python-version: 3.8
             os:  ubuntu-latest
-            toxenv: py38,codecov
+            toxenv: py38
             test_quick: 1
 
           - python-version: 3.7
             os:  ubuntu-latest
-            toxenv: py37,codecov
+            toxenv: py37
             test_quick: 1
 
           - python-version: 3.6
             os:  ubuntu-latest
-            toxenv: py36,codecov
+            toxenv: py36
             test_quick: 1
 
           - python-version: 3.5
             os:  ubuntu-latest
-            toxenv: py35,codecov
+            toxenv: py35
             test_quick: 1
 
           - python-version: 3.4
             os:  ubuntu-18.04
-            toxenv: py34,codecov
+            toxenv: py34
             test_quick: 1
 
           - python-version: 2.7
             os:  ubuntu-latest
-            toxenv: py27,codecov
+            toxenv: py27
             test_keyboard: 'yes'
             test_raw: 'yes'
 
           - python-version: 2.7
             os: windows-latest
-            toxenv: py27,codecov
+            toxenv: py27
 
           - python-version: '3.10-dev'
             optional: true
             os:  ubuntu-latest
-            toxenv: py310,codecov
+            toxenv: py310
             test_quick: 1
 
     steps:
@@ -95,3 +95,9 @@ jobs:
           TEST_RAW: ${{ matrix.test_raw }}
 
         run: tox
+
+      - name: Upload to Codecov
+        if: ${{ matrix.label != 'linting' }}
+        uses: codecov/codecov-action@v2
+        with:
+          verbose: true
