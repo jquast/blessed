@@ -102,5 +102,4 @@ jobs:
         with:
           verbose: true
           name: ${{ matrix.label || matrix.python-version }} ${{ startsWith(matrix.os, 'windows') && '(Windows)' || '' }}
-          files: ./coverage.xml
           env_vars: TOXENV,TEST_QUICK,TEST_KEYBOARD,TEST_RAW

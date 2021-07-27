@@ -1,6 +1,7 @@
 .coverage
 ._coverage.*
 .coverage.*
+coverage.xml
 .cache
 .tox
 *.egg-info

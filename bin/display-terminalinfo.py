@@ -145,10 +145,7 @@ def display_ctl_chars(index, ctlc):
         try:
             index = getattr(termios, index_name)
             value = ctlc[index]
-            if value == b'\xff':
-                value = '_POSIX_VDISABLE'
-            else:
-                value = repr(value)
+            value = '_POSIX_VDISABLE' if value == b'\xff' else repr(value)
         except AttributeError:
             value = 'undef'
         print(fmt.format(idx=index_name,
