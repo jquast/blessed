@@ -102,7 +102,7 @@ jobs:
         # Python Uploader
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: tox
+        run: tox -e codecov
 
         # GitHub Actions Uploader
         # uses: codecov/codecov-action@v2
