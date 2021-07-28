@@ -322,8 +322,7 @@ class Sequence(six.text_type):
         current_width = 0
         for text, cap in iter_parse(self._term, self):
             if not cap:
-                char_width = wcwidth(text)
-                current_width += char_width
+                current_width += wcwidth(text)
                 if current_width <= width:
                     output += text
                 continue
