@@ -2,7 +2,8 @@ Measuring
 =========
 
 Any string containing sequences can be measured by blessed using the :meth:`~.Terminal.length`
-method. This means that blessed can measure, right-align, center, or word-wrap its own output!
+method. This means that blessed can measure, right-align, center, truncate, or word-wrap its
+own output!
 
 The :attr:`~.Terminal.height` and :attr:`~.Terminal.width` properties always provide a current
 readout of the size of the window:
@@ -11,8 +12,9 @@ readout of the size of the window:
     (34, 102)
 
 By combining the measure of the printable width of strings containing sequences with the terminal
-width, the :meth:`~.Terminal.center`, :meth:`~.Terminal.ljust`, :meth:`~.Terminal.rjust`, and
-:meth:`~Terminal.wrap` methods "just work" for strings that contain sequences.
+width, the :meth:`~.Terminal.center`, :meth:`~.Terminal.ljust`, :meth:`~.Terminal.rjust`,
+:meth:`~Terminal.truncate`, and :meth:`~Terminal.wrap` methods "just work" for strings that
+contain sequences.
 
 .. code-block:: python
 
