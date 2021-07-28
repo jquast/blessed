@@ -651,3 +651,19 @@ def test_termcap_match_optional():
         assert cap.re_compiled.match(t.cub1) is None
 
     child()
+
+def test_truncate():
+    """Test terminal.truncate and make sure it agrees with terminal.length"""
+    @as_subprocess
+    def child(kind):
+        from blessed import Terminal
+        term = Terminal(kind)
+
+        test_string = term.red("Testing ") term.yellow("makes ") + term.green("me ") + term.blue("feel ") + term.indigo("good") + term.normal
+        stripped_string = term.strip_seqs(test_string)
+        for i in len(stripped_string):
+            assert term.length(term.truncate(test_string, i)) == len(stripped_string[:i])
+        test_nogood = term.red("Testing ") term.yellow("makes ") + term.green("me ") + term.blue("feel ") + term.indigo + term.normal
+        assert term.truncate(test_string, term.length(test_string) - len("good")) == test_nogood
+
+    child(all_terms)
