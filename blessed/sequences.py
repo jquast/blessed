@@ -309,8 +309,10 @@ class Sequence(six.text_type):
 
     def truncate(self, width):
         """
-        Truncate a string in a sequence-aware manner. Any printable characters 
-        beyond ``width`` are removed, while all sequences remain in place.
+        Truncate a string in a sequence-aware manner.
+
+        Any printable characters beyond ``width`` are removed, while all
+        sequences remain in place.
 
         :arg int width: The printable width to truncate the string to.
         :rtype: str
