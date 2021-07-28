@@ -26,11 +26,11 @@ if os.environ.get('TEST_FULL'):
         pass
 elif platform.system() == 'Windows':
     all_terms_params = ['vtwin10', ]
-elif os.environ.get('TEST_QUICK'):
+elif int(os.environ.get('TEST_QUICK', 0)):
     all_terms_params = 'xterm screen ansi linux'.split()
 
 
-if os.environ.get('TEST_QUICK'):
+if int(os.environ.get('TEST_QUICK', 0)):
     many_lines_params = [80, ]
     many_columns_params = [25, ]
 

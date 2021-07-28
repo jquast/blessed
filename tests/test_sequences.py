@@ -365,16 +365,10 @@ def test_formatting_functions(all_terms):
     def child(kind):
         t = TestTerminal(kind=kind)
         # test simple sugar,
-        if t.bold:
-            expected_output = u''.join((t.bold, u'hi', t.normal))
-        else:
-            expected_output = u'hi'
+        expected_output = u''.join((t.bold, u'hi', t.normal)) if t.bold else u'hi'
         assert t.bold(u'hi') == expected_output
         # Plain strs for Python 2.x
-        if t.green:
-            expected_output = u''.join((t.green, 'hi', t.normal))
-        else:
-            expected_output = u'hi'
+        expected_output = u''.join((t.green, 'hi', t.normal)) if t.green else u'hi'
         assert t.green('hi') == expected_output
         # Test unicode
         if t.underline:

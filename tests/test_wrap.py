@@ -36,7 +36,7 @@ TEXTWRAP_KEYWORD_COMBINATIONS = [
          drop_whitespace=True,
          subsequent_indent=' '),
 ]
-if os.environ.get('TEST_QUICK', None) is not None:
+if int(os.environ.get('TEST_QUICK', 0)):
     # test only one feature: everything on
     TEXTWRAP_KEYWORD_COMBINATIONS = [
         dict(break_long_words=True,
