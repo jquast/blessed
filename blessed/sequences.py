@@ -307,6 +307,27 @@ class Sequence(six.text_type):
             (max(0.0, math.ceil(split))) / float(len(fillchar)))
         return u''.join((leftside, self, rightside))
 
+    def truncate(self, width):
+        """
+        Truncate a string in a sequence-aware manner. Any printable characters 
+        beyond ``width`` are removed, while all sequences remain in place.
+
+        :arg int width: The printable width to truncate the string to.
+        :rtype: str
+        :returns: String truncated to at most ``width`` printable characters.
+        """
+        output = ""
+        current_width = 0
+        for text, cap in iter_parse(self._term, self):
+            if not cap:
+                char_width = wcwidth(text)
+                current_width += char_width
+                if current_width <= width:
+                    output += text
+                continue
+            output += text
+        return output
+
     def length(self):
         r"""
         Return the printable length of string containing sequences.
