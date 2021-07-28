@@ -103,3 +103,4 @@ jobs:
           verbose: true
           name: ${{ matrix.label || matrix.python-version }} ${{ startsWith(matrix.os, 'windows') && '(Windows)' || '' }}
           env_vars: TOXENV,TEST_QUICK,TEST_KEYBOARD,TEST_RAW
+          token: ${{ secrets.CODECOV_TOKEN }}
