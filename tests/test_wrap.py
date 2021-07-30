@@ -1,7 +1,6 @@
 """Tests for Terminal.wrap()"""
 
 # std imports
-import os
 import textwrap
 
 # 3rd party
@@ -9,6 +8,7 @@ import pytest
 
 # local
 from .accessories import TestTerminal, as_subprocess
+from.conftest import TEST_QUICK
 
 TEXTWRAP_KEYWORD_COMBINATIONS = [
     dict(break_long_words=False,
@@ -36,7 +36,7 @@ TEXTWRAP_KEYWORD_COMBINATIONS = [
          drop_whitespace=True,
          subsequent_indent=' '),
 ]
-if int(os.environ.get('TEST_QUICK', 0)):
+if TEST_QUICK:
     # test only one feature: everything on
     TEXTWRAP_KEYWORD_COMBINATIONS = [
         dict(break_long_words=True,

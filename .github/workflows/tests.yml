@@ -28,8 +28,8 @@ jobs:
           - python-version: 3.9
             os:  ubuntu-latest
             toxenv: py39
-            test_keyboard: 'yes'
-            test_raw: 'yes'
+            test_keyboard: 1
+            test_raw: 1
 
           - python-version: 3.9
             os: windows-latest
@@ -63,8 +63,8 @@ jobs:
           - python-version: 2.7
             os:  ubuntu-latest
             toxenv: py27
-            test_keyboard: 'yes'
-            test_raw: 'yes'
+            test_keyboard: 1
+            test_raw: 1
 
           - python-version: 2.7
             os: windows-latest
@@ -80,8 +80,8 @@ jobs:
     env:
       TOXENV: ${{ matrix.toxenv }}
       TEST_QUICK: ${{ matrix.test_quick || 0 }}
-      TEST_KEYBOARD: ${{ matrix.test_keyboard || 'no' }}
-      TEST_RAW: ${{ matrix.test_raw || 'no' }}
+      TEST_KEYBOARD: ${{ matrix.test_keyboard || 0 }}
+      TEST_RAW: ${{ matrix.test_raw || 0 }}
 
     steps:
       - uses: actions/checkout@v2

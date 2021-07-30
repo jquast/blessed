@@ -236,7 +236,7 @@ def test_inject_move_y():
 
 @pytest.mark.skipif(platform.system() == 'Windows', reason="requires multiprocess")
 def test_inject_civis_and_cnorm_for_ansi():
-    """Test injection of cvis attribute for ansi."""
+    """Test injection of civis attribute for ansi."""
     @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)

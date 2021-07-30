@@ -23,6 +23,7 @@ from .accessories import (SEMAPHORE,
                           read_until_eof,
                           read_until_semaphore,
                           init_subproc_coverage)
+from.conftest import TEST_KEYBOARD, TEST_QUICK, TEST_RAW
 
 try:
     from unittest import mock
@@ -32,11 +33,11 @@ except ImportError:
 got_sigwinch = False
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get('TEST_KEYBOARD', None) != 'yes' or platform.system() == 'Windows',
+    not TEST_KEYBOARD or platform.system() == 'Windows',
     reason="Timing-sensitive tests please do not run on build farms.")
 
 
-@pytest.mark.skipif(int(os.environ.get('TEST_QUICK', 0)), reason="TEST_QUICK specified")
+@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_kbhit_interrupted():
     """kbhit() should not be interrupted with a signal handler."""
     # pylint: disable=global-statement
@@ -81,7 +82,7 @@ def test_kbhit_interrupted():
     assert math.floor(time.time() - stime) == 1.0
 
 
-@pytest.mark.skipif(int(os.environ.get('TEST_QUICK', 0)), reason="TEST_QUICK specified")
+@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_kbhit_interrupted_nonetype():
     """kbhit() should also allow interruption with timeout of None."""
     # pylint: disable=global-statement
@@ -181,7 +182,7 @@ def test_keystroke_0s_cbreak_noinput_nokb():
     child()
 
 
-@pytest.mark.skipif(int(os.environ.get('TEST_QUICK', 0)), reason="TEST_QUICK specified")
+@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_keystroke_1s_cbreak_noinput():
     """1-second keystroke without input; '' should be returned after ~1 second."""
     @as_subprocess
@@ -195,7 +196,7 @@ def test_keystroke_1s_cbreak_noinput():
     child()
 
 
-@pytest.mark.skipif(int(os.environ.get('TEST_QUICK', 0)), reason="TEST_QUICK specified")
+@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_keystroke_1s_cbreak_noinput_nokb():
     """1-second keystroke without input or keyboard."""
     @as_subprocess
@@ -375,7 +376,7 @@ def test_keystroke_0s_cbreak_sequence():
     assert math.floor(time.time() - stime) == 0.0
 
 
-@pytest.mark.skipif(int(os.environ.get('TEST_QUICK', 0)), reason="TEST_QUICK specified")
+@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_keystroke_1s_cbreak_with_input():
     """1-second keystroke w/multibyte sequence; should return after ~1 second."""
     import pty
@@ -406,7 +407,7 @@ def test_keystroke_1s_cbreak_with_input():
     assert math.floor(time.time() - stime) == 1.0
 
 
-@pytest.mark.skipif(int(os.environ.get('TEST_QUICK', 0)), reason="TEST_QUICK specified")
+@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_esc_delay_cbreak_035():
     """esc_delay will cause a single ESC (\\x1b) to delay for 0.35."""
     import pty
@@ -440,7 +441,7 @@ def test_esc_delay_cbreak_035():
     assert 34 <= int(duration_ms) <= 45, duration_ms
 
 
-@pytest.mark.skipif(int(os.environ.get('TEST_QUICK', 0)), reason="TEST_QUICK specified")
+@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_esc_delay_cbreak_135():
     """esc_delay=1.35 will cause a single ESC (\\x1b) to delay for 1.35."""
     import pty
@@ -592,7 +593,7 @@ def test_get_location_0s():
 # jquast: having trouble with these tests intermittently locking up on Mac OS X 10.15.1,
 # that they *lock up* is troublesome, I tried to use "pytest-timeout" but this conflicts
 # with our retry module, so, just skip them entirely.
-@pytest.mark.skipif(os.environ.get('TEST_RAW', None) != 'yes', reason="TEST_RAW not specified")
+@pytest.mark.skipif(not TEST_RAW, reason="TEST_RAW not specified")
 def test_get_location_0s_under_raw():
     """0-second get_location call without response under raw mode."""
     import pty
@@ -617,7 +618,7 @@ def test_get_location_0s_under_raw():
     assert math.floor(time.time() - stime) == 0.0
 
 
-@pytest.mark.skipif(os.environ.get('TEST_RAW', None) != 'yes', reason="TEST_RAW not specified")
+@pytest.mark.skipif(not TEST_RAW, reason="TEST_RAW not specified")
 def test_get_location_0s_reply_via_ungetch_under_raw():
     """0-second get_location call with response under raw mode."""
     import pty
