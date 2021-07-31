@@ -1381,6 +1381,13 @@ class Terminal(object):
         .. note:: When used without the context manager :meth:`cbreak`, or
             :meth:`raw`, :obj:`sys.__stdin__` remains line-buffered, and this
             function will block until the return key is pressed!
+
+        .. note:: On Windows, a 10 ms sleep is added to the key press detection loop to reduce CPU
+            load. Due to the behavior of :py:func:`time.sleep` on Windows, this will actually
+            result in a 15.6 ms delay when using the default `time resolution
+            <https://docs.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timebeginperiod>`_.
+            Decreasing the time resolution will reduce this to 10 ms, while increasing it, which
+            is rarely done, will have a perceptable impact on the behavior.
         """
         resolve = functools.partial(resolve_sequence,
                                     mapper=self._keymap,
