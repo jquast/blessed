@@ -9,7 +9,12 @@ import six
 import pytest
 
 # local
-from .accessories import TestTerminal, unicode_cap, unicode_parm, as_subprocess
+from .accessories import TestTerminal, unicode_cap, unicode_parm, as_subprocess, MockTigetstr
+
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 
 @pytest.mark.skipif(platform.system() == 'Windows', reason="requires real tty")
@@ -199,8 +204,9 @@ def test_inject_move_x():
     def child(kind):
         t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
         COL = 5
-        with t.location(x=COL):
-            pass
+        with mock.patch('curses.tigetstr', side_effect=MockTigetstr(hpa=None)):
+            with t.location(x=COL):
+                pass
         expected_output = u''.join(
             (unicode_cap('sc') or u'\x1b[s',
              u'\x1b[{0}G'.format(COL + 1),
@@ -220,8 +226,9 @@ def test_inject_move_y():
     def child(kind):
         t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
         ROW = 5
-        with t.location(y=ROW):
-            pass
+        with mock.patch('curses.tigetstr', side_effect=MockTigetstr(vpa=None)):
+            with t.location(y=ROW):
+                pass
         expected_output = u''.join(
             (unicode_cap('sc') or u'\x1b[s',
              u'\x1b[{0}d'.format(ROW + 1),

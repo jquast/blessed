@@ -224,3 +224,18 @@ def unicode_parm(cap, *parms):
         if val:
             return val.decode('latin1')
     return u''
+
+
+class MockTigetstr(object):  # pylint: disable=too-few-public-methods
+    """
+    Wraps curses.tigetstr() to override specific capnames
+
+    Capnames and return values are provided as keyword arguments
+    """
+
+    def __init__(self, **kwargs):
+        self.callable = curses.tigetstr
+        self.kwargs = kwargs
+
+    def __call__(self, capname):
+        return self.kwargs.get(capname, self.callable(capname))
