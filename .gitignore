@@ -20,3 +20,4 @@ htmlcov
 .*.sw?
 .vscode
 .python-version
+.idea/

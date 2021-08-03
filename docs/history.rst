@@ -1,5 +1,9 @@
 Version History
 ===============
+1.19
+  * Added :meth:`~Terminal.truncate` to truncate a string while
+    retaining the sequences, :ghissue:`211` by :ghuser:`fishermans-friend`
+
 1.18
   * bugfix: :meth:`~Terminal.split_seqs` for some sequences
     like ``term.move_left(3)``, :ghissue:`197`.
