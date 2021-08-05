@@ -328,13 +328,16 @@ class Sequence(six.text_type):
         """
         output = ""
         current_width = 0
-        for text, cap in iter_parse(self._term, self):
+        iterator = iter_parse(self._term, self)
+        for text, cap in iterator:
             if not cap:
                 current_width += wcwidth(text)
-                if current_width <= width:
-                    output += text
-                continue
+                if current_width > width:
+                    break
             output += text
+        for text, cap in iterator:
+            if cap:
+                output += text
         return output
 
     def length(self):
