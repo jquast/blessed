@@ -674,3 +674,15 @@ def test_truncate(all_terms):
         assert trunc == test_nogood
 
     child(all_terms)
+
+
+def test_truncate_wide_end(all_terms):
+    """Ensure that terminal.truncate has the correct behaviour for wide characters."""
+    @as_subprocess
+    def child(kind):
+        from blessed import Terminal
+        term = Terminal(kind)
+        test_string = u"ABＣ"
+        assert term.truncate(test_string, 3) == u"AB"
+
+    child(all_terms)
