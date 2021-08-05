@@ -320,17 +320,18 @@ class Sequence(six.text_type):
         """
         output = ""
         current_width = 0
-        iterator = iter_parse(self._term, self)
-        for text, cap in iterator:
+        parsed_seq = iter_parse(self._term, self)
+
+        # Retain all text until non-cap width reaches desired width
+        for text, cap in parsed_seq:
             if not cap:
                 current_width += wcwidth(text)
                 if current_width > width:
                     break
             output += text
-        for text, cap in iterator:
-            if cap:
-                output += text
-        return output
+
+        # Return with remaining caps appended
+        return output + ''.join(text for text, cap in parsed_seq if cap)
 
     def length(self):
         r"""
