@@ -34,10 +34,7 @@ def main():
                 if maybe_digit.isdigit() and int(maybe_digit) > 23:
                     continue
             code = getattr(term, key_attr_name)
-            repr_sequences = []
-            for (seq, value) in DEFAULT_SEQUENCE_MIXIN:
-                if value == code:
-                    repr_sequences.append(repr(seq))
+            repr_sequences = [repr(seq) for (seq, value) in DEFAULT_SEQUENCE_MIXIN if value == code]
             txt_sequences = ', '.join(repr_sequences).replace('\\', '\\\\')
             fout.write(f'    {key_attr_name} | {code}')
             if txt_sequences:

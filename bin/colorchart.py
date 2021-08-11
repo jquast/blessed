@@ -80,7 +80,7 @@ def color_chart(term):
             dirty = True
             if inp in '[]':
                 algo_idx += 1 if inp == ']' else -1
-                algo_idx = algo_idx % len(ALGORITHMS)
+                algo_idx %= len(ALGORITHMS)
                 term.color_distance_algorithm = ALGORITHMS[algo_idx]
             elif inp == '\x0c':
                 pass

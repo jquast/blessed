@@ -218,8 +218,7 @@ class FormattingString(six.text_type):
         # >>> t.red('This is ', t.bold('extremely'), ' dangerous!')
         for idx, ucs_part in enumerate(args):
             if not isinstance(ucs_part, six.string_types):
-                expected_types = ', '.join([
-                    _type.__name__ for _type in six.string_types])
+                expected_types = ', '.join(_type.__name__ for _type in six.string_types)
                 raise TypeError(
                     "TypeError for FormattingString argument, "
                     "%r, at position %s: expected type %s, "
@@ -286,8 +285,7 @@ class NullCallableString(six.text_type):
 
     def __new__(cls):
         """Class constructor."""
-        new = six.text_type.__new__(cls, u'')
-        return new
+        return six.text_type.__new__(cls, u'')
 
     def __call__(self, *args):
         """

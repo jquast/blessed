@@ -31,9 +31,7 @@ else:
     import jinxed as curses
 
 
-test_kind = 'xterm-256color'
-if platform.system() == 'Windows':
-    test_kind = 'vtwin10'
+test_kind = 'vtwin10' if platform.system() == 'Windows' else 'xterm-256color'
 TestTerminal = functools.partial(Terminal, kind=test_kind)  # type: Callable[..., Terminal]
 SEND_SEMAPHORE = SEMAPHORE = b'SEMAPHORE\n'
 RECV_SEMAPHORE = b'SEMAPHORE\r\n'

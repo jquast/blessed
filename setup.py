@@ -8,10 +8,8 @@ import setuptools
 
 
 def _get_install_requires(fname):
-    result = [req_line.strip() for req_line in open(fname)
-              if req_line.strip() and not req_line.startswith('#')]
-
-    return result
+    return [req_line.strip() for req_line in open(fname)
+            if req_line.strip() and not req_line.startswith('#')]
 
 
 def _get_version(fname):

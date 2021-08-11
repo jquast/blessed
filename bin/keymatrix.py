@@ -68,7 +68,7 @@ def refresh(term, board, level, score, inps):
 def build_gameboard(term):
     """Build the gameboard layout."""
     column, row = 0, 0
-    board = dict()
+    board = {}
     spacing = 2
     for keycode in sorted(term._keycodes.values()):
         if (keycode.startswith('KEY_F')
