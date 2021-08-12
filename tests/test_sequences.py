@@ -694,8 +694,10 @@ def test_truncate_wcwidth_clipping(all_terms):
     def child(kind):
         from blessed import Terminal
         term = Terminal(kind)
+        test_emptystring = ""
         test_string = term.blue(u"one\x01two")
         test_bsstring = term.bold(u"one\btwo")
+        assert term.truncate(test_emptystring, 4) == ""
         assert term.truncate(test_string, 4) == term.blue(u"one\x01t")
         # this is incorrect, i suppose, in that \b doesn't resolve as
         # an erasing width of -1, I think the wcwidth library should
