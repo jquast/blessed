@@ -320,7 +320,8 @@ class Sequence(six.text_type):
         Truncate a string in a sequence-aware manner.
 
         Any printable characters beyond ``width`` are removed, while all
-        sequences remain in place.
+        sequences remain in place. Horizontal Sequences are first expanded
+        by :meth:`padd`.
 
         :arg int width: The printable width to truncate the string to.
         :rtype: str
@@ -328,7 +329,7 @@ class Sequence(six.text_type):
         """
         output = ""
         current_width = 0
-        parsed_seq = iter_parse(self._term, self)
+        parsed_seq = iter_parse(self._term, self.padd())
 
         # Retain all text until non-cap width reaches desired width
         for text, cap in parsed_seq:
