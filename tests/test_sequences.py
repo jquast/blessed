@@ -682,7 +682,7 @@ def test_truncate_wide_end(all_terms):
     def child(kind):
         from blessed import Terminal
         term = Terminal(kind)
-        test_string = u"ABＣ"
+        test_string = u"AB\uff23"  # ABＣ
         assert term.truncate(test_string, 3) == u"AB"
 
     child(all_terms)
