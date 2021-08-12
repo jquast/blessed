@@ -694,14 +694,23 @@ def test_truncate_wcwidth_clipping(all_terms):
     def child(kind):
         from blessed import Terminal
         term = Terminal(kind)
-        test_emptystring = ""
+        assert term.truncate("", 4) == ""
         test_string = term.blue(u"one\x01two")
-        test_bsstring = term.bold(u"one\btwo")
-        assert term.truncate(test_emptystring, 4) == ""
         assert term.truncate(test_string, 4) == term.blue(u"one\x01t")
-        # this is incorrect, i suppose, in that \b doesn't resolve as
-        # an erasing width of -1, I think the wcwidth library should
-        # handle that, though!
-        assert term.truncate(test_bsstring, 4) == term.bold(u"one\bt")
+
+    child(all_terms)
+
+def test_truncate_padding(all_terms):
+    """Ensure that terminal.truncate has the correct behaviour for wide characters."""
+    @as_subprocess
+    def child(kind):
+        from blessed import Terminal
+        term = Terminal(kind)
+        test_emptystring = ""
+        test_right_string = term.blue(u"one" + term.move_right(5) + u"two")
+        assert term.truncate(test_right_string, 9) == term.blue(u"one     t")
+
+        test_bs_string = term.blue(u"one\b\b\btwo")
+        assert term.truncate(test_string, 3) == term.blue(u"two")
 
     child(all_terms)
