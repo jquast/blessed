@@ -333,7 +333,8 @@ class Sequence(six.text_type):
         # Retain all text until non-cap width reaches desired width
         for text, cap in parsed_seq:
             if not cap:
-                current_width += wcwidth(text)
+                # use wcwidth clipped to 0 because it can sometimes return -1
+                current_width += max(wcwidth(text), 0)
                 if current_width > width:
                     break
             output += text
