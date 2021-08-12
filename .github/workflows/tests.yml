@@ -23,57 +23,57 @@ jobs:
           - python-version: 3.9
             label: Linting
             os: ubuntu-latest
-            toxenv: about,docformatter_check,flake8,flake8_tests,isort_check,mypy,sphinx,pydocstyle,pylint,pylint_tests
+            toxenv: docformatter_check,flake8,flake8_tests,isort_check,mypy,sphinx,pydocstyle,pylint,pylint_tests
 
           - python-version: 3.9
             os:  ubuntu-latest
-            toxenv: py39
+            toxenv: about,py39
             test_keyboard: 1
             test_raw: 1
 
           - python-version: 3.9
             os: windows-latest
-            toxenv: py39
+            toxenv: about,py39
 
           - python-version: 3.8
             os:  ubuntu-latest
-            toxenv: py38
+            toxenv: about,py38
             test_quick: 1
 
           - python-version: 3.7
             os:  ubuntu-latest
-            toxenv: py37
+            toxenv: about,py37
             test_quick: 1
 
           - python-version: 3.6
             os:  ubuntu-latest
-            toxenv: py36
+            toxenv: about,py36
             test_quick: 1
 
           - python-version: 3.5
             os:  ubuntu-latest
-            toxenv: py35
+            toxenv: about,py35
             test_quick: 1
 
           - python-version: 3.4
             os:  ubuntu-18.04
-            toxenv: py34
+            toxenv: about,py34
             test_quick: 1
 
           - python-version: 2.7
             os:  ubuntu-latest
-            toxenv: py27
+            toxenv: about,py27
             test_keyboard: 1
             test_raw: 1
 
           - python-version: 2.7
             os: windows-latest
-            toxenv: py27
+            toxenv: about,py27
 
           - python-version: '3.10-dev'
             optional: true
             os:  ubuntu-latest
-            toxenv: py310
+            toxenv: about,py310
             toxpython: 3.10
             test_quick: 1
 
