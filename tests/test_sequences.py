@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 """Tests for Terminal() sequences and sequence-awareness."""
+# -*- coding: utf-8 -*-
 # std imports
 import sys
 import platform
@@ -676,6 +676,7 @@ def test_truncate(all_terms):
     child(all_terms)
 
 
+
 def test_truncate_wide_end(all_terms):
     """Ensure that terminal.truncate has the correct behaviour for wide characters."""
     @as_subprocess
@@ -684,5 +685,21 @@ def test_truncate_wide_end(all_terms):
         term = Terminal(kind)
         test_string = u"ABＣ"
         assert term.truncate(test_string, 3) == u"AB"
+
+    child(all_terms)
+
+def test_truncate_wcwidth_clipping(all_terms):
+    """Ensure that terminal.truncate has the correct behaviour for wide characters."""
+    @as_subprocess
+    def child(kind):
+        from blessed import Terminal
+        term = Terminal(kind)
+        test_string = term.blue(u"one\x01two")
+        test_bsstring = term.bold(u"one\btwo")
+        assert term.truncate(test_string, 4) == term.blue(u"one\x01t")
+        # this is incorrect, i suppose, in that \b doesn't resolve as
+        # an erasing width of -1, I think the wcwidth library should
+        # handle that, though!
+        assert term.truncate(test_bsstring, 4) == term.bold(u"one\bt")
 
     child(all_terms)
