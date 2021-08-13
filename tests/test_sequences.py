@@ -700,6 +700,7 @@ def test_truncate_wcwidth_clipping(all_terms):
 
     child(all_terms)
 
+
 def test_truncate_padding(all_terms):
     """Ensure that terminal.truncate has the correct behaviour for wide characters."""
     @as_subprocess
