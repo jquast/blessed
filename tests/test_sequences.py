@@ -711,6 +711,6 @@ def test_truncate_padding(all_terms):
         assert term.truncate(test_right_string, 9) == term.blue(u"one     t")
 
         test_bs_string = term.blue(u"one\b\b\btwo")
-        assert term.truncate(test_string, 3) == term.blue(u"two")
+        assert term.truncate(test_bs_string, 3) == term.blue(u"two")
 
     child(all_terms)
