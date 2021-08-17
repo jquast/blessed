@@ -92,9 +92,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Collect terminal information
-        run: tox -e about
-
       - name: Install tox
         run: pip install tox
 
