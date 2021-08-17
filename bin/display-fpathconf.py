@@ -41,21 +41,20 @@ def display_fpathconf():
     print(fmt.replace('<', '-<').format(name='-', value='-', description='-'))
 
     fd = sys.stdin.fileno()
-    if hasattr(os, "pathconf_names"):
-        for name, description in disp_values:
-            key = os.pathconf_names.get(name, None)
-            if key is None:
-                value = 'UNDEF'
-            else:
-                try:
-                    value = os.fpathconf(fd, name)
-                    if name == 'PC_VDISABLE':
-                        value = r'\x{0:02x}'.format(value)
-                except OSError as err:
-                    value = 'OSErrno {0.errno}'.format(err)
+    for name, description in disp_values:
+        key = os.pathconf_names.get(name, None)
+        if key is None:
+            value = 'UNDEF'
+        else:
+            try:
+                value = os.fpathconf(fd, name)
+                if name == 'PC_VDISABLE':
+                    value = r'\x{0:02x}'.format(value)
+            except OSError as err:
+                value = 'OSErrno {0.errno}'.format(err)
 
-            print(fmt.format(name=name, value=value, description=description))
-        print()
+        print(fmt.format(name=name, value=value, description=description))
+    print()
 
 
 if __name__ == '__main__':
