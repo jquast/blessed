@@ -11,6 +11,10 @@ import sys
 
 def display_fpathconf():
     """Program entry point."""
+
+    if not hasattr(os, "pathconf_names"):
+        return
+
     disp_values = (
         ('PC_MAX_CANON', ('Max no. of bytes in a '
                           'terminal canonical input line.')),
