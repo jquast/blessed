@@ -10,6 +10,7 @@ import pytest
 
 # local
 from .accessories import TestTerminal, unicode_cap, unicode_parm, as_subprocess, MockTigetstr
+from .conftest import IS_WINDOWS
 
 try:
     from unittest import mock
@@ -17,7 +18,7 @@ except ImportError:
     import mock
 
 
-@pytest.mark.skipif(platform.system() == 'Windows', reason="requires real tty")
+@pytest.mark.skipif(IS_WINDOWS, reason="requires real tty")
 def test_capability():
     """Check that capability lookup works."""
     @as_subprocess
@@ -197,7 +198,7 @@ def test_vertical_location(all_terms):
     child(all_terms)
 
 
-@pytest.mark.skipif(platform.system() == 'Windows', reason="requires multiprocess")
+@pytest.mark.skipif(IS_WINDOWS, reason="requires multiprocess")
 def test_inject_move_x():
     """Test injection of hpa attribute for screen/ansi (issue #55)."""
     @as_subprocess
@@ -219,7 +220,7 @@ def test_inject_move_x():
     child('ansi')
 
 
-@pytest.mark.skipif(platform.system() == 'Windows', reason="requires multiprocess")
+@pytest.mark.skipif(IS_WINDOWS, reason="requires multiprocess")
 def test_inject_move_y():
     """Test injection of vpa attribute for screen/ansi (issue #55)."""
     @as_subprocess
@@ -241,7 +242,7 @@ def test_inject_move_y():
     child('ansi')
 
 
-@pytest.mark.skipif(platform.system() == 'Windows', reason="requires multiprocess")
+@pytest.mark.skipif(IS_WINDOWS, reason="requires multiprocess")
 def test_inject_civis_and_cnorm_for_ansi():
     """Test injection of civis attribute for ansi."""
     @as_subprocess
@@ -255,7 +256,7 @@ def test_inject_civis_and_cnorm_for_ansi():
     child('ansi')
 
 
-@pytest.mark.skipif(platform.system() == 'Windows', reason="requires multiprocess")
+@pytest.mark.skipif(IS_WINDOWS, reason="requires multiprocess")
 def test_inject_sc_and_rc_for_ansi():
     """Test injection of sc and rc (save and restore cursor) for ansi."""
     @as_subprocess
@@ -526,10 +527,7 @@ def test_padd():
         assert Sequence('xxxx\x1b[3Dzz', term).padd() == u'xzz'
         assert Sequence('\x1b[3D', term).padd() == u''  # "Trim left"
         assert Sequence(term.red('xxxx\x1b[3Dzz'), term).padd() == term.red(u'xzz')
-
-    kind = 'xterm-256color'
-    if platform.system() == 'Windows':
-        kind = 'vtwin10'
+    kind = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
     child(kind)
 
 

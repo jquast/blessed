@@ -14,6 +14,7 @@ import pytest
 
 # local
 from .accessories import TestTerminal, as_subprocess
+from .conftest import IS_WINDOWS
 
 if platform.system() != 'Windows':
     import fcntl
@@ -54,9 +55,7 @@ def test_length_ansiart():
         assert term.length(lines[4]) == 78
         assert term.length(lines[5]) == 78
         assert term.length(lines[6]) == 77
-    kind = 'xterm-256color'
-    if platform.system() == 'Windows':
-        kind = 'vtwin10'
+    kind = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
     child(kind)
 
 
@@ -327,7 +326,7 @@ def test_env_winsize():
     child()
 
 
-@pytest.mark.skipif(platform.system() == 'Windows', reason="requires fcntl")
+@pytest.mark.skipif(IS_WINDOWS, reason="requires fcntl")
 def test_winsize(many_lines, many_columns):
     """Test height and width is appropriately queried in a pty."""
     pixel_width, pixel_height = 1024, 768
@@ -373,7 +372,7 @@ def test_Sequence_alignment_fixed_width(all_terms):
     child(kind=all_terms)
 
 
-@pytest.mark.skipif(platform.system() == 'Windows', reason="requires fcntl")
+@pytest.mark.skipif(IS_WINDOWS, reason="requires fcntl")
 def test_Sequence_alignment(all_terms):
     """Tests methods related to Sequence class, namely ljust, rjust, center."""
     @as_subprocess

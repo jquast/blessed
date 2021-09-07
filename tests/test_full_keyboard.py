@@ -23,7 +23,7 @@ from .accessories import (SEMAPHORE,
                           read_until_eof,
                           read_until_semaphore,
                           init_subproc_coverage)
-from.conftest import TEST_KEYBOARD, TEST_QUICK, TEST_RAW
+from.conftest import IS_WINDOWS, TEST_KEYBOARD, TEST_QUICK, TEST_RAW
 
 try:
     from unittest import mock
@@ -33,7 +33,7 @@ except ImportError:
 got_sigwinch = False
 
 pytestmark = pytest.mark.skipif(
-    not TEST_KEYBOARD or platform.system() == 'Windows',
+    not TEST_KEYBOARD or IS_WINDOWS,
     reason="Timing-sensitive tests please do not run on build farms.")
 
 

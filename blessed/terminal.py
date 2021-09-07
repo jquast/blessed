@@ -261,8 +261,7 @@ class Terminal(object):
         self._color_distance_algorithm = 'cie2000'
         if not self.does_styling:
             self.number_of_colors = 0
-        elif platform.system() == 'Windows' or (
-                os.environ.get('COLORTERM') in ('truecolor', '24bit')):
+        elif IS_WINDOWS or os.environ.get('COLORTERM') in ('truecolor', '24bit'):
             self.number_of_colors = 1 << 24
         else:
             self.number_of_colors = max(0, curses.tigetnum('colors') or -1)

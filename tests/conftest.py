@@ -8,6 +8,8 @@ import subprocess
 # 3rd party
 import pytest
 
+IS_WINDOWS = platform.system() == 'Windows'
+
 all_terms_params = 'xterm screen ansi vt220 rxvt cons25 linux'.split()
 many_lines_params = [40, 80]
 # we must test a '1' column for conditional in _handle_long_word
@@ -53,7 +55,7 @@ if TEST_FULL:
             .communicate()[0].splitlines()]
     except OSError:
         pass
-elif platform.system() == 'Windows':
+elif IS_WINDOWS:
     all_terms_params = ['vtwin10', ]
 elif TEST_QUICK:
     all_terms_params = 'xterm screen ansi linux'.split()

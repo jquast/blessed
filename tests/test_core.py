@@ -17,6 +17,7 @@ from six.moves import reload_module
 
 # local
 from .accessories import TestTerminal, unicode_cap, as_subprocess
+from .conftest import IS_WINDOWS
 
 try:
     from unittest import mock
@@ -90,7 +91,7 @@ def test_null_fileno():
     child()
 
 
-@pytest.mark.skipif(platform.system() == 'Windows', reason="requires more than 1 tty")
+@pytest.mark.skipif(IS_WINDOWS, reason="requires more than 1 tty")
 def test_number_of_colors_without_tty():
     """``number_of_colors`` should return 0 when there's no tty."""
     @as_subprocess
@@ -123,7 +124,7 @@ def test_number_of_colors_without_tty():
     child_256_nostyle()
 
 
-@pytest.mark.skipif(platform.system() == 'Windows', reason="requires more than 1 tty")
+@pytest.mark.skipif(IS_WINDOWS, reason="requires more than 1 tty")
 def test_number_of_colors_with_tty():
     """test ``number_of_colors`` 0, 8, and 256."""
     @as_subprocess
@@ -294,7 +295,7 @@ def test_IOUnsupportedOperation():
     child()
 
 
-@pytest.mark.skipif(platform.system() == 'Windows', reason="has process-wide side-effects")
+@pytest.mark.skipif(IS_WINDOWS, reason="has process-wide side-effects")
 def test_winsize_IOError_returns_environ():
     """When _winsize raises IOError, defaults from os.environ given."""
     @as_subprocess
@@ -341,7 +342,7 @@ def test_yield_hidden_cursor(all_terms):
     child(all_terms)
 
 
-@pytest.mark.skipif(platform.system() == 'Windows', reason="windows doesn't work like this")
+@pytest.mark.skipif(IS_WINDOWS, reason="windows doesn't work like this")
 def test_no_preferredencoding_fallback():
     """Ensure empty preferredencoding value defaults to ascii."""
     @as_subprocess
@@ -354,7 +355,7 @@ def test_no_preferredencoding_fallback():
     child()
 
 
-@pytest.mark.skipif(platform.system() == 'Windows', reason="requires fcntl")
+@pytest.mark.skipif(IS_WINDOWS, reason="requires fcntl")
 def test_unknown_preferredencoding_warned_and_fallback():
     """Ensure a locale without a codec emits a warning."""
     @as_subprocess
@@ -370,7 +371,7 @@ def test_unknown_preferredencoding_warned_and_fallback():
     child()
 
 
-@pytest.mark.skipif(platform.system() == 'Windows', reason="requires fcntl")
+@pytest.mark.skipif(IS_WINDOWS, reason="requires fcntl")
 def test_win32_missing_tty_modules(monkeypatch):
     """Ensure dummy exception is used when io is without UnsupportedOperation."""
     @as_subprocess
@@ -447,7 +448,7 @@ def test_time_left_infinite_None():
     assert _time_left(stime=time.time(), timeout=None) is None
 
 
-@pytest.mark.skipif(platform.system() == 'Windows', reason="cant multiprocess")
+@pytest.mark.skipif(IS_WINDOWS, reason="cant multiprocess")
 def test_termcap_repr():
     """Ensure ``hidden_cursor()`` writes hide_cursor and normal_cursor."""
 

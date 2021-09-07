@@ -16,6 +16,7 @@ import six
 
 # local
 from blessed import Terminal
+from .conftest import IS_WINDOWS
 
 try:
     from typing import Callable
@@ -23,15 +24,15 @@ except ImportError:  # py2
     pass
 
 
-if platform.system() != "Windows":
+if IS_WINDOWS:
+    import jinxed as curses
+else:
     import curses
     import pty
     import termios
-else:
-    import jinxed as curses
 
 
-test_kind = 'vtwin10' if platform.system() == 'Windows' else 'xterm-256color'
+test_kind = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
 TestTerminal = functools.partial(Terminal, kind=test_kind)  # type: Callable[..., Terminal]
 SEND_SEMAPHORE = SEMAPHORE = b'SEMAPHORE\n'
 RECV_SEMAPHORE = b'SEMAPHORE\r\n'
@@ -61,7 +62,7 @@ class as_subprocess(object):  # pylint: disable=too-few-public-methods
         self.func = func
 
     def __call__(self, *args, **kwargs):  # pylint: disable=too-many-locals, too-complex
-        if platform.system() == 'Windows':
+        if IS_WINDOWS:
             self.func(*args, **kwargs)
             return
 
