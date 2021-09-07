@@ -1,8 +1,12 @@
+.. py:currentmodule:: blessed.terminal
+
 Version History
 ===============
 1.19
-  * Added :meth:`~Terminal.truncate` to truncate a string while
+  * introduced :meth:`~Terminal.truncate` to truncate a string while
     retaining the sequences, :ghissue:`211` by :ghuser:`fishermans-friend`
+  * enhancement: Add small sleep in :meth:`~Terminal.kbhit` on Windows
+    to reduce CPU load :ghissue:`209` by :ghuser:`numerlor`
 
 1.18
   * bugfix: :meth:`~Terminal.split_seqs` for some sequences
