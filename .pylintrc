@@ -16,6 +16,7 @@ disable=
     fixme,
     c-extension-no-member,
     raise-missing-from,  # Python 2
+    redundant-u-string-prefix,  # Python 2
     super-with-arguments,  # Python 2
     ungrouped-imports,
     useless-object-inheritance  # Python 2

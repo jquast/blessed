@@ -129,7 +129,7 @@ def redraw(term, screen, start=None, end=None):
             if col >= term.width or row >= term.height:
                 # out of bounds
                 continue
-            if not (row == lastrow and col == lastcol + 1):
+            if row != lastrow or col != lastcol + 1:
                 # use cursor movement
                 echo_yx(Cursor(row, col, term), screen[row, col])
             else:

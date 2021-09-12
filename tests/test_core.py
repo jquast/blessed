@@ -105,11 +105,8 @@ def test_number_of_colors_without_tty():
 
     @as_subprocess
     def child_8_forcestyle():
-        kind = 'ansi'
-        if platform.system().lower() == 'freebsd':
-            # 'ansi' on freebsd returns 0 colors, we use the 'cons25' driver,
-            # compatible with its kernel tty.c
-            kind = 'cons25'
+        # 'ansi' on freebsd returns 0 colors. We use 'cons25', compatible with its kernel tty.c
+        kind = 'cons25' if platform.system().lower() == 'freebsd' else 'ansi'
         t = TestTerminal(kind=kind, stream=six.StringIO(),
                          force_styling=True)
         assert (t.number_of_colors == 8)
@@ -136,11 +133,8 @@ def test_number_of_colors_with_tty():
 
     @as_subprocess
     def child_8():
-        kind = 'ansi'
-        if platform.system().lower() == 'freebsd':
-            # 'ansi' on freebsd returns 0 colors, we use the 'cons25' driver,
-            # compatible with its kernel tty.c
-            kind = 'cons25'
+        # 'ansi' on freebsd returns 0 colors. We use 'cons25', compatible with its kernel tty.c
+        kind = 'cons25' if platform.system().lower() == 'freebsd' else 'ansi'
         t = TestTerminal(kind=kind)
         assert (t.number_of_colors == 8)
 

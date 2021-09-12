@@ -178,21 +178,17 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         while chunks:
             cur_line = []
             cur_len = 0
-            if lines:
-                indent = self.subsequent_indent
-            else:
-                indent = self.initial_indent
+            indent = self.subsequent_indent if lines else self.initial_indent
             width = self.width - len(indent)
             if drop_whitespace and (
                     Sequence(chunks[-1], term).strip() == '' and lines):
                 del chunks[-1]
             while chunks:
                 chunk_len = Sequence(chunks[-1], term).length()
-                if cur_len + chunk_len <= width:
-                    cur_line.append(chunks.pop())
-                    cur_len += chunk_len
-                else:
+                if cur_len + chunk_len > width:
                     break
+                cur_line.append(chunks.pop())
+                cur_len += chunk_len
             if chunks and Sequence(chunks[-1], term).length() > width:
                 self._handle_long_word(chunks, cur_line, cur_len, width)
             if drop_whitespace and (
@@ -213,11 +209,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         """
         # Figure out when indent is larger than the specified width, and make
         # sure at least one character is stripped off on every pass
-        if width < 1:
-            space_left = 1
-        else:
-            space_left = width - cur_len
-
+        space_left = 1 if width < 1 else width - cur_len
         # If we're allowed to break long words, then do so: put as much
         # of the next chunk onto the current line as will fit.
 

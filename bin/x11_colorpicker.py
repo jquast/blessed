@@ -104,9 +104,7 @@ def main():
             elif inp in ('[', ']'):
                 term.color_distance_algorithm = next_algo(
                     term.color_distance_algorithm, inp == '[')
-            elif inp == '\x0c':
-                pass
-            else:
+            elif inp != '\x0c':
                 dirty = False
 
             while idx < 0:

@@ -502,7 +502,7 @@ def test_sequence_is_movement_false(all_terms):
 def test_termcap_will_move_false(all_terms):  # pylint: disable=too-complex,too-many-branches
     """Test parser about sequences that do not move the cursor."""
     @as_subprocess
-    def child(kind):
+    def child(kind):  # pylint: disable=too-many-branches
         from blessed.sequences import iter_parse
         term = TestTerminal(kind=kind)
         if term.clear_eol:

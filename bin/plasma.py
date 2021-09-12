@@ -109,8 +109,9 @@ def main(term):
             inp = term.inkey(timeout=0.01 if not pause else None)
             if inp == '?':
                 assert False, "don't panic"
-            if inp == '\x0c':
+            elif inp == '\x0c':
                 dirty = True
+
             if inp in ('[', ']'):
                 term.color_distance_algorithm = next_algo(
                     term.color_distance_algorithm, inp == '[')
@@ -118,6 +119,7 @@ def main(term):
                 dirty = True
             if inp == ' ':
                 pause = not pause
+
             if inp.code in (term.KEY_TAB, term.KEY_BTAB):
                 term.number_of_colors = next_color(
                     term.number_of_colors, inp.code == term.KEY_TAB)

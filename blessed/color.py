@@ -65,10 +65,7 @@ def xyz_to_lab(x_val, y_val, z_val):
     xyz = []
     for val, ref in (x_val, 95.047), (y_val, 100.0), (z_val, 108.883):
         val /= ref
-        if val > 0.008856:
-            val = pow(val, 1 / 3.0)
-        else:
-            val = 7.787 * val + 16 / 116.0
+        val = pow(val, 1 / 3.0) if val > 0.008856 else 7.787 * val + 16 / 116.0
         xyz.append(val)
 
     x_val, y_val, z_val = xyz  # pylint: disable=unbalanced-tuple-unpacking
@@ -185,7 +182,7 @@ def dist_cie94(rgb1, rgb2):
     s_c = 1 + k_1 * c_1
     s_h = 1 + k_2 * c_1
 
-    return ((delta_l / (k_l * s_l)) ** 2 +
+    return ((delta_l / (k_l * s_l)) ** 2 +  # pylint: disable=superfluous-parens
             (delta_c / (k_c * s_c)) ** 2 +
             (delta_h / (k_h * s_h)) ** 2)
 
@@ -232,10 +229,7 @@ def dist_cie2000(rgb1, rgb2):
                 delta_h_prime += 360
             else:
                 delta_h_prime -= 360
-            if h_1 + h_2 < 360:
-                h_mean = (h_1 + h_2 + 360) / 2
-            else:
-                h_mean = (h_1 + h_2 - 360) / 2
+            h_mean = (h_1 + h_2 + 360) / 2 if h_1 + h_2 < 360 else (h_1 + h_2 - 360) / 2
 
     delta_h = 2 * sqrt(c_1 * c_2) * sin(delta_h_prime / 2)
 

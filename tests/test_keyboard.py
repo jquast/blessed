@@ -293,7 +293,7 @@ def test_keyboard_prefixes():
 
 
 @pytest.mark.skipif(platform.system() == 'Windows', reason="no multiprocess")
-def test_keypad_mixins_and_aliases():
+def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
     """Test PC-Style function key translations when in ``keypad`` mode."""
     # Key     plain   app     modified
     # Up      ^[[A    ^[OA    ^[[1;mA
@@ -303,7 +303,7 @@ def test_keypad_mixins_and_aliases():
     # End     ^[[F    ^[OF    ^[[1;mF
     # Home    ^[[H    ^[OH    ^[[1;mH
     @as_subprocess
-    def child(kind):
+    def child(kind):  # pylint: disable=too-many-statements
         term = TestTerminal(kind=kind, force_styling=True)
         from blessed.keyboard import resolve_sequence
 

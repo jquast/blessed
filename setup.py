@@ -8,10 +8,8 @@ import setuptools
 
 
 def _get_install_requires(fname):
-    result = [req_line.strip() for req_line in open(fname)
-              if req_line.strip() and not req_line.startswith('#')]
-
-    return result
+    return [req_line.strip() for req_line in open(fname)
+            if req_line.strip() and not req_line.startswith('#')]
 
 
 def _get_version(fname):
@@ -71,13 +69,12 @@ setuptools.setup(
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.2',
-        'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
         'Topic :: Software Development :: Libraries',
         'Topic :: Software Development :: User Interfaces',
         'Topic :: Terminals'

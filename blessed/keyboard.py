@@ -79,8 +79,7 @@ def get_curses_keycodes():
     """
     _keynames = [attr for attr in dir(curses)
                  if attr.startswith('KEY_')]
-    return dict((keyname, getattr(curses, keyname))
-                for keyname in _keynames)
+    return {keyname: getattr(curses, keyname) for keyname in _keynames}
 
 
 def get_keyboard_codes():
@@ -136,7 +135,7 @@ def _alternative_left_right(term):
     preferring their true application key sequence, instead.
     """
     # pylint: disable=protected-access
-    keymap = dict()
+    keymap = {}
     if term._cuf1 and term._cuf1 != u' ':
         keymap[term._cuf1] = curses.KEY_RIGHT
     if term._cub1 and term._cub1 != u'\b':
@@ -209,7 +208,7 @@ def get_leading_prefixes(sequences):
     >>> prefixes(['abc', 'abdf', 'e', 'jkl'])
     set([u'a', u'ab', u'abd', u'j', u'jk'])
     """
-    return set(seq[:i] for seq in sequences for i in range(1, len(seq)))
+    return {seq[:i] for seq in sequences for i in range(1, len(seq))}
 
 
 def resolve_sequence(text, mapper, codes):

@@ -172,13 +172,10 @@ class Terminal(object):
             self._kind = kind or os.environ.get('TERM', 'dumb') or 'dumb'
 
         self._does_styling = False
-        if force_styling:
+        if force_styling is None and self.is_a_tty:
+            self.errors.append('force_styling is None')
+        elif force_styling or self.is_a_tty:
             self._does_styling = True
-        elif self.is_a_tty:
-            if force_styling is None:
-                self.errors.append('force_styling is None')
-            else:
-                self._does_styling = True
 
         if self.does_styling:
             # Initialize curses (call setupterm), so things like tigetstr() work.
@@ -1175,9 +1172,7 @@ class Terminal(object):
         wrapper = SequenceTextWrapper(width=width, term=self, **kwargs)
         lines = []
         for line in text.splitlines():
-            lines.extend(
-                (_linewrap for _linewrap in wrapper.wrap(line))
-                if line.strip() else (u'',))
+            lines.extend(iter(wrapper.wrap(line)) if line.strip() else (u'',))
 
         return lines
 
@@ -1393,6 +1388,13 @@ class Terminal(object):
         .. note:: When used without the context manager :meth:`cbreak`, or
             :meth:`raw`, :obj:`sys.__stdin__` remains line-buffered, and this
             function will block until the return key is pressed!
+
+        .. note:: On Windows, a 10 ms sleep is added to the key press detection loop to reduce CPU
+            load. Due to the behavior of :py:func:`time.sleep` on Windows, this will actually
+            result in a 15.6 ms delay when using the default `time resolution
+            <https://docs.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timebeginperiod>`_.
+            Decreasing the time resolution will reduce this to 10 ms, while increasing it, which
+            is rarely done, will have a perceptable impact on the behavior.
         """
         resolve = functools.partial(resolve_sequence,
                                     mapper=self._keymap,

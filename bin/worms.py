@@ -172,9 +172,10 @@ def nibble_locations(nibble_location, nibble_value):
     """Return array of locations for the current "nibble"."""
     # generate an array of locations for the current nibble's location
     # -- a digit such as '123' may be hit at 3 different (y, x) coordinates.
-    return [Location(x=nibble_location.x + offset,
-                     y=nibble_location.y)
-            for offset in range(0, 1 + len('{}'.format(nibble_value)) - 1)]
+    return [
+        Location(x=nibble_location.x + offset, y=nibble_location.y)
+        for offset in range(1 + len('{}'.format(nibble_value)) - 1)
+    ]
 
 
 def main():
