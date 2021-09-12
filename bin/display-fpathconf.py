@@ -56,5 +56,6 @@ def display_fpathconf():
         print(fmt.format(name=name, value=value, description=description))
     print()
 
+
 if __name__ == '__main__':
     display_fpathconf()
