@@ -27,53 +27,53 @@ jobs:
 
           - python-version: 3.9
             os:  ubuntu-latest
-            toxenv: about,py39
+            toxenv: py39
             test_keyboard: 1
             test_raw: 1
 
           - python-version: 3.9
             os: windows-latest
-            toxenv: about,py39
+            toxenv: py39
 
           - python-version: 3.8
             os:  ubuntu-latest
-            toxenv: about,py38
+            toxenv: py38
             test_quick: 1
 
           - python-version: 3.7
             os:  ubuntu-latest
-            toxenv: about,py37
+            toxenv: py37
             test_quick: 1
 
           - python-version: 3.6
             os:  ubuntu-latest
-            toxenv: about,py36
+            toxenv: py36
             test_quick: 1
 
           - python-version: 3.5
             os:  ubuntu-latest
-            toxenv: about,py35
+            toxenv: py35
             test_quick: 1
 
           - python-version: 3.4
             os:  ubuntu-18.04
-            toxenv: about,py34
+            toxenv: py34
             test_quick: 1
 
           - python-version: 2.7
             os:  ubuntu-latest
-            toxenv: about,py27
+            toxenv: py27
             test_keyboard: 1
             test_raw: 1
 
           - python-version: 2.7
             os: windows-latest
-            toxenv: about,py27
+            toxenv: py27
 
           - python-version: '3.10-dev'
             optional: true
             os:  ubuntu-latest
-            toxenv: about,py310
+            toxenv: py310
             toxpython: 3.10
             test_quick: 1
 
