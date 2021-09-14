@@ -716,3 +716,16 @@ def test_truncate_padding(all_terms):
     if all_terms != 'vtwin10':
         # padding doesn't work the same on windows !
         child(all_terms)
+
+
+def test_truncate_default(all_terms):
+    """Ensure that terminal.truncate functions with the default argument."""
+    @as_subprocess
+    def child(kind):
+        from blessed import Terminal
+        term = Terminal(kind)
+        test = "Testing " + term.red("attention ") + term.blue("please.")
+        trunc = term.truncate(test)
+        assert term.length(trunc) <= term.width
+
+    child(all_terms)
