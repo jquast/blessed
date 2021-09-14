@@ -1033,9 +1033,9 @@ class Terminal(object):
             width = self.width
         return Sequence(text, self).center(width, fillchar)
 
-    def truncate(self, text, width):
+    def truncate(self, text, width=None):
         r"""
-        Return ``text`` truncated to a maximum of ``width`` printable characters.
+        Truncate ``text`` to maximum ``width`` printable characters, retaining terminal sequences.
 
         :arg str text: Text to truncate
         :arg int width: The maximum width to truncate it to
@@ -1045,6 +1045,8 @@ class Terminal(object):
         >>> term.truncate(u'xyz\x1b[0;3m', 2)
         u'xy\x1b[0;3m'
         """
+        if width is None:
+            width = self.width
         return Sequence(text, self).truncate(width)
 
     def length(self, text):
