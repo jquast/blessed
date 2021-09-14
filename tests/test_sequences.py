@@ -727,5 +727,6 @@ def test_truncate_default(all_terms):
         test = "Testing " + term.red("attention ") + term.blue("please.")
         trunc = term.truncate(test)
         assert term.length(trunc) <= term.width
+        assert term.truncate(term.red('x' * 1000)) == term.red('x' * term.width)
 
     child(all_terms)
