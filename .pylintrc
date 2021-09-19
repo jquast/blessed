@@ -12,13 +12,11 @@ unsafe-load-any-extension = yes
 
 [MESSAGES CONTROL]
 disable=
-    I,
     fixme,
-    c-extension-no-member,
+    consider-using-f-string,  # Python 2
     raise-missing-from,  # Python 2
     redundant-u-string-prefix,  # Python 2
     super-with-arguments,  # Python 2
-    ungrouped-imports,
     useless-object-inheritance  # Python 2
 
 [FORMAT]
