@@ -77,7 +77,7 @@ setuptools.setup(
         'Programming Language :: Python :: 3.9',
         'Topic :: Software Development :: Libraries',
         'Topic :: Software Development :: User Interfaces',
-        'Topic :: Terminals'
+        'Topic :: Terminals',
         'Typing :: Typed',
     ],
     keywords=['terminal', 'sequences', 'tty', 'curses', 'ncurses',
