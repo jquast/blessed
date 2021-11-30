@@ -14,8 +14,8 @@ from typing import (Any,
 # local
 from .terminal import Terminal
 
-COLORS = Set[str]
-COMPOUNDABLES = Set[str]
+COLORS: Set[str]
+COMPOUNDABLES: Set[str]
 
 _T = TypeVar("_T")
 
