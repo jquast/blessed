@@ -1153,7 +1153,7 @@ class Terminal(object):
         return result
 
     def wrap(self, text, width=None, **kwargs):
-        """
+        r"""
         Text-wrap a string, returning a list of wrapped lines.
 
         :arg str text: Unlike :func:`textwrap.wrap`, ``text`` may contain
@@ -1162,7 +1162,7 @@ class Terminal(object):
             :func:`string.expandtabs`.
         :arg int width: Unlike :func:`textwrap.wrap`, ``width`` will
             default to the width of the attached terminal.
-        :arg \\**kwargs: See :py:class:`textwrap.TextWrapper`
+        :arg \**kwargs: See :py:class:`textwrap.TextWrapper`
         :rtype: list
         :returns: List of wrapped lines
 
