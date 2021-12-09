@@ -92,6 +92,15 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Test forced styling without TTY
+        run: >
+          pipx run --spec blessed==1.19.0 python -c
+          "import blessed;
+          term = blessed.Terminal(force_styling=True);
+          message = term.bold_red('test TTY');
+          print(repr(message));
+          print(message)"
+
       - name: Install tox
         run: pip install tox
 
