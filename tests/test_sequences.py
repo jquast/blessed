@@ -728,3 +728,32 @@ def test_truncate_default(all_terms):
         assert term.truncate(term.red('x' * 1000)) == term.red('x' * term.width)
 
     child(all_terms)
+
+
+def test_supports_index(all_terms):
+    """Ensure sequence formatting methods support objects with __index__()"""
+
+    @as_subprocess
+    def child(kind):
+        from blessed.sequences import Sequence
+        from blessed.terminal import Terminal
+
+        class Indexable:  # pylint: disable=too-few-public-methods
+            """ Custom class implementing index()"""
+            def __index__(self):
+                return 100
+
+        term = Terminal(kind)
+        seq = Sequence('abcd', term)
+        indexable = Indexable()
+
+        assert seq.rjust(100) == seq.rjust(indexable)
+        assert seq.ljust(100) == seq.ljust(indexable)
+        assert seq.center(100) == seq.center(indexable)
+        assert seq.truncate(100) == seq.truncate(indexable)
+
+        seq = Sequence('abcd' * 30, term)
+        assert seq.truncate(100) == seq.truncate(indexable)
+
+    kind = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
+    child(kind)
