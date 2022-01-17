@@ -7,6 +7,12 @@ Version History
     retaining the sequences, :ghissue:`211` by :ghuser:`fishermans-friend`
   * enhancement: Add small sleep in :meth:`~Terminal.kbhit` on Windows
     to reduce CPU load :ghissue:`209` by :ghuser:`numerlor`
+  * enhancement: :meth:`~Terminal.rjust`, :meth:`~Terminal.ljust`,
+    and :meth:`~Terminal.center` now accept :class:`~typing.SupportsIndex` types, :ghissue:`234`
+  * enhancement: When 88 colors is detected, it is now interpreted as 16 colors rather than raising
+    an :exc:`AssertionError`, :ghissue:`235`
+  * bugfix: Fix global variable declarations in type annotations, :ghissue:`230` by
+    :ghuser:`mwchase`
 
 1.18
   * bugfix: :meth:`~Terminal.split_seqs` for some sequences
