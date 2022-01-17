@@ -938,13 +938,21 @@ class Terminal(object):
 
         This may be used to test whether the terminal supports colors,
         and at what depth, if that's a concern.
+
+        If this property is assigned a value of 88, the value 16 will be saved. This is due to the
+        the rarity of 88 color support and the inconsistency of behavior between implementations.
+
+        Assigning this property to a value other than 0, 4, 8, 16, 88, 256, or 1 << 24 will
+        raise an :py:exc:`AssertionError`.
         """
         return self._number_of_colors
 
     @number_of_colors.setter
     def number_of_colors(self, value):
-        assert value in (0, 4, 8, 16, 256, 1 << 24)
-        self._number_of_colors = value
+        assert value in (0, 4, 8, 16, 88, 256, 1 << 24)
+        # Because 88 colors is rare and we can't guarantee consistent behavior,
+        # when 88 colors is detected, it is treated as 16 colors
+        self._number_of_colors = 16 if value == 88 else value
         self.__clear_color_capabilities()
 
     @property

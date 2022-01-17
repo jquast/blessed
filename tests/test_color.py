@@ -89,6 +89,10 @@ def test_set_number_of_colors():
             t.number_of_colors = num
             assert t.number_of_colors == num
             assert 'aqua' not in dir(t)
+
+        t.number_of_colors = 88
+        assert t.number_of_colors == 16
+
         with pytest.raises(AssertionError):
             t.number_of_colors = 40
 
