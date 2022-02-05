@@ -712,6 +712,90 @@ def test_get_location_timeout():
     child()
 
 
+def test_get_fgcolor_0s():
+    """0-second get_fgcolor call without response."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=six.StringIO())
+        stime = time.time()
+        rgb = term.get_fgcolor(timeout=0)
+        assert (math.floor(time.time() - stime) == 0.0)
+        assert rgb == (-1, -1, -1)
+    child()
+
+
+def test_get_fgcolor_0s_reply_via_ungetch():
+    """0-second get_fgcolor call with response."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=six.StringIO())
+        stime = time.time()
+        term.ungetch(u'\x1b]10;rgb:ffff/ffff/ffff\x07')
+
+        rgb = term.get_fgcolor(timeout=0.01)
+        assert (math.floor(time.time() - stime) == 0.0)
+        assert rgb == (65535, 65535, 65535)
+    child()
+
+
+def test_get_fgcolor_styling_indifferent():
+    """Ensure get_fgcolor() behavior is the same regardless of styling"""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=six.StringIO(), force_styling=True)
+        term.ungetch(u'\x1b]10;rgb:ffff/ffff/ffff\x07')
+        rgb = term.get_fgcolor(timeout=0.01)
+        assert rgb == (65535, 65535, 65535)
+
+        term = TestTerminal(stream=six.StringIO(), force_styling=False)
+        term.ungetch(u'\x1b]10;rgb:ffff/ffff/ffff\x07')
+        rgb = term.get_fgcolor(timeout=0.01)
+        assert rgb == (65535, 65535, 65535)
+    child()
+
+
+def test_get_bgcolor_0s():
+    """0-second get_bgcolor call without response."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=six.StringIO())
+        stime = time.time()
+        rgb = term.get_bgcolor(timeout=0)
+        assert (math.floor(time.time() - stime) == 0.0)
+        assert rgb == (-1, -1, -1)
+    child()
+
+
+def test_get_bgcolor_0s_reply_via_ungetch():
+    """0-second get_bgcolor call with response."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=six.StringIO())
+        stime = time.time()
+        term.ungetch(u'\x1b]11;rgb:ffff/ffff/ffff\x07')
+
+        rgb = term.get_bgcolor(timeout=0.01)
+        assert (math.floor(time.time() - stime) == 0.0)
+        assert rgb == (65535, 65535, 65535)
+    child()
+
+
+def test_get_bgcolor_styling_indifferent():
+    """Ensure get_bgcolor() behavior is the same regardless of styling"""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=six.StringIO(), force_styling=True)
+        term.ungetch(u'\x1b]11;rgb:ffff/ffff/ffff\x07')
+        rgb = term.get_bgcolor(timeout=0.01)
+        assert rgb == (65535, 65535, 65535)
+
+        term = TestTerminal(stream=six.StringIO(), force_styling=False)
+        term.ungetch(u'\x1b]11;rgb:ffff/ffff/ffff\x07')
+        rgb = term.get_bgcolor(timeout=0.01)
+        assert rgb == (65535, 65535, 65535)
+    child()
+
+
 @pytest.mark.skipif(six.PY2, reason="Python 3 only")
 def test_detached_stdout():
     """Ensure detached __stdout__ does not raise an exception"""
