@@ -661,6 +661,102 @@ class Terminal(object):
         # rather than crowbarring such logic into an exception handler.
         return -1, -1
 
+    def get_fgcolor(self, timeout=None):
+        """
+        Return tuple (r, g, b) of foreground color.
+
+        :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1, -1)`` indicating
+            that the remote end did not respond.
+        :rtype: tuple
+        :returns: foreground color as tuple in form of ``(r, g, b)``.  When a timeout is specified,
+            always ensure the return value is checked for ``(-1, -1, -1)``.
+
+        The foreground color is determined by emitting an `OSC 10 color query
+        <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
+        """
+        query_str = u'\x1b]10;?\x07'
+        response_re = re.compile(u'\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+
+        ctx = None
+        try:
+            if self._line_buffered:
+                ctx = self.cbreak()
+                ctx.__enter__()  # pylint: disable=no-member
+
+            # emit the 'query foregound color' sequence,
+            self.stream.write(query_str)
+            self.stream.flush()
+
+            # expect a response,
+            match, data = _read_until(term=self,
+                                      pattern=response_re,
+                                      timeout=timeout)
+
+            # ensure response sequence is excluded from subsequent input,
+            if match:
+                data = (data[:match.start()] + data[match.end():])
+
+            # re-buffer keyboard data, if any
+            self.ungetch(data)
+
+            if match:
+                # return matching sequence response, the foreground color.
+                return tuple(int(val, 16) for val in match.groups())
+        finally:
+            if ctx is not None:
+                ctx.__exit__(None, None, None)  # pylint: disable=no-member
+
+        # We return an illegal value rather than an exception.
+        return -1, -1, -1
+
+    def get_bgcolor(self, timeout=None):
+        """
+        Return tuple (r, g, b) of background color.
+
+        :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1, -1)`` indicating
+            that the remote end did not respond.
+        :rtype: tuple
+        :returns: background color as tuple in form of ``(r, g, b)``.  When a timeout is specified,
+            always ensure the return value is checked for ``(-1, -1, -1)``.
+
+        The background color is determined by emitting an `OSC 11 color query
+        <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
+        """
+        query_str = u'\x1b]11;?\x07'
+        response_re = re.compile(u'\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+
+        ctx = None
+        try:
+            if self._line_buffered:
+                ctx = self.cbreak()
+                ctx.__enter__()  # pylint: disable=no-member
+
+            # emit the 'query background color' sequence,
+            self.stream.write(query_str)
+            self.stream.flush()
+
+            # expect a response,
+            match, data = _read_until(term=self,
+                                      pattern=response_re,
+                                      timeout=timeout)
+
+            # ensure response sequence is excluded from subsequent input,
+            if match:
+                data = (data[:match.start()] + data[match.end():])
+
+            # re-buffer keyboard data, if any
+            self.ungetch(data)
+
+            if match:
+                # return matching sequence response, the background color.
+                return tuple(int(val, 16) for val in match.groups())
+        finally:
+            if ctx is not None:
+                ctx.__exit__(None, None, None)  # pylint: disable=no-member
+
+        # We return an illegal value rather than an exception.
+        return -1, -1, -1
+
     @contextlib.contextmanager
     def fullscreen(self):
         """
