@@ -665,8 +665,8 @@ class Terminal(object):
         """
         Return tuple (r, g, b) of foreground color.
 
-        :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1, -1)`` indicating
-            that the remote end did not respond.
+        :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1, -1)``
+            indicating that the remote end did not respond.
         :rtype: tuple
         :returns: foreground color as tuple in form of ``(r, g, b)``.  When a timeout is specified,
             always ensure the return value is checked for ``(-1, -1, -1)``.
@@ -713,8 +713,8 @@ class Terminal(object):
         """
         Return tuple (r, g, b) of background color.
 
-        :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1, -1)`` indicating
-            that the remote end did not respond.
+        :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1, -1)``
+            indicating that the remote end did not respond.
         :rtype: tuple
         :returns: background color as tuple in form of ``(r, g, b)``.  When a timeout is specified,
             always ensure the return value is checked for ``(-1, -1, -1)``.
