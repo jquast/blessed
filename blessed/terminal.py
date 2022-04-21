@@ -39,12 +39,9 @@ from ._capabilities import CAPABILITY_DATABASE, CAPABILITIES_ADDITIVES, CAPABILI
 
 # isort: off
 
-try:
-    InterruptedError
-except NameError:
-    # alias py2 exception to py3
-    # pylint: disable=redefined-builtin
-    InterruptedError = select.error
+# Alias py2 exception to py3
+if sys.version_info[:2] < (3, 3):
+    InterruptedError = select.error  # pylint: disable=redefined-builtin
 
 
 HAS_TTY = True
