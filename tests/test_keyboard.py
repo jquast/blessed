@@ -288,7 +288,7 @@ def test_keyboard_prefixes():
     from blessed.keyboard import get_leading_prefixes
     keys = ['abc', 'abdf', 'e', 'jkl']
     pfs = get_leading_prefixes(keys)
-    assert pfs == set([u'a', u'ab', u'abd', u'j', u'jk'])
+    assert pfs == {u'a', u'ab', u'abd', u'j', u'jk'}
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no multiprocess")

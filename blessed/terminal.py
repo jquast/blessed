@@ -766,10 +766,10 @@ class Terminal(object):
         This should not be used directly, but rather a specific color by name or
         :meth:`~.Terminal.color_rgb` value.
         """
-        if not self.does_styling:
-            return NullCallableString()
-        return ParameterizingString(self._foreground_color,
-                                    self.normal, 'color')
+        if self.does_styling:
+            return ParameterizingString(self._foreground_color, self.normal, 'color')
+
+        return NullCallableString()
 
     def color_rgb(self, red, green, blue):
         """
@@ -800,10 +800,10 @@ class Terminal(object):
 
         :rtype: ParameterizingString
         """
-        if not self.does_styling:
-            return NullCallableString()
-        return ParameterizingString(self._background_color,
-                                    self.normal, 'on_color')
+        if self.does_styling:
+            return ParameterizingString(self._background_color, self.normal, 'on_color')
+
+        return NullCallableString()
 
     def on_color_rgb(self, red, green, blue):
         """

@@ -270,9 +270,7 @@ class FormattingOtherString(six.text_type):
 
     def __call__(self, *args):
         """Return ``text`` by ``target``."""
-        if args:
-            return self._callable(*args)
-        return self
+        return self._callable(*args) if args else self
 
 
 class NullCallableString(six.text_type):

@@ -71,14 +71,14 @@ class Termcap(object):
             'cursor_right': 1,
             'tab': 8,
             'ascii_tab': 8,
-        }.get(self.name, None)
+        }.get(self.name)
         if value is not None:
             return value
 
         unit = {
             'parm_left_cursor': -1,
             'parm_right_cursor': 1
-        }.get(self.name, None)
+        }.get(self.name)
         if unit is not None:
             value = int(self.re_compiled.match(text).group(1))
             return unit * value
