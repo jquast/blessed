@@ -25,7 +25,7 @@ else:
 def fn_tparm(*args):
     """Mock tparm function"""
     return u'~'.join(
-        '%s' % (arg,) if num else arg.decode('latin1') for num, arg in enumerate(args)
+        str(arg) if num else arg.decode('latin1') for num, arg in enumerate(args)
     ).encode('latin1')
 
 
