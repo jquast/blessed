@@ -273,7 +273,7 @@ class Sequence(six.text_type):
         :rtype: str
         """
         rightside = fillchar * int(
-            (max(0.0, float(width.__index__() - self.length()))) / float(len(fillchar)))
+            (max(0.0, float(int(width) - self.length()))) / float(len(fillchar)))
         return u''.join((self, rightside))
 
     def rjust(self, width, fillchar=u' '):
@@ -287,7 +287,7 @@ class Sequence(six.text_type):
         :rtype: str
         """
         leftside = fillchar * int(
-            (max(0.0, float(width.__index__() - self.length()))) / float(len(fillchar)))
+            (max(0.0, float(int(width) - self.length()))) / float(len(fillchar)))
         return u''.join((leftside, self))
 
     def center(self, width, fillchar=u' '):
@@ -300,7 +300,7 @@ class Sequence(six.text_type):
         :returns: String of ``text``, centered by ``width``.
         :rtype: str
         """
-        split = max(0.0, float(width.__index__()) - self.length()) / 2
+        split = max(0.0, float(int(width)) - self.length()) / 2
         leftside = fillchar * int(
             (max(0.0, math.floor(split))) / float(len(fillchar)))
         rightside = fillchar * int(
@@ -321,7 +321,7 @@ class Sequence(six.text_type):
         """
         output = ""
         current_width = 0
-        target_width = width.__index__()
+        target_width = int(width)
         parsed_seq = iter_parse(self._term, self.padd())
 
         # Retain all text until non-cap width reaches desired width

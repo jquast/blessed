@@ -506,7 +506,7 @@ def test_null_callable_string(all_terms):
     def child(kind):
         t = TestTerminal(stream=six.StringIO(), kind=kind)
         assert (t.clear == '')
-        assert (t.move(1 == 2) == '')
+        assert (t.move(False) == '')
         assert (t.move_x(1) == '')
         assert (t.bold() == '')
         assert (t.bold('', 'x', 'huh?') == 'xhuh?')
@@ -730,6 +730,7 @@ def test_truncate_default(all_terms):
     child(all_terms)
 
 
+@pytest.mark.skipif(sys.version_info[:2] < (3, 8), reason="Only supported on Python >= 3.8")
 def test_supports_index(all_terms):
     """Ensure sequence formatting methods support objects with __index__()"""
 
