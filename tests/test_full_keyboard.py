@@ -23,7 +23,7 @@ from .accessories import (SEMAPHORE,
                           read_until_eof,
                           read_until_semaphore,
                           init_subproc_coverage)
-from.conftest import IS_WINDOWS, TEST_KEYBOARD, TEST_QUICK, TEST_RAW
+from .conftest import IS_WINDOWS, TEST_KEYBOARD, TEST_QUICK, TEST_RAW
 
 try:
     from unittest import mock

@@ -8,7 +8,7 @@ import pytest
 
 # local
 from .accessories import TestTerminal, as_subprocess
-from.conftest import TEST_QUICK
+from .conftest import TEST_QUICK
 
 TEXTWRAP_KEYWORD_COMBINATIONS = [
     dict(break_long_words=False,
