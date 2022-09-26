@@ -42,7 +42,7 @@ def main():
         'subsequent_indent': (' ' * (term.width // 6)) + ' ' * 2,
     }
     for a_href in find_articles(soup):
-        url_id = int(random.randrange(0, 1 << 24))
+        url_id = random.randrange(0, 1 << 24)
         for line in term.wrap(make_bold(term, a_href.text), **textwrap_kwargs):
             print(whitespace_only(term, line), end='')
             print(term.link(cnn_url + a_href.get('href'), line.lstrip(), url_id))

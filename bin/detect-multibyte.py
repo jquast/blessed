@@ -77,7 +77,7 @@ def main():
 
         # determine distance
         horizontal_distance = pos1.column - pos0.column
-        multibyte_capable = bool(horizontal_distance == 1)
+        multibyte_capable = horizontal_distance == 1
 
         # rubout character(s)
         print('\b \b' * horizontal_distance, end='')

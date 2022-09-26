@@ -106,7 +106,7 @@ def main(term):
             if pause:
                 show_paused(term)
 
-            inp = term.inkey(timeout=0.01 if not pause else None)
+            inp = term.inkey(timeout=None if pause else 0.01)
             if inp == '?':
                 assert False, "don't panic"
             elif inp == '\x0c':

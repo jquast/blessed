@@ -117,11 +117,11 @@ def redraw(term, screen, start=None, end=None):
     """Redraw the screen."""
     if start is None and end is None:
         echo(term.clear)
-        start, end = (Cursor(y=min([y for (y, x) in screen or [(0, 0)]]),
-                             x=min([x for (y, x) in screen or [(0, 0)]]),
+        start, end = (Cursor(y=min(y for (y, x) in screen or [(0, 0)]),
+                             x=min(x for (y, x) in screen or [(0, 0)]),
                              term=term),
-                      Cursor(y=max([y for (y, x) in screen or [(0, 0)]]),
-                             x=max([x for (y, x) in screen or [(0, 0)]]),
+                      Cursor(y=max(y for (y, x) in screen or [(0, 0)]),
+                             x=max(x for (y, x) in screen or [(0, 0)]),
                              term=term))
     lastcol, lastrow = -1, -1
     for row, col in sorted(screen):

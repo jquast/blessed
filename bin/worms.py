@@ -141,16 +141,12 @@ def next_wormlength(nibble, head, worm_length):
 
 def next_speed(nibble, head, speed, modifier):
     """Return new speed if current nibble is hit."""
-    if hit(head, nibble.location):
-        return speed * modifier
-    return speed
+    return speed * modifier if hit(head, nibble.location) else speed
 
 
 def head_glyph(direction):
     """Return character for worm head depending on horiz/vert orientation."""
-    if direction in (left_of, right_of):
-        return u':'
-    return u'"'
+    return u':' if direction in (left_of, right_of) else u'"'
 
 
 def next_nibble(term, nibble, head, worm):

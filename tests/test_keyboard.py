@@ -93,8 +93,8 @@ def test_keystroke_default_args():
     assert ks.code == ks._code
     assert u'x' + ks == u'x'
     assert not ks.is_sequence
-    assert repr(ks) in ("u''",  # py26, 27
-                        "''",)  # py33
+    assert repr(ks) in {"u''",  # py26, 27
+                        "''",}  # py33
 
 
 def test_a_keystroke():
@@ -244,43 +244,43 @@ def test_resolve_sequence():
     assert ks.name is None
     assert ks.code is None
     assert not ks.is_sequence
-    assert repr(ks) in ("u''",  # py26, 27
-                        "''",)  # py33
+    assert repr(ks) in {"u''",  # py26, 27
+                        "''",}  # py33
 
     ks = resolve_sequence(u'notfound', mapper=mapper, codes=codes)
     assert ks == u'n'
     assert ks.name is None
     assert ks.code is None
     assert not ks.is_sequence
-    assert repr(ks) in (u"u'n'", "'n'",)
+    assert repr(ks) in {u"u'n'", "'n'",}
 
     ks = resolve_sequence(u'SEQ1', mapper, codes)
     assert ks == u'SEQ1'
     assert ks.name == u'KEY_SEQ1'
     assert ks.code == 1
     assert ks.is_sequence
-    assert repr(ks) in (u"KEY_SEQ1", "KEY_SEQ1")
+    assert repr(ks) in {u"KEY_SEQ1", "KEY_SEQ1"}
 
     ks = resolve_sequence(u'LONGSEQ_longer', mapper, codes)
     assert ks == u'LONGSEQ'
     assert ks.name == u'KEY_LONGSEQ'
     assert ks.code == 4
     assert ks.is_sequence
-    assert repr(ks) in (u"KEY_LONGSEQ", "KEY_LONGSEQ")
+    assert repr(ks) in {u"KEY_LONGSEQ", "KEY_LONGSEQ"}
 
     ks = resolve_sequence(u'LONGSEQ', mapper, codes)
     assert ks == u'LONGSEQ'
     assert ks.name == u'KEY_LONGSEQ'
     assert ks.code == 4
     assert ks.is_sequence
-    assert repr(ks) in (u"KEY_LONGSEQ", "KEY_LONGSEQ")
+    assert repr(ks) in {u"KEY_LONGSEQ", "KEY_LONGSEQ"}
 
     ks = resolve_sequence(u'Lxxxxx', mapper, codes)
     assert ks == u'L'
     assert ks.name == u'KEY_L'
     assert ks.code == 6
     assert ks.is_sequence
-    assert repr(ks) in (u"KEY_L", "KEY_L")
+    assert repr(ks) in {u"KEY_L", "KEY_L"}
 
 
 def test_keyboard_prefixes():
