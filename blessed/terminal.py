@@ -585,7 +585,6 @@ class Terminal(object):
             ...
             >>> assert given_x == result_x, (given_x, result_x)
             >>> assert given_y == result_y, (given_y, result_y)
-
         """
         # Local lines attached by termios and remote login protocols such as
         # ssh and telnet both provide a means to determine the window
