@@ -6,9 +6,6 @@ import time
 import platform
 from collections import OrderedDict
 
-# 3rd party
-import six
-
 # isort: off
 # curses
 if platform.system() == 'Windows':
@@ -20,7 +17,7 @@ else:
     from curses.has_key import _capability_names as capability_names
 
 
-class Keystroke(six.text_type):
+class Keystroke(str):
     """
     A unicode-derived class for describing a single keystroke.
 
@@ -41,7 +38,7 @@ class Keystroke(six.text_type):
 
     def __new__(cls, ucs='', code=None, name=None):
         """Class constructor."""
-        new = six.text_type.__new__(cls, ucs)
+        new = str.__new__(cls, ucs)
         new._name = name
         new._code = code
         return new
@@ -53,9 +50,9 @@ class Keystroke(six.text_type):
 
     def __repr__(self):
         """Docstring overwritten."""
-        return (six.text_type.__repr__(self) if self._name is None else
+        return (str.__repr__(self) if self._name is None else
                 self._name)
-    __repr__.__doc__ = six.text_type.__doc__
+    __repr__.__doc__ = str.__doc__
 
     @property
     def name(self):
@@ -358,12 +355,12 @@ for keycode_name in _CURSES_KEYCODE_ADDINS:
 DEFAULT_SEQUENCE_MIXIN = (
     # these common control characters (and 127, ctrl+'?') mapped to
     # an application key definition.
-    (six.unichr(10), curses.KEY_ENTER),
-    (six.unichr(13), curses.KEY_ENTER),
-    (six.unichr(8), curses.KEY_BACKSPACE),
-    (six.unichr(9), KEY_TAB),  # noqa  # pylint: disable=undefined-variable
-    (six.unichr(27), curses.KEY_EXIT),
-    (six.unichr(127), curses.KEY_BACKSPACE),
+    (chr(10), curses.KEY_ENTER),
+    (chr(13), curses.KEY_ENTER),
+    (chr(8), curses.KEY_BACKSPACE),
+    (chr(9), KEY_TAB),  # noqa  # pylint: disable=undefined-variable
+    (chr(27), curses.KEY_EXIT),
+    (chr(127), curses.KEY_BACKSPACE),
 
     (u"\x1b[A", curses.KEY_UP),
     (u"\x1b[B", curses.KEY_DOWN),

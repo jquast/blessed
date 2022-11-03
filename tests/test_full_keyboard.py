@@ -2,6 +2,7 @@
 """Tests for capturing keyboard input"""
 
 # std imports
+import io
 import os
 import sys
 import math
@@ -10,7 +11,6 @@ import signal
 import platform
 
 # 3rd party
-import six
 import pytest
 
 # local
@@ -136,7 +136,7 @@ def test_kbhit_no_kb():
     """kbhit() always immediately returns False without a keyboard."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=six.StringIO())
+        term = TestTerminal(stream=io.StringIO())
         stime = time.time()
         assert term._keyboard_fd is None
         assert not term.kbhit(timeout=1.1)
@@ -149,7 +149,7 @@ def test_kbhit_no_tty():
     @as_subprocess
     def child():
         with mock.patch('blessed.terminal.HAS_TTY', False):
-            term = TestTerminal(stream=six.StringIO())
+            term = TestTerminal(stream=io.StringIO())
             stime = time.time()
             assert term.kbhit(timeout=1.1) is False
             assert math.floor(time.time() - stime) == 0
@@ -173,7 +173,7 @@ def test_keystroke_0s_cbreak_noinput_nokb():
     """0-second keystroke without data in input stream and no keyboard/tty."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=six.StringIO())
+        term = TestTerminal(stream=io.StringIO())
         with term.cbreak():
             stime = time.time()
             inp = term.inkey(timeout=0)
@@ -201,7 +201,7 @@ def test_keystroke_1s_cbreak_noinput_nokb():
     """1-second keystroke without input or keyboard."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=six.StringIO())
+        term = TestTerminal(stream=io.StringIO())
         with term.cbreak():
             stime = time.time()
             inp = term.inkey(timeout=1)
@@ -582,7 +582,7 @@ def test_get_location_0s():
     """0-second get_location call without response."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=six.StringIO())
+        term = TestTerminal(stream=io.StringIO())
         stime = time.time()
         y, x = term.get_location(timeout=0)
         assert (math.floor(time.time() - stime) == 0.0)
@@ -650,7 +650,7 @@ def test_get_location_0s_reply_via_ungetch():
     """0-second get_location call with response."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=six.StringIO())
+        term = TestTerminal(stream=io.StringIO())
         stime = time.time()
         # monkey patch in an invalid response !
         term.ungetch(u'\x1b[10;10R')
@@ -667,7 +667,7 @@ def test_get_location_0s_nonstandard_u6():
 
     @as_subprocess
     def child():
-        term = TestTerminal(stream=six.StringIO())
+        term = TestTerminal(stream=io.StringIO())
 
         stime = time.time()
         # monkey patch in an invalid response !
@@ -685,12 +685,12 @@ def test_get_location_styling_indifferent():
     """Ensure get_location() behavior is the same regardless of styling"""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=six.StringIO(), force_styling=True)
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term.ungetch(u'\x1b[10;10R')
         y, x = term.get_location(timeout=0.01)
         assert (y, x) == (9, 9)
 
-        term = TestTerminal(stream=six.StringIO(), force_styling=False)
+        term = TestTerminal(stream=io.StringIO(), force_styling=False)
         term.ungetch(u'\x1b[10;10R')
         y, x = term.get_location(timeout=0.01)
         assert (y, x) == (9, 9)
@@ -701,7 +701,7 @@ def test_get_location_timeout():
     """0-second get_location call with response."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=six.StringIO())
+        term = TestTerminal(stream=io.StringIO())
         stime = time.time()
         # monkey patch in an invalid response !
         term.ungetch(u'\x1b[0n')
@@ -712,7 +712,6 @@ def test_get_location_timeout():
     child()
 
 
-@pytest.mark.skipif(six.PY2, reason="Python 3 only")
 def test_detached_stdout():
     """Ensure detached __stdout__ does not raise an exception"""
     import pty

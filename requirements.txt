@@ -1,5 +1,4 @@
 wcwidth>=0.1.4
-six>=1.9.0
 # support python2.6 by using backport of 'orderedict'
 ordereddict==1.1; python_version < "2.7"
 # support python2.7 by using backport of 'functools.lru_cache'

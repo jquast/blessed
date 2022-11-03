@@ -2,6 +2,7 @@
 """Core blessed Terminal() tests."""
 
 # std imports
+from importlib import reload as reload_module
 import io
 import os
 import sys
@@ -11,9 +12,7 @@ import platform
 import warnings
 
 # 3rd party
-import six
 import pytest
-from six.moves import reload_module
 
 # local
 from .accessories import TestTerminal, unicode_cap, as_subprocess
@@ -35,7 +34,7 @@ def test_null_location(all_terms):
     """Make sure ``location()`` with no args just does position restoration."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(stream=six.StringIO(), force_styling=True)
+        t = TestTerminal(stream=io.StringIO(), force_styling=True)
         with t.location():
             pass
         expected_output = u''.join(
@@ -49,7 +48,7 @@ def test_location_to_move_xy(all_terms):
     """``location()`` and ``move_xy()`` receive complimentary arguments."""
     @as_subprocess
     def child(kind):
-        buf = six.StringIO()
+        buf = io.StringIO()
         t = TestTerminal(stream=buf, force_styling=True)
         x, y = 12, 34
         with t.location(y, x):
@@ -65,7 +64,7 @@ def test_yield_keypad():
     @as_subprocess
     def child(kind):
         # given,
-        t = TestTerminal(stream=six.StringIO(), force_styling=True)
+        t = TestTerminal(stream=io.StringIO(), force_styling=True)
         expected_output = u''.join((t.smkx, t.rmkx))
 
         # exercise,
@@ -83,7 +82,7 @@ def test_null_fileno():
     @as_subprocess
     def child():
         # This simulates piping output to another program.
-        out = six.StringIO()
+        out = io.StringIO()
         out.fileno = None
         t = TestTerminal(stream=out)
         assert (t.save == u'')
@@ -96,25 +95,25 @@ def test_number_of_colors_without_tty():
     """``number_of_colors`` should return 0 when there's no tty."""
     @as_subprocess
     def child_256_nostyle():
-        t = TestTerminal(stream=six.StringIO())
+        t = TestTerminal(stream=io.StringIO())
         assert (t.number_of_colors == 0)
 
     @as_subprocess
     def child_256_forcestyle():
-        t = TestTerminal(stream=six.StringIO(), force_styling=True)
+        t = TestTerminal(stream=io.StringIO(), force_styling=True)
         assert (t.number_of_colors == 256)
 
     @as_subprocess
     def child_8_forcestyle():
         # 'ansi' on freebsd returns 0 colors. We use 'cons25', compatible with its kernel tty.c
         kind = 'cons25' if platform.system().lower() == 'freebsd' else 'ansi'
-        t = TestTerminal(kind=kind, stream=six.StringIO(),
+        t = TestTerminal(kind=kind, stream=io.StringIO(),
                          force_styling=True)
         assert (t.number_of_colors == 8)
 
     @as_subprocess
     def child_0_forcestyle():
-        t = TestTerminal(kind='vt220', stream=six.StringIO(),
+        t = TestTerminal(kind='vt220', stream=io.StringIO(),
                          force_styling=True)
         assert (t.number_of_colors == 0)
 
@@ -153,7 +152,7 @@ def test_init_descriptor_always_initted(all_terms):
     """Test height and width with non-tty Terminals."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, stream=six.StringIO())
+        t = TestTerminal(kind=kind, stream=io.StringIO())
         assert t._init_descriptor == sys.__stdout__.fileno()
         assert (isinstance(t.height, int))
         assert (isinstance(t.width, int))
@@ -316,7 +315,7 @@ def test_yield_fullscreen(all_terms):
     """Ensure ``fullscreen()`` writes enter_fullscreen and exit_fullscreen."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(stream=six.StringIO(), force_styling=True)
+        t = TestTerminal(stream=io.StringIO(), force_styling=True)
         t.enter_fullscreen = u'BEGIN'
         t.exit_fullscreen = u'END'
         with t.fullscreen():
@@ -331,7 +330,7 @@ def test_yield_hidden_cursor(all_terms):
     """Ensure ``hidden_cursor()`` writes hide_cursor and normal_cursor."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(stream=six.StringIO(), force_styling=True)
+        t = TestTerminal(stream=io.StringIO(), force_styling=True)
         t.hide_cursor = u'BEGIN'
         t.normal_cursor = u'END'
         with t.hidden_cursor():
