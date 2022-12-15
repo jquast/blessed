@@ -12,6 +12,7 @@ jobs:
 
   Tests:
 
+    continue-on-error: ${{ matrix.optional || false }}
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.label || matrix.python-version }} ${{ startsWith(matrix.os, 'windows') && '(Windows)' || '' }} ${{ matrix.optional && '[OPTIONAL]' }}
 
@@ -20,61 +21,71 @@ jobs:
       matrix:
 
         include:
-          - python-version: 3.9
+          - python-version: '3.10'
             label: Linting
             os: ubuntu-latest
             toxenv: docformatter_check,flake8,flake8_tests,isort_check,mypy,sphinx,pydocstyle,pylint,pylint_tests
 
-          - python-version: 3.9
+          - python-version: '3.10'
             os:  ubuntu-latest
             toxenv: py39
             test_keyboard: 1
             test_raw: 1
 
-          - python-version: 3.9
+          - python-version: '3.10'
             os: windows-latest
             toxenv: py39
 
-          - python-version: 3.8
+          - python-version: '3.11'
+            os:  ubuntu-latest
+            toxenv: py311
+            test_quick: 1
+
+          - python-version: '3.9'
+            os:  ubuntu-latest
+            toxenv: py39
+            test_quick: 1
+
+          - python-version: '3.8'
             os:  ubuntu-latest
             toxenv: py38
             test_quick: 1
 
-          - python-version: 3.7
+          - python-version: '3.7'
             os:  ubuntu-latest
             toxenv: py37
             test_quick: 1
 
-          - python-version: 3.6
-            os:  ubuntu-latest
+          - python-version: '3.6'
+            os:  ubuntu-20.04
             toxenv: py36
             test_quick: 1
 
-          - python-version: 3.5
-            os:  ubuntu-latest
+          - python-version: '3.5'
+            os:  ubuntu-20.04
             toxenv: py35
             test_quick: 1
 
-          - python-version: 3.4
+          - python-version: '3.4'
             os:  ubuntu-18.04
             toxenv: py34
             test_quick: 1
 
-          - python-version: 2.7
-            os:  ubuntu-latest
+          - python-version: '2.7'
+            os:  ubuntu-20.04
             toxenv: py27
             test_keyboard: 1
             test_raw: 1
 
-          - python-version: 2.7
+          - python-version: '2.7'
             os: windows-latest
             toxenv: py27
 
-          - python-version: '3.10-dev'
+          - python-version: '3.12-dev'
             optional: true
             os:  ubuntu-latest
-            toxenv: py310
-            toxpython: 3.10
+            toxenv: py312
+            toxpython: 3.12
             test_quick: 1
 
     env:
@@ -85,10 +96,10 @@ jobs:
       TOXPYTHON: python${{ matrix.toxpython || matrix.python-version }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
 
