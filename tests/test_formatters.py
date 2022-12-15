@@ -280,8 +280,8 @@ def test_resolve_attribute_as_color(monkeypatch):
 
     def resolve_color(term, digit):
         return 'seq-%s' % (digit,)
-    COLORS = set(['COLORX', 'COLORY'])
-    COMPOUNDABLES = set(['JOINT', 'COMPOUND'])
+    COLORS = {'COLORX', 'COLORY'}
+    COMPOUNDABLES = {'JOINT', 'COMPOUND'}
     monkeypatch.setattr(blessed.formatters, 'resolve_color', resolve_color)
     monkeypatch.setattr(blessed.formatters, 'COLORS', COLORS)
     monkeypatch.setattr(blessed.formatters, 'COMPOUNDABLES', COMPOUNDABLES)
@@ -296,7 +296,7 @@ def test_resolve_attribute_as_compoundable(monkeypatch):
 
     def resolve_cap(term, digit):
         return 'seq-%s' % (digit,)
-    COMPOUNDABLES = set(['JOINT', 'COMPOUND'])
+    COMPOUNDABLES = {'JOINT', 'COMPOUND'}
     monkeypatch.setattr(blessed.formatters,
                         'resolve_capability',
                         resolve_cap)

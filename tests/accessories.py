@@ -204,9 +204,8 @@ def unicode_cap(cap):
         val = curses.tigetstr(cap)
     except curses.error:
         val = None
-    if val:
-        return val.decode('latin1')
-    return u''
+
+    return val.decode('latin1') if val else u''
 
 
 def unicode_parm(cap, *parms):
