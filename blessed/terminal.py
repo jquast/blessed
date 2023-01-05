@@ -501,6 +501,50 @@ class Terminal(object):
                      ws_xpixel=None,
                      ws_ypixel=None)
 
+    def _query_response(self, query_str, response_re, timeout):
+        """
+        Sends a query string to the terminal and waits for a response.
+
+        :arg str query_str: Query string written to output
+        :arg str response_re: Regular expression matching query response
+        :arg float timeout: Return after time elapsed in seconds
+        :return: re.match object for response_re or None if not found
+        :rtype: re.Match
+        """
+        # Avoid changing user's desired raw or cbreak mode if already entered,
+        # by entering cbreak mode ourselves.  This is necessary to receive user
+        # input without awaiting a human to press the return key.   This mode
+        # also disables echo, which we should also hide, as our input is an
+        # sequence that is not meaningful for display as an output sequence.
+
+        ctx = None
+        try:
+            if self._line_buffered:
+                ctx = self.cbreak()
+                ctx.__enter__()  # pylint: disable=no-member
+
+            # Emit the query sequence,
+            self.stream.write(query_str)
+            self.stream.flush()
+
+            # Wait for response
+            match, data = _read_until(term=self,
+                                      pattern=response_re,
+                                      timeout=timeout)
+
+            # Exclude response from subsequent input
+            if match:
+                data = (data[:match.start()] + data[match.end():])
+
+            # re-buffer keyboard data, if any
+            self.ungetch(data)
+
+        finally:
+            if ctx is not None:
+                ctx.__exit__(None, None, None)  # pylint: disable=no-member
+
+        return match
+
     @contextlib.contextmanager
     def location(self, x=None, y=None):
         """
@@ -602,59 +646,27 @@ class Terminal(object):
         # >  u8   terminal answerback description
         # >  u7   cursor position request (equiv. to VT100/ANSI/ECMA-48 DSR 6)
         # >  u6   cursor position report (equiv. to ANSI/ECMA-48 CPR)
-        query_str = self.u7 or u'\x1b[6n'
+
         response_str = getattr(self, self.caps['cursor_report'].attribute) or u'\x1b[%i%d;%dR'
+        match = self._query_response(
+            self.u7 or u'\x1b[6n', self.caps['cursor_report'].re_compiled, timeout
+        )
 
-        # determine response format as a regular expression
-        response_re = self.caps['cursor_report'].re_compiled
+        if match:
+            # return matching sequence response, the cursor location.
+            row, col = (int(val) for val in match.groups())
 
-        # Avoid changing user's desired raw or cbreak mode if already entered,
-        # by entering cbreak mode ourselves.  This is necessary to receive user
-        # input without awaiting a human to press the return key.   This mode
-        # also disables echo, which we should also hide, as our input is an
-        # sequence that is not meaningful for display as an output sequence.
-
-        ctx = None
-        try:
-            if self._line_buffered:
-                ctx = self.cbreak()
-                ctx.__enter__()  # pylint: disable=no-member
-
-            # emit the 'query cursor position' sequence,
-            self.stream.write(query_str)
-            self.stream.flush()
-
-            # expect a response,
-            match, data = _read_until(term=self,
-                                      pattern=response_re,
-                                      timeout=timeout)
-
-            # ensure response sequence is excluded from subsequent input,
-            if match:
-                data = (data[:match.start()] + data[match.end():])
-
-            # re-buffer keyboard data, if any
-            self.ungetch(data)
-
-            if match:
-                # return matching sequence response, the cursor location.
-                row, col = (int(val) for val in match.groups())
-
-                # Per https://invisible-island.net/ncurses/terminfo.src.html
-                # The cursor position report (<u6>) string must contain two
-                # scanf(3)-style %d format elements.  The first of these must
-                # correspond to the Y coordinate and the second to the %d.
-                # If the string contains the sequence %i, it is taken as an
-                # instruction to decrement each value after reading it (this is
-                # the inverse sense from the cup string).
-                if u'%i' in response_str:
-                    row -= 1
-                    col -= 1
-                return row, col
-
-        finally:
-            if ctx is not None:
-                ctx.__exit__(None, None, None)  # pylint: disable=no-member
+            # Per https://invisible-island.net/ncurses/terminfo.src.html
+            # The cursor position report (<u6>) string must contain two
+            # scanf(3)-style %d format elements.  The first of these must
+            # correspond to the Y coordinate and the second to the %d.
+            # If the string contains the sequence %i, it is taken as an
+            # instruction to decrement each value after reading it (this is
+            # the inverse sense from the cup string).
+            if u'%i' in response_str:
+                row -= 1
+                col -= 1
+            return row, col
 
         # We chose to return an illegal value rather than an exception,
         # favoring that users author function filters, such as max(0, y),
@@ -674,40 +686,13 @@ class Terminal(object):
         The foreground color is determined by emitting an `OSC 10 color query
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
         """
-        query_str = u'\x1b]10;?\x07'
-        response_re = re.compile(u'\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+        match = self._query_response(
+            u'\x1b]10;?\x07',
+            re.compile(u'\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07'),
+            timeout
+        )
 
-        ctx = None
-        try:
-            if self._line_buffered:
-                ctx = self.cbreak()
-                ctx.__enter__()  # pylint: disable=no-member
-
-            # emit the 'query foregound color' sequence,
-            self.stream.write(query_str)
-            self.stream.flush()
-
-            # expect a response,
-            match, data = _read_until(term=self,
-                                      pattern=response_re,
-                                      timeout=timeout)
-
-            # ensure response sequence is excluded from subsequent input,
-            if match:
-                data = (data[:match.start()] + data[match.end():])
-
-            # re-buffer keyboard data, if any
-            self.ungetch(data)
-
-            if match:
-                # return matching sequence response, the foreground color.
-                return tuple(int(val, 16) for val in match.groups())
-        finally:
-            if ctx is not None:
-                ctx.__exit__(None, None, None)  # pylint: disable=no-member
-
-        # We return an illegal value rather than an exception.
-        return -1, -1, -1
+        return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
 
     def get_bgcolor(self, timeout=None):
         """
@@ -722,40 +707,13 @@ class Terminal(object):
         The background color is determined by emitting an `OSC 11 color query
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
         """
-        query_str = u'\x1b]11;?\x07'
-        response_re = re.compile(u'\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+        match = self._query_response(
+            u'\x1b]11;?\x07',
+            re.compile(u'\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07'),
+            timeout
+        )
 
-        ctx = None
-        try:
-            if self._line_buffered:
-                ctx = self.cbreak()
-                ctx.__enter__()  # pylint: disable=no-member
-
-            # emit the 'query background color' sequence,
-            self.stream.write(query_str)
-            self.stream.flush()
-
-            # expect a response,
-            match, data = _read_until(term=self,
-                                      pattern=response_re,
-                                      timeout=timeout)
-
-            # ensure response sequence is excluded from subsequent input,
-            if match:
-                data = (data[:match.start()] + data[match.end():])
-
-            # re-buffer keyboard data, if any
-            self.ungetch(data)
-
-            if match:
-                # return matching sequence response, the background color.
-                return tuple(int(val, 16) for val in match.groups())
-        finally:
-            if ctx is not None:
-                ctx.__exit__(None, None, None)  # pylint: disable=no-member
-
-        # We return an illegal value rather than an exception.
-        return -1, -1, -1
+        return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
 
     @contextlib.contextmanager
     def fullscreen(self):
