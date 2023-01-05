@@ -719,7 +719,7 @@ def test_get_fgcolor_0s():
         term = TestTerminal(stream=six.StringIO())
         stime = time.time()
         rgb = term.get_fgcolor(timeout=0)
-        assert (math.floor(time.time() - stime) == 0.0)
+        assert math.floor(time.time() - stime) == 0.0
         assert rgb == (-1, -1, -1)
     child()
 
@@ -730,11 +730,11 @@ def test_get_fgcolor_0s_reply_via_ungetch():
     def child():
         term = TestTerminal(stream=six.StringIO())
         stime = time.time()
-        term.ungetch(u'\x1b]10;rgb:ffff/ffff/ffff\x07')
+        term.ungetch(u'\x1b]10;rgb:a0/52/2d\x07')  # sienna
 
         rgb = term.get_fgcolor(timeout=0.01)
-        assert (math.floor(time.time() - stime) == 0.0)
-        assert rgb == (65535, 65535, 65535)
+        assert math.floor(time.time() - stime) == 0.0
+        assert rgb == (160, 82, 45)
     child()
 
 
@@ -743,14 +743,14 @@ def test_get_fgcolor_styling_indifferent():
     @as_subprocess
     def child():
         term = TestTerminal(stream=six.StringIO(), force_styling=True)
-        term.ungetch(u'\x1b]10;rgb:ffff/ffff/ffff\x07')
+        term.ungetch(u'\x1b]10;rgb:d2/b4/8c\x07')  # tan
         rgb = term.get_fgcolor(timeout=0.01)
-        assert rgb == (65535, 65535, 65535)
+        assert rgb == (210, 180, 140)
 
         term = TestTerminal(stream=six.StringIO(), force_styling=False)
-        term.ungetch(u'\x1b]10;rgb:ffff/ffff/ffff\x07')
+        term.ungetch(u'\x1b]10;rgb:40/e0/d0\x07')  # turquoise
         rgb = term.get_fgcolor(timeout=0.01)
-        assert rgb == (65535, 65535, 65535)
+        assert rgb == (64, 224, 208)
     child()
 
 
@@ -761,7 +761,7 @@ def test_get_bgcolor_0s():
         term = TestTerminal(stream=six.StringIO())
         stime = time.time()
         rgb = term.get_bgcolor(timeout=0)
-        assert (math.floor(time.time() - stime) == 0.0)
+        assert math.floor(time.time() - stime) == 0.0
         assert rgb == (-1, -1, -1)
     child()
 
@@ -772,11 +772,11 @@ def test_get_bgcolor_0s_reply_via_ungetch():
     def child():
         term = TestTerminal(stream=six.StringIO())
         stime = time.time()
-        term.ungetch(u'\x1b]11;rgb:ffff/ffff/ffff\x07')
+        term.ungetch(u'\x1b]11;rgb:99/32/cc\x07')  # darkorchid
 
         rgb = term.get_bgcolor(timeout=0.01)
-        assert (math.floor(time.time() - stime) == 0.0)
-        assert rgb == (65535, 65535, 65535)
+        assert math.floor(time.time() - stime) == 0.0
+        assert rgb == (153, 50, 204)
     child()
 
 
@@ -785,14 +785,14 @@ def test_get_bgcolor_styling_indifferent():
     @as_subprocess
     def child():
         term = TestTerminal(stream=six.StringIO(), force_styling=True)
-        term.ungetch(u'\x1b]11;rgb:ffff/ffff/ffff\x07')
+        term.ungetch(u'\x1b]11;rgb:ff/e4/c4\x07')  # bisque
         rgb = term.get_bgcolor(timeout=0.01)
-        assert rgb == (65535, 65535, 65535)
+        assert rgb == (255, 228, 196)
 
         term = TestTerminal(stream=six.StringIO(), force_styling=False)
-        term.ungetch(u'\x1b]11;rgb:ffff/ffff/ffff\x07')
+        term.ungetch(u'\x1b]11;rgb:de/b8/87\x07')  # burlywood
         rgb = term.get_bgcolor(timeout=0.01)
-        assert rgb == (65535, 65535, 65535)
+        assert rgb == (222, 184, 135)
     child()
 
 
