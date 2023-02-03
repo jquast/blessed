@@ -2,6 +2,13 @@
 
 Version History
 ===============
+1.20
+  * introduced :meth:`~Terminal.get_fgcolor` and :meth:`~Terminal.get_bgcolor` to query
+    the terminal for the currently set colors. :ghissue:`237` by :ghuser:`stefanholek`
+  * bugfix: Copy globals dict before iterating to avoid RuntimeError in multithreaded
+    applications, :ghissue:`248` by :ghuser:`adamnovak`
+
+
 1.19
   * introduced :meth:`~Terminal.truncate` to truncate a string while
     retaining the sequences, :ghissue:`211` by :ghuser:`fishermans-friend`
