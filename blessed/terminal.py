@@ -86,40 +86,40 @@ class Terminal(object):
     #         Too many instance attributes (12/7)
 
     #: Sugary names for commonly-used capabilities
-    _sugar = dict(
-        save='sc',
-        restore='rc',
-        clear_eol='el',
-        clear_bol='el1',
-        clear_eos='ed',
-        enter_fullscreen='smcup',
-        exit_fullscreen='rmcup',
-        move='cup',
-        move_yx='cup',
-        move_x='hpa',
-        move_y='vpa',
-        hide_cursor='civis',
-        normal_cursor='cnorm',
-        reset_colors='op',
-        normal='sgr0',
-        reverse='rev',
-        italic='sitm',
-        no_italic='ritm',
-        shadow='sshm',
-        no_shadow='rshm',
-        standout='smso',
-        no_standout='rmso',
-        subscript='ssubm',
-        no_subscript='rsubm',
-        superscript='ssupm',
-        no_superscript='rsupm',
-        underline='smul',
-        no_underline='rmul',
-        cursor_report='u6',
-        cursor_request='u7',
-        terminal_answerback='u8',
-        terminal_enquire='u9',
-    )
+    _sugar = {
+        'save': 'sc',
+        'restore': 'rc',
+        'clear_eol': 'el',
+        'clear_bol': 'el1',
+        'clear_eos': 'ed',
+        'enter_fullscreen': 'smcup',
+        'exit_fullscreen': 'rmcup',
+        'move': 'cup',
+        'move_yx': 'cup',
+        'move_x': 'hpa',
+        'move_y': 'vpa',
+        'hide_cursor': 'civis',
+        'normal_cursor': 'cnorm',
+        'reset_colors': 'op',
+        'normal': 'sgr0',
+        'reverse': 'rev',
+        'italic': 'sitm',
+        'no_italic': 'ritm',
+        'shadow': 'sshm',
+        'no_shadow': 'rshm',
+        'standout': 'smso',
+        'no_standout': 'rmso',
+        'subscript': 'ssubm',
+        'no_subscript': 'rsubm',
+        'superscript': 'ssupm',
+        'no_superscript': 'rsupm',
+        'underline': 'smul',
+        'no_underline': 'rmul',
+        'cursor_report': 'u6',
+        'cursor_request': 'u7',
+        'terminal_answerback': 'u8',
+        'terminal_enquire': 'u9',
+    }
 
     def __init__(self, kind=None, stream=None, force_styling=False):
         """
@@ -534,7 +534,7 @@ class Terminal(object):
 
             # Exclude response from subsequent input
             if match:
-                data = (data[:match.start()] + data[match.end():])
+                data = data[:match.start()] + data[match.end():]
 
             # re-buffer keyboard data, if any
             self.ungetch(data)

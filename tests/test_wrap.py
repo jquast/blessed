@@ -11,37 +11,19 @@ from .accessories import TestTerminal, as_subprocess
 from .conftest import TEST_QUICK
 
 TEXTWRAP_KEYWORD_COMBINATIONS = [
-    dict(break_long_words=False,
-         drop_whitespace=False,
-         subsequent_indent=''),
-    dict(break_long_words=False,
-         drop_whitespace=True,
-         subsequent_indent=''),
-    dict(break_long_words=False,
-         drop_whitespace=False,
-         subsequent_indent=' '),
-    dict(break_long_words=False,
-         drop_whitespace=True,
-         subsequent_indent=' '),
-    dict(break_long_words=True,
-         drop_whitespace=False,
-         subsequent_indent=''),
-    dict(break_long_words=True,
-         drop_whitespace=True,
-         subsequent_indent=''),
-    dict(break_long_words=True,
-         drop_whitespace=False,
-         subsequent_indent=' '),
-    dict(break_long_words=True,
-         drop_whitespace=True,
-         subsequent_indent=' '),
+    {'break_long_words': False, 'drop_whitespace': False, 'subsequent_indent': ''},
+    {'break_long_words': False, 'drop_whitespace': True, 'subsequent_indent': ''},
+    {'break_long_words': False, 'drop_whitespace': False, 'subsequent_indent': ' '},
+    {'break_long_words': False, 'drop_whitespace': True, 'subsequent_indent': ' '},
+    {'break_long_words': True, 'drop_whitespace': False, 'subsequent_indent': ''},
+    {'break_long_words': True, 'drop_whitespace': True, 'subsequent_indent': ''},
+    {'break_long_words': True, 'drop_whitespace': False, 'subsequent_indent': ' '},
+    {'break_long_words': True, 'drop_whitespace': True, 'subsequent_indent': ' '},
 ]
 if TEST_QUICK:
     # test only one feature: everything on
     TEXTWRAP_KEYWORD_COMBINATIONS = [
-        dict(break_long_words=True,
-             drop_whitespace=True,
-             subsequent_indent=' ')
+        {'break_long_words': True, 'drop_whitespace': True, 'subsequent_indent': ' '}
     ]
 
 

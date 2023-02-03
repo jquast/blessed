@@ -204,7 +204,7 @@ def test_resolve_capability(monkeypatch):
         return ('seq-%s' % (attr,)).encode('latin1')
     monkeypatch.setattr(curses, 'tigetstr', tigetstr)
     term = mock.Mock()
-    term._sugar = dict(mnemonic='xyz')
+    term._sugar = {'mnemonic': 'xyz'}
 
     # exercise
     assert resolve_capability(term, 'mnemonic') == u'seq-xyz'
