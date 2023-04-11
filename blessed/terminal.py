@@ -986,14 +986,14 @@ class Terminal(object):
 
         Common return values are 0, 8, 16, 256, or 1 << 24.
 
-        This may be used to test whether the terminal supports colors,
-        and at what depth, if that's a concern.
+        This may be used to test whether the terminal supports colors, and at what depth, if that's
+        a concern.
 
         If this property is assigned a value of 88, the value 16 will be saved. This is due to the
         the rarity of 88 color support and the inconsistency of behavior between implementations.
 
-        Assigning this property to a value other than 0, 4, 8, 16, 88, 256, or 1 << 24 will
-        raise an :py:exc:`AssertionError`.
+        Assigning this property to a value other than 0, 4, 8, 16, 88, 256, or 1 << 24 will raise an
+        :py:exc:`AssertionError`.
         """
         return self._number_of_colors
 

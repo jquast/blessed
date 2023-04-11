@@ -2,9 +2,9 @@
 """
 A simple cmd-line tool for displaying FormattingString capabilities.
 
-For example::
+For example:
 
-    $ python tprint.py bold A rather bold statement.
+$ python tprint.py bold A rather bold statement.
 """
 # std
 from __future__ import print_function

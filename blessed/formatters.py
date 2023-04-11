@@ -289,14 +289,13 @@ class NullCallableString(six.text_type):
         """
         Allow empty string to be callable, returning given string, if any.
 
-        When called with an int as the first arg, return an empty Unicode. An
-        int is a good hint that I am a :class:`ParameterizingString`, as there
-        are only about half a dozen string-returning capabilities listed in
-        terminfo(5) which accept non-int arguments, they are seldom used.
+        When called with an int as the first arg, return an empty Unicode. An int is a good hint
+        that I am a :class:`ParameterizingString`, as there are only about half a dozen string-
+        returning capabilities listed in terminfo(5) which accept non-int arguments, they are seldom
+        used.
 
-        When called with a non-int as the first arg (no no args at all), return
-        the first arg, acting in place of :class:`FormattingString` without
-        any attributes.
+        When called with a non-int as the first arg (no no args at all), return the first arg,
+        acting in place of :class:`FormattingString` without any attributes.
         """
         if not args or isinstance(args[0], int):
             # As a NullCallableString, even when provided with a parameter,

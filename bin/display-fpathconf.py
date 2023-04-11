@@ -11,7 +11,6 @@ import sys
 
 def display_fpathconf():
     """Program entry point."""
-
     if not hasattr(os, "pathconf_names"):
         return
 

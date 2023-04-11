@@ -108,7 +108,7 @@ def change_bearing(f_mov, segment, term):
 
 def bearing_flipped(dir1, dir2):
     """
-    direction-flipped check.
+    Direction-flipped check.
 
     Return true if dir2 travels in opposite direction of dir1.
     """
