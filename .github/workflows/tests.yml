@@ -66,11 +66,6 @@ jobs:
             toxenv: py35
             test_quick: 1
 
-          - python-version: '3.4'
-            os:  ubuntu-18.04
-            toxenv: py34
-            test_quick: 1
-
           - python-version: '2.7'
             os:  ubuntu-20.04
             toxenv: py27
