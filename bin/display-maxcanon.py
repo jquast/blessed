@@ -2,25 +2,20 @@
 """
 A tool which uses pexpect to test expected Canonical mode length.
 
-All systems use the value of MAX_CANON which can be found using
-fpathconf(3) value PC_MAX_CANON -- with the exception of Linux
-and FreeBSD.
+All systems use the value of MAX_CANON which can be found using fpathconf(3) value PC_MAX_CANON --
+with the exception of Linux and FreeBSD.
 
-Linux, though defining a value of 255, actually honors the value
-of 4096 from linux kernel include file tty.h definition
-N_TTY_BUF_SIZE.
+Linux, though defining a value of 255, actually honors the value of 4096 from linux kernel include
+file tty.h definition N_TTY_BUF_SIZE.
 
-Linux also does not honor IMAXBEL. termios(3) states, "Linux does not
-implement this bit, and acts as if it is always set." Although these
-tests ensure it is enabled, this is a non-op for Linux.
+Linux also does not honor IMAXBEL. termios(3) states, "Linux does not implement this bit, and acts
+as if it is always set." Although these tests ensure it is enabled, this is a non-op for Linux.
 
-FreeBSD supports neither, and instead uses a fraction (1/5) of the tty
-speed which is always 9600.  Therefor, the maximum limited input line
-length is 9600 / 5 = 1920.
+FreeBSD supports neither, and instead uses a fraction (1/5) of the tty speed which is always 9600.
+Therefor, the maximum limited input line length is 9600 / 5 = 1920.
 
-In other words, the only way to determine the true MAX_CANON in a
-cross-platform manner is through this systems integrated test: the given
-system definitions are misleading on some operating systems.
+In other words, the only way to determine the true MAX_CANON in a cross-platform manner is through
+this systems integrated test: the given system definitions are misleading on some operating systems.
 """
 # pylint: disable=invalid-name
 #         Invalid module name "display-sighandlers"

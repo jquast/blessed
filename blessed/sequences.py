@@ -59,10 +59,8 @@ class Termcap(object):
         Horizontal carriage adjusted by capability, may be negative.
 
         :rtype: int
-        :arg str text: for capabilities *parm_left_cursor*,
-            *parm_right_cursor*, provide the matching sequence
-            text, its interpreted distance is returned.
-
+        :arg str text: for capabilities *parm_left_cursor*, *parm_right_cursor*, provide the
+            matching sequence text, its interpreted distance is returned.
         :returns: 0 except for matching '
         """
         value = {
