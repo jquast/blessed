@@ -705,8 +705,10 @@ def test_truncate_padding(all_terms):
     def child(kind):
         from blessed import Terminal
         term = Terminal(kind)
-        test_right_string = term.blue(u"one" + term.move_right(5) + u"two")
-        assert term.truncate(test_right_string, 9) == term.blue(u"one     t")
+
+        if term.move_right(5):
+            test_right_string = term.blue(u"one" + term.move_right(5) + u"two")
+            assert term.truncate(test_right_string, 9) == term.blue(u"one     t")
 
         test_bs_string = term.blue(u"one\b\b\btwo")
         assert term.truncate(test_bs_string, 3) == term.blue(u"two")
