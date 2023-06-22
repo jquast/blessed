@@ -13,75 +13,53 @@ jobs:
   Tests:
 
     continue-on-error: ${{ matrix.optional || false }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
     container: ${{ matrix.container }}
     name: ${{ matrix.label || matrix.python-version }} ${{ startsWith(matrix.os, 'windows') && '(Windows)' || '' }} ${{ matrix.optional && '[OPTIONAL]' }}
 
     strategy:
       fail-fast: false
       matrix:
+        python-version: ['3.7', '3.8', '3.9', '3.10', '3.11']
+        test_quick: [1]
 
         include:
           - python-version: '3.11'
             label: Linting
-            os: ubuntu-latest
             toxenv: docformatter_check,flake8,flake8_tests,isort_check,mypy,sphinx,pydocstyle,pylint,pylint_tests
 
+          - python-version: '3.12-dev'
+            optional: true
+            toxenv: py312
+            toxpython: 3.12
+
           - python-version: '3.11'
-            os:  ubuntu-latest
-            toxenv: py311
             test_keyboard: 1
             test_raw: 1
+            test_quick: 0
 
           - python-version: '3.11'
             os: windows-latest
-            toxenv: py311
-
-          - python-version: '3.10'
-            os:  ubuntu-latest
-            toxenv: py310
-            test_quick: 1
-
-          - python-version: '3.9'
-            os:  ubuntu-latest
-            toxenv: py39
-            test_quick: 1
-
-          - python-version: '3.8'
-            os:  ubuntu-latest
-            toxenv: py38
-            test_quick: 1
-
-          - python-version: '3.7'
-            os:  ubuntu-latest
-            toxenv: py37
-            test_quick: 1
+            test_quick: 0
 
           - python-version: '3.6'
             os:  ubuntu-20.04
             toxenv: py36
-            test_quick: 1
 
           - python-version: '3.5'
             os:  ubuntu-20.04
             toxenv: py35
-            test_quick: 1
 
           - python-version: '2.7'
             container: {image: 'python:2.7.18-buster'}
             toxenv: py27
             test_keyboard: 1
             test_raw: 1
+            test_quick: 0
 
-          - python-version: '3.12-dev'
-            optional: true
-            os:  ubuntu-latest
-            toxenv: py312
-            toxpython: 3.12
-            test_quick: 1
 
     env:
-      TOXENV: ${{ matrix.toxenv }}
+      TOXENV: ${{ matrix.toxenv || format('py{0}', matrix.python-version) }}
       TEST_QUICK: ${{ matrix.test_quick || 0 }}
       TEST_KEYBOARD: ${{ matrix.test_keyboard || 0 }}
       TEST_RAW: ${{ matrix.test_raw || 0 }}
