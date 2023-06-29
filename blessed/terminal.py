@@ -128,7 +128,7 @@ class Terminal(object):
         :arg str kind: A terminal string as taken by :func:`curses.setupterm`.
             Defaults to the value of the ``TERM`` environment variable.
 
-            .. note:: Terminals withing a single process must share a common
+            .. note:: Terminals within a single process must share a common
                 ``kind``. See :obj:`_CUR_TERM`.
 
         :arg file stream: A file-like object representing the Terminal output.
