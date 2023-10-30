@@ -1,6 +1,7 @@
 """Sub-module providing 'keyboard awareness'."""
 
 # std imports
+import os
 import re
 import time
 import platform
@@ -447,5 +448,19 @@ CURSES_KEYCODE_OVERRIDE_MIXIN = (
     ('KEY_CENTER', curses.KEY_B2),
     ('KEY_BEGIN', curses.KEY_BEG),
 )
+
+#: Default delay, in seconds, of Escape key detection in
+#: :meth:`Terminal.inkey`.` curses has a default delay of 1000ms (1 second) for
+#: escape sequences.  This is too long for modern applications, so we set it to
+#: 350ms, or 0.35 seconds. It is still a bit conservative but does well with
+#: for telnet or ssh servers.
+DEFAULT_ESCDELAY = 0.35
+if os.environ.get('ESCDELAY'):
+    try:
+        DEFAULT_ESCDELAY = int(os.environ['ESCDELAY']) / 1000.0
+    except ValueError:
+        # invalid values of 'ESCDELAY' are ignored
+        pass
+
 
 __all__ = ('Keystroke', 'get_keyboard_codes', 'get_keyboard_sequences',)

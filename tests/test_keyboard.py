@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for keyboard support."""
 # std imports
+import os
 import sys
 import platform
 import tempfile
@@ -363,3 +364,31 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
         assert resolve(u"\x1bOS").name == "KEY_F4"
 
     child('xterm')
+
+UNDER_PY34 = sys.version_info[0:2] < (3, 4)
+
+@pytest.fixture(scope="session", autouse=True)
+@pytest.mark.skipif(UNDER_PY34, reason="importlib was renamed in py34")
+def test_ESCDELAY_unset():
+    if 'ESCDELAY' in os.environ:
+        del os.environ['ESCDELAY']
+    import importlib, blessed.keyboard
+    importlib.reload(blessed.keyboard)
+    assert blessed.keyboard.DEFAULT_ESCDELAY == 0.35
+
+@pytest.fixture(scope="session", autouse=True)
+@pytest.mark.skipif(UNDER_PY34, reason="importlib was renamed in py34")
+def test_ESCDELAY_bad_value():
+    os.environ['ESCDELAY'] = 'XYZ123!'
+    import importlib, blessed.keyboard
+    importlib.reload(blessed.keyboard)
+    assert blessed.keyboard.DEFAULT_ESCDELAY == 0.35
+
+@pytest.fixture(scope="session", autouse=True)
+@pytest.mark.skipif(UNDER_PY34, reason="importlib was renamed in py34")
+def test_ESCDELAY_bad_value():
+    os.environ['ESCDELAY'] = '10'
+    import importlib, blessed.keyboard
+    importlib.reload(blessed.keyboard)
+    assert blessed.keyboard.DEFAULT_ESCDELAY == 0.01
+

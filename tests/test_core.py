@@ -91,9 +91,13 @@ def test_null_fileno():
     child()
 
 
+@pytest.fixture(scope="session", autouse=True)
 @pytest.mark.skipif(IS_WINDOWS, reason="requires more than 1 tty")
 def test_number_of_colors_without_tty():
     """``number_of_colors`` should return 0 when there's no tty."""
+    if 'COLORTERM' in os.environ:
+        del os.environ['COLORTERM']
+
     @as_subprocess
     def child_256_nostyle():
         t = TestTerminal(stream=six.StringIO())
@@ -117,6 +121,15 @@ def test_number_of_colors_without_tty():
         t = TestTerminal(kind='vt220', stream=six.StringIO(),
                          force_styling=True)
         assert (t.number_of_colors == 0)
+
+    @as_subprocess
+    def child_24bit_forcestyle_with_colorterm():
+        os.environ['COLORTERM'] = 'truecolor'
+        t = TestTerminal(kind='vt220', stream=six.StringIO(),
+                         force_styling=True)
+        assert (t.number_of_colors == 1 << 24)
+
+
 
     child_0_forcestyle()
     child_8_forcestyle()

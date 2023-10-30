@@ -23,7 +23,8 @@ from .keyboard import (_time_left,
                        resolve_sequence,
                        get_keyboard_codes,
                        get_leading_prefixes,
-                       get_keyboard_sequences)
+                       get_keyboard_sequences,
+                       DEFAULT_ESCDELAY)
 from .sequences import Termcap, Sequence, SequenceTextWrapper
 from .colorspace import RGB_256TABLE
 from .formatters import (COLORS,
@@ -1425,7 +1426,7 @@ class Terminal(object):
             self.stream.write(self.rmkx)
             self.stream.flush()
 
-    def inkey(self, timeout=None, esc_delay=0.35):
+    def inkey(self, timeout=None, esc_delay=DEFAULT_ESCDELAY):
         """
         Read and return the next keyboard event within given timeout.
 
@@ -1434,12 +1435,20 @@ class Terminal(object):
         :arg float timeout: Number of seconds to wait for a keystroke before
             returning.  When ``None`` (default), this method may block
             indefinitely.
-        :arg float esc_delay: To distinguish between the keystroke of
-           ``KEY_ESCAPE``, and sequences beginning with escape, the parameter
-           ``esc_delay`` specifies the amount of time after receiving escape
-           (``chr(27)``) to seek for the completion of an application key
-           before returning a :class:`~.Keystroke` instance for
-           ``KEY_ESCAPE``.
+        :arg float esc_delay: Time in seconds to block after Escape key
+           is received to await another key sequence beginning with
+           escape such as *KEY_LEFT*, sequence ``'\x1b[D'``], before returning a
+           :class:`~.Keystroke` instance for ``KEY_ESCAPE``.
+
+           Users may also override this for all blessed and curses applications
+           with environment value of ESCDELAY_ as an integer in milliseconds.
+           You may also override user preference as an argument to this function,
+           as the delay value is in seconds.
+
+           It could be set to low value such as 10, modern pipelines typically
+           transmit a keyboard input sequence without framing and this can often
+           be safely set at very low values!
+
         :rtype: :class:`~.Keystroke`.
         :returns: :class:`~.Keystroke`, which may be empty (``u''``) if
            ``timeout`` is specified and keystroke is not received.
@@ -1458,7 +1467,6 @@ class Terminal(object):
         resolve = functools.partial(resolve_sequence,
                                     mapper=self._keymap,
                                     codes=self._keycodes)
-
         stime = time.time()
 
         # re-buffer previously received keystrokes,
