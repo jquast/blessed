@@ -1440,15 +1440,11 @@ class Terminal(object):
            escape such as *KEY_LEFT*, sequence ``'\x1b[D'``], before returning a
            :class:`~.Keystroke` instance for ``KEY_ESCAPE``.
 
-           Users may also override this for all blessed and curses applications
-           with environment value of ESCDELAY_ as an integer in milliseconds.
-           You may also override user preference as an argument to this function,
-           as the delay value is in seconds.
-
-           It could be set to low value such as 10, modern pipelines typically
-           transmit a keyboard input sequence without framing and this can often
-           be safely set at very low values!
-
+           Users may override the default value of ``esc_delay`` in seconds,
+           using environment value of ``ESCDELAY`` as milliseconds, see
+           `ncurses(3)`_ section labeled *ESCDELAY* for details.  Setting
+           the value as an argument to this function will override any
+           such preference.
         :rtype: :class:`~.Keystroke`.
         :returns: :class:`~.Keystroke`, which may be empty (``u''``) if
            ``timeout`` is specified and keystroke is not received.
@@ -1463,6 +1459,8 @@ class Terminal(object):
             <https://docs.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timebeginperiod>`_.
             Decreasing the time resolution will reduce this to 10 ms, while increasing it, which
             is rarely done, will have a perceptable impact on the behavior.
+
+        _`ncurses(3)`: https://www.man7.org/linux/man-pages/man3/ncurses.3x.html
         """
         resolve = functools.partial(resolve_sequence,
                                     mapper=self._keymap,
