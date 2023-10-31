@@ -456,6 +456,8 @@ CURSES_KEYCODE_OVERRIDE_MIXIN = (
 #: ssh servers, for example.
 DEFAULT_ESCDELAY = 0.35
 def _reinit_escdelay():
+    # pylint: disable=W0603 Using the global statement, this is necessary to
+    # allow test coverage without complex module reload
     global DEFAULT_ESCDELAY
     if os.environ.get('ESCDELAY'):
         try:

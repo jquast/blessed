@@ -129,8 +129,6 @@ def test_number_of_colors_without_tty():
                          force_styling=True)
         assert (t.number_of_colors == 1 << 24)
 
-
-
     child_0_forcestyle()
     child_8_forcestyle()
     child_256_forcestyle()
