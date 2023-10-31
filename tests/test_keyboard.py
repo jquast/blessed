@@ -390,4 +390,3 @@ def test_ESCDELAY_10ms():
     blessed.keyboard._reinit_escdelay()
     assert blessed.keyboard.DEFAULT_ESCDELAY == 1.234
     del os.environ['ESCDELAY']
-
