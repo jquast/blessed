@@ -452,8 +452,8 @@ CURSES_KEYCODE_OVERRIDE_MIXIN = (
 #: Default delay, in seconds, of Escape key detection in
 #: :meth:`Terminal.inkey`.` curses has a default delay of 1000ms (1 second) for
 #: escape sequences.  This is too long for modern applications, so we set it to
-#: 350ms, or 0.35 seconds. It is still a bit conservative but does well with
-#: for telnet or ssh servers.
+#: 350ms, or 0.35 seconds. It is still a bit conservative, for remote telnet or
+#: ssh servers, for example.
 DEFAULT_ESCDELAY = 0.35
 if os.environ.get('ESCDELAY'):
     try:
