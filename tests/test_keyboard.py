@@ -365,30 +365,29 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
 
     child('xterm')
 
-UNDER_PY34 = sys.version_info[0:2] < (3, 4)
-
-@pytest.fixture(scope="session", autouse=True)
-@pytest.mark.skipif(UNDER_PY34, reason="importlib was renamed in py34")
-def test_ESCDELAY_unset():
+def test_ESCDELAY_unset_unchanged():
+    """Unset ESCDELAY leaves DEFAULT_ESCDELAY unchanged in _reinit_escdelay()."""
     if 'ESCDELAY' in os.environ:
         del os.environ['ESCDELAY']
-    import importlib, blessed.keyboard
-    importlib.reload(blessed.keyboard)
-    assert blessed.keyboard.DEFAULT_ESCDELAY == 0.35
+    import blessed.keyboard
+    prev_value = blessed.keyboard.DEFAULT_ESCDELAY
+    blessed.keyboard._reinit_escdelay()
+    assert blessed.keyboard.DEFAULT_ESCDELAY == prev_value
 
-@pytest.fixture(scope="session", autouse=True)
-@pytest.mark.skipif(UNDER_PY34, reason="importlib was renamed in py34")
-def test_ESCDELAY_bad_value():
+def test_ESCDELAY_bad_value_unchanged():
+    """Invalid ESCDELAY leaves DEFAULT_ESCDELAY unchanged in _reinit_escdelay()."""
     os.environ['ESCDELAY'] = 'XYZ123!'
-    import importlib, blessed.keyboard
-    importlib.reload(blessed.keyboard)
-    assert blessed.keyboard.DEFAULT_ESCDELAY == 0.35
+    import blessed.keyboard
+    prev_value = blessed.keyboard.DEFAULT_ESCDELAY
+    blessed.keyboard._reinit_escdelay()
+    assert blessed.keyboard.DEFAULT_ESCDELAY == prev_value
+    del os.environ['ESCDELAY']
 
-@pytest.fixture(scope="session", autouse=True)
-@pytest.mark.skipif(UNDER_PY34, reason="importlib was renamed in py34")
-def test_ESCDELAY_bad_value():
-    os.environ['ESCDELAY'] = '10'
-    import importlib, blessed.keyboard
-    importlib.reload(blessed.keyboard)
-    assert blessed.keyboard.DEFAULT_ESCDELAY == 0.01
+def test_ESCDELAY_10ms():
+    """Verify ESCDELAY modifies DEFAULT_ESCDELAY in _reinit_escdelay()."""
+    os.environ['ESCDELAY'] = '1234'
+    import blessed.keyboard
+    blessed.keyboard._reinit_escdelay()
+    assert blessed.keyboard.DEFAULT_ESCDELAY == 1.234
+    del os.environ['ESCDELAY']
 

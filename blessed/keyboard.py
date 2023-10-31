@@ -455,12 +455,15 @@ CURSES_KEYCODE_OVERRIDE_MIXIN = (
 #: 350ms, or 0.35 seconds. It is still a bit conservative, for remote telnet or
 #: ssh servers, for example.
 DEFAULT_ESCDELAY = 0.35
-if os.environ.get('ESCDELAY'):
-    try:
-        DEFAULT_ESCDELAY = int(os.environ['ESCDELAY']) / 1000.0
-    except ValueError:
-        # invalid values of 'ESCDELAY' are ignored
-        pass
+def _reinit_escdelay():
+    global DEFAULT_ESCDELAY
+    if os.environ.get('ESCDELAY'):
+        try:
+            DEFAULT_ESCDELAY = int(os.environ['ESCDELAY']) / 1000.0
+        except ValueError:
+            # invalid values of 'ESCDELAY' are ignored
+            pass
+_reinit_escdelay()
 
 
 __all__ = ('Keystroke', 'get_keyboard_codes', 'get_keyboard_sequences',)
