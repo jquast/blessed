@@ -365,6 +365,7 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
 
     child('xterm')
 
+
 def test_ESCDELAY_unset_unchanged():
     """Unset ESCDELAY leaves DEFAULT_ESCDELAY unchanged in _reinit_escdelay()."""
     if 'ESCDELAY' in os.environ:
@@ -374,6 +375,7 @@ def test_ESCDELAY_unset_unchanged():
     blessed.keyboard._reinit_escdelay()
     assert blessed.keyboard.DEFAULT_ESCDELAY == prev_value
 
+
 def test_ESCDELAY_bad_value_unchanged():
     """Invalid ESCDELAY leaves DEFAULT_ESCDELAY unchanged in _reinit_escdelay()."""
     os.environ['ESCDELAY'] = 'XYZ123!'
@@ -382,6 +384,7 @@ def test_ESCDELAY_bad_value_unchanged():
     blessed.keyboard._reinit_escdelay()
     assert blessed.keyboard.DEFAULT_ESCDELAY == prev_value
     del os.environ['ESCDELAY']
+
 
 def test_ESCDELAY_10ms():
     """Verify ESCDELAY modifies DEFAULT_ESCDELAY in _reinit_escdelay()."""

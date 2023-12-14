@@ -61,7 +61,7 @@ class as_subprocess(object):  # pylint: disable=too-few-public-methods
     def __init__(self, func):
         self.func = func
 
-    def __call__(self, *args, **kwargs):  # pylint: disable=too-many-locals, too-complex
+    def __call__(self, *args, **kwargs):  # pylint: disable=too-many-locals,too-complex
         if IS_WINDOWS:
             self.func(*args, **kwargs)
             return

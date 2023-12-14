@@ -18,13 +18,13 @@ import collections
 
 # local
 from .color import COLOR_DISTANCE_ALGORITHMS
-from .keyboard import (_time_left,
+from .keyboard import (DEFAULT_ESCDELAY,
+                       _time_left,
                        _read_until,
                        resolve_sequence,
                        get_keyboard_codes,
                        get_leading_prefixes,
-                       get_keyboard_sequences,
-                       DEFAULT_ESCDELAY)
+                       get_keyboard_sequences)
 from .sequences import Termcap, Sequence, SequenceTextWrapper
 from .colorspace import RGB_256TABLE
 from .formatters import (COLORS,
