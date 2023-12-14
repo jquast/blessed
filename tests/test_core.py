@@ -91,7 +91,6 @@ def test_null_fileno():
     child()
 
 
-@pytest.fixture(scope="session", autouse=True)
 @pytest.mark.skipif(IS_WINDOWS, reason="requires more than 1 tty")
 def test_number_of_colors_without_tty():
     """``number_of_colors`` should return 0 when there's no tty."""
