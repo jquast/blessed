@@ -1427,7 +1427,7 @@ class Terminal(object):
             self.stream.flush()
 
     def inkey(self, timeout=None, esc_delay=DEFAULT_ESCDELAY):
-        """
+        r"""
         Read and return the next keyboard event within given timeout.
 
         Generally, this should be used inside the :meth:`raw` context manager.
