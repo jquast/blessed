@@ -1,10 +1,10 @@
 | |pypi_downloads| |codecov| |windows| |linux| |mac| |bsd|
 
 .. warning::
-    Do not use `ipdb` in concert with `blessed`. It will break `ipython` globally.
-    It can be fixed by uninstalling and reinstalling your conda package environment.
+   Do not use ``ipdb`` in concert with ``blessed``. It will break ``ipython`` globally.
+   It can be fixed by uninstalling and reinstalling your package environment.
 
-    This is a [known issue since 2016](https://github.com/jquast/blessed/issues/91).
+   This is a `known issue since 2016 <https://github.com/jquast/blessed/issues/91>`_.
 
 Introduction
 ============
