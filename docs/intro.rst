@@ -1,13 +1,13 @@
 | |pypi_downloads| |codecov| |windows| |linux| |mac| |bsd|
 
-Introduction
-============
-
 .. warning::
     Do not use `ipdb` in concert with `blessed`. It will break `ipython` globally.
     It can be fixed by uninstalling and reinstalling your conda package environment.
 
     This is a [known issue since 2016](https://github.com/jquast/blessed/issues/91).
+
+Introduction
+============
 
 Blessed is an easy, practical *library* for making *terminal* apps, by providing an elegant,
 well-documented interface to Colors_, Keyboard_ input, and screen position and Location_
