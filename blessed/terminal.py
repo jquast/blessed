@@ -48,6 +48,7 @@ if sys.version_info[:2] < (3, 3):
 HAS_TTY = True
 if platform.system() == 'Windows':
     IS_WINDOWS = True
+    import msvcrt
     import jinxed as curses  # pylint: disable=import-error
     from jinxed.win32 import get_console_input_encoding  # pylint: disable=import-error
 else:
@@ -1253,7 +1254,11 @@ class Terminal(object):
         this method.
         """
         assert self._keyboard_fd is not None
-        byte = os.read(self._keyboard_fd, 1)
+        byte: str
+        if IS_WINDOWS:
+            byte = msvcrt.getch()
+        else:
+            byte = os.read(self._keyboard_fd, 1)
         return self._keyboard_decoder.decode(byte, final=False)
 
     def ungetch(self, text):
