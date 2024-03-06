@@ -894,6 +894,7 @@ class Terminal(object):
         inadvertently returning another terminal capability.
         """
         formatters = split_compound(value)
+        # Pylint sometimes thinks formatters isn't a list  # pylint: disable=not-an-iterable
         if all((fmt in COLORS or fmt in COMPOUNDABLES) for fmt in formatters):
             return getattr(self, value)
 

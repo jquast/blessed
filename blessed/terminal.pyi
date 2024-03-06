@@ -4,6 +4,7 @@
 from typing import IO, Any, List, Tuple, Union, Optional, OrderedDict, SupportsIndex, ContextManager
 
 # local
+# The type hints do have circular imports, but the code doesn't  # pylint: disable=cyclic-import
 from .keyboard import Keystroke
 from .sequences import Termcap
 from .formatters import (FormattingString,
