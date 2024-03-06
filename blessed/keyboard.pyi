@@ -1,3 +1,5 @@
+"""Type hints for 'keyboard awareness'"""
+
 # std imports
 from typing import Set, Dict, Type, Mapping, TypeVar, Iterable, Optional, OrderedDict
 
@@ -5,6 +7,8 @@ from typing import Set, Dict, Type, Mapping, TypeVar, Iterable, Optional, Ordere
 from .terminal import Terminal
 
 _T = TypeVar("_T")
+
+# pylint: disable=unused-argument,missing-function-docstring,missing-class-docstring
 
 class Keystroke(str):
     def __new__(

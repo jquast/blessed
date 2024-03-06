@@ -1,3 +1,5 @@
+"""Type hints for sequence-formatting functions"""
+
 # std imports
 from typing import (Any,
                     Set,
@@ -18,6 +20,8 @@ COLORS: Set[str]
 COMPOUNDABLES: Set[str]
 
 _T = TypeVar("_T")
+
+# pylint: disable=unused-argument,missing-function-docstring,missing-class-docstring
 
 class ParameterizingString(str):
     def __new__(cls: Type[_T], cap: str, normal: str = ..., name: str = ...) -> _T: ...

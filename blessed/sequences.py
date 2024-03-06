@@ -15,6 +15,8 @@ from blessed._capabilities import CAPABILITIES_CAUSE_MOVEMENT
 __all__ = ('Sequence', 'SequenceTextWrapper', 'iter_parse', 'measure_length')
 
 
+# pylint: disable=unused-argument,missing-function-docstring
+
 class Termcap(object):
     """Terminal capability of given variable name and pattern."""
 

@@ -1,3 +1,5 @@
+"""Type hints for :class:`Terminal`, the primary API entry point."""
+
 # std imports
 from typing import IO, Any, List, Tuple, Union, Optional, OrderedDict, SupportsIndex, ContextManager
 
@@ -10,6 +12,9 @@ from .formatters import (FormattingString,
                          FormattingOtherString)
 
 HAS_TTY: bool
+
+# pylint: disable=unused-argument,missing-function-docstring,missing-class-docstring
+# pylint: disable=too-many-public-methods,too-few-public-methods
 
 class Terminal:
     caps: OrderedDict[str, Termcap]
@@ -105,4 +110,5 @@ class Terminal:
         self, timeout: Optional[float] = ..., esc_delay: float = ...
     ) -> Keystroke: ...
 
-class WINSZ: ...
+class WINSZ:
+    ...

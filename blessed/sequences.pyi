@@ -1,3 +1,5 @@
+"""Type hints for 'sequence awareness'"""
+
 # std imports
 import textwrap
 from typing import Any, Type, Tuple, Pattern, TypeVar, Iterator, Optional, SupportsIndex
@@ -6,6 +8,9 @@ from typing import Any, Type, Tuple, Pattern, TypeVar, Iterator, Optional, Suppo
 from .terminal import Terminal
 
 _T = TypeVar("_T")
+
+# pylint: disable=unused-argument,missing-function-docstring,missing-class-docstring
+# pylint: disable=super-init-not-called
 
 class Termcap:
     name: str = ...
