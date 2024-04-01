@@ -2,10 +2,19 @@
 
 # std imports
 import textwrap
-from typing import Any, Type, Tuple, Pattern, TypeVar, Iterator, Optional, SupportsIndex
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Type,
+                    Tuple,
+                    Pattern,
+                    TypeVar,
+                    Iterator,
+                    Optional,
+                    SupportsIndex)
 
-# local
-from .terminal import Terminal
+if TYPE_CHECKING:
+    # local
+    from .terminal import Terminal
 
 _T = TypeVar("_T")
 
@@ -38,11 +47,11 @@ class Termcap:
     ) -> "Termcap": ...
 
 class SequenceTextWrapper(textwrap.TextWrapper):
-    term: Terminal = ...
-    def __init__(self, width: int, term: Terminal, **kwargs: Any) -> None: ...
+    term: 'Terminal' = ...
+    def __init__(self, width: int, term: 'Terminal', **kwargs: Any) -> None: ...
 
 class Sequence(str):
-    def __new__(cls: Type[_T], sequence_text: str, term: Terminal) -> _T: ...
+    def __new__(cls: Type[_T], sequence_text: str, term: 'Terminal') -> _T: ...
     def ljust(self, width: SupportsIndex, fillchar: str = ...) -> str: ...
     def rjust(self, width: SupportsIndex, fillchar: str = ...) -> str: ...
     def center(self, width: SupportsIndex, fillchar: str = ...) -> str: ...
@@ -55,6 +64,6 @@ class Sequence(str):
     def padd(self, strip: bool = ...) -> str: ...
 
 def iter_parse(
-    term: Terminal, text: str
+    term: 'Terminal', text: str
 ) -> Iterator[Tuple[str, Optional[Termcap]]]: ...
-def measure_length(text: str, term: Terminal) -> int: ...
+def measure_length(text: str, term: 'Terminal') -> int: ...
