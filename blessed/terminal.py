@@ -528,7 +528,7 @@ class Terminal(object):
             self.stream.flush()
 
             # Wait for response
-            match, data = _read_until(term=self,
+            match, data = _read_until(term=self,  # pylint: disable=unpacking-non-sequence
                                       pattern=response_re,
                                       timeout=timeout)
 
@@ -1496,7 +1496,7 @@ class Terminal(object):
         if ks.code == self.KEY_ESCAPE:
             esctime = time.time()
             while (ks.code == self.KEY_ESCAPE and
-                   ucs in self._keymap_prefixes and
+                   ucs in self._keymap_prefixes and  # pylint: disable=unsupported-membership-test
                    self.kbhit(timeout=_time_left(esctime, esc_delay))):
                 ucs += self.getch()
                 ks = resolve_sequence(ucs, self._keymap, self._keycodes)
