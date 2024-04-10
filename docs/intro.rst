@@ -219,7 +219,7 @@ The same program with *Blessed* is simply:
     :target: https://codecov.io/gh/jquast/blessed/
 .. |linux| image:: https://img.shields.io/badge/Linux-yes-success?logo=linux
     :alt: Linux supported
-.. |windows| image:: https://img.shields.io/badge/Windows-NEW-success?logo=windows
+.. |windows| image:: https://img.shields.io/badge/Windows-yes-success?logo=windows
     :alt: Windows supported
 .. |mac| image:: https://img.shields.io/badge/MacOS-yes-success?logo=apple
     :alt: MacOS supported
