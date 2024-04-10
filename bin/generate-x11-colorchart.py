@@ -70,8 +70,8 @@ def main():
         hsv = colorsys.rgb_to_hsv(*rgb)
         csv_rows += ('   '
                      f'{x11_color}, |{x11_color}|, '
-                     f'{rgb[0]/255:0.1%}, {rgb[1]/255:0.1%}, {rgb[2]/255:0.1%}, '
-                     f'{hsv[0]:0.1%}, {hsv[1]:0.1%}, {hsv[2]/255:0.1%}\n')
+                     f'{rgb[0] / 255:0.1%}, {rgb[1] / 255:0.1%}, {rgb[2] / 255:0.1%}, '
+                     f'{hsv[0]:0.1%}, {hsv[1]:0.1%}, {hsv[2] / 255:0.1%}\n')
 
     output = aliases + '\n\n' + csv_table + '\n' + csv_rows
     filepath_txt = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir, 'docs',
