@@ -20,25 +20,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.7', '3.8', '3.9', '3.10', '3.11']
+        python-version: ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
         test_quick: [1]
 
         include:
-          - python-version: '3.11'
+          - python-version: '3.12'
             label: Linting
             toxenv: docformatter_check,flake8,flake8_tests,isort_check,mypy,sphinx,pydocstyle,pylint,pylint_tests
 
-          - python-version: '3.12-dev'
+          - python-version: '3.13-dev'
             optional: true
-            toxenv: py312
-            toxpython: 3.12
+            toxenv: py313
+            toxpython: 3.13
 
-          - python-version: '3.11'
+          - python-version: '3.12'
             test_keyboard: 1
             test_raw: 1
             test_quick: 0
 
-          - python-version: '3.11'
+          - python-version: '3.12'
             os: windows-latest
             test_quick: 0
 
