@@ -335,6 +335,7 @@ def test_winsize(many_lines, many_columns):
     def child(lines=25, cols=80):
         # set the pty's virtual window size
         val = struct.pack('HHHH', lines, cols, pixel_width, pixel_height)
+        # pylint: disable-next=possibly-used-before-assignment
         fcntl.ioctl(sys.__stdout__.fileno(), termios.TIOCSWINSZ, val)
         term = TestTerminal()
         winsize = term._height_and_width()

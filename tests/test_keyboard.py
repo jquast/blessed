@@ -2,13 +2,13 @@
 """Tests for keyboard support."""
 # std imports
 import os
-import sys
 import platform
 import tempfile
 import functools
 
 # 3rd party
 import pytest
+import six
 
 # local
 from .accessories import TestTerminal, as_subprocess
@@ -24,9 +24,6 @@ if platform.system() != 'Windows':
     import tty  # pylint: disable=unused-import  # NOQA
 else:
     import jinxed as curses
-
-if sys.version_info[0] == 3:
-    unichr = chr
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="?")
@@ -311,12 +308,12 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
                                     mapper=term._keymap,
                                     codes=term._keycodes)
 
-        assert resolve(unichr(10)).name == "KEY_ENTER"
-        assert resolve(unichr(13)).name == "KEY_ENTER"
-        assert resolve(unichr(8)).name == "KEY_BACKSPACE"
-        assert resolve(unichr(9)).name == "KEY_TAB"
-        assert resolve(unichr(27)).name == "KEY_ESCAPE"
-        assert resolve(unichr(127)).name == "KEY_BACKSPACE"
+        assert resolve(six.unichr(10)).name == "KEY_ENTER"
+        assert resolve(six.unichr(13)).name == "KEY_ENTER"
+        assert resolve(six.unichr(8)).name == "KEY_BACKSPACE"
+        assert resolve(six.unichr(9)).name == "KEY_TAB"
+        assert resolve(six.unichr(27)).name == "KEY_ESCAPE"
+        assert resolve(six.unichr(127)).name == "KEY_BACKSPACE"
         assert resolve(u"\x1b[A").name == "KEY_UP"
         assert resolve(u"\x1b[B").name == "KEY_DOWN"
         assert resolve(u"\x1b[C").name == "KEY_RIGHT"

@@ -6,7 +6,6 @@ from __future__ import print_function, with_statement
 import os
 import sys
 import codecs
-import platform
 import functools
 import traceback
 import contextlib
@@ -67,7 +66,7 @@ class as_subprocess(object):  # pylint: disable=too-few-public-methods
             return
 
         pid_testrunner = os.getpid()
-        pid, master_fd = pty.fork()
+        pid, master_fd = pty.fork()  # pylint: disable=possibly-used-before-assignment
         if pid == self._CHILD_PID:
             # child process executes function, raises exception
             # if failed, causing a non-zero exit code, using the
@@ -185,7 +184,8 @@ def read_until_eof(fd, encoding='utf8'):
 @contextlib.contextmanager
 def echo_off(fd):
     """Ensure any bytes written to pty fd are not duplicated as output."""
-    if platform.system() != 'Windows':
+    if not IS_WINDOWS:
+        # pylint: disable=possibly-used-before-assignment
         try:
             attrs = termios.tcgetattr(fd)
             attrs[3] = attrs[3] & ~termios.ECHO

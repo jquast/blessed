@@ -325,6 +325,7 @@ class Terminal(object):
             # set input encoding and initialize incremental decoder
 
             if IS_WINDOWS:
+                # pylint: disable-next=possibly-used-before-assignment
                 self._encoding = get_console_input_encoding() \
                     or locale.getpreferredencoding() or 'UTF-8'
             else:
@@ -459,7 +460,7 @@ class Terminal(object):
             - ``ws_ypixel``: height of terminal by pixels (not accurate).
         """
         if HAS_TTY:
-            # pylint: disable=protected-access
+            # pylint: disable=protected-access,possibly-used-before-assignment
             data = fcntl.ioctl(fd, termios.TIOCGWINSZ, WINSZ._BUF)
             return WINSZ(*struct.unpack(WINSZ._FMT, data))
         return WINSZ(ws_row=25, ws_col=80, ws_xpixel=0, ws_ypixel=0)
@@ -1350,6 +1351,7 @@ class Terminal(object):
             # Save current terminal mode:
             save_mode = termios.tcgetattr(self._keyboard_fd)
             save_line_buffered = self._line_buffered
+            # pylint: disable-next=possibly-used-before-assignment
             tty.setcbreak(self._keyboard_fd, termios.TCSANOW)
             try:
                 self._line_buffered = False
