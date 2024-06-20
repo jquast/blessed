@@ -95,7 +95,7 @@ jobs:
       - name: Upload to Codecov
         if: ${{ matrix.label != 'linting' }}
 
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v3
         with:
           verbose: true
           name: ${{ matrix.label || matrix.python-version }} ${{ startsWith(matrix.os, 'windows') && '(Windows)' || '' }}
