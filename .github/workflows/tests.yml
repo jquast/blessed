@@ -95,8 +95,11 @@ jobs:
       - name: Upload to Codecov
         if: ${{ matrix.label != 'linting' }}
 
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           verbose: true
           name: ${{ matrix.label || matrix.python-version }} ${{ startsWith(matrix.os, 'windows') && '(Windows)' || '' }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+          os: ${{ startsWith(matrix.os, 'windows') && 'windows' || 'linux' }}
           env_vars: TOXENV,TEST_QUICK,TEST_KEYBOARD,TEST_RAW
