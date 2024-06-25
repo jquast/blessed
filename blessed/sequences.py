@@ -189,7 +189,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
                     break
                 cur_line.append(chunks.pop())
                 cur_len += chunk_len
-            if chunks and Sequence(chunks[-1], term).length() > width:
+            if chunks and chunk_len > width:
                 self._handle_long_word(chunks, cur_line, cur_len, width)
             if drop_whitespace and (
                     cur_line and Sequence(cur_line[-1], term).strip() == ''):
