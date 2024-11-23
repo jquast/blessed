@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 _T = TypeVar("_T")
 
 # pylint: disable=unused-argument,missing-function-docstring,missing-class-docstring
-# pylint: disable=super-init-not-called
+# pylint: disable=super-init-not-called,too-many-positional-arguments
 
 class Termcap:
     name: str = ...

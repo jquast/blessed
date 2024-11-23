@@ -85,7 +85,7 @@ class Termcap(object):
 
         return 0
 
-    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-positional-arguments
     @classmethod
     def build(cls, name, capability, attribute, nparams=0,
               numeric=99, match_grouped=False, match_any=False,
