@@ -433,7 +433,7 @@ class Terminal(object):
     @property
     def pixel_height(self):
         """
-        Read-only property: Height ofthe terminal (in pixels).
+        Read-only property: Height of the terminal (in pixels).
 
         :rtype: int
         """
@@ -590,7 +590,7 @@ class Terminal(object):
 
         .. note:: The argument order *(x, y)* differs from the return value order *(y, x)*
             of :meth:`get_location`, or argument order *(y, x)* of :meth:`move`. This is
-            for API Compaibility with the blessings library, sorry for the trouble!
+            for API Compatibility with the blessings library, sorry for the trouble!
         """
         # pylint: disable=invalid-name
         #         Invalid argument name "x"
@@ -1262,7 +1262,7 @@ class Terminal(object):
         the keyboard string at a time. This method should always return
         without blocking if called after :meth:`kbhit` has returned True.
 
-        Implementors of alternate input stream methods should override
+        Implementers of alternate input stream methods should override
         this method.
         """
         assert self._keyboard_fd is not None
