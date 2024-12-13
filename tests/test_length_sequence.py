@@ -292,7 +292,7 @@ def test_sequence_length(all_terms):
         assert (term.length(term.cud(10)) == 0)
 
         # this is how manpages perform underlining, this is done
-        # with the 'overstrike' capability of teletypes, and aparently
+        # with the 'overstrike' capability of teletypes, and apparently
         # less(1), '123' -> '1\b_2\b_3\b_'
         text_wseqs = u''.join(itertools.chain(
             *zip(plain_text, itertools.cycle(['\b_']))))

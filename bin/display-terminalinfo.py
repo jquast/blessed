@@ -126,7 +126,7 @@ def display_bitmask(kind, bitmap, value):
 
 
 def display_ctl_chars(index, ctlc):
-    """Display all control character indicies, names, and values."""
+    """Display all control character indices, names, and values."""
     import termios
     title = 'Special Character'
     col1_width = len(title)
