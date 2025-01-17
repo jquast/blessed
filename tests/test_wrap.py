@@ -1,4 +1,5 @@
 """Tests for Terminal.wrap()"""
+# coding: utf-8
 
 # std imports
 import textwrap
@@ -111,5 +112,75 @@ def test_multiline():
         ]
         result = term.wrap(given_string, width=30)
         assert expected == result
+
+    child()
+
+
+def test_east_asian_emojis_width_1():
+    """Tests edge-case of east-asian and emoji characters split into single columns."""
+    @as_subprocess
+    def child():
+        term = TestTerminal()
+        # by @grayjk from https://github.com/jquast/blessed/issues/273
+        result = term.wrap(u'\u5973', 1)
+        assert result == [u'\u5973']
+
+        # much like test_length_with_zwj_is_wrong(), blessed gets ZWJ wrong when wrapping, also.
+        # In this case, each character gets its own line--even though '\u200D' is considered
+        # a width of 0, the next emoji is "too large to fit".
+        # RGI_Emoji_ZWJ_Sequence  ; family: woman, woman, girl, boy
+        given = u'\U0001F469\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466'
+        result = term.wrap(given, 1)
+        assert result == list(given)
+
+        # in another example, two *narrow* characters, \u1100, "ᄀ" HANGUL
+        # CHOSEONG KIYEOK (consonant) is joined with \u1161, "ᅡ" HANGUL
+        # JUNGSEONG A (vowel), to form a single *wide* character "가" HANGUL
+        # SYLLABLE GA. Ideally, a native speaker would rather have the cojoined
+        # wide character, and word-wrapping to a column width of '1' for any
+        # language that includes wide characters or emoji is a bit foolish!
+        given = u'\u1100\u1161'
+        result = term.wrap(given, 1)
+        assert result == list(given)
+
+    child()
+
+
+def test_emojis_width_2_and_greater():
+    """Tests emoji characters split into multiple columns."""
+    @as_subprocess
+    def child():
+        term = TestTerminal()
+        given = u'\U0001F469\U0001F467\U0001F466'  # woman, girl, boy
+        result = term.wrap(given, 2)
+        assert result == list(given)
+        result = term.wrap(given, 3)
+        assert result == list(given)
+        result = term.wrap(given, 4)
+        assert result == [u'\U0001F469\U0001F467', u'\U0001F466']
+        result = term.wrap(given, 5)
+        assert result == [u'\U0001F469\U0001F467', u'\U0001F466']
+        result = term.wrap(given, 6)
+        assert result == [u'\U0001F469\U0001F467\U0001F466']
+        result = term.wrap(given, 7)
+        assert result == [u'\U0001F469\U0001F467\U0001F466']
+
+    child()
+
+
+def test_greedy_join_with_cojoining():
+    """Test that a word with trailing combining (café) wraps correctly."""
+    @as_subprocess
+    def child():
+        term = TestTerminal()
+        given = u'cafe\u0301-latte'
+        result = term.wrap(given, 5)
+        assert result == [u'cafe\u0301-', u'latte']
+        result = term.wrap(given, 4)
+        assert result == [u'cafe\u0301', u'-lat', u'te']
+        result = term.wrap(given, 3)
+        assert result == [u'caf', u'e\u0301-l', u'att', u'e']
+        result = term.wrap(given, 2)
+        assert result == [u'ca', u'fe\u0301', u'-l', u'at', u'te']
 
     child()
