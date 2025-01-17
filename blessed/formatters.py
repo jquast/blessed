@@ -353,7 +353,7 @@ def get_proxy_string(term, attr):
 
 def split_compound(compound):
     """
-    Split compound formating string into segments.
+    Split compound formatting string into segments.
 
     >>> split_compound('bold_underline_bright_blue_on_red')
     ['bold', 'underline', 'bright_blue', 'on_red']
@@ -361,7 +361,7 @@ def split_compound(compound):
     :arg str compound: a string that may contain compounds, separated by
         underline (``_``).
     :rtype: list
-    :returns: List of formating string segments
+    :returns: List of formatting string segments
     """
     merged_segs = []
     # These occur only as prefixes, so they can always be merged:

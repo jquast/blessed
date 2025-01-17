@@ -69,7 +69,7 @@ def test_raw_input_with_kb():
 
 def test_notty_kb_is_None():
     """term._keyboard_fd should be None when os.isatty returns False."""
-    # in this scenerio, stream is sys.__stdout__,
+    # in this scenario, stream is sys.__stdout__,
     # but os.isatty(0) is False,
     # such as when piping output to less(1)
     @as_subprocess
@@ -227,7 +227,7 @@ def test_resolve_sequence():
                           # takes precedence over LONGSEQ, first-match
                           (u'KEY_LONGSEQ_longest', 3),
                           (u'LONGSEQ', 4),
-                          # wont match, LONGSEQ is first-match in this order
+                          # won't match, LONGSEQ is first-match in this order
                           (u'LONGSEQ_longer', 5),
                           # falls through for L{anything_else}
                           (u'L', 6)))

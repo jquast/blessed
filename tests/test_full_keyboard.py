@@ -311,7 +311,7 @@ def test_keystroke_0s_cbreak_multibyte_utf8():
     assert math.floor(time.time() - stime) == 0.0
 
 
-# Avylove: Added delay which should account for race contition. Re-add skip if randomly fail
+# Avylove: Added delay which should account for race condition. Re-add skip if randomly fail
 # @pytest.mark.skipif(os.environ.get('TRAVIS', None) is not None,
 #                     reason="travis-ci does not handle ^C very well.")
 @pytest.mark.skipif(platform.system() == 'Darwin',

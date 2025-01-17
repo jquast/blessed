@@ -12,7 +12,7 @@ Linux also does not honor IMAXBEL. termios(3) states, "Linux does not implement 
 as if it is always set." Although these tests ensure it is enabled, this is a non-op for Linux.
 
 FreeBSD supports neither, and instead uses a fraction (1/5) of the tty speed which is always 9600.
-Therefor, the maximum limited input line length is 9600 / 5 = 1920.
+Therefore, the maximum limited input line length is 9600 / 5 = 1920.
 
 In other words, the only way to determine the true MAX_CANON in a cross-platform manner is through
 this systems integrated test: the given system definitions are misleading on some operating systems.
@@ -30,7 +30,7 @@ def detect_maxcanon():
     """Program entry point."""
     import pexpect
     bashrc = os.path.join(
-        # re-use pexpect/replwrap.py's bashrc file,
+        # reuse pexpect/replwrap.py's bashrc file,
         os.path.dirname(__file__), os.path.pardir, 'pexpect', 'bashrc.sh')
 
     child = pexpect.spawn('bash', ['--rcfile', bashrc],
