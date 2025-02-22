@@ -8,9 +8,9 @@ import functools
 
 # 3rd party
 import pytest
-import six
 
 # local
+from blessed._compat import unicode_chr
 from .accessories import TestTerminal, as_subprocess
 from .conftest import IS_WINDOWS
 
@@ -308,12 +308,12 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
                                     mapper=term._keymap,
                                     codes=term._keycodes)
 
-        assert resolve(six.unichr(10)).name == "KEY_ENTER"
-        assert resolve(six.unichr(13)).name == "KEY_ENTER"
-        assert resolve(six.unichr(8)).name == "KEY_BACKSPACE"
-        assert resolve(six.unichr(9)).name == "KEY_TAB"
-        assert resolve(six.unichr(27)).name == "KEY_ESCAPE"
-        assert resolve(six.unichr(127)).name == "KEY_BACKSPACE"
+        assert resolve(unicode_chr(10)).name == "KEY_ENTER"
+        assert resolve(unicode_chr(13)).name == "KEY_ENTER"
+        assert resolve(unicode_chr(8)).name == "KEY_BACKSPACE"
+        assert resolve(unicode_chr(9)).name == "KEY_TAB"
+        assert resolve(unicode_chr(27)).name == "KEY_ESCAPE"
+        assert resolve(unicode_chr(127)).name == "KEY_BACKSPACE"
         assert resolve(u"\x1b[A").name == "KEY_UP"
         assert resolve(u"\x1b[B").name == "KEY_DOWN"
         assert resolve(u"\x1b[C").name == "KEY_RIGHT"
