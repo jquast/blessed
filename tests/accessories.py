@@ -10,11 +10,9 @@ import functools
 import traceback
 import contextlib
 
-# 3rd party
-import six
-
 # local
 from blessed import Terminal
+from blessed._compat import TextType
 from .conftest import IS_WINDOWS
 
 try:
@@ -105,7 +103,7 @@ class as_subprocess(object):  # pylint: disable=too-few-public-methods
                   .format(pid_testrunner, os.getpid()), file=sys.stderr)
             os._exit(1)
 
-        exc_output = six.text_type()
+        exc_output = TextType()
         decoder = codecs.getincrementaldecoder(self.encoding)()
         while True:
             try:
@@ -145,7 +143,7 @@ def read_until_semaphore(fd, semaphore=RECV_SEMAPHORE, encoding='utf8'):
     # process will read xyz\\r\\n -- this is how pseudo terminals
     # behave; a virtual terminal requires both carriage return and
     # line feed, it is only for convenience that \\n does both.
-    outp = six.text_type()
+    outp = TextType()
     decoder = codecs.getincrementaldecoder(encoding)()
     semaphore = semaphore.decode('ascii')
     while not outp.startswith(semaphore):
@@ -169,7 +167,7 @@ def read_until_eof(fd, encoding='utf8'):
     Return decoded string.
     """
     decoder = codecs.getincrementaldecoder(encoding)()
-    outp = six.text_type()
+    outp = TextType()
     while True:
         try:
             _exc = os.read(fd, 100)
