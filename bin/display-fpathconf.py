@@ -30,7 +30,7 @@ def display_fpathconf():
         #          VEOF          EOF                  ^D
         #          VEOL          EOL                  _POSIX_VDISABLE
         #
-        # irregardless, this value is almost always \xff.
+        # regardless, this value is almost always \xff.
         ('PC_VDISABLE', 'Terminal character disabling value.')
     )
     fmt = '{name:<13} {value:<10} {description:<11}'
