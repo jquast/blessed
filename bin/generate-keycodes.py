@@ -17,7 +17,7 @@ def main():
     csv_header = """
 .. csv-table:: All Terminal class attribute Keyboard codes, by name
    :delim: |
-   :header: "Name", "Value", "Example Sequence(s)"
+   :header: "Name"| "Value"| "Example Sequence(s)"
 
 """
     fname = os.path.abspath(

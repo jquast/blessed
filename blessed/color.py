@@ -129,7 +129,7 @@ def dist_rgb_weighted(rgb1, rgb2):
 
 def dist_cie76(rgb1, rgb2):
     """
-    Determine distance between two rgb colors using the CIE94 algorithm.
+    Determine distance between two rgb colors using the CIE76 algorithm.
 
     :arg tuple rgb1: RGB color definition
     :arg tuple rgb2: RGB color definition

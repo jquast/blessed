@@ -14,49 +14,39 @@ jobs:
 
     continue-on-error: ${{ matrix.optional || false }}
     runs-on: ${{ matrix.os || 'ubuntu-latest' }}
-    container: ${{ matrix.container }}
+    container: ${{ !startsWith(matrix.os, 'windows') && (matrix.container || format('python:{0}', matrix.python-version)) || null }}
     name: ${{ matrix.label || matrix.python-version }} ${{ startsWith(matrix.os, 'windows') && '(Windows)' || '' }} ${{ matrix.optional && '[OPTIONAL]' }}
 
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version:  ['3.5', '3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
         test_quick: [1]
 
         include:
-          - python-version: '3.12'
+          - python-version: '3.13'
             label: Linting
             toxenv: docformatter_check,flake8,flake8_tests,isort_check,mypy,sphinx,pydocstyle,pylint,pylint_tests
+            os-deps:
+              - enchant-2
 
-          - python-version: '3.13-dev'
+          - python-version: '3.14'
+            container: 'python:3.14-rc'
             optional: true
-            toxenv: py313
-            toxpython: 3.13
 
-          - python-version: '3.12'
+          - python-version: '3.13'
             test_keyboard: 1
             test_raw: 1
             test_quick: 0
 
-          - python-version: '3.12'
+          - python-version: '3.13'
             os: windows-latest
             test_quick: 0
 
-          - python-version: '3.6'
-            os:  ubuntu-20.04
-            toxenv: py36
-
-          - python-version: '3.5'
-            os:  ubuntu-20.04
-            toxenv: py35
-
           - python-version: '2.7'
-            container: {image: 'python:2.7.18-buster'}
-            toxenv: py27
             test_keyboard: 1
             test_raw: 1
             test_quick: 0
-
 
     env:
       TOXENV: ${{ matrix.toxenv || format('py{0}', matrix.python-version) }}
@@ -66,22 +56,16 @@ jobs:
       TOXPYTHON: python${{ matrix.toxpython || matrix.python-version }}
 
     steps:
+      # This is only needed for Python 3.6 and earlier because Tox 4 requires 3.7+
+      - name: Fix TOXENV
+        run: echo "TOXENV=$(echo $TOXENV | sed 's/\.//g')" >> $GITHUB_ENV
+        if: ${{ contains(fromJson('["2.7", "3.5", "3.6"]'), matrix.python-version) }}
+
+      - name: Install OS Dependencies
+        run: apt update && apt -y install ${{ join(matrix.os-deps, ' ') }}
+        if: ${{ matrix.os-deps }}
+
       - uses: actions/checkout@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-        if: ${{ matrix.python-version != '2.7' && matrix.python-version != '3.5' }}
-
-      # Workaround for https://github.com/actions/setup-python/issues/866
-      - name: Set up Python 3.5 (Workaround)
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.5
-        env:
-          PIP_TRUSTED_HOST: "pypi.python.org pypi.org files.pythonhosted.org"
-        if: ${{ matrix.python-version == '3.5' }}
 
       - name: Install tox
         run: pip install tox
@@ -93,7 +77,20 @@ jobs:
         run: tox
 
       - name: Upload to Codecov
-        if: ${{ matrix.label != 'linting' }}
+        if: ${{ matrix.label != 'linting' && !contains(fromJson('["2.7", "3.5"]'), matrix.python-version) }}
+
+        uses: codecov/codecov-action@v4
+        with:
+          verbose: true
+          name: ${{ matrix.label || matrix.python-version }} ${{ startsWith(matrix.os, 'windows') && '(Windows)' || '' }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+          os: ${{ startsWith(matrix.os, 'windows') && 'windows' || 'linux' }}
+          env_vars: TOXENV,TEST_QUICK,TEST_KEYBOARD,TEST_RAW
+
+      # Work around for https://github.com/codecov/codecov-action/issues/1277
+      - name: Upload to Codecov Workaround
+        if: ${{ matrix.label != 'linting' && contains(fromJson('["2.7", "3.5"]'), matrix.python-version) }}
 
         uses: codecov/codecov-action@v3
         with:

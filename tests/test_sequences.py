@@ -5,10 +5,10 @@ import sys
 import platform
 
 # 3rd party
-import six
 import pytest
 
 # local
+from blessed._compat import StringIO
 from .accessories import TestTerminal, unicode_cap, unicode_parm, as_subprocess, MockTigetstr
 from .conftest import IS_WINDOWS
 
@@ -36,7 +36,7 @@ def test_capability_without_tty():
     """Assert capability templates are '' when stream is not a tty."""
     @as_subprocess
     def child():
-        t = TestTerminal(stream=six.StringIO())
+        t = TestTerminal(stream=StringIO())
         assert t.save == u''
         assert t.red == u''
 
@@ -47,7 +47,7 @@ def test_capability_with_forced_tty():
     """force styling should return sequences even for non-ttys."""
     @as_subprocess
     def child():
-        t = TestTerminal(stream=six.StringIO(), force_styling=True)
+        t = TestTerminal(stream=StringIO(), force_styling=True)
         assert t.save == unicode_cap('sc')
 
     child()
@@ -58,7 +58,7 @@ def test_basic_url():
     @as_subprocess
     def child():
         # given
-        t = TestTerminal(stream=six.StringIO(), force_styling=True)
+        t = TestTerminal(stream=StringIO(), force_styling=True)
         given_url = 'https://blessed.readthedocs.org'
         given_text = 'documentation'
         expected_output = ('\x1b]8;;{0}\x1b\\{1}\x1b]8;;\x1b\\'
@@ -78,7 +78,7 @@ def test_url_with_id():
     @as_subprocess
     def child():
         # given
-        t = TestTerminal(stream=six.StringIO(), force_styling=True)
+        t = TestTerminal(stream=StringIO(), force_styling=True)
         given_url = 'https://blessed.readthedocs.org'
         given_text = 'documentation'
         given_url_id = '123'
@@ -128,7 +128,7 @@ def test_location_with_styling(all_terms):
     """Make sure ``location()`` works on all terminals."""
     @as_subprocess
     def child_with_styling(kind):
-        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
+        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location(3, 4):
             t.stream.write(u'hi')
         expected_output = u''.join(
@@ -146,7 +146,7 @@ def test_location_without_styling():
     @as_subprocess
     def child_without_styling():
         """No side effect for location as a context manager without styling."""
-        t = TestTerminal(stream=six.StringIO(), force_styling=None)
+        t = TestTerminal(stream=StringIO(), force_styling=None)
 
         with t.location(3, 4):
             t.stream.write(u'hi')
@@ -160,7 +160,7 @@ def test_horizontal_location(all_terms):
     """Make sure we can move the cursor horizontally without changing rows."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
+        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location(x=5):
             pass
         _hpa = unicode_parm('hpa', 5)
@@ -181,7 +181,7 @@ def test_vertical_location(all_terms):
     """Make sure we can move the cursor horizontally without changing rows."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
+        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location(y=5):
             pass
         _vpa = unicode_parm('vpa', 5)
@@ -203,7 +203,7 @@ def test_inject_move_x():
     """Test injection of hpa attribute for screen/ansi (issue #55)."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
+        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         COL = 5
         with mock.patch('curses.tigetstr', side_effect=MockTigetstr(hpa=None)):
             with t.location(x=COL):
@@ -225,7 +225,7 @@ def test_inject_move_y():
     """Test injection of vpa attribute for screen/ansi (issue #55)."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
+        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         ROW = 5
         with mock.patch('curses.tigetstr', side_effect=MockTigetstr(vpa=None)):
             with t.location(y=ROW):
@@ -247,7 +247,7 @@ def test_inject_civis_and_cnorm_for_ansi():
     """Test injection of civis attribute for ansi."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
+        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.hidden_cursor():
             pass
         expected_output = u'\x1b[?25l\x1b[?25h'
@@ -261,7 +261,7 @@ def test_inject_sc_and_rc_for_ansi():
     """Test injection of sc and rc (save and restore cursor) for ansi."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
+        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location():
             pass
         expected_output = u'\x1b[s\x1b[u'
@@ -274,7 +274,7 @@ def test_zero_location(all_terms):
     """Make sure ``location()`` pays attention to 0-valued args."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=True)
+        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location(0, 0):
             pass
         expected_output = u''.join(
@@ -350,7 +350,7 @@ def test_null_callable_numeric_colors(all_terms):
     """``color(n)`` should be a no-op on null terminals."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(stream=six.StringIO(), kind=kind)
+        t = TestTerminal(stream=StringIO(), kind=kind)
         assert (t.color(5)('smoo') == 'smoo')
         assert (t.on_color(6)('smoo') == 'smoo')
 
@@ -442,7 +442,7 @@ def test_formatting_functions_without_tty(all_terms):
     """Test crazy-ass formatting wrappers when there's no tty."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, stream=six.StringIO(), force_styling=False)
+        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=False)
         assert (t.bold(u'hi') == u'hi')
         assert (t.green('hi') == u'hi')
         # Test non-ASCII chars, no longer really necessary:
@@ -504,7 +504,7 @@ def test_null_callable_string(all_terms):
     """Make sure NullCallableString tolerates all kinds of args."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(stream=six.StringIO(), kind=kind)
+        t = TestTerminal(stream=StringIO(), kind=kind)
         assert (t.clear == '')
         assert (t.move(False) == '')
         assert (t.move_x(1) == '')
@@ -605,7 +605,7 @@ def test_formatting_other_string(all_terms):
     """FormattingOtherString output depends on how it's called"""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(stream=six.StringIO(), kind=kind, force_styling=True)
+        t = TestTerminal(stream=StringIO(), kind=kind, force_styling=True)
 
         assert (t.move_left == t.cub1)
         assert (t.move_left() == t.cub1)
