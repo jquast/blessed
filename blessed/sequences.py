@@ -186,11 +186,11 @@ class SequenceTextWrapper(textwrap.TextWrapper):
             while chunks:
                 chunk_len = Sequence(chunks[-1], term).length()
                 if cur_len + chunk_len > width:
+                    if chunk_len > width:
+                        self._handle_long_word(chunks, cur_line, cur_len, width)
                     break
                 cur_line.append(chunks.pop())
                 cur_len += chunk_len
-            if chunks and Sequence(chunks[-1], term).length() > width:
-                self._handle_long_word(chunks, cur_line, cur_len, width)
             if drop_whitespace and (
                     cur_line and Sequence(cur_line[-1], term).strip() == ''):
                 del cur_line[-1]
@@ -202,10 +202,18 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         """
         Sequence-aware :meth:`textwrap.TextWrapper._handle_long_word`.
 
-        This simply ensures that word boundaries are not broken mid-sequence, as standard python
-        textwrap would incorrectly determine the length of a string containing sequences, and may
-        also break consider sequences part of a "word" that may be broken by hyphen (``-``), where
-        this implementation corrects both.
+        This method ensures that word boundaries are not broken mid-sequence, as
+        standard python textwrap would incorrectly determine the length of a
+        string containing sequences and wide characters it would also break
+        these "words" that would be broken by hyphen (``-``), this
+        implementation corrects both.
+
+        This is done by mutating the passed arguments, removing items from
+        'reversed_chunks' and appending them to 'cur_line'.
+
+        However, some characters (east-asian, emoji, etc.) cannot be split any
+        less than 2 cells, so in the case of a width of 1, we have no choice
+        but to allow those characters to flow outside of the given cell.
         """
         # Figure out when indent is larger than the specified width, and make
         # sure at least one character is stripped off on every pass
@@ -219,8 +227,15 @@ class SequenceTextWrapper(textwrap.TextWrapper):
             idx = nxt = 0
             for text, _ in iter_parse(term, chunk):
                 nxt += len(text)
-                if Sequence(chunk[:nxt], term).length() > space_left:
-                    break
+                seq_length = Sequence(chunk[:nxt], term).length()
+                if seq_length > space_left:
+                    if cur_len == 0 and width == 1 and nxt == 1 and seq_length == 2:
+                        # Emoji etc. cannot be split under 2 cells, so in the
+                        # case of a width of 1, we have no choice but to allow
+                        # those characters to flow outside of the given cell.
+                        pass
+                    else:
+                        break
                 idx = nxt
             cur_line.append(chunk[:idx])
             reversed_chunks[-1] = chunk[idx:]

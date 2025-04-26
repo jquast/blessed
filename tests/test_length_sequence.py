@@ -37,6 +37,21 @@ def test_length_cjk():
     child()
 
 
+def test_length_with_zwj_is_wrong():
+    """Because of the way Zero-Width Joiner (ZWJ) is measured, blessed gets this wrong"""
+    # But for the time being, so do many terminals (~85%), so its not a huge deal..
+    # https://ucs-detect.readthedocs.io/results.html
+    @as_subprocess
+    def child():
+        term = TestTerminal()
+        # RGI_Emoji_ZWJ_Sequence  ; family: woman, woman, girl, boy
+        given = term.bold_red(u'\U0001F469\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466')
+        expected = sum((2, 0, 2, 0, 2, 0, 2))
+
+        # exercise,
+        assert term.length(given) == expected
+
+
 def test_length_ansiart():
     """Test length of ANSI art"""
     @as_subprocess
@@ -60,7 +75,7 @@ def test_length_ansiart():
 
 
 def test_sequence_length(all_terms):
-    """Ensure T.length(string containing sequence) is correcterm."""
+    """Ensure T.length(string containing sequence) is correct."""
     # pylint: disable=too-complex,too-many-statements
     @as_subprocess
     def child(kind):
