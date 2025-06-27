@@ -9,6 +9,7 @@ load-plugins=
 persistent = no
 jobs = 0
 unsafe-load-any-extension = yes
+ignore-paths=.*.pyi
 
 [MESSAGES CONTROL]
 disable=
