@@ -12,7 +12,7 @@ import itertools
 import pytest
 
 # local
-from blessed._compat import StringIO
+from blessed._compat import StringIO, PY2
 from .accessories import TestTerminal, as_subprocess
 from .conftest import IS_WINDOWS
 
@@ -56,12 +56,16 @@ def test_length_ansiart():
     """Test length of ANSI art"""
     @as_subprocess
     def child(kind):
-        import codecs
+        if PY2:
+            from codecs import open as open_
+        else:
+            open_ = open
+
         term = TestTerminal(kind=kind)
         # this 'ansi' art contributed by xzip!impure for another project,
         # unlike most CP-437 DOS ansi art, this is actually utf-8 encoded.
         fname = os.path.join(os.path.dirname(__file__), 'wall.ans')
-        with codecs.open(fname, 'r', 'utf-8') as ansiart:
+        with open_(fname, 'r', encoding='utf-8') as ansiart:
             lines = ansiart.readlines()
         assert term.length(lines[0]) == 67  # ^[[64C^[[34m▄▓▄
         assert term.length(lines[1]) == 75
