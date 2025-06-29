@@ -466,7 +466,7 @@ def test_time_left_infinite_None():
     assert _time_left(stime=time.time(), timeout=None) is None
 
 
-@pytest.mark.skipif(IS_WINDOWS, reason="cant multiprocess")
+@pytest.mark.skipif(IS_WINDOWS, reason="can't multiprocess")
 def test_termcap_repr():
     """Ensure ``hidden_cursor()`` writes hide_cursor and normal_cursor."""
 
