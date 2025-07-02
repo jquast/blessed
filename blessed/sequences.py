@@ -10,7 +10,7 @@ from wcwidth import wcwidth
 
 # local
 from blessed._compat import TextType
-from blessed._capabilities import CAPABILITIES_CAUSE_MOVEMENT
+from blessed._capabilities import CAPABILITIES_CAUSE_MOVEMENT, CAPABILITIES_HORIZONTAL_DISTANCE
 
 __all__ = ('Sequence', 'SequenceTextWrapper', 'iter_parse', 'measure_length')
 
@@ -20,7 +20,7 @@ __all__ = ('Sequence', 'SequenceTextWrapper', 'iter_parse', 'measure_length')
 class Termcap(object):
     """Terminal capability of given variable name and pattern."""
 
-    def __init__(self, name, pattern, attribute):
+    def __init__(self, name, pattern, attribute, nparams=0):
         """
         Class initializer.
 
@@ -28,10 +28,12 @@ class Termcap(object):
         :arg str pattern: regular expression string.
         :arg str attribute: :class:`~.Terminal` attribute used to build
             this terminal capability.
+        :arg int nparams: number of positional arguments for callable.
         """
         self.name = name
         self.pattern = pattern
         self.attribute = attribute
+        self.nparams = nparams
         self._re_compiled = None
 
     def __repr__(self):
@@ -65,25 +67,14 @@ class Termcap(object):
             matching sequence text, its interpreted distance is returned.
         :returns: 0 except for matching '
         """
-        value = {
-            'cursor_left': -1,
-            'backspace': -1,
-            'cursor_right': 1,
-            'tab': 8,
-            'ascii_tab': 8,
-        }.get(self.name)
-        if value is not None:
-            return value
+        value = CAPABILITIES_HORIZONTAL_DISTANCE.get(self.name)
+        if value is None:
+            return 0
 
-        unit = {
-            'parm_left_cursor': -1,
-            'parm_right_cursor': 1
-        }.get(self.name)
-        if unit is not None:
-            value = int(self.re_compiled.match(text).group(1))
-            return unit * value
+        if self.nparams:
+            return value * int(self.re_compiled.match(text).group(1))
 
-        return 0
+        return value
 
     # pylint: disable=too-many-positional-arguments
     @classmethod
@@ -123,7 +114,7 @@ class Termcap(object):
 
         # basic capability attribute, not used as a callable
         if nparams == 0:
-            return cls(name, re.escape(capability), attribute)
+            return cls(name, re.escape(capability), attribute, nparams)
 
         # a callable capability accepting numeric argument
         _outp = re.escape(capability(*(numeric,) * nparams))
@@ -131,13 +122,13 @@ class Termcap(object):
             for num in range(numeric - 1, numeric + 2):
                 if str(num) in _outp:
                     pattern = _outp.replace(str(num), _numeric_regex)
-                    return cls(name, pattern, attribute)
+                    return cls(name, pattern, attribute, nparams)
 
         if match_grouped:
             pattern = re.sub(r'(\d+)', lambda x: _numeric_regex, _outp)
         else:
             pattern = re.sub(r'\d+', lambda x: _numeric_regex, _outp)
-        return cls(name, pattern, attribute)
+        return cls(name, pattern, attribute, nparams)
 
 
 class SequenceTextWrapper(textwrap.TextWrapper):
@@ -431,18 +422,30 @@ class Sequence(TextType):
             return TextType(self)
 
         outp = ''
-        for text, cap in iter_parse(self._term, self):
-            if not cap:
-                outp += text
-                continue
+        last_end = 0
 
-            value = cap.horizontal_distance(text)
+        for match in self._term.caps_compiled.finditer(self):
+
+            # Capture unmatched text between matched capabilities
+            if match.start() > last_end:
+                outp += self[last_end:match.start()]
+
+            last_end = match.end()
+
+            text = match.group(match.lastgroup)
+            value = self._term.caps[match.lastgroup].horizontal_distance(text)
+
             if value > 0:
                 outp += ' ' * value
             elif value < 0:
                 outp = outp[:value]
             elif not strip:
                 outp += text
+
+        # Capture any remaining unmatched text
+        if last_end < len(self):
+            outp += self[last_end:]
+
         return outp
 
 
