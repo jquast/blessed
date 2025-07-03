@@ -424,7 +424,8 @@ class Sequence(TextType):
         outp = ''
         last_end = 0
 
-        for match in self._term.caps_compiled.finditer(self):
+        # pylint: disable-next=protected-access
+        for match in self._term._caps_named_compiled.finditer(self):
 
             # Capture unmatched text between matched capabilities
             if match.start() > last_end:

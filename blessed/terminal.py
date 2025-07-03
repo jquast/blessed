@@ -292,9 +292,12 @@ class Terminal(object):
 
         # make a compiled named regular expression table
         self.caps_compiled = re.compile(
+            '|'.join(cap.pattern for cap in self.caps.values())
+        )
+        # Used with padd() to separate plain text from caps
+        self._caps_named_compiled = re.compile(
             '|'.join(cap.named_pattern for cap in self.caps.values())
         )
-
         # for tokenizer, the '.lastgroup' is the primary lookup key for
         # 'self.caps', unless 'MISMATCH'; then it is an unmatched character.
         self._caps_compiled_any = re.compile('|'.join(
