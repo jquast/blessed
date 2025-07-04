@@ -78,8 +78,7 @@ jobs:
 
       - name: Upload to Codecov
         if: ${{ matrix.label != 'linting' && !contains(fromJson('["2.7", "3.5"]'), matrix.python-version) }}
-
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           verbose: true
           name: ${{ matrix.label || matrix.python-version }} ${{ startsWith(matrix.os, 'windows') && '(Windows)' || '' }}
@@ -88,11 +87,48 @@ jobs:
           os: ${{ startsWith(matrix.os, 'windows') && 'windows' || 'linux' }}
           env_vars: TOXENV,TEST_QUICK,TEST_KEYBOARD,TEST_RAW
 
-      # Work around for https://github.com/codecov/codecov-action/issues/1277
+         # Work around for https://github.com/codecov/codecov-action/issues/1277
       - name: Upload to Codecov Workaround
         if: ${{ matrix.label != 'linting' && contains(fromJson('["2.7", "3.5"]'), matrix.python-version) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage.${{ matrix.python-version }}.xml
+          path: coverage.xml
+          retention-days: 1
 
-        uses: codecov/codecov-action@v3
+# Another Job to upload Codecov reports for older versions
+  Codecov-Upload-Workaround:
+    needs: Tests
+    runs-on: 'ubuntu-latest'
+    name: Codecov Upload (${{ matrix.python-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:  ['3.5']
+        test_quick: [1]
+        include:
+          - python-version: '2.7'
+            test_keyboard: 1
+            test_raw: 1
+            test_quick: 0
+    env:
+      TOXENV: ${{ matrix.toxenv || format('py{0}', matrix.python-version) }}
+      TEST_QUICK: ${{ matrix.test_quick || 0 }}
+      TEST_KEYBOARD: ${{ matrix.test_keyboard || 0 }}
+      TEST_RAW: ${{ matrix.test_raw || 0 }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Upload to Codecov Workaround
+        if: ${{ matrix.label != 'linting' && contains(fromJson('["2.7", "3.5"]'), matrix.python-version) }}
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage.${{ matrix.python-version }}.xml
+          path: coverage.xml
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
         with:
           verbose: true
           name: ${{ matrix.label || matrix.python-version }} ${{ startsWith(matrix.os, 'windows') && '(Windows)' || '' }}
