@@ -7,6 +7,7 @@ __all__ = (
     'CAPABILITY_DATABASE',
     'CAPABILITIES_RAW_MIXIN',
     'CAPABILITIES_ADDITIVES',
+    'CAPABILITIES_HORIZONTAL_DISTANCE',
     'CAPABILITIES_CAUSE_MOVEMENT',
 )
 
@@ -114,55 +115,58 @@ CAPABILITIES_RAW_MIXIN = {
 _ANY_NOTESC = '[^' + re.escape('\x1b') + ']*'
 
 CAPABILITIES_ADDITIVES = {
-    'link': ('link',
-             re.escape('\x1b') + r'\]8;' + _ANY_NOTESC + ';' +
-             _ANY_NOTESC + re.escape('\x1b') + '\\\\'),
-    'color256': ('color', re.escape('\x1b') + r'\[38;5;\d+m'),
-    'on_color256': ('on_color', re.escape('\x1b') + r'\[48;5;\d+m'),
-    'color_rgb': ('color_rgb', re.escape('\x1b') + r'\[38;2;\d+;\d+;\d+m'),
-    'on_color_rgb': ('on_color_rgb', re.escape('\x1b') + r'\[48;2;\d+;\d+;\d+m'),
-    'shift_in': ('', re.escape('\x0f')),
-    'shift_out': ('', re.escape('\x0e')),
+    'link': (
+        re.escape('\x1b') + r'\]8;' + _ANY_NOTESC + ';' + _ANY_NOTESC + re.escape('\x1b') + '\\\\',
+        'link', 1),
+    'color256': (re.escape('\x1b') + r'\[38;5;\d+m', 'color', 1),
+    'on_color256': (re.escape('\x1b') + r'\[48;5;\d+m', 'on_color', 1),
+    'color_rgb': (re.escape('\x1b') + r'\[38;2;\d+;\d+;\d+m', 'color_rgb', 3),
+    'on_color_rgb': (re.escape('\x1b') + r'\[48;2;\d+;\d+;\d+m', 'on_color_rgb', 3),
+    'shift_in': (re.escape('\x0f'), ''),
+    'shift_out': (re.escape('\x0e'), ''),
     # sgr(...) outputs strangely, use the basic ANSI/EMCA-48 codes here.
     'set_a_attributes1': (
-        'sgr', re.escape('\x1b') + r'\[\d+m'),
+        re.escape('\x1b') + r'\[\d+m', 'sgr', 1),
     'set_a_attributes2': (
-        'sgr', re.escape('\x1b') + r'\[\d+\;\d+m'),
+        re.escape('\x1b') + r'\[\d+\;\d+m', 'sgr', 2),
     'set_a_attributes3': (
-        'sgr', re.escape('\x1b') + r'\[\d+\;\d+\;\d+m'),
+        re.escape('\x1b') + r'\[\d+\;\d+\;\d+m', 'sgr', 3),
     'set_a_attributes4': (
-        'sgr', re.escape('\x1b') + r'\[\d+\;\d+\;\d+\;\d+m'),
+        re.escape('\x1b') + r'\[\d+\;\d+\;\d+\;\d+m', 'sgr', 4),
     # this helps where xterm's sgr0 includes set0_des_seq, we'd
     # rather like to also match this immediate substring.
-    'sgr0': ('sgr0', re.escape('\x1b') + r'\[m'),
-    'backspace': ('', re.escape('\b')),
-    'ascii_tab': ('', re.escape('\t')),
-    'clr_eol': ('', re.escape('\x1b[K')),
-    'clr_eol0': ('', re.escape('\x1b[0K')),
-    'clr_bol': ('', re.escape('\x1b[1K')),
-    'clr_eosK': ('', re.escape('\x1b[2K')),
+    'sgr0': (re.escape('\x1b') + r'\[m', 'sgr0'),
+    'backspace': (re.escape('\b'), ''),
+    'ascii_tab': (re.escape('\t'), ''),
+    'clr_eol': (re.escape('\x1b[K'), ''),
+    'clr_eol0': (re.escape('\x1b[0K'), ''),
+    'clr_bol': (re.escape('\x1b[1K'), ''),
+    'clr_eosK': (re.escape('\x1b[2K'), ''),
 }
 
-CAPABILITIES_CAUSE_MOVEMENT = (
-    'ascii_tab',
-    'backspace',
+CAPABILITIES_HORIZONTAL_DISTANCE = {
+    'ascii_tab': 8,
+    'backspace': -1,
+    'cursor_left': -1,
+    'cursor_right': 1,
+    'parm_left_cursor': -1,
+    'parm_right_cursor': 1,
+    'tab': 8,
+}
+
+CAPABILITIES_CAUSE_MOVEMENT = tuple(CAPABILITIES_HORIZONTAL_DISTANCE) + (
     'carriage_return',
     'clear_screen',
     'column_address',
     'cursor_address',
     'cursor_down',
     'cursor_home',
-    'cursor_left',
-    'cursor_right',
     'cursor_up',
     'enter_fullscreen',
     'exit_fullscreen',
     'parm_down_cursor',
-    'parm_left_cursor',
-    'parm_right_cursor',
     'parm_up_cursor',
     'restore_cursor',
     'row_address',
     'scroll_forward',
-    'tab',
 )
