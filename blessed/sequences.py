@@ -427,6 +427,9 @@ class Sequence(TextType):
         :rtype: str
         :returns: Text adjusted for horizontal movement
         """
+        if self._term.caps_compiled.search(self) is None:
+            return TextType(self)
+
         outp = ''
         for text, cap in iter_parse(self._term, self):
             if not cap:
