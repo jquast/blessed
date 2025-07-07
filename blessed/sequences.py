@@ -215,10 +215,10 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         if self.break_long_words:
             term = self.term
             chunk = reversed_chunks[-1]
-            idx = nxt = 0
+            idx = nxt = seq_length = 0
             for text, _ in iter_parse(term, chunk):
                 nxt += len(text)
-                seq_length = Sequence(chunk[:nxt], term).length()
+                seq_length += Sequence(text, term).length()
                 if seq_length > space_left:
                     if cur_len == 0 and width == 1 and nxt == 1 and seq_length == 2:
                         # Emoji etc. cannot be split under 2 cells, so in the
