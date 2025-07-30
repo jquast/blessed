@@ -851,6 +851,15 @@ class Terminal(object):
         color_idx = self.rgb_downconvert(red, green, blue)
         return FormattingString(self._foreground_color(color_idx), self.normal)
 
+    def color_hex(self, hex_color: str) -> str:
+        """Convert a hex color to an RGB terminal color sequence."""
+        hex_color = hex_color.lstrip("#")
+        if len(hex_color) != 6:
+            raise ValueError("Hex color must be in the format #RRGGBB")
+
+        r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        return self.color_rgb(r, g, b)
+  
     @property
     def on_color(self):
         """
