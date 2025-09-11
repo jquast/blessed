@@ -447,7 +447,7 @@ class Sequence(TextType):
                 outp += ' ' * value
             elif value < 0:
                 outp = outp[:value]
-            elif not strip:
+            else:
                 outp += text
 
         # Capture any remaining unmatched text
