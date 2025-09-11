@@ -423,7 +423,7 @@ class Sequence(TextType):
             return TextType(data)
         if strip:  # strip all except CAPABILITIES_HORIZONTAL_DISTANCE
             # pylint: disable-next=protected-access
-            data = self._term._caps_xxx.sub("", data)
+            data = self._term._caps_compiled_without_hdist.sub("", data)
 
             if self._term.caps_compiled.search(data) is None:
                 return TextType(data)

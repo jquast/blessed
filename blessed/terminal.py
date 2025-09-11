@@ -302,7 +302,7 @@ class Terminal(object):
             '|'.join(cap.named_pattern for cap in self.caps.values())
         )
         # Used with padd() to strip non-horizontal caps
-        self._caps_xxx = re.compile('|'.join(
+        self._caps_compiled_without_hdist = re.compile('|'.join(
             cap.pattern for cap in self.caps.values()
             if cap.name not in CAPABILITIES_HORIZONTAL_DISTANCE)
         )
