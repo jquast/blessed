@@ -421,7 +421,7 @@ class Sequence(TextType):
         data = self
         if self._term.caps_compiled.search(data) is None:
             return TextType(data)
-        elif strip:  # strip all except CAPABILITIES_HORIZONTAL_DISTANCE
+        if strip:  # strip all except CAPABILITIES_HORIZONTAL_DISTANCE
             # pylint: disable-next=protected-access
             data = self._term._caps_xxx.sub("", data)
 

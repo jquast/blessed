@@ -35,7 +35,10 @@ from .formatters import (COLORS,
                          split_compound,
                          resolve_attribute,
                          resolve_capability)
-from ._capabilities import CAPABILITY_DATABASE, CAPABILITIES_ADDITIVES, CAPABILITIES_RAW_MIXIN, CAPABILITIES_HORIZONTAL_DISTANCE
+from ._capabilities import (CAPABILITY_DATABASE,
+                            CAPABILITIES_ADDITIVES,
+                            CAPABILITIES_RAW_MIXIN,
+                            CAPABILITIES_HORIZONTAL_DISTANCE)
 
 # isort: off
 
@@ -299,8 +302,9 @@ class Terminal(object):
             '|'.join(cap.named_pattern for cap in self.caps.values())
         )
         # Used with padd() to strip non-horizontal caps
-        self._caps_xxx = re.compile(
-            '|'.join(cap.pattern for cap in self.caps.values() if cap.name not in CAPABILITIES_HORIZONTAL_DISTANCE)
+        self._caps_xxx = re.compile('|'.join(
+            cap.pattern for cap in self.caps.values()
+            if cap.name not in CAPABILITIES_HORIZONTAL_DISTANCE)
         )
         # for tokenizer, the '.lastgroup' is the primary lookup key for
         # 'self.caps', unless 'MISMATCH'; then it is an unmatched character.
