@@ -418,18 +418,25 @@ class Sequence(TextType):
         :rtype: str
         :returns: Text adjusted for horizontal movement
         """
-        if self._term.caps_compiled.search(self) is None:
-            return TextType(self)
+        data = self
+        if self._term.caps_compiled.search(data) is None:
+            return TextType(data)
+        elif strip:  # strip all except CAPABILITIES_HORIZONTAL_DISTANCE
+            # pylint: disable-next=protected-access
+            data = self._term._caps_xxx.sub("", data)
+
+            if self._term.caps_compiled.search(data) is None:
+                return TextType(data)
 
         outp = ''
         last_end = 0
 
         # pylint: disable-next=protected-access
-        for match in self._term._caps_named_compiled.finditer(self):
+        for match in self._term._caps_named_compiled.finditer(data):
 
             # Capture unmatched text between matched capabilities
             if match.start() > last_end:
-                outp += self[last_end:match.start()]
+                outp += data[last_end:match.start()]
 
             last_end = match.end()
 
@@ -444,8 +451,8 @@ class Sequence(TextType):
                 outp += text
 
         # Capture any remaining unmatched text
-        if last_end < len(self):
-            outp += self[last_end:]
+        if last_end < len(data):
+            outp += data[last_end:]
 
         return outp
 
