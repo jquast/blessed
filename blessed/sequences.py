@@ -6,11 +6,11 @@ import math
 import textwrap
 
 # 3rd party
-import six
 from wcwidth import wcwidth
 
 # local
-from blessed._capabilities import CAPABILITIES_CAUSE_MOVEMENT
+from blessed._compat import TextType
+from blessed._capabilities import CAPABILITIES_CAUSE_MOVEMENT, CAPABILITIES_HORIZONTAL_DISTANCE
 
 __all__ = ('Sequence', 'SequenceTextWrapper', 'iter_parse', 'measure_length')
 
@@ -20,7 +20,7 @@ __all__ = ('Sequence', 'SequenceTextWrapper', 'iter_parse', 'measure_length')
 class Termcap(object):
     """Terminal capability of given variable name and pattern."""
 
-    def __init__(self, name, pattern, attribute):
+    def __init__(self, name, pattern, attribute, nparams=0):
         """
         Class initializer.
 
@@ -28,10 +28,12 @@ class Termcap(object):
         :arg str pattern: regular expression string.
         :arg str attribute: :class:`~.Terminal` attribute used to build
             this terminal capability.
+        :arg int nparams: number of positional arguments for callable.
         """
         self.name = name
         self.pattern = pattern
         self.attribute = attribute
+        self.nparams = nparams
         self._re_compiled = None
 
     def __repr__(self):
@@ -65,25 +67,14 @@ class Termcap(object):
             matching sequence text, its interpreted distance is returned.
         :returns: 0 except for matching '
         """
-        value = {
-            'cursor_left': -1,
-            'backspace': -1,
-            'cursor_right': 1,
-            'tab': 8,
-            'ascii_tab': 8,
-        }.get(self.name)
-        if value is not None:
-            return value
+        value = CAPABILITIES_HORIZONTAL_DISTANCE.get(self.name)
+        if value is None:
+            return 0
 
-        unit = {
-            'parm_left_cursor': -1,
-            'parm_right_cursor': 1
-        }.get(self.name)
-        if unit is not None:
-            value = int(self.re_compiled.match(text).group(1))
-            return unit * value
+        if self.nparams:
+            return value * int(self.re_compiled.match(text).group(1))
 
-        return 0
+        return value
 
     # pylint: disable=too-many-positional-arguments
     @classmethod
@@ -123,7 +114,7 @@ class Termcap(object):
 
         # basic capability attribute, not used as a callable
         if nparams == 0:
-            return cls(name, re.escape(capability), attribute)
+            return cls(name, re.escape(capability), attribute, nparams)
 
         # a callable capability accepting numeric argument
         _outp = re.escape(capability(*(numeric,) * nparams))
@@ -131,13 +122,13 @@ class Termcap(object):
             for num in range(numeric - 1, numeric + 2):
                 if str(num) in _outp:
                     pattern = _outp.replace(str(num), _numeric_regex)
-                    return cls(name, pattern, attribute)
+                    return cls(name, pattern, attribute, nparams)
 
         if match_grouped:
             pattern = re.sub(r'(\d+)', lambda x: _numeric_regex, _outp)
         else:
             pattern = re.sub(r'\d+', lambda x: _numeric_regex, _outp)
-        return cls(name, pattern, attribute)
+        return cls(name, pattern, attribute, nparams)
 
 
 class SequenceTextWrapper(textwrap.TextWrapper):
@@ -186,11 +177,11 @@ class SequenceTextWrapper(textwrap.TextWrapper):
             while chunks:
                 chunk_len = Sequence(chunks[-1], term).length()
                 if cur_len + chunk_len > width:
+                    if chunk_len > width:
+                        self._handle_long_word(chunks, cur_line, cur_len, width)
                     break
                 cur_line.append(chunks.pop())
                 cur_len += chunk_len
-            if chunks and Sequence(chunks[-1], term).length() > width:
-                self._handle_long_word(chunks, cur_line, cur_len, width)
             if drop_whitespace and (
                     cur_line and Sequence(cur_line[-1], term).strip() == ''):
                 del cur_line[-1]
@@ -202,10 +193,18 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         """
         Sequence-aware :meth:`textwrap.TextWrapper._handle_long_word`.
 
-        This simply ensures that word boundaries are not broken mid-sequence, as standard python
-        textwrap would incorrectly determine the length of a string containing sequences, and may
-        also break consider sequences part of a "word" that may be broken by hyphen (``-``), where
-        this implementation corrects both.
+        This method ensures that word boundaries are not broken mid-sequence, as
+        standard python textwrap would incorrectly determine the length of a
+        string containing sequences and wide characters it would also break
+        these "words" that would be broken by hyphen (``-``), this
+        implementation corrects both.
+
+        This is done by mutating the passed arguments, removing items from
+        'reversed_chunks' and appending them to 'cur_line'.
+
+        However, some characters (east-asian, emoji, etc.) cannot be split any
+        less than 2 cells, so in the case of a width of 1, we have no choice
+        but to allow those characters to flow outside of the given cell.
         """
         # Figure out when indent is larger than the specified width, and make
         # sure at least one character is stripped off on every pass
@@ -216,11 +215,18 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         if self.break_long_words:
             term = self.term
             chunk = reversed_chunks[-1]
-            idx = nxt = 0
+            idx = nxt = seq_length = 0
             for text, _ in iter_parse(term, chunk):
                 nxt += len(text)
-                if Sequence(chunk[:nxt], term).length() > space_left:
-                    break
+                seq_length += Sequence(text, term).length()
+                if seq_length > space_left:
+                    if cur_len == 0 and width == 1 and nxt == 1 and seq_length == 2:
+                        # Emoji etc. cannot be split under 2 cells, so in the
+                        # case of a width of 1, we have no choice but to allow
+                        # those characters to flow outside of the given cell.
+                        pass
+                    else:
+                        break
                 idx = nxt
             cur_line.append(chunk[:idx])
             reversed_chunks[-1] = chunk[idx:]
@@ -241,7 +247,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
 SequenceTextWrapper.__doc__ = textwrap.TextWrapper.__doc__
 
 
-class Sequence(six.text_type):
+class Sequence(TextType):
     """
     A "sequence-aware" version of the base :class:`str` class.
 
@@ -258,7 +264,7 @@ class Sequence(six.text_type):
         :arg str sequence_text: A string that may contain sequences.
         :arg blessed.Terminal term: :class:`~.Terminal` instance.
         """
-        new = six.text_type.__new__(cls, sequence_text)
+        new = TextType.__new__(cls, sequence_text)
         new._term = term
         return new
 
@@ -412,19 +418,42 @@ class Sequence(six.text_type):
         :rtype: str
         :returns: Text adjusted for horizontal movement
         """
-        outp = ''
-        for text, cap in iter_parse(self._term, self):
-            if not cap:
-                outp += text
-                continue
+        data = self
+        if self._term.caps_compiled.search(data) is None:
+            return TextType(data)
+        if strip:  # strip all except CAPABILITIES_HORIZONTAL_DISTANCE
+            # pylint: disable-next=protected-access
+            data = self._term._caps_compiled_without_hdist.sub("", data)
 
-            value = cap.horizontal_distance(text)
+            if self._term.caps_compiled.search(data) is None:
+                return TextType(data)
+
+        outp = ''
+        last_end = 0
+
+        # pylint: disable-next=protected-access
+        for match in self._term._caps_named_compiled.finditer(data):
+
+            # Capture unmatched text between matched capabilities
+            if match.start() > last_end:
+                outp += data[last_end:match.start()]
+
+            last_end = match.end()
+
+            text = match.group(match.lastgroup)
+            value = self._term.caps[match.lastgroup].horizontal_distance(text)
+
             if value > 0:
                 outp += ' ' * value
             elif value < 0:
                 outp = outp[:value]
-            elif not strip:
+            else:
                 outp += text
+
+        # Capture any remaining unmatched text
+        if last_end < len(data):
+            outp += data[last_end:]
+
         return outp
 
 

@@ -1,6 +1,5 @@
 Pillow
 Sphinx>3
-jinxed
 sphinx-paramlinks
 sphinx_rtd_theme
 sphinxcontrib-manpage

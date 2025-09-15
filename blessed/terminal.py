@@ -35,7 +35,10 @@ from .formatters import (COLORS,
                          split_compound,
                          resolve_attribute,
                          resolve_capability)
-from ._capabilities import CAPABILITY_DATABASE, CAPABILITIES_ADDITIVES, CAPABILITIES_RAW_MIXIN
+from ._capabilities import (CAPABILITY_DATABASE,
+                            CAPABILITIES_ADDITIVES,
+                            CAPABILITIES_RAW_MIXIN,
+                            CAPABILITIES_HORIZONTAL_DISTANCE)
 
 # isort: off
 
@@ -273,8 +276,8 @@ class Terminal(object):
         self.caps = collections.OrderedDict()
 
         # some static injected patterns, esp. without named attribute access.
-        for name, (attribute, pattern) in CAPABILITIES_ADDITIVES.items():
-            self.caps[name] = Termcap(name, pattern, attribute)
+        for name, args in CAPABILITIES_ADDITIVES.items():
+            self.caps[name] = Termcap(name, *args)
 
         for name, (attribute, kwds) in CAPABILITY_DATABASE.items():
             if self.does_styling:
@@ -288,19 +291,28 @@ class Terminal(object):
             # fall-back
             pattern = CAPABILITIES_RAW_MIXIN.get(name)
             if pattern:
-                self.caps[name] = Termcap(name, pattern, attribute)
+                self.caps[name] = Termcap(name, pattern, attribute, kwds.get('nparams', 0))
 
         # make a compiled named regular expression table
         self.caps_compiled = re.compile(
-            '|'.join(cap.pattern for name, cap in self.caps.items()))
-
+            '|'.join(cap.pattern for cap in self.caps.values())
+        )
+        # Used with padd() to separate plain text from caps
+        self._caps_named_compiled = re.compile(
+            '|'.join(cap.named_pattern for cap in self.caps.values())
+        )
+        # Used with padd() to strip non-horizontal caps
+        self._caps_compiled_without_hdist = re.compile('|'.join(
+            cap.pattern for cap in self.caps.values()
+            if cap.name not in CAPABILITIES_HORIZONTAL_DISTANCE)
+        )
         # for tokenizer, the '.lastgroup' is the primary lookup key for
         # 'self.caps', unless 'MISMATCH'; then it is an unmatched character.
         self._caps_compiled_any = re.compile('|'.join(
-            cap.named_pattern for name, cap in self.caps.items()
+            cap.named_pattern for cap in self.caps.values()
         ) + '|(?P<MISMATCH>.)')
         self._caps_unnamed_any = re.compile('|'.join(
-            '({0})'.format(cap.pattern) for name, cap in self.caps.items()
+            '({0})'.format(cap.pattern) for cap in self.caps.values()
         ) + '|(.)')
 
     def __init__keycodes(self):

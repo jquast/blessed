@@ -9,10 +9,10 @@ import platform
 import itertools
 
 # 3rd party
-import six
 import pytest
 
 # local
+from blessed._compat import StringIO, PY2
 from .accessories import TestTerminal, as_subprocess
 from .conftest import IS_WINDOWS
 
@@ -37,16 +37,35 @@ def test_length_cjk():
     child()
 
 
+def test_length_with_zwj_is_wrong():
+    """Because of the way Zero-Width Joiner (ZWJ) is measured, blessed gets this wrong"""
+    # But for the time being, so do many terminals (~85%), so its not a huge deal..
+    # https://ucs-detect.readthedocs.io/results.html
+    @as_subprocess
+    def child():
+        term = TestTerminal()
+        # RGI_Emoji_ZWJ_Sequence  ; family: woman, woman, girl, boy
+        given = term.bold_red(u'\U0001F469\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466')
+        expected = sum((2, 0, 2, 0, 2, 0, 2))
+
+        # exercise,
+        assert term.length(given) == expected
+
+
 def test_length_ansiart():
     """Test length of ANSI art"""
     @as_subprocess
     def child(kind):
-        import codecs
+        if PY2:
+            from codecs import open as open_
+        else:
+            open_ = open
+
         term = TestTerminal(kind=kind)
         # this 'ansi' art contributed by xzip!impure for another project,
         # unlike most CP-437 DOS ansi art, this is actually utf-8 encoded.
         fname = os.path.join(os.path.dirname(__file__), 'wall.ans')
-        with codecs.open(fname, 'r', 'utf-8') as ansiart:
+        with open_(fname, 'r', encoding='utf-8') as ansiart:
             lines = ansiart.readlines()
         assert term.length(lines[0]) == 67  # ^[[64C^[[34m▄▓▄
         assert term.length(lines[1]) == 75
@@ -60,7 +79,7 @@ def test_length_ansiart():
 
 
 def test_sequence_length(all_terms):
-    """Ensure T.length(string containing sequence) is correcterm."""
+    """Ensure T.length(string containing sequence) is correct."""
     # pylint: disable=too-complex,too-many-statements
     @as_subprocess
     def child(kind):
@@ -308,7 +327,7 @@ def test_env_winsize():
         # set the pty's virtual window size
         os.environ['COLUMNS'] = '99'
         os.environ['LINES'] = '11'
-        term = TestTerminal(stream=six.StringIO())
+        term = TestTerminal(stream=StringIO())
         save_init = term._init_descriptor
         save_stdout = sys.__stdout__
         try:

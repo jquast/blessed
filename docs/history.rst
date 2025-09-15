@@ -2,6 +2,17 @@
 
 Version History
 ===============
+next
+  * performance improvements to :meth:`~Terminal.length` and
+    :meth:`~Terminal.wrap` via :ghpull:`286`, :ghpull:`287`, :ghpull:`289`, and
+    :ghpull:`291`
+
+1.21
+  * bugfix infinite loop in :meth:`~Terminal.wrap` when "Wide" characters of
+    width 2 (East-Asian or Emoji) are used with a wrap width of 1, and a small
+    performance enhancement, :ghissue:`273` and :ghpull:`274` by :ghuser:`grayjk`
+    merged as :ghpull:`275`.
+
 1.20
   * introduced :meth:`~Terminal.get_fgcolor` and :meth:`~Terminal.get_bgcolor` to query
     the terminal for the currently set colors. :ghissue:`237` by :ghuser:`stefanholek`
