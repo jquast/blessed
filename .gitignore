@@ -21,3 +21,5 @@ htmlcov
 .vscode
 .python-version
 .idea/
+.venv
+.pytest_cache

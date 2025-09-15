@@ -106,7 +106,7 @@ It is therefore a recommendation to **avoid alt or meta keys entirely** in appli
 And instead prefer the ctrl-key combinations, maybe along with :meth:`~.Terminal.raw`, to avoid
 instructing users to custom-configure their terminal emulators to communicate *Alt* sequences.
 
-If you still wish to optionall decode them, *ALT+z* becomes *Escape + z* (or, in raw form
+If you still wish to optionally decode them, *ALT+z* becomes *Escape + z* (or, in raw form
 ``\x1bz``). This is detected by blessings as two keystrokes, ``KEY_ESCAPE`` and ``'z'``.  Blessings
 currently provides no further assistance in detecting these key combinations.
 
