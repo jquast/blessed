@@ -2,10 +2,11 @@
 
 Version History
 ===============
-next
+1.22
   * performance improvements to :meth:`~Terminal.length` and
     :meth:`~Terminal.wrap` via :ghpull:`286`, :ghpull:`287`, :ghpull:`289`, and
     :ghpull:`291`
+  * spelling fixes, :ghpull:`278`, :ghpull:`293`
 
 1.21
   * bugfix infinite loop in :meth:`~Terminal.wrap` when "Wide" characters of
