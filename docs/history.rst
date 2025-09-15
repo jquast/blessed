@@ -2,6 +2,11 @@
 
 Version History
 ===============
+next
+  * performance improvements to :meth:`~Terminal.length` and
+    :meth:`~Terminal.wrap` via :ghpull:`286`, :ghpull:`287`, :ghpull:`289`, and
+    :ghpull:`291`
+
 1.21
   * bugfix infinite loop in :meth:`~Terminal.wrap` when "Wide" characters of
     width 2 (East-Asian or Emoji) are used with a wrap width of 1, and a small
