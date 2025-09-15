@@ -26,7 +26,7 @@ jobs:
         include:
           - python-version: '3.13'
             label: Linting
-            toxenv: docformatter_check,flake8,flake8_tests,isort_check,mypy,sphinx,pydocstyle,pylint,pylint_tests
+            toxenv: docformatter_check,flake8,flake8_tests,isort_check,mypy,sphinx,pydocstyle,pylint,pylint_tests,codespell
             os-deps:
               - enchant-2
 
