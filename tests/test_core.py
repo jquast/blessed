@@ -193,44 +193,51 @@ def test_force_styling_none(all_terms):
 
     child(all_terms)
 
+
 def test_force_styling_none_but_FORCE_COLOR(all_terms):
     """If ``force_styling=None`` is used, but FORCE_COLOR=1, do styling."""
     @as_subprocess
-    def child(kind):
-        os.putenv('FORCE_COLOR', '1')
+    def child(kind, envkey):
+        os.environ[envkey] = '1'
         t = TestTerminal(kind=kind, force_styling=None)
         assert t.does_styling
         assert (t.save != '')
         assert (t.color(9) != '')
         assert (t.bold('oi') != 'oi')
 
-    child(all_terms)
+    child(all_terms, 'FORCE_COLOR')
+    child(all_terms, 'CLICOLOR_FORCE')
+
 
 def test_force_styling_none_and_unset_FORCE_COLOR(all_terms):
     """If ``force_styling=None`` is used, but FORCE_COLOR is empty, "unset", do not style."""
     @as_subprocess
-    def child(kind):
-        os.putenv('FORCE_COLOR', '')
+    def child(kind, envkey):
+        os.environ[envkey] = ''
         t = TestTerminal(kind=kind, force_styling=None)
         assert not t.does_styling
         assert (t.save == '')
         assert (t.color(9) == '')
         assert (t.bold('oi') == 'oi')
 
-    child(all_terms)
+    child(all_terms, 'FORCE_COLOR')
+    child(all_terms, 'CLICOLOR_FORCE')
+
 
 def test_force_styling_False_but_FORCE_COLOR(all_terms):
     """If ``force_styling=None`` is used, but FORCE_COLOR=1, do styling."""
     @as_subprocess
-    def child(kind):
-        os.putenv('FORCE_COLOR', '1')
+    def child(kind, envkey):
+        os.environ[env_key] = '1'
         t = TestTerminal(kind=kind, force_styling=False)
         assert t.does_styling
         assert (t.save != '')
         assert (t.color(9) != '')
         assert (t.bold('oi') != 'oi')
 
-    child(all_terms)
+    child(all_terms, 'FORCE_COLOR')
+    child(all_terms, 'CLICOLOR_FORCE')
+
 
 def test_setupterm_singleton_issue_33():
     """A warning is emitted if a new terminal ``kind`` is used per process."""
