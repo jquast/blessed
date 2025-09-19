@@ -158,9 +158,9 @@ class Terminal(object):
             Conversely, When OS Environment variable NO_COLOR_ is *non-empty*,
             styling is **not** used no matter the value specified by ``force_styling``
 
-            .. _`FORCE_COLOR`: https://force-color.org/
-            .. _`CLICOLOR_FORCE`: https://bixense.com/clicolors/
-            .. _`NO_COLOR`: https://no-color.org/
+            .. _FORCE_COLOR: https://force-color.org/
+            .. _CLICOLOR_FORCE: https://bixense.com/clicolors/
+            .. _NO_COLOR: https://no-color.org/
         """
         # pylint: disable=global-statement,too-many-branches
         global _CUR_TERM

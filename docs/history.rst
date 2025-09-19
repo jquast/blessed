@@ -3,8 +3,8 @@
 Version History
 ===============
 *next*
-  * A non-empty FORCE_COLOR_ environment variable now acts as though
-    ``force_styling=True`` argument was passed to :class:`blessed.Terminal`.
+  * Environment values FORCE_COLOR_, CLICOLOR_FORCE_, and NO_COLOR_ overrides
+    :class:`blessed.Terminal` argument value, ``force_styling``.
 
 1.22
   * performance improvements to :meth:`~Terminal.length` and
@@ -340,3 +340,6 @@ Version History
 .. _`PDCurses`: https://www.lfd.uci.edu/~gohlke/pythonlibs/#curses
 .. _`ansi`: https://github.com/tehmaze/ansi
 .. _FORCE_COLOR: https://force-color.org/
+.. _CLICOLOR_FORCE: https://bixense.com/clicolors/
+.. _NO_COLOR: https://no-color.org/
+
