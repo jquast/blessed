@@ -198,6 +198,7 @@ def test_force_styling_none_but_FORCE_COLOR(all_terms):
         os.environ[envkey] = '1'
         t = TestTerminal(force_styling=None)
         assert t.does_styling
+        del os.environ[envkey]
 
     child('FORCE_COLOR')
     child('CLICOLOR_FORCE')
@@ -212,6 +213,7 @@ def test_force_styling_none_and_unset_FORCE_COLOR(all_terms):
         os.environ[envkey] = ''
         t = TestTerminal(force_styling=None)
         assert not t.does_styling
+        del os.environ[envkey]
 
     child('FORCE_COLOR')
     child('CLICOLOR_FORCE')
@@ -224,17 +226,19 @@ def test_force_styling_False_but_FORCE_COLOR():
         os.environ[envkey] = '1'
         t = TestTerminal(force_styling=False)
         assert t.does_styling
+        del os.environ[envkey]
 
     child('FORCE_COLOR')
     child('CLICOLOR_FORCE')
 
 def test_force_styling_True_but_NO_COLOR():
-    """``force_styling=True``, but N_COLOR is non-empty, do styling."""
+    """``force_styling=True``, but NO_COLOR is non-empty, do not style."""
     @as_subprocess
     def child(envkey):
         os.environ[envkey] = '1'
         t = TestTerminal(force_styling=True)
         assert not t.does_styling
+        del os.environ[envkey]
 
     child('NO_COLOR')
 
