@@ -213,7 +213,6 @@ class Terminal(object):
         self.__init__capabilities()
         self.__init__keycodes()
 
-
     def __init_set_styling(self, force_styling):
         self._does_styling = False
         if os.getenv('NO_COLOR'):
@@ -228,7 +227,6 @@ class Terminal(object):
             self.errors.append('force_styling is None')
         elif force_styling or self.is_a_tty:
             self._does_styling = True
-
 
     def __init__streams(self):
         # pylint: disable=too-complex,too-many-branches
