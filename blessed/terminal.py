@@ -174,17 +174,7 @@ class Terminal(object):
         else:
             self._kind = kind or os.environ.get('TERM', 'dumb') or 'dumb'
 
-        if os.getenv('FORCE_COLOR'):
-            self.errors.append('FORCE_COLOR=' + repr(os.getenv('FORCE_COLOR')))
-        if os.getenv('CLICOLOR_FORCE'):
-            self.errors.append('CLICOLOR_FORCE=' + repr(os.getenv('FORCE_COLOR')))
-
-        self._does_styling = bool(os.getenv('FORCE_COLOR') or os.getenv('CLICOLOR_FORCE'))
-        if force_styling is None and self.is_a_tty:
-            self.errors.append('force_styling is None')
-        elif force_styling or self.is_a_tty:
-            self._does_styling = True
-
+        self.__init_set_styling(force_styling)
         if self.does_styling:
             # Initialize curses (call setupterm), so things like tigetstr() work.
             try:
@@ -214,6 +204,23 @@ class Terminal(object):
         self.__init__color_capabilities()
         self.__init__capabilities()
         self.__init__keycodes()
+
+
+    def __init_set_styling(self, force_styling):
+        self._does_styling = False
+        if os.getenv('NO_COLOR'):
+            self.errors.append('NO_COLOR=' + repr(os.getenv('NO_COLOR')))
+        elif os.getenv('FORCE_COLOR'):
+            self.errors.append('FORCE_COLOR=' + repr(os.getenv('FORCE_COLOR')))
+            self._does_styling = True
+        elif os.getenv('CLICOLOR_FORCE'):
+            self.errors.append('CLICOLOR_FORCE=' + repr(os.getenv('CLICOLOR_FORCE')))
+            self._does_styling = True
+        elif force_styling is None and self.is_a_tty:
+            self.errors.append('force_styling is None')
+        elif force_styling or self.is_a_tty:
+            self._does_styling = True
+
 
     def __init__streams(self):
         # pylint: disable=too-complex,too-many-branches
