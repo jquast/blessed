@@ -2,6 +2,10 @@
 
 Version History
 ===============
+*next*
+  * A non-empty FORCE_COLOR_ environment variable now acts as though
+    ``force_styling=True`` argument was passed to :class:`blessed.Terminal`.
+
 1.22
   * performance improvements to :meth:`~Terminal.length` and
     :meth:`~Terminal.wrap` via :ghpull:`286`, :ghpull:`287`, :ghpull:`289`, and
@@ -335,3 +339,4 @@ Version History
 .. _`API Documentation`: http://blessed.rtfd.org
 .. _`PDCurses`: https://www.lfd.uci.edu/~gohlke/pythonlibs/#curses
 .. _`ansi`: https://github.com/tehmaze/ansi
+.. _FORCE_COLOR: https://force-color.org/

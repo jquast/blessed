@@ -150,6 +150,9 @@ class Terminal(object):
             This comes in handy if users are trying to pipe your output through
             something like ``less -r`` or build systems which support decoding
             of terminal sequences.
+
+            When the OS Environment variable ``FORCE_COLOR`` is non-empty, this
+            value defaults to True, complies with spec at https://force-color.org/
         """
         # pylint: disable=global-statement,too-many-branches
         global _CUR_TERM
@@ -171,7 +174,10 @@ class Terminal(object):
         else:
             self._kind = kind or os.environ.get('TERM', 'dumb') or 'dumb'
 
-        self._does_styling = False
+        if os.getenv('FORCE_COLOR'):
+            self.errors.append('FORCE_COLOR=' + os.getenv('FORCE_COLOR'))
+
+        self._does_styling = bool(os.getenv('FORCE_COLOR'))
         if force_styling is None and self.is_a_tty:
             self.errors.append('force_styling is None')
         elif force_styling or self.is_a_tty:
