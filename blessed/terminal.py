@@ -175,9 +175,11 @@ class Terminal(object):
             self._kind = kind or os.environ.get('TERM', 'dumb') or 'dumb'
 
         if os.getenv('FORCE_COLOR'):
-            self.errors.append('FORCE_COLOR=' + os.getenv('FORCE_COLOR'))
+            self.errors.append('FORCE_COLOR=' + repr(os.getenv('FORCE_COLOR')))
+        if os.getenv('CLICOLOR_FORCE'):
+            self.errors.append('CLICOLOR_FORCE=' + repr(os.getenv('FORCE_COLOR')))
 
-        self._does_styling = bool(os.getenv('FORCE_COLOR'))
+        self._does_styling = bool(os.getenv('FORCE_COLOR') or os.getenv('CLICOLOR_FORCE'))
         if force_styling is None and self.is_a_tty:
             self.errors.append('force_styling is None')
         elif force_styling or self.is_a_tty:
