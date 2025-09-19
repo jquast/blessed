@@ -228,6 +228,15 @@ def test_force_styling_False_but_FORCE_COLOR():
     child('FORCE_COLOR')
     child('CLICOLOR_FORCE')
 
+def test_force_styling_True_but_NO_COLOR():
+    """``force_styling=True``, but N_COLOR is non-empty, do styling."""
+    @as_subprocess
+    def child(envkey):
+        os.environ[envkey] = '1'
+        t = TestTerminal(force_styling=True)
+        assert not t.does_styling
+
+    child('NO_COLOR')
 
 def test_setupterm_singleton_issue_33():
     """A warning is emitted if a new terminal ``kind`` is used per process."""
