@@ -156,7 +156,9 @@ class Terminal(object):
             ``force_styling``.
 
             Conversely, When OS Environment variable NO_COLOR_ is *non-empty*,
-            styling is **not** used no matter the value specified by ``force_styling``
+            styling is **not** used no matter the value specified by
+            ``force_styling`` and has precedence over FORCE_COLOR_ and
+            CLICOLOR_FORCE_.
 
             .. _FORCE_COLOR: https://force-color.org/
             .. _CLICOLOR_FORCE: https://bixense.com/clicolors/
