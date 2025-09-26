@@ -9,6 +9,7 @@ import contextlib
 
 # local
 import blessed
+from blessed.dec_modes import DecPrivateMode
 
 
 def scale_255(val): return int(round(val * 255))
@@ -88,7 +89,6 @@ def status(term, elapsed):
             term.white_on_blue + term.clear_eol + left_txt +
             term.rjust(right_txt, term.width - len(left_txt)))
 
-
 def main(term):
     with term.cbreak(), term.hidden_cursor(), term.fullscreen():
         pause, dirty = False, True
@@ -100,8 +100,10 @@ def main(term):
                 with elapsed_timer() as elapsed:
                     outp = term.home + screen_plasma(term, rgb_at_xy, t)
                 outp += status(term, elapsed())
-                print(outp, end='')
-                sys.stdout.flush()
+                # Use synchronized output to reduce tearing and improve smoothness
+                with term.dec_modes_enabled(DecPrivateMode.SYNCHRONIZED_OUTPUT, timeout=0.1):
+                    print(outp, end='')
+                    sys.stdout.flush()
                 dirty = False
             if pause:
                 show_paused(term)

@@ -12,6 +12,7 @@ if _platform.system() == 'Windows':
     from blessed.win_terminal import Terminal
 else:
     from blessed.terminal import Terminal  # type: ignore
+from blessed.dec_modes import DecPrivateMode
 
 if (3, 0, 0) <= _sys.version_info[:3] < (3, 2, 3):
     # Good till 3.2.10
@@ -19,5 +20,5 @@ if (3, 0, 0) <= _sys.version_info[:3] < (3, 2, 3):
     raise ImportError('Blessed needs Python 3.2.3 or greater for Python 3 '
                       'support due to http://bugs.python.org/issue10570.')
 
-__all__ = ('Terminal',)
+__all__ = ('Terminal', 'DecPrivateMode',)
 __version__ = "1.22.0"

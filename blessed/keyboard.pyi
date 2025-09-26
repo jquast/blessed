@@ -27,6 +27,8 @@ class Keystroke(str):
         ucs: str = ...,
         code: Optional[int] = ...,
         name: Optional[str] = ...,
+        mode: Optional[int] = ...,
+        match: Optional[Match[str]] = ...,
     ) -> _T: ...
     @property
     def is_sequence(self) -> bool: ...
@@ -34,6 +36,11 @@ class Keystroke(str):
     def name(self) -> Optional[str]: ...
     @property
     def code(self) -> Optional[int]: ...
+    @property
+    def mode(self) -> Optional[int]: ...
+    @property
+    def event_mode(self) -> Optional[int]: ...
+    def get_event_values(self) -> Tuple[int, ...]: ...
 
 def get_keyboard_codes() -> Dict[int, str]: ...
 def get_keyboard_sequences(term: 'Terminal') -> OrderedDict[str, int]: ...
@@ -46,5 +53,50 @@ def _read_until(
         term: 'Terminal', pattern: str, timeout: Optional[float]
     ) -> Tuple[Optional[Match[str]], str]: ...
 
+class BracketedPasteEvent:
+    def __init__(self, text: str) -> None: ...
+    @property
+    def text(self) -> str: ...
+
+class FocusEvent:
+    def __init__(self, gained: bool) -> None: ...
+    @property
+    def gained(self) -> bool: ...
+
+class MouseLegacyEvent:
+    def __init__(
+        self,
+        button: int,
+        x: int,
+        y: int,
+        is_release: bool,
+        shift: bool,
+        meta: bool,
+        ctrl: bool,
+        is_motion: bool,
+        is_drag: bool,
+        is_wheel: bool,
+    ) -> None: ...
+
+class MouseSGREvent:
+    def __init__(
+        self,
+        button: int,
+        x: int,
+        y: int,
+        is_release: bool,
+        shift: bool,
+        meta: bool,
+        ctrl: bool,
+        is_drag: bool,
+        is_wheel: bool,
+    ) -> None: ...
+
+class SyncEvent:
+    def __init__(self, begin: bool) -> None: ...
+    @property
+    def begin(self) -> bool: ...
+
+def _match_dec_event(text: str) -> Optional[Keystroke]: ...
 
 DEFAULT_ESCDELAY: float

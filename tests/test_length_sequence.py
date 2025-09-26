@@ -50,6 +50,7 @@ def test_length_with_zwj_is_wrong():
 
         # exercise,
         assert term.length(given) == expected
+    child()
 
 
 def test_length_ansiart():

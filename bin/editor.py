@@ -27,6 +27,8 @@ import collections
 
 # local
 from blessed import Terminal
+from blessed.dec_modes import DecPrivateMode
+from blessed.keyboard import MouseSGREvent
 
 # python 2/3 compatibility, provide 'echo' function as an
 # alias for "print without newline and flush"
@@ -227,7 +229,8 @@ def main():
             term.raw(), \
             term.location(), \
             term.fullscreen(), \
-            term.keypad():
+            term.keypad(), \
+            term.dec_modes_enabled(DecPrivateMode.MOUSE_EXTENDED_SGR):
         inp = None
         while True:
             echo_yx(csr, term.reverse(screen.get((csr.y, csr.x), u' ')))
@@ -252,6 +255,20 @@ def main():
             elif inp == chr(12):
                 # ^l refreshes
                 redraw(term=term, screen=screen)
+
+            elif inp.event_mode == DecPrivateMode.MOUSE_EXTENDED_SGR:
+                # Handle mouse events
+                mouse_event = inp.get_event_values()
+                if isinstance(mouse_event, MouseSGREvent) and not mouse_event.is_release:
+                    # Mouse click - move cursor to click position (convert to 0-based)
+                    new_y = max(0, min(term.height - 1, mouse_event.y - 1))
+                    new_x = max(0, min(term.width - 1, mouse_event.x - 1))
+
+                    # erase old cursor
+                    echo_yx(csr, screen.get((csr.y, csr.x), u' '))
+                    # set new cursor position
+                    csr = Cursor(new_y, new_x, term)
+                continue
 
             else:
                 n_csr = lookup_move(inp.code, csr)

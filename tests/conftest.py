@@ -82,3 +82,9 @@ def many_lines(request):
 def many_columns(request):
     """Various number of columns for screen width."""
     return request.param
+
+
+@pytest.fixture(params=[True, False])
+def styling(request):
+    """Test with styling enabled and disabled."""
+    return request.param
