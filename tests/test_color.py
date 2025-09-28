@@ -311,3 +311,22 @@ def test_256_vs_legacy_downconvert_compatibility():
         assert red_256 == 196  # Cube red
 
     child()
+
+
+def test_rgb_downconvert_zero_colors():
+    """Test rgb_downconvert when number_of_colors == 0 returns color 7"""
+    @as_subprocess
+    def child():
+        t = TestTerminal(force_styling=True)
+        t.number_of_colors = 0
+
+        # When number_of_colors is 0, rgb_downconvert should always return 7
+        # regardless of the input RGB values (covers line 925)
+        assert t.rgb_downconvert(0, 0, 0) == 7
+        assert t.rgb_downconvert(255, 0, 0) == 7
+        assert t.rgb_downconvert(0, 255, 0) == 7
+        assert t.rgb_downconvert(0, 0, 255) == 7
+        assert t.rgb_downconvert(255, 255, 255) == 7
+        assert t.rgb_downconvert(128, 64, 192) == 7
+
+    child()
