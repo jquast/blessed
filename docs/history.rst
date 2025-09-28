@@ -2,6 +2,10 @@
 
 Version History
 ===============
+*next release*
+  * performance improvements in :meth:`~Terminal.rgb_downconvert` for 256-color
+    terminals, :ghpull:`298`.
+
 1.22
   * performance improvements to :meth:`~Terminal.length` and
     :meth:`~Terminal.wrap` via :ghpull:`286`, :ghpull:`287`, :ghpull:`289`, and
