@@ -920,6 +920,8 @@ class Terminal(object):
         :rtype: int
         :returns: Color code of downconverted RGB color
         """
+        # pylint: disable=too-many-locals
+
         if self.number_of_colors == 0:
             # bit of a waste to downconvert to no color at all, the final
             # formatting string will be empty, we play along with color #7
@@ -941,10 +943,9 @@ class Terminal(object):
             return best_idx
 
         # For 256-color terminals, use *only* cube (16-231) and grayscale
-        # (232-255) color matches, avoid ANSI colors 0-15 alltogether, to
-        # prevent interference from user theme customizations, and its
-        # fastest for our purpose, anyway! We chose the nearest distance
-        # of either color.
+        # (232-255) color matches, avoid ANSI colors 0-15 altogether, to prevent
+        # interference from user themes, and its fastest for our purpose,
+        # anyway! We chose the nearest distance of either color.
         cube_idx, cube_rgb = xterm256color_from_rgb(red, green, blue)
         gray_idx, gray_rgb = xterm256gray_from_rgb(red, green, blue)
         cube_distance = fn_distance(cube_rgb, target_rgb)
