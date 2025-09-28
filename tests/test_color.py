@@ -167,21 +167,22 @@ def test_rgb_to_xterm_cube_index():
     def child():
         t = TestTerminal(force_styling=True)
         t.number_of_colors = 256
-        
+
         # In 256-color mode, we avoid ANSI colors 0-15 to prevent theme interference
         # All colors map to either cube (16-231) or grayscale (232-255)
-        
+
         # Test colors that map to cube indices
         assert t.rgb_downconvert(0, 0, 0) == 16  # Cube black (0,0,0)
         assert t.rgb_downconvert(255, 0, 0) == 196  # Cube red (255,0,0) = 16 + 36*5 + 6*0 + 0
-        assert t.rgb_downconvert(0, 255, 0) == 46   # Cube green (0,255,0) = 16 + 36*0 + 6*5 + 0  
+        assert t.rgb_downconvert(0, 255, 0) == 46   # Cube green (0,255,0) = 16 + 36*0 + 6*5 + 0
         assert t.rgb_downconvert(0, 0, 255) == 21   # Cube blue (0,0,255) = 16 + 36*0 + 6*0 + 5
-        assert t.rgb_downconvert(255, 255, 255) == 231  # Cube white (255,255,255) = 16 + 36*5 + 6*5 + 5
-        
+        # Cube white (255,255,255) = 16 + 36*5 + 6*5 + 5
+        assert t.rgb_downconvert(255, 255, 255) == 231
+
         # Test intermediate cube colors
         assert t.rgb_downconvert(95, 95, 95) == 59  # 16 + 36*1 + 6*1 + 1 = 59
         assert t.rgb_downconvert(135, 135, 135) == 102  # 16 + 36*2 + 6*2 + 2 = 102
-        
+
         # Test some colors that should prefer cube over grayscale
         cube_orange = t.rgb_downconvert(215, 135, 0)  # Should be in cube range
         assert 16 <= cube_orange <= 231
@@ -195,21 +196,22 @@ def test_rgb_to_xterm_gray_index():
     def child():
         t = TestTerminal(force_styling=True)
         t.number_of_colors = 256
-        
+
         # Test grayscale ramp mapping (indices 232-255, values 8, 18, 28, ..., 238)
         # Gray value = 8 + 10*i, where i is the offset from 232
-        
+
         # Test edge cases and specific grays
         assert t.rgb_downconvert(8, 8, 8) == 232  # First gray (8+10*0)
-        assert t.rgb_downconvert(18, 18, 18) == 233  # Second gray (8+10*1) 
-        assert t.rgb_downconvert(128, 128, 128) in [244, 245]  # Mid gray, should be around (128-8)/10 ≈ 12
+        assert t.rgb_downconvert(18, 18, 18) == 233  # Second gray (8+10*1)
+        # Mid gray, should be around (128-8)/10 ≈ 12
+        assert t.rgb_downconvert(128, 128, 128) in [244, 245]
         assert t.rgb_downconvert(238, 238, 238) == 255  # Last gray (8+10*23)
-        
+
         # Test pure grayscale inputs
         for i, expected_idx in enumerate([232, 233, 234, 235, 236]):
             gray_val = 8 + 10 * i
             result_idx = t.rgb_downconvert(gray_val, gray_val, gray_val)
-            assert result_idx == expected_idx, f"Gray {gray_val} should map to {expected_idx}, got {result_idx}"
+            assert result_idx == expected_idx
 
     child()
 
@@ -220,30 +222,30 @@ def test_256_downconvert_cube_vs_gray_choice():
     def child():
         t = TestTerminal(force_styling=True)
         t.number_of_colors = 256
-        
+
         # In 256-color mode, we avoid ANSI colors 0-15 to prevent theme interference
         # All colors map to either cube (16-231) or grayscale (232-255)
-        
+
         # Test colors that map to cube indices
         red_idx = t.rgb_downconvert(255, 0, 0)
         assert red_idx == 196  # Cube red (255,0,0) = 16 + 36*5 + 6*0 + 0
-        
+
         green_idx = t.rgb_downconvert(0, 255, 0)
         assert green_idx == 46  # Cube green (0,255,0) = 16 + 36*0 + 6*5 + 0
-        
+
         blue_idx = t.rgb_downconvert(0, 0, 255)
         assert blue_idx == 21  # Cube blue (0,0,255) = 16 + 36*0 + 6*0 + 5
-        
+
         # Test gray values that should prefer grayscale ramp
         gray_idx = t.rgb_downconvert(128, 128, 128)
         assert 232 <= gray_idx <= 255  # Should be in grayscale range
-        
+
         # Test mixed color - algorithm finds best match between cube and grayscale only
         mixed_idx = t.rgb_downconvert(200, 100, 50)  # Orange-ish color
         assert 16 <= mixed_idx <= 255  # Valid color index (cube or grayscale, not ANSI)
-        
+
         # Test very dark colors - should prefer grayscale or very dark cube colors
-        dark_idx = t.rgb_downconvert(20, 20, 20) 
+        dark_idx = t.rgb_downconvert(20, 20, 20)
         # Could be either cube (16) or early grayscale (232-235), both are valid
         assert dark_idx == 16 or 232 <= dark_idx <= 235
 
@@ -256,16 +258,16 @@ def test_256_downconvert_preserves_distance_algorithm():
     def child():
         t = TestTerminal(force_styling=True)
         t.number_of_colors = 256
-        
+
         # Test with different distance algorithms
         for algo in ['cie2000', 'rgb', 'rgb-weighted', 'cie76', 'cie94']:
             t.color_distance_algorithm = algo
-            
+
             # The fast path should still work and give reasonable results
             # Pure red (255,0,0) may map to ANSI red (index 9) or cube red
             red_idx = t.rgb_downconvert(255, 0, 0)
             assert red_idx in range(256)  # Valid color index
-            
+
             # Pure grays should prefer grayscale (for most algorithms)
             gray_idx = t.rgb_downconvert(128, 128, 128)
             # Result depends on algorithm, but should be reasonable
@@ -279,33 +281,33 @@ def test_256_vs_legacy_downconvert_compatibility():
     @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
-        
+
         # Test basic colors in 16-color mode
         t.number_of_colors = 16
         black_16 = t.rgb_downconvert(0, 0, 0)
         red_16 = t.rgb_downconvert(255, 0, 0)
-        
-        # Test same colors in 256-color mode 
+
+        # Test same colors in 256-color mode
         t.number_of_colors = 256
         black_256 = t.rgb_downconvert(0, 0, 0)
         red_256 = t.rgb_downconvert(255, 0, 0)
-        
+
         # The indices will be different, but both should be valid
         assert black_16 in range(16)  # Valid 16-color index
         assert black_256 in range(256)  # Valid 256-color index
-        assert red_16 in range(16)  # Valid 16-color index  
+        assert red_16 in range(16)  # Valid 16-color index
         assert red_256 in range(256)  # Valid 256-color index
-        
+
         # Black behavior differs between modes:
-        # - 16-color mode: uses ANSI black (index 0)  
+        # - 16-color mode: uses ANSI black (index 0)
         # - 256-color mode: uses cube black (index 16) to avoid theme interference
         assert black_16 == 0
         assert black_256 == 16  # Cube black to avoid user theme customizations
-        
+
         # Red behavior also differs:
         # - 16-color mode: uses ANSI bright red (index 9)
-        # - 256-color mode: uses cube red (index 196) to avoid theme interference  
+        # - 256-color mode: uses cube red (index 196) to avoid theme interference
         assert red_16 == 9
         assert red_256 == 196  # Cube red
-        
+
     child()

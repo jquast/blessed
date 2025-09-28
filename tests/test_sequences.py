@@ -743,6 +743,7 @@ def test_supports_index(all_terms):
 
         class Indexable:  # pylint: disable=too-few-public-methods
             """Custom class implementing __index__()"""
+
             def __index__(self):
                 return 100
 

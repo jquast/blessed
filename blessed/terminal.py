@@ -16,15 +16,14 @@ import contextlib
 import collections
 
 # local
-from .color import (COLOR_DISTANCE_ALGORITHMS, xterm256color_from_rgb, xterm256gray_from_rgb)
+from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
 from .keyboard import (DEFAULT_ESCDELAY,
                        _time_left,
                        _read_until,
                        resolve_sequence,
                        get_keyboard_codes,
                        get_leading_prefixes,
-                       get_keyboard_sequences,
-                       )
+                       get_keyboard_sequences)
 from .sequences import Termcap, Sequence, SequenceTextWrapper
 from .colorspace import RGB_256TABLE
 from .formatters import (COLORS,
@@ -74,8 +73,11 @@ else:
         HAS_TTY = False
 
 _CUR_TERM = None  # See comments at end of file
-_RE_GET_FGCOLOR_RESPONSE = re.compile(u'\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
-_RE_GET_BGCOLOR_RESPONSE = re.compile(u'\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+_RE_GET_FGCOLOR_RESPONSE = re.compile(
+    u'\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+_RE_GET_BGCOLOR_RESPONSE = re.compile(
+    u'\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+
 
 class Terminal(object):
     """
@@ -328,7 +330,7 @@ class Terminal(object):
 
         # Build database of sequence <=> KEY_NAME.
         self._keymap = get_keyboard_sequences(self)
-        
+
         # build set of prefixes of sequences
         self._keymap_prefixes = get_leading_prefixes(self._keymap)
 
@@ -948,7 +950,6 @@ class Terminal(object):
         cube_distance = fn_distance(cube_rgb, target_rgb)
         gray_distance = fn_distance(gray_rgb, target_rgb)
         return cube_idx if cube_distance <= gray_distance else gray_idx
-
 
     @property
     def normal(self):

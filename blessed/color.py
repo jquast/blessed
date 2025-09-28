@@ -248,7 +248,7 @@ COLOR_DISTANCE_ALGORITHMS = {'rgb': dist_rgb,
 # Based on xterm's 256colres.pl: levels [0, 95, 135, 175, 215, 255] for 6x6x6 cube
 _CUBE_LEVELS = (0, 95, 135, 175, 215, 255)
 
-# Precomputed RGB to cube index mapping (0-5) for each RGB value (0-255)
+# Precomputed RGB to cube index mapping "level", (0-5) for each RGB value (0-255)
 # Uses xterm thresholds based on midpoints between cube levels [0,95,135,175,215,255]
 # Thresholds: 48, 115, 155, 195, 235
 _RGB_TO_CUBE_IDX = tuple(
@@ -273,9 +273,9 @@ _GRAY_VAL_FROM_IDX = tuple(8 + 10 * i for i in range(24))
 def xterm256color_from_rgb(red, green, blue):
     """
     Convert RGB values to xterm 256-color cube index and RGB approximation.
-    
+
     Uses the 6x6x6 color cube (indices 16-231) with levels [0,95,135,175,215,255].
-    
+
     :arg int red: RGB value of Red (0-255).
     :arg int green: RGB value of Green (0-255).
     :arg int blue: RGB value of Blue (0-255).
@@ -289,16 +289,16 @@ def xterm256color_from_rgb(red, green, blue):
     b_idx = _RGB_TO_CUBE_IDX[blue]
     cube_idx = 16 + 36 * r_idx + 6 * g_idx + b_idx
     cube_rgb = (_RGB_TO_CUBE_VAL[red], _RGB_TO_CUBE_VAL[green], _RGB_TO_CUBE_VAL[blue])
-    
+
     return cube_idx, cube_rgb
 
 
 def xterm256gray_from_rgb(red, green, blue):
     """
     Convert RGB values to xterm 256-color grayscale index and RGB approximation.
-    
+
     Uses the 24 grayscale entries (indices 232-255) with values 8+10*i.
-    
+
     :arg int red: RGB value of Red (0-255).
     :arg int green: RGB value of Green (0-255).
     :arg int blue: RGB value of Blue (0-255).
@@ -312,5 +312,5 @@ def xterm256gray_from_rgb(red, green, blue):
     gray_idx = 232 + gray_idx_offset
     gray_val = _GRAY_VAL_FROM_IDX[gray_idx_offset]
     gray_rgb = (gray_val, gray_val, gray_val)
-    
+
     return gray_idx, gray_rgb
