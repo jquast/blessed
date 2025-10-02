@@ -7,8 +7,8 @@ import time
 import typing
 import platform
 import functools
+from typing import Set, Dict, Match, Tuple, TypeVar, Optional
 from collections import OrderedDict, namedtuple
-from typing import Optional, Dict, Set, Tuple, Match, TypeVar
 
 # local
 from blessed.dec_modes import DecPrivateMode
@@ -43,7 +43,8 @@ ModifyOtherKeysEvent = namedtuple('ModifyOtherKeysEvent', 'key modifiers')
 
 # Legacy CSI modifier key support
 LegacyCSIKeyEvent = namedtuple('LegacyCSIKeyEvent', 'kind key_id modifiers event_type')
-LEGACY_CSI_MODIFIERS_PATTERN = re.compile(r'\x1b\[1;(?P<mod>\d+)(?::(?P<event>\d+))?(?P<final>[ABCDEFHPQRS])~?')
+LEGACY_CSI_MODIFIERS_PATTERN = re.compile(
+    r'\x1b\[1;(?P<mod>\d+)(?::(?P<event>\d+))?(?P<final>[ABCDEFHPQRS])~?')
 LEGACY_CSI_TILDE_PATTERN = re.compile(r'\x1b\[(?P<key_num>\d+);(?P<mod>\d+)(?::(?P<event>\d+))?~')
 LEGACY_SS3_FKEYS_PATTERN = re.compile(r'\x1bO(?P<mod>\d)(?P<final>[PQRS])')
 DEC_EVENT_PATTERN = functools.namedtuple("DEC_EVENT_PATTERN", ["mode", "pattern"])
@@ -231,35 +232,35 @@ class Keystroke(str):
                     return base_result
 
         # Kitty keyboard protocol letter/digit/symbol name synthesis
-        if (self._mode == DecPrivateMode.SpecialInternalKitty and 
-            hasattr(self._match, 'event_type') and hasattr(self._match, 'unicode_key')):
+        if (self._mode == DecPrivateMode.SpecialInternalKitty and
+                hasattr(self._match, 'event_type') and hasattr(self._match, 'unicode_key')):
             # Only synthesize for keypress events (event_type == 1), not release/repeat
             if self._match.event_type == 1:
                 # Determine the base key - prefer base_key if available
-                base_codepoint = (self._match.base_key if self._match.base_key is not None 
-                                else self._match.unicode_key)
-                
+                base_codepoint = (self._match.base_key if self._match.base_key is not None
+                                  else self._match.unicode_key)
+
                 # Special case: '[' always returns 'CSI' regardless of modifiers
-                if base_codepoint == 91:  # '[' 
+                if base_codepoint == 91:  # '['
                     return 'CSI'
-                
+
                 # Only proceed if it's an ASCII letter or digit
                 if base_codepoint and ((65 <= base_codepoint <= 90) or   # A-Z
-                                     (97 <= base_codepoint <= 122) or    # a-z
-                                     (48 <= base_codepoint <= 57)):      # 0-9
+                                       (97 <= base_codepoint <= 122) or    # a-z
+                                       (48 <= base_codepoint <= 57)):      # 0-9
                     # For letters: convert to uppercase for consistent naming
                     # For digits: use as-is
                     if 65 <= base_codepoint <= 90 or 97 <= base_codepoint <= 122:  # letter
                         char = chr(base_codepoint).upper()  # Convert to uppercase
                     else:  # digit
                         char = chr(base_codepoint)  # Keep as-is
-                    
+
                     # Build modifier prefix list in order: CTRL, ALT, SHIFT, SUPER, HYPER, META
                     mod_parts = []
                     for mod_name in ('ctrl', 'alt', 'shift', 'super', 'hyper', 'meta'):
                         if getattr(self, f'_{mod_name}'):
                             mod_parts.append(mod_name.upper())
-                    
+
                     # Only synthesize name if at least one modifier is present
                     if mod_parts:
                         return f"{'_'.join(mod_parts)}_{char}"
@@ -380,7 +381,7 @@ class Keystroke(str):
         # Release events never have text
         if self.released:
             return ''
-        
+
         # Plain printable characters - return as-is, supports Unicode and multi-codepoint text
         if len(self) == 1 and not self[0] == '\x1b' and self[0].isprintable():
             return str(self)
@@ -497,19 +498,19 @@ class Keystroke(str):
         Whether this is a key press event.
 
         :rtype: bool
-        :returns: True if this is a key press event (event_type=1 or not specified),
-                  False for repeat or release events
+        :returns: True if this is a key press event (event_type=1 or not specified), False for
+            repeat or release events
         """
         # Check Kitty protocol
-        if (self._mode == DecPrivateMode.SpecialInternalKitty and 
-            hasattr(self._match, 'event_type')):
+        if (self._mode == DecPrivateMode.SpecialInternalKitty and
+                hasattr(self._match, 'event_type')):
             return self._match.event_type == 1
-        
+
         # Check Legacy CSI modifiers
         if (self._mode == DecPrivateMode.SpecialInternalLegacyCSIModifier and
-            hasattr(self._match, 'event_type')):
+                hasattr(self._match, 'event_type')):
             return self._match.event_type == 1
-        
+
         # Default: all other events are considered press events
         return True
 
@@ -522,15 +523,15 @@ class Keystroke(str):
         :returns: True if this is a key repeat event (event_type=2), False otherwise
         """
         # Check Kitty protocol
-        if (self._mode == DecPrivateMode.SpecialInternalKitty and 
-            hasattr(self._match, 'event_type')):
+        if (self._mode == DecPrivateMode.SpecialInternalKitty and
+                hasattr(self._match, 'event_type')):
             return self._match.event_type == 2
-        
+
         # Check Legacy CSI modifiers
         if (self._mode == DecPrivateMode.SpecialInternalLegacyCSIModifier and
-            hasattr(self._match, 'event_type')):
+                hasattr(self._match, 'event_type')):
             return self._match.event_type == 2
-        
+
         # Default: not a repeat event
         return False
 
@@ -543,15 +544,15 @@ class Keystroke(str):
         :returns: True if this is a key release event (event_type=3), False otherwise
         """
         # Check Kitty protocol
-        if (self._mode == DecPrivateMode.SpecialInternalKitty and 
-            hasattr(self._match, 'event_type')):
+        if (self._mode == DecPrivateMode.SpecialInternalKitty and
+                hasattr(self._match, 'event_type')):
             return self._match.event_type == 3
-        
+
         # Check Legacy CSI modifiers
         if (self._mode == DecPrivateMode.SpecialInternalLegacyCSIModifier and
-            hasattr(self._match, 'event_type')):
+                hasattr(self._match, 'event_type')):
             return self._match.event_type == 3
-        
+
         # Default: not a release event
         return False
 
@@ -581,7 +582,8 @@ class Keystroke(str):
             return DecPrivateMode(self._mode)
         return None
 
-    def mode_values(self) -> typing.Union[BracketedPasteEvent, MouseSGREvent, MouseLegacyEvent, FocusEvent]:
+    def mode_values(self) -> typing.Union[BracketedPasteEvent,
+                                          MouseSGREvent, MouseLegacyEvent, FocusEvent]:
         """
         Return structured data for DEC private mode events.
 
@@ -740,7 +742,7 @@ class Keystroke(str):
             expected_name = tokens_str.upper()
             if self.name == expected_name:
                 return lambda: True
-            
+
             # Try extracting event type suffix
             event_type = None
             if tokens_str.endswith('_pressed'):
@@ -752,11 +754,11 @@ class Keystroke(str):
             elif tokens_str.endswith('_repeated'):
                 event_type = 'repeated'
                 tokens_str = tokens_str[:-9]  # Remove '_repeated'
-            
+
             # If event type was found, check if name without suffix matches
             if event_type:
                 expected_name_without_event = tokens_str.upper()
-                
+
                 def event_predicate():
                     """Check if keystroke matches the expected event type."""
                     # Check if the name matches (with or without event type suffix)
@@ -771,10 +773,10 @@ class Keystroke(str):
                         name_ok = True
                     else:
                         name_ok = False
-                    
+
                     if not name_ok:
                         return False
-                    
+
                     # Check event type
                     if event_type == 'pressed':
                         return self.pressed
@@ -783,9 +785,9 @@ class Keystroke(str):
                     elif event_type == 'repeated':
                         return self.repeated
                     return False
-                
+
                 return event_predicate
-            
+
             tokens = tokens_str.split('_')
 
             # Validate tokens - only allow known modifier names
@@ -881,7 +883,8 @@ class DeviceAttribute(object):
     supported extensions/capabilities.
     """
 
-    def __init__(self, raw: str, service_class: int, extensions: typing.Optional[typing.List[int]]) -> None:
+    def __init__(self, raw: str, service_class: int,
+                 extensions: typing.Optional[typing.List[int]]) -> None:
         """
         Initialize DeviceAttribute instance.
 
@@ -1157,8 +1160,8 @@ def _time_left(stime: float, timeout: Optional[float]) -> Optional[float]:
     return max(0, timeout - (time.time() - stime)) if timeout else timeout
 
 
-def _read_until(term: typing.Any, pattern: str, timeout: Optional[float]) -> Tuple[Optional[Match[str]],
-                                                                                    str]:
+def _read_until(term: typing.Any, pattern: str,
+                timeout: Optional[float]) -> Tuple[Optional[Match[str]], str]:
     """
     Convenience read-until-pattern function, supporting :meth:`~.get_location`.
 
@@ -1347,7 +1350,11 @@ def _match_legacy_csi_modifiers(text):
         event_type = int(match.group('event')) if match.group('event') else 1
 
         if keycode_match is not None:
-            legacy_event = LegacyCSIKeyEvent(kind=kind, key_id=key_id, modifiers=modifiers, event_type=event_type)
+            legacy_event = LegacyCSIKeyEvent(
+                kind=kind,
+                key_id=key_id,
+                modifiers=modifiers,
+                event_type=event_type)
             return Keystroke(ucs=matched_text,
                              code=keycode_match,
                              mode=DecPrivateMode.SpecialInternalLegacyCSIModifier,
@@ -1396,7 +1403,11 @@ def _match_legacy_csi_modifiers(text):
         }.get(key_id)
 
         if keycode_match is not None:
-            legacy_event = LegacyCSIKeyEvent(kind=kind, key_id=key_id, modifiers=modifiers, event_type=event_type)
+            legacy_event = LegacyCSIKeyEvent(
+                kind=kind,
+                key_id=key_id,
+                modifiers=modifiers,
+                event_type=event_type)
             return Keystroke(ucs=matched_text,
                              code=keycode_match,
                              mode=DecPrivateMode.SpecialInternalLegacyCSIModifier,
@@ -1461,7 +1472,7 @@ KEY_MENU = 530
 # These are from the functional key definitions in the Kitty keyboard protocol spec
 # PUA starts at 57344 (0xE000)
 KEY_LEFT_SHIFT = 57441          # 0xE061
-KEY_LEFT_CONTROL = 57442        # 0xE062  
+KEY_LEFT_CONTROL = 57442        # 0xE062
 KEY_LEFT_ALT = 57443            # 0xE063
 KEY_LEFT_SUPER = 57444          # 0xE064
 KEY_LEFT_HYPER = 57445          # 0xE065

@@ -36,10 +36,12 @@ pytestmark = pytest.mark.skipif(
     not TEST_KEYBOARD or IS_WINDOWS,
     reason="Timing-sensitive tests please do not run on build farms.")
 
+
 def assert_elapsed_range(start_time, min_ms, max_ms):
     """Assert that elapsed time in milliseconds is within range."""
     elapsed_ms = (time.time() - start_time) * 100
     assert min_ms <= int(elapsed_ms) <= max_ms, f"elapsed: {int(elapsed_ms)}ms"
+
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_kbhit_interrupted():

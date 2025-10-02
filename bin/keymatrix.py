@@ -167,7 +167,11 @@ def get_test_modes() -> Tuple[DecPrivateMode, ...]:
 
 def render_header(term: Terminal, header: List[str], dec_manager: DecModeManager,
                   kitty_manager: KittyKeyboardManager) -> int:
-    """Render the header section. Returns number of rows used."""
+    """
+    Render the header section.
+
+    Returns number of rows used.
+    """
     row_count = 0
     print(term.home, end='', flush=False)
 
@@ -222,14 +226,15 @@ def render_keymatrix(term: Terminal, n_header_rows: int, raw_sequences: deque,
         return rs
 
     while True:
-        bar_content = ''.join(_fmt(len(raw_sequences)-i, sequence)
+        bar_content = ''.join(_fmt(len(raw_sequences) - i, sequence)
                               for i, sequence in
                               enumerate(raw_sequences))
         if term.length(bar_content) < bar_width:
             break
         raw_sequences.popleft()
-    
-    print(term.move_yx(bar_y, (term.width // 3)-3) + bar_content, end=term.clear_eol + '\r\n', flush=False)
+
+    print(term.move_yx(bar_y, (term.width // 3) - 3) +
+          bar_content, end=term.clear_eol + '\r\n', flush=False)
     print(end=term.clear_eol + '\r\n', flush=False)
     print(end=term.clear_eol + '\r\n', flush=False)
 
@@ -238,7 +243,7 @@ def render_keymatrix(term: Terminal, n_header_rows: int, raw_sequences: deque,
 
     # Render formatted events table
     events_to_display = list(formatted_events)[-max_event_rows:]
-    
+
     for event_line in events_to_display:
         print(event_line, end=term.clear_eol + '\r\n', flush=False)
     print('', end=term.clear_eos, flush=True)
@@ -250,12 +255,12 @@ def format_key_event(key: Any) -> str:
     seq_repr = repr(str(key))[:20]
     value_repr = repr(key.value)[:15] if hasattr(key, 'value') else ''
     name_repr = repr(key.name)[:20] if hasattr(key, 'name') else ''
-    
+
     if key.mode and int(key.mode) != 0:
         extra = f'mode={key.mode_values()!r}'[:30]
     else:
         extra = f'mods={key.modifiers}' if hasattr(key, 'modifiers') else ''
-    
+
     return f"{seq_repr:<22} {value_repr:<17} {name_repr:<22} {extra}"
 
 
@@ -294,11 +299,11 @@ def main():
     with input_mode(), term.fullscreen():
         message = None
         n_header_rows = 0
-        
+
         # Initial full render
         n_header_rows = render_header(term, header, dec_manager, kitty_manager)
         render_keymatrix(term, n_header_rows, raw_sequences, formatted_events)
-        
+
         while True:
             if do_exit:
                 dec_manager.cleanup()
@@ -332,13 +337,13 @@ def main():
             for char in str(key):
                 raw_sequences.append(char)
             formatted_events.append(format_key_event(key))
-            
+
             # If mode was toggled, re-render header and flush input
             if message:
                 formatted_events.append(f">> {message}")
                 n_header_rows = render_header(term, header, dec_manager, kitty_manager)
                 message = None
-            
+
             # Always render key matrix (efficient, only updates changed area)
             render_keymatrix(term, n_header_rows, raw_sequences, formatted_events)
 

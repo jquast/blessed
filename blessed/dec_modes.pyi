@@ -2,7 +2,8 @@
 Type stubs for DEC Private Modes and their Response values.
 """
 
-from typing import Union, Any
+# std imports
+from typing import Any, Union
 
 class DecModeResponse:
     NOT_QUERIED: int

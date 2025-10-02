@@ -14,7 +14,7 @@ import platform
 import warnings
 import contextlib
 import collections
-from typing import Optional, Tuple, List, Generator, Union, Match, IO
+from typing import IO, List, Match, Tuple, Union, Optional, Generator
 
 # SupportsIndex was added in Python 3.8
 if sys.version_info >= (3, 8):
@@ -27,17 +27,17 @@ else:
 # local
 from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
 from .keyboard import (DEFAULT_ESCDELAY,
+                       Keystroke,
+                       DeviceAttribute,
+                       KittyKeyboardProtocol,
                        _time_left,
                        _read_until,
                        resolve_sequence,
                        get_keyboard_codes,
                        get_leading_prefixes,
-                       get_keyboard_sequences,
-                       KittyKeyboardProtocol,
-                       DeviceAttribute,
-                       )
+                       get_keyboard_sequences)
+from .dec_modes import DecPrivateMode, DecModeResponse
 from .sequences import Termcap, Sequence, SequenceTextWrapper
-from .dec_modes import (DecPrivateMode, DecModeResponse)
 from .colorspace import RGB_256TABLE
 from .formatters import (COLORS,
                          COMPOUNDABLES,
@@ -91,6 +91,33 @@ _RE_GET_FGCOLOR_RESPONSE = re.compile(
 _RE_GET_BGCOLOR_RESPONSE = re.compile(
     '\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
 _RE_GET_DEVICE_ATTR_RESPONSE = re.compile('\x1b\\[\\?([0-9]+)((?:;[0-9]+)*)c')
+
+
+class WINSZ(collections.namedtuple('WINSZ', (
+        'ws_row', 'ws_col', 'ws_xpixel', 'ws_ypixel'))):
+    """
+    Structure represents return value of :const:`termios.TIOCGWINSZ`.
+
+    .. py:attribute:: ws_row
+
+        rows, in characters
+
+    .. py:attribute:: ws_col
+
+        columns, in characters
+
+    .. py:attribute:: ws_xpixel
+
+        horizontal size, pixels
+
+    .. py:attribute:: ws_ypixel
+
+        vertical size, pixels
+    """
+    #: format of termios structure
+    _FMT = 'hhhh'
+    #: buffer of termios structure appropriate for ioctl argument
+    _BUF = '\x00' * struct.calcsize(_FMT)
 
 
 class Terminal(object):
@@ -393,9 +420,8 @@ class Terminal(object):
 
     def __getattr__(self,
                     attr: str) -> Union[NullCallableString,
-                    ParameterizingString,
-                    FormattingString]:
-
+                                        ParameterizingString,
+                                        FormattingString]:
         r"""
         Return a terminal capability as Unicode string.
 
@@ -1441,7 +1467,6 @@ class Terminal(object):
         cube_distance = fn_distance(cube_rgb, target_rgb)
         gray_distance = fn_distance(gray_rgb, target_rgb)
         return cube_idx if cube_distance <= gray_distance else gray_idx
-        
 
     @property
     def normal(self) -> str:
@@ -1699,7 +1724,7 @@ class Terminal(object):
         """
         return Sequence(text, self).strip_seqs()
 
-    def split_seqs(self, text: str, maxsplit: int=0) -> List[str]:
+    def split_seqs(self, text: str, maxsplit: int = 0) -> List[str]:
         r"""
         Return ``text`` split by individual character elements and sequences.
 
@@ -2198,33 +2223,6 @@ class Terminal(object):
         # re-buffer any remaining unmatched sequence text
         self.ungetch(ucs[len(ks):])
         return ks
-
-
-class WINSZ(collections.namedtuple('WINSZ', (
-        'ws_row', 'ws_col', 'ws_xpixel', 'ws_ypixel'))):
-    """
-    Structure represents return value of :const:`termios.TIOCGWINSZ`.
-
-    .. py:attribute:: ws_row
-
-        rows, in characters
-
-    .. py:attribute:: ws_col
-
-        columns, in characters
-
-    .. py:attribute:: ws_xpixel
-
-        horizontal size, pixels
-
-    .. py:attribute:: ws_ypixel
-
-        vertical size, pixels
-    """
-    #: format of termios structure
-    _FMT = 'hhhh'
-    #: buffer of termios structure appropriate for ioctl argument
-    _BUF = '\x00' * struct.calcsize(_FMT)
 
 
 #: _CUR_TERM = None

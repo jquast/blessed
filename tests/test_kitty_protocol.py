@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
 """Tests specific to Kitty keyboard protocol features."""
+from blessed.keyboard import (
+    KEY_LEFT_SHIFT, KEY_LEFT_CONTROL, KEY_LEFT_ALT,
+    KEY_RIGHT_SHIFT, KEY_RIGHT_CONTROL, KEY_RIGHT_ALT,
+    KEY_LEFT_SUPER, KEY_LEFT_HYPER, KEY_LEFT_META,
+    _match_legacy_csi_modifiers
+)
 import io
 import os
 import sys
@@ -13,6 +19,7 @@ from tests.accessories import (as_subprocess, SEMAPHORE, SEND_SEMAPHORE, TestTer
                                echo_off, read_until_eof, read_until_semaphore,
                                init_subproc_coverage)
 from tests.conftest import IS_WINDOWS, TEST_KEYBOARD
+from blessed.dec_modes import DecPrivateMode
 
 # Skip PTY tests on Windows and build farms
 pytestmark = pytest.mark.skipif(
@@ -26,7 +33,7 @@ def test_match_kitty_basic():
     """Basic Kitty protocol sequences."""
     ks = _match_kitty_key('\x1b[97u')
     assert ks is not None
-    assert ks._mode == -1
+    assert ks._mode == DecPrivateMode.SpecialInternalKitty
     assert isinstance(ks._match, KittyKeyEvent)
 
     event = ks._match
@@ -134,8 +141,8 @@ def test_kitty_modifier_encoding():
 
     for name, mod_value in modifiers.items():
         ks = _match_kitty_key(f'\x1b[97;{mod_value}u')  # 'a' with modifier
-        assert ks is not None, f"Failed to match {name} modifier"
-        assert ks._match.modifiers == mod_value, f"Wrong modifier value for {name}"
+        assert ks is not None
+        assert ks._match.modifiers == mod_value
 
 
 def test_full_sequence_string_matching():
@@ -150,7 +157,7 @@ def test_sequence_properties():
     # Test Kitty sequence
     ks = _match_kitty_key('\x1b[97;5u')
     assert ks.is_sequence is True
-    assert ks._mode == -1
+    assert ks._mode == DecPrivateMode.SpecialInternalKitty
     assert ks._code is None  # No traditional keycode for these protocols
 
 
@@ -171,7 +178,7 @@ def test_terminal_inkey_kitty_protocol():
         # Should have been parsed as a Kitty protocol sequence
         assert ks is not None
         assert ks == kitty_sequence
-        assert ks._mode == -1  # Kitty mode indicator
+        assert ks._mode == DecPrivateMode.SpecialInternalKitty
         assert isinstance(ks._match, KittyKeyEvent)
 
         # Verify the parsed event data
@@ -197,7 +204,7 @@ def test_terminal_inkey_kitty_precedence():
         ks = term.inkey(timeout=0)
 
         # Should be parsed as Kitty, not as legacy sequence
-        assert ks._mode == -1  # Kitty mode
+        assert ks._mode == DecPrivateMode.SpecialInternalKitty
         event = ks._match
         assert event.unicode_key == 65  # 'A'
         assert stream.getvalue() == ''
@@ -219,7 +226,7 @@ def test_terminal_inkey_kitty_buffer_handling():
 
         # Should parse just the Kitty sequence
         assert ks == '\x1b[97;5u'
-        assert ks._mode == -1
+        assert ks._mode == DecPrivateMode.SpecialInternalKitty
 
         # Extra characters should still be in buffer
         remaining = term.inkey(timeout=0)
@@ -263,8 +270,8 @@ def test_kitty_functional_keys():
 
     for sequence, expected_key in functional_keys.items():
         ks = _match_kitty_key(sequence)
-        assert ks is not None, f"Failed to match {expected_key}"
-        assert ks._mode == -1
+        assert ks is not None
+        assert ks._mode == DecPrivateMode.SpecialInternalKitty
         # The unicode_key should be the private use area code
         expected_code = int(sequence.split('[')[1].split('u')[0])
         assert ks._match.unicode_key == expected_code
@@ -281,8 +288,8 @@ def test_kitty_f_keys():
 
     for sequence, expected_key in f_keys.items():
         ks = _match_kitty_key(sequence)
-        assert ks is not None, f"Failed to match {expected_key}"
-        assert ks._mode == -1
+        assert ks is not None
+        assert ks._mode == DecPrivateMode.SpecialInternalKitty
         expected_code = int(sequence.split('[')[1].split('u')[0])
         assert ks._match.unicode_key == expected_code
 
@@ -299,7 +306,7 @@ def test_kitty_keypad_keys():
     for sequence, expected_key in keypad_keys.items():
         ks = _match_kitty_key(sequence)
         assert ks is not None, f"Failed to match {expected_key}"
-        assert ks._mode == -1
+        assert ks._mode == DecPrivateMode.SpecialInternalKitty
         expected_code = int(sequence.split('[')[1].split('u')[0])
         assert ks._match.unicode_key == expected_code
 
@@ -1006,13 +1013,12 @@ def test_kitty_keyboard_protocol_setters_all_combinations():
         for flag_name, flag_value in case.items():
             setattr(protocol, flag_name, flag_value)
 
-        assert protocol.value == expected, f"Failed for case {case}, got {
-            protocol.value}, expected {expected}"
+        assert protocol.value == expected
 
         # Verify individual flag values
         for flag_name, expected_flag_value in case.items():
             actual_flag_value = getattr(protocol, flag_name)
-            assert actual_flag_value == expected_flag_value, f"Flag {flag_name} should be {expected_flag_value}, got {actual_flag_value}"
+            assert actual_flag_value == expected_flag_value
 
 
 def test_kitty_digit_name_synthesis():
@@ -1022,28 +1028,28 @@ def test_kitty_digit_name_synthesis():
     # Test digit name synthesis for Kitty sequences
     digit_test_cases = [
         ('\x1b[49;3u', 'ALT_1', 'Alt+1'),       # ASCII '1' = 49
-        ('\x1b[49;5u', 'CTRL_1', 'Ctrl+1'),     
+        ('\x1b[49;5u', 'CTRL_1', 'Ctrl+1'),
         ('\x1b[49;4u', 'ALT_SHIFT_1', 'Alt+Shift+1'),  # Alt(2) + Shift(1) + base(1) = 4
         ('\x1b[50;3u', 'ALT_2', 'Alt+2'),       # ASCII '2' = 50
         ('\x1b[57;5u', 'CTRL_9', 'Ctrl+9'),     # ASCII '9' = 57
-        ('\x1b[48;7u', 'CTRL_ALT_0', 'Ctrl+Alt+0'), # ASCII '0' = 48, modifiers=7 (1+2+4)
+        ('\x1b[48;7u', 'CTRL_ALT_0', 'Ctrl+Alt+0'),  # ASCII '0' = 48, modifiers=7 (1+2+4)
     ]
 
     for sequence, expected_name, description in digit_test_cases:
         ks = _match_kitty_key(sequence)
-        assert ks is not None, f"Failed to match {description} sequence={sequence!r}"
-        assert ks._mode == -1  # Kitty mode indicator
-        assert ks.name == expected_name, f"Expected name {expected_name} for {description}, got {ks.name!r}"
+        assert ks is not None
+        assert ks._mode == DecPrivateMode.SpecialInternalKitty
+        assert ks.name == expected_name
 
     # Test that digits without modifiers don't get names (same as letters)
     ks_plain = _match_kitty_key('\x1b[49u')  # Plain '1' without modifiers
     assert ks_plain is not None
-    assert ks_plain.name is None, "Plain digits without modifiers should not have names"
+    assert ks_plain.name is None
 
     # Test that existing letter name synthesis still works
     ks_letter = _match_kitty_key('\x1b[97;3u')  # Alt+a
     assert ks_letter is not None
-    assert ks_letter.name == 'ALT_A', f"Letter name synthesis broken, got {ks_letter.name!r}"
+    assert ks_letter.name == 'ALT_A'
 
 
 def test_kitty_letter_name_synthesis_basic_modifiers():
@@ -1053,7 +1059,7 @@ def test_kitty_letter_name_synthesis_basic_modifiers():
     # Test basic modifier combinations for letter 'a' (unicode_key=97)
     test_cases = [
         ('\x1b[97;5u', 'CTRL_A', 'Ctrl+a'),
-        ('\x1b[97;3u', 'ALT_A', 'Alt+a'), 
+        ('\x1b[97;3u', 'ALT_A', 'Alt+a'),
         ('\x1b[97;7u', 'CTRL_ALT_A', 'Ctrl+Alt+a'),
         ('\x1b[97;2u', 'SHIFT_A', 'Shift+a'),
         ('\x1b[97;6u', 'CTRL_SHIFT_A', 'Ctrl+Shift+a'),
@@ -1063,9 +1069,9 @@ def test_kitty_letter_name_synthesis_basic_modifiers():
 
     for sequence, expected_name, description in test_cases:
         ks = _match_kitty_key(sequence)
-        assert ks is not None, f"Failed to match {description}"
-        assert ks.name == expected_name, f"Expected name {expected_name} for {description}, got {ks.name!r}"
-        assert ks._mode == -1, f"Should have Kitty mode for {description}"
+        assert ks is not None
+        assert ks.name == expected_name
+        assert ks._mode == DecPrivateMode.SpecialInternalKitty
 
 
 def test_kitty_letter_name_synthesis_different_letters():
@@ -1075,17 +1081,17 @@ def test_kitty_letter_name_synthesis_different_letters():
     # Test various letters with Ctrl modifier
     letters_test_cases = [
         ('\x1b[65;5u', 'CTRL_A', 'A'),  # uppercase A
-        ('\x1b[90;5u', 'CTRL_Z', 'Z'),  # uppercase Z  
+        ('\x1b[90;5u', 'CTRL_Z', 'Z'),  # uppercase Z
         ('\x1b[97;5u', 'CTRL_A', 'a'),  # lowercase a
-        ('\x1b[122;5u', 'CTRL_Z', 'z'), # lowercase z
+        ('\x1b[122;5u', 'CTRL_Z', 'z'),  # lowercase z
         ('\x1b[77;3u', 'ALT_M', 'M'),   # Alt+M
         ('\x1b[109;3u', 'ALT_M', 'm'),  # Alt+m
     ]
 
     for sequence, expected_name, letter in letters_test_cases:
         ks = _match_kitty_key(sequence)
-        assert ks is not None, f"Failed to match Ctrl+{letter}"
-        assert ks.name == expected_name, f"Expected {expected_name} for {letter}, got {ks.name!r}"
+        assert ks is not None
+        assert ks.name == expected_name
 
 
 def test_kitty_letter_name_synthesis_base_key_preference():
@@ -1095,13 +1101,13 @@ def test_kitty_letter_name_synthesis_base_key_preference():
     # Test Cyrillic 'С' (unicode_key=1089) with base_key='c' (99)
     # Should synthesize name based on base_key 'c' -> 'CTRL_C'
     ks = _match_kitty_key('\x1b[1089::99;5u')  # Ctrl+Cyrillic С with base_key c
-    assert ks is not None, "Should match Cyrillic letter sequence"
-    assert ks.name == 'CTRL_C', f"Should use base_key for naming, got {ks.name!r}"
+    assert ks is not None
+    assert ks.name == 'CTRL_C'
 
     # Test when base_key is not present, should fall back to unicode_key
     ks = _match_kitty_key('\x1b[97;5u')  # Ctrl+a, no base_key
-    assert ks is not None, "Should match regular letter sequence"  
-    assert ks.name == 'CTRL_A', f"Should use unicode_key when base_key absent, got {ks.name!r}"
+    assert ks is not None
+    assert ks.name == 'CTRL_A'
 
 
 def test_kitty_letter_name_synthesis_event_type_filtering():
@@ -1110,23 +1116,23 @@ def test_kitty_letter_name_synthesis_event_type_filtering():
 
     # Test keypress event (event_type=1) - should get name
     ks = _match_kitty_key('\x1b[97;5:1u')  # Ctrl+a keypress
-    assert ks is not None, "Should match keypress event"
-    assert ks.name == 'CTRL_A', f"Keypress should get name, got {ks.name!r}"
+    assert ks is not None
+    assert ks.name == 'CTRL_A'
 
-    # Test key release event (event_type=3) - should NOT get name  
+    # Test key release event (event_type=3) - should NOT get name
     ks = _match_kitty_key('\x1b[97;5:3u')  # Ctrl+a key release
-    assert ks is not None, "Should match key release event"
-    assert ks.name is None, f"Key release should not get name, got {ks.name!r}"
+    assert ks is not None
+    assert ks.name is None
 
     # Test key repeat event (event_type=2) - should NOT get name
-    ks = _match_kitty_key('\x1b[97;5:2u')  # Ctrl+a key repeat  
-    assert ks is not None, "Should match key repeat event"
-    assert ks.name is None, f"Key repeat should not get name, got {ks.name!r}"
+    ks = _match_kitty_key('\x1b[97;5:2u')  # Ctrl+a key repeat
+    assert ks is not None
+    assert ks.name is None
 
     # Test default event_type (1) - should get name
     ks = _match_kitty_key('\x1b[97;5u')  # Ctrl+a (default event_type=1)
-    assert ks is not None, "Should match default event type"
-    assert ks.name == 'CTRL_A', f"Default event type should get name, got {ks.name!r}"
+    assert ks is not None
+    assert ks.name == 'CTRL_A'
 
 
 def test_kitty_letter_name_synthesis_non_letters_no_name():
@@ -1147,15 +1153,15 @@ def test_kitty_letter_name_synthesis_non_letters_no_name():
 
     for sequence, description, expected_name in non_letter_non_digit_cases:
         ks = _match_kitty_key(sequence)
-        assert ks is not None, f"Should match {description}"
+        assert ks is not None
         if expected_name is None:
-            assert ks.name is None, f"{description} should not get synthesized name, got {ks.name!r}"
+            assert ks.name is None
         else:
-            assert ks.name == expected_name, f"Expected {expected_name} for {description}, got {ks.name!r}"
+            assert ks.name == expected_name
 
 
 def test_kitty_letter_name_synthesis_no_modifiers_no_name():
-    """Test that plain letters without modifiers do not get synthesized names.""" 
+    """Test that plain letters without modifiers do not get synthesized names."""
     from blessed.keyboard import _match_kitty_key
 
     # Test plain letters (modifiers=1, meaning no modifiers) - should not get names
@@ -1169,8 +1175,8 @@ def test_kitty_letter_name_synthesis_no_modifiers_no_name():
 
     for sequence, description in plain_letter_cases:
         ks = _match_kitty_key(sequence)
-        assert ks is not None, f"Should match plain {description}"
-        assert ks.name is None, f"Plain {description} should not get synthesized name, got {ks.name!r}"
+        assert ks is not None
+        assert ks.name is None
 
 
 def test_kitty_letter_name_synthesis_supports_advanced_modifiers():
@@ -1180,7 +1186,7 @@ def test_kitty_letter_name_synthesis_supports_advanced_modifiers():
     # Test that super/hyper/meta DO appear in letter names (new behavior)
     advanced_modifier_cases = [
         ('\x1b[97;9u', 'SUPER_A', 'Super+a'),       # super (1+8=9) - should get name
-        ('\x1b[97;17u', 'HYPER_A', 'Hyper+a'),      # hyper (1+16=17) - should get name  
+        ('\x1b[97;17u', 'HYPER_A', 'Hyper+a'),      # hyper (1+16=17) - should get name
         ('\x1b[97;33u', 'META_A', 'Meta+a'),        # meta (1+32=33) - should get name
         ('\x1b[97;13u', 'CTRL_SUPER_A', 'Ctrl+Super+a'),  # ctrl+super (1+4+8=13) - should get both
         ('\x1b[97;11u', 'ALT_SUPER_A', 'Alt+Super+a'),    # alt+super (1+2+8=11) - should get both
@@ -1188,8 +1194,8 @@ def test_kitty_letter_name_synthesis_supports_advanced_modifiers():
 
     for sequence, expected_name, description in advanced_modifier_cases:
         ks = _match_kitty_key(sequence)
-        assert ks is not None, f"Should match {description}"
-        assert ks.name == expected_name, f"Expected {expected_name} for {description}, got {ks.name!r}"
+        assert ks is not None
+        assert ks.name == expected_name
 
 
 def test_kitty_letter_name_synthesis_preserves_explicit_names():
@@ -1198,15 +1204,16 @@ def test_kitty_letter_name_synthesis_preserves_explicit_names():
 
     # Create a Kitty keystroke with explicit name - should preserve it
     kitty_event = KittyKeyEvent(unicode_key=97, shifted_key=None, base_key=None,
-                               modifiers=5, event_type=1, int_codepoints=())
-    ks = Keystroke('\x1b[97;5u', name='CUSTOM_NAME', mode=-1, match=kitty_event)
-    
-    assert ks.name == 'CUSTOM_NAME', f"Should preserve explicit name, got {ks.name!r}"
+                                modifiers=5, event_type=1, int_codepoints=())
+    ks = Keystroke('\x1b[97;5u', name='CUSTOM_NAME',
+                   mode=DecPrivateMode.SpecialInternalKitty, match=kitty_event)
+
+    assert ks.name == 'CUSTOM_NAME'
 
 
 def test_kitty_letter_name_synthesis_integration():
     """Test Kitty letter name synthesis integration with existing Terminal.inkey()."""
-    @as_subprocess 
+    @as_subprocess
     def child():
         from blessed import Terminal
         term = Terminal(force_styling=True)
@@ -1222,11 +1229,11 @@ def test_kitty_letter_name_synthesis_integration():
         for sequence, expected_name in test_sequences:
             term.ungetch(sequence)
             ks = term.inkey(timeout=0)
-            
-            assert ks == sequence, f"Should match sequence {sequence!r}"
-            assert ks.name == expected_name, f"Expected {expected_name}, got {ks.name!r}"
-            assert ks._mode == -1, "Should have Kitty mode"
-    
+
+            assert ks == sequence
+            assert ks.name == expected_name
+            assert ks._mode == DecPrivateMode.SpecialInternalKitty
+
     child()
 
 
@@ -1244,8 +1251,8 @@ def test_kitty_letter_name_synthesis_case_normalization():
 
     for sequence, expected_name, description in case_test_cases:
         ks = _match_kitty_key(sequence)
-        assert ks is not None, f"Should match {description}"
-        assert ks.name == expected_name, f"Expected {expected_name} for {description}, got {ks.name!r}"
+        assert ks is not None
+        assert ks.name == expected_name
 
 
 def test_kitty_letter_name_synthesis_modifier_ordering():
@@ -1255,14 +1262,14 @@ def test_kitty_letter_name_synthesis_modifier_ordering():
     # Test various combinations to ensure consistent ordering
     ordering_test_cases = [
         ('\x1b[97;6u', 'CTRL_SHIFT_A', 'Ctrl+Shift'),     # ctrl+shift (1+4+1=6)
-        ('\x1b[97;4u', 'ALT_SHIFT_A', 'Alt+Shift'),       # alt+shift (1+2+1=4) 
-        ('\x1b[97;8u', 'CTRL_ALT_SHIFT_A', 'Ctrl+Alt+Shift'), # all three (1+4+2+1=8)
+        ('\x1b[97;4u', 'ALT_SHIFT_A', 'Alt+Shift'),       # alt+shift (1+2+1=4)
+        ('\x1b[97;8u', 'CTRL_ALT_SHIFT_A', 'Ctrl+Alt+Shift'),  # all three (1+4+2+1=8)
     ]
 
     for sequence, expected_name, description in ordering_test_cases:
         ks = _match_kitty_key(sequence)
-        assert ks is not None, f"Should match {description}"
-        assert ks.name == expected_name, f"Expected {expected_name} for {description}, got {ks.name!r}"
+        assert ks is not None
+        assert ks.name == expected_name
 
 
 def test_disambiguate_f1_f4_csi_sequences():
@@ -1272,12 +1279,12 @@ def test_disambiguate_f1_f4_csi_sequences():
         from blessed import Terminal
         from blessed.keyboard import resolve_sequence
         term = Terminal(force_styling=True)
-        
+
         # Get keyboard sequences and codes for resolution
         mapper = term._keymap
         codes = term._keycodes
         prefixes = set()
-        
+
         # Test F1-F4 in disambiguate CSI format (not SS3)
         test_cases = [
             ('\x1b[P', 'KEY_F1', 'F1'),
@@ -1285,13 +1292,13 @@ def test_disambiguate_f1_f4_csi_sequences():
             ('\x1b[13~', 'KEY_F3', 'F3'),  # F3 uses tilde format
             ('\x1b[S', 'KEY_F4', 'F4'),
         ]
-        
+
         for sequence, expected_name, description in test_cases:
             ks = resolve_sequence(sequence, mapper, codes, prefixes, final=True)
-            assert ks is not None, f"Failed to match {description}"
-            assert ks.name == expected_name, f"Expected {expected_name} for {description}, got {ks.name!r}"
-            assert str(ks) == sequence, f"Expected sequence {sequence!r}, got {str(ks)!r}"
-    
+            assert ks is not None
+            assert ks.name == expected_name
+            assert str(ks) == sequence
+
     child()
 
 
@@ -1302,7 +1309,7 @@ def test_disambiguate_f1_f4_via_inkey():
         import io
         from blessed import Terminal
         term = Terminal(stream=io.StringIO(), force_styling=True)
-        
+
         # Test F1-F4 in disambiguate CSI format
         test_cases = [
             ('\x1b[P', 'KEY_F1'),
@@ -1310,14 +1317,14 @@ def test_disambiguate_f1_f4_via_inkey():
             ('\x1b[13~', 'KEY_F3'),
             ('\x1b[S', 'KEY_F4'),
         ]
-        
+
         for sequence, expected_name in test_cases:
             term.ungetch(sequence)
             ks = term.inkey(timeout=0)
-            
-            assert ks == sequence, f"Expected sequence {sequence!r}, got {str(ks)!r}"
-            assert ks.name == expected_name, f"Expected name {expected_name}, got {ks.name!r}"
-    
+
+            assert ks == sequence
+            assert ks.name == expected_name
+
     child()
 
 
@@ -1328,20 +1335,20 @@ def test_disambiguate_f1_f4_not_confused_with_alt():
         import io
         from blessed import Terminal
         term = Terminal(stream=io.StringIO(), force_styling=True)
-        
+
         # F1 should be \x1b[P, not confused with ALT+[ followed by P
         term.ungetch('\x1b[P')
         ks = term.inkey(timeout=0)
-        
+
         # Should be recognized as F1, not as two separate keys
-        assert ks.name == 'KEY_F1', f"Expected KEY_F1, got {ks.name!r}"
-        assert str(ks) == '\x1b[P', f"Expected full sequence \\x1b[P, got {str(ks)!r}"
-        assert len(ks) == 3, f"Expected length 3, got {len(ks)}"
-        
+        assert ks.name == 'KEY_F1'
+        assert str(ks) == '\x1b[P'
+        assert len(ks) == 3
+
         # Verify no leftover input
         remaining = term.inkey(timeout=0)
-        assert remaining == '', f"Expected no remaining input, got {remaining!r}"
-    
+        assert remaining == ''
+
     child()
 
 
@@ -1352,19 +1359,19 @@ def test_kitty_letter_name_synthesis_boundary_conditions():
     # Test edge cases around ASCII letter ranges
     boundary_cases = [
         ('\x1b[64;5u', None, '@'),     # ASCII 64, just before 'A' (65) - no name
-        ('\x1b[91;5u', 'CSI', '['),    # ASCII 91, just after 'Z' (90) - special case: CSI 
+        ('\x1b[91;5u', 'CSI', '['),    # ASCII 91, just after 'Z' (90) - special case: CSI
         ('\x1b[96;5u', None, '`'),     # ASCII 96, just before 'a' (97) - no name
         ('\x1b[123;5u', None, '{'),    # ASCII 123, just after 'z' (122) - no name
-        ('\x1b[65;5u', 'CTRL_A', 'A'), # ASCII 65, 'A' - should get name
-        ('\x1b[90;5u', 'CTRL_Z', 'Z'), # ASCII 90, 'Z' - should get name
-        ('\x1b[97;5u', 'CTRL_A', 'a'), # ASCII 97, 'a' - should get name  
-        ('\x1b[122;5u', 'CTRL_Z', 'z'), # ASCII 122, 'z' - should get name
+        ('\x1b[65;5u', 'CTRL_A', 'A'),  # ASCII 65, 'A' - should get name
+        ('\x1b[90;5u', 'CTRL_Z', 'Z'),  # ASCII 90, 'Z' - should get name
+        ('\x1b[97;5u', 'CTRL_A', 'a'),  # ASCII 97, 'a' - should get name
+        ('\x1b[122;5u', 'CTRL_Z', 'z'),  # ASCII 122, 'z' - should get name
     ]
 
     for sequence, expected_name, description in boundary_cases:
         ks = _match_kitty_key(sequence)
-        assert ks is not None, f"Should match sequence for {description}"
-        assert ks.name == expected_name, f"Expected {expected_name} for {description}, got {ks.name!r}"
+        assert ks is not None
+        assert ks.name == expected_name
 
 
 @pytest.mark.parametrize("initial_value,flag_name,bit_position", [
@@ -1407,13 +1414,6 @@ def test_kitty_keyboard_protocol_individual_setters(initial_value, flag_name, bi
 
 # PUA Modifier Keys Tests
 
-from blessed.keyboard import (
-    KEY_LEFT_SHIFT, KEY_LEFT_CONTROL, KEY_LEFT_ALT,
-    KEY_RIGHT_SHIFT, KEY_RIGHT_CONTROL, KEY_RIGHT_ALT,
-    KEY_LEFT_SUPER, KEY_LEFT_HYPER, KEY_LEFT_META,
-    _match_legacy_csi_modifiers
-)
-
 
 @pytest.mark.parametrize("sequence,expected_key,expected_mods", [
     ('\x1b[57442;5u', KEY_LEFT_CONTROL, 5),
@@ -1426,7 +1426,7 @@ def test_kitty_pua_modifier_keys(sequence, expected_key, expected_mods):
     """Test Kitty PUA modifier key sequences."""
     ks = _match_kitty_key(sequence)
     assert ks is not None
-    assert ks._mode == -1
+    assert ks._mode == DecPrivateMode.SpecialInternalKitty
     assert ks._match.unicode_key == expected_key
     assert ks.modifiers == expected_mods
     assert ks.value == ''
@@ -1532,7 +1532,7 @@ def test_event_type_dynamic_predicates():
     ks_release = _match_legacy_csi_modifiers('\x1b[1;2:3Q')
     assert ks_release.is_key_shift_f2_released() is True
     assert ks_release.is_key_shift_f2_pressed() is False
-    
+
     ks_press = _match_legacy_csi_modifiers('\x1b[1;2Q')
     assert ks_press.is_key_shift_f2_pressed() is True
     assert ks_press.is_key_shift_f2_released() is False
