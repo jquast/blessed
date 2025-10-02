@@ -2,6 +2,7 @@ from blessed import Terminal, DecPrivateMode
 
 DEC_MODE = DecPrivateMode.BRACKETED_PASTE
 
+
 def main():
     """Interactive test for bracketed paste mode."""
     term = Terminal()
@@ -10,7 +11,8 @@ def main():
         response = term.get_dec_mode(DEC_MODE, timeout=1.0)
 
     # flush input
-    while term.inkey(timeout=0): pass
+    while term.inkey(timeout=0):
+        pass
 
     if response.is_supported():
         print('supported, currently ', end='')
@@ -38,7 +40,7 @@ def main():
             if key.lower() == 'q':
                 break
             if key.mode == DEC_MODE:
-                print(repr(key.get_event_values()), end='\r\n')
+                print(repr(key.mode_values()), end='\r\n')
             else:
                 print(repr(str(key)), key.name, end='\r\n')
 

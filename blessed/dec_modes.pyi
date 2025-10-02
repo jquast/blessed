@@ -30,13 +30,16 @@ class DecModeResponse:
     def is_disabled(self) -> bool: ...
     def is_permanent(self) -> bool: ...
     def is_changeable(self) -> bool: ...
-    def is_temporarily_enabled(self) -> bool: ...
-    def is_temporarily_disabled(self) -> bool: ...
     def is_failed(self) -> bool: ...
     def __str__(self) -> str: ...
     def __repr__(self) -> str: ...
 
 class DecPrivateMode:
+    # These are *not* DecPrivateModes, but carry special meaning for Keystroke evaluation
+    SpecialInternalKitty: int
+    SpecialInternalLegacyCSIModifier: int
+    SpecialInternalModifyOtherKeys: int
+
     # VT/DEC standard modes
     DECCKM: int
     DECANM: int
@@ -188,7 +191,7 @@ class DecPrivateMode:
 
     # Modern terminal extensions
     SYNCHRONIZED_OUTPUT: int
-    REWRAP_ON_RESIZE_DEPRECATED: int
+    GRAPHEME_CLUSTERING: int
     TEXT_REFLOW: int
     PASSIVE_MOUSE_TRACKING: int
     REPORT_GRID_CELL_SELECTION: int
@@ -225,7 +228,7 @@ class DecPrivateMode:
     MINTTY_BIDI: int
     INPUT_METHOD_EDITOR: int
 
-    LONG_DESCRIPTIONS: dict[int, str]
+    _LONG_DESCRIPTIONS: dict[int, str]
     _VALUE_TO_NAME: dict[int, str]
 
     value: int

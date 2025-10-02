@@ -117,7 +117,7 @@ Receiving DEC Events
 
 When DEC Private Modes are enabled, the terminal sends special event sequences that can be received 
 through :meth:`~blessed.Terminal.inkey`. These events have an :attr:`~blessed.keyboard.Keystroke.event_mode` 
-property and provide structured data through :meth:`~blessed.keyboard.Keystroke.get_event_values`.
+property and provide structured data through :meth:`~blessed.keyboard.Keystroke.mode_values`.
 
 Bracketed Paste Events
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -137,7 +137,7 @@ When bracketed paste mode is enabled, pasted content is automatically detected:
         ks = term.inkey()
         
         if ks.event_mode == DecPrivateMode.BRACKETED_PASTE:
-            event = ks.get_event_values()
+            event = ks.mode_values()
             print(f"Pasted: {repr(event.text)}")
         else:
             print(f"Regular key: {ks}")
@@ -161,7 +161,7 @@ Mouse tracking modes send detailed mouse event information:
             ks = term.inkey()
             
             if ks.event_mode == DecPrivateMode.MOUSE_EXTENDED_SGR:
-                event = ks.get_event_values()
+                event = ks.mode_values()
                 action = "release" if event.is_release else "press" 
                 print(f"Mouse {action}: button={event.button} at ({event.x}, {event.y})")
                 
@@ -192,7 +192,7 @@ Focus tracking reports when the terminal window gains or loses focus:
             ks = term.inkey()
             
             if ks.event_mode == DecPrivateMode.FOCUS_IN_OUT_EVENTS:
-                event = ks.get_event_values()
+                event = ks.mode_values()
                 status = "gained" if event.gained else "lost"
                 print(f"Focus {status}")
             elif ks == 'q':

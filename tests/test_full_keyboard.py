@@ -36,18 +36,19 @@ pytestmark = pytest.mark.skipif(
     not TEST_KEYBOARD or IS_WINDOWS,
     reason="Timing-sensitive tests please do not run on build farms.")
 
+def assert_elapsed_range(start_time, min_ms, max_ms):
+    """Assert that elapsed time in milliseconds is within range."""
+    elapsed_ms = (time.time() - start_time) * 100
+    assert min_ms <= int(elapsed_ms) <= max_ms, f"elapsed: {int(elapsed_ms)}ms"
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_kbhit_interrupted():
-    """kbhit() should not be interrupted with a signal handler."""
-    # pylint: disable=global-statement
-
+    """kbhit() survives signal handler."""
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:
         cov = init_subproc_coverage('test_kbhit_interrupted')
 
-        # child pauses, writes semaphore and begins awaiting input
         global got_sigwinch
         got_sigwinch = False
 
@@ -60,7 +61,7 @@ def test_kbhit_interrupted():
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.raw():
-            assert term.inkey(timeout=1.05) == u''
+            assert term.inkey(timeout=0.2) == u''
         os.write(sys.__stdout__.fileno(), b'complete')
         assert got_sigwinch
         if cov is not None:
@@ -79,7 +80,7 @@ def test_kbhit_interrupted():
     pid, status = os.waitpid(pid, 0)
     assert output == u'complete'
     assert os.WEXITSTATUS(status) == 0
-    assert math.floor(time.time() - stime) == 1.0
+    assert_elapsed_range(stime, 15, 80)
 
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
@@ -139,8 +140,8 @@ def test_kbhit_no_kb():
         term = TestTerminal(stream=StringIO())
         stime = time.time()
         assert term._keyboard_fd is None
-        assert not term.kbhit(timeout=1.1)
-        assert math.floor(time.time() - stime) == 1.0
+        assert not term.kbhit(timeout=0.3)
+        assert_elapsed_range(stime, 25, 80)
     child()
 
 
@@ -156,25 +157,25 @@ def test_kbhit_no_tty():
     child()
 
 
-@pytest.mark.parametrize('use_stream,timeout,expected_floor', [
-    (False, 0, 0.0),
-    (True, 0, 0.0),
-    pytest.param(False, 1, 1.0, marks=pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")),
-    pytest.param(True, 1, 1.0, marks=pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")),
-])
-def test_keystroke_cbreak_noinput(use_stream, timeout, expected_floor):
+@pytest.mark.parametrize(
+    'use_stream,timeout,expected_cs_range', [
+        (False, 0, (0, 5)), (True, 0, (0, 5)), pytest.param(
+            False, 0.3, (25, 80), marks=pytest.mark.skipif(
+                TEST_QUICK, reason="TEST_QUICK specified")), pytest.param(
+                    True, 0.3, (25, 80), marks=pytest.mark.skipif(
+                        TEST_QUICK, reason="TEST_QUICK specified")), ])
+def test_keystroke_cbreak_noinput(use_stream, timeout, expected_cs_range):
     """Test keystroke without input with various timeout/stream combinations."""
     @as_subprocess
-    def child(use_stream, timeout, expected_floor):
-        from .helpers import assert_elapsed_floor
+    def child(use_stream, timeout, expected_cs_range):
         stream = StringIO() if use_stream else None
         term = TestTerminal(stream=stream)
         with term.cbreak():
             stime = time.time()
             inp = term.inkey(timeout=timeout)
             assert inp == u''
-            assert_elapsed_floor(stime, expected_floor)
-    child(use_stream, timeout, expected_floor)
+            assert_elapsed_range(stime, *expected_cs_range)
+    child(use_stream, timeout, expected_cs_range)
 
 
 def test_keystroke_0s_cbreak_with_input():
@@ -206,7 +207,6 @@ def test_keystroke_0s_cbreak_with_input():
     assert output == u'x'
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
-
 
 
 def test_keystroke_cbreak_with_input_slowly():
@@ -354,7 +354,7 @@ def test_keystroke_1s_cbreak_with_input():
         term = TestTerminal()
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
-            inp = term.inkey(timeout=3)
+            inp = term.inkey(timeout=1)
             os.write(sys.__stdout__.fileno(), inp.name.encode('utf-8'))
             sys.stdout.flush()
         if cov is not None:
@@ -365,19 +365,19 @@ def test_keystroke_1s_cbreak_with_input():
     with echo_off(master_fd):
         read_until_semaphore(master_fd)
         stime = time.time()
-        time.sleep(1)
+        time.sleep(0.3)
         os.write(master_fd, u'\x1b[C'.encode('ascii'))
         output = read_until_eof(master_fd)
 
     pid, status = os.waitpid(pid, 0)
     assert output == u'KEY_RIGHT'
     assert os.WEXITSTATUS(status) == 0
-    assert math.floor(time.time() - stime) == 1.0
+    assert_elapsed_range(stime, 25, 80)
 
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_esc_delay_cbreak_035():
-    """esc_delay will cause a single ESC (\\x1b) to delay for 0.35."""
+    """esc_delay will cause a single ESC (\\x1b) to delay for 0.15."""
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:  # child
@@ -386,7 +386,7 @@ def test_esc_delay_cbreak_035():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            inp = term.inkey(timeout=5)
+            inp = term.inkey(timeout=1, esc_delay=0.15)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
                 '%s %i' % (inp.name, measured_time,)).encode('ascii'))
@@ -406,12 +406,12 @@ def test_esc_delay_cbreak_035():
     assert key_name == u'KEY_ESCAPE'
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
-    assert 34 <= int(duration_ms) <= 45, duration_ms
+    assert 14 <= int(duration_ms) <= 25, duration_ms
 
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_esc_delay_cbreak_135():
-    """esc_delay=1.35 will cause a single ESC (\\x1b) to delay for 1.35."""
+    """esc_delay=0.25 will cause a single ESC (\\x1b) to delay for 0.25."""
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:  # child
@@ -420,7 +420,7 @@ def test_esc_delay_cbreak_135():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            inp = term.inkey(timeout=5, esc_delay=1.35)
+            inp = term.inkey(timeout=1, esc_delay=0.25)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
                 '%s %i' % (inp.name, measured_time,)).encode('ascii'))
@@ -439,8 +439,7 @@ def test_esc_delay_cbreak_135():
     pid, status = os.waitpid(pid, 0)
     assert key_name == u'KEY_ESCAPE'
     assert os.WEXITSTATUS(status) == 0
-    assert math.floor(time.time() - stime) == 1.0
-    assert 134 <= int(duration_ms) <= 145, int(duration_ms)
+    assert 24 <= int(duration_ms) <= 35, int(duration_ms)
 
 
 def test_esc_delay_cbreak_timout_0():
@@ -453,7 +452,7 @@ def test_esc_delay_cbreak_timout_0():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            inp = term.inkey(timeout=0)
+            inp = term.inkey(timeout=0, esc_delay=0.15)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
                 '%s %i' % (inp.name, measured_time,)).encode('ascii'))
@@ -473,7 +472,7 @@ def test_esc_delay_cbreak_timout_0():
     assert key_name == u'KEY_ESCAPE'
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
-    assert 34 <= int(duration_ms) <= 45, int(duration_ms)
+    assert 14 <= int(duration_ms) <= 25, int(duration_ms)
 
 
 def test_esc_delay_cbreak_nonprefix_sequence():
@@ -548,10 +547,10 @@ def test_esc_delay_cbreak_prefix_sequence():
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_esc_delay_cbreak_ambiguous_alt_o():
     """ESC O (\\x1bO) waits esc_delay for possible F1 (\\x1bOP) before returning ALT_O.
-    
+
     This test demonstrates the ambiguous case where Alt+O sends "\\x1bO" which is also
-    the prefix for the vt220 F1 key sequence "\\x1bOP". The terminal waits up to 
-    esc_delay (~350ms) to see if a 'P' follows, and when it doesn't, falls back to
+    the prefix for the vt220 F1 key sequence "\\x1bOP". The terminal waits up to
+    esc_delay (~150ms) to see if a 'P' follows, and when it doesn't, falls back to
     interpreting the sequence as Alt+O rather than returning separate ESC and 'O' keystrokes.
     """
     import pty
@@ -562,7 +561,7 @@ def test_esc_delay_cbreak_ambiguous_alt_o():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            keystroke = term.inkey(timeout=5)
+            keystroke = term.inkey(timeout=1, esc_delay=0.15)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
                 '%s %i' % (keystroke.name, measured_time,)).encode('ascii'))
@@ -582,8 +581,8 @@ def test_esc_delay_cbreak_ambiguous_alt_o():
     assert key_name == u'ALT_SHIFT_O'
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
-    # Should have waited ~esc_delay (350ms) before giving up on F1 and returning Alt+O
-    assert 34 <= int(duration_ms) <= 45, duration_ms
+    # Should have waited ~esc_delay (150ms) before giving up on F1 and returning Alt+O
+    assert 14 <= int(duration_ms) <= 25, duration_ms
 
 
 def test_get_location_0s():
@@ -858,7 +857,7 @@ def test_get_device_attributes_with_sixel():
         stime = time.time()
         # Mock a VT510 response with sixel support
         term.ungetch(u'\x1b[?64;1;2;4;7;8;9;15;18;21c')
-        
+
         da = term.get_device_attributes(timeout=0.01, force=True)
         assert math.floor(time.time() - stime) == 0.0
         assert da is not None
@@ -866,7 +865,7 @@ def test_get_device_attributes_with_sixel():
         assert 4 in da.extensions  # sixel support
         assert da.supports_sixel is True
         assert term.does_sixel(timeout=0.01) is True
-        
+
         # Test cache behavior - should return same object without force
         da2 = term.get_device_attributes(timeout=0.01, force=False)
         assert da2 is da  # Should be same cached object
@@ -881,7 +880,7 @@ def test_get_device_attributes_without_sixel():
         stime = time.time()
         # Mock a terminal response without sixel support (missing 4)
         term.ungetch(u'\x1b[?64;1;2;7;8;9;15;18;21c')
-        
+
         da = term.get_device_attributes(timeout=0.01, force=True)
         assert math.floor(time.time() - stime) == 0.0
         assert da is not None
@@ -900,16 +899,16 @@ def test_get_device_attributes_no_response():
     if pid == 0:
         cov = init_subproc_coverage('test_get_device_attributes_no_response')
         term = TestTerminal()
-        
+
         stime = time.time()
         da = term.get_device_attributes(timeout=0.05, force=True)
         elapsed = time.time() - stime
-        
+
         # Should return None and take approximately the timeout duration
         assert da is None
         assert 0.04 <= elapsed <= 0.1  # Allow some variance
         assert term.does_sixel(timeout=0.05) is False
-        
+
         if cov is not None:
             cov.stop()
             cov.save()

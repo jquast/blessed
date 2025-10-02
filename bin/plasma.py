@@ -89,6 +89,7 @@ def status(term, elapsed):
             term.white_on_blue + term.clear_eol + left_txt +
             term.rjust(right_txt, term.width - len(left_txt)))
 
+
 def main(term):
     with term.cbreak(), term.hidden_cursor(), term.fullscreen():
         pause, dirty = False, True

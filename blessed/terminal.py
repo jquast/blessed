@@ -77,9 +77,12 @@ else:
         HAS_TTY = False
 
 _CUR_TERM = None  # See comments at end of file
-_RE_GET_FGCOLOR_RESPONSE = re.compile(u'\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
-_RE_GET_BGCOLOR_RESPONSE = re.compile(u'\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+_RE_GET_FGCOLOR_RESPONSE = re.compile(
+    u'\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+_RE_GET_BGCOLOR_RESPONSE = re.compile(
+    u'\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
 _RE_GET_DEVICE_ATTR_RESPONSE = re.compile(u'\x1b\\[\\?([0-9]+)((?:;[0-9]+)*)c')
+
 
 class Terminal(object):
     """
@@ -228,7 +231,6 @@ class Terminal(object):
 
         # Device Attributes (DA1) cache
         self._device_attributes_cache = None
-
 
     def __init__streams(self):
         # pylint: disable=too-complex,too-many-branches
@@ -897,7 +899,7 @@ class Terminal(object):
         # Build and send query sequence and expected response pattern
         query = u'\x1b[?{0:d}$p'.format(int(mode))
         response_pattern = re.compile(u'\x1b\\[\\?{0:d};([0-4])\\$y'.format(int(mode)))
-        
+
         match = self._query_response(query, response_pattern, timeout)
 
         # invalid or no response (timeout)
@@ -948,8 +950,8 @@ class Terminal(object):
         **No state caching is performed** - each call re-queries the terminal unless
         the first query previously failed (sticky failure) and ``force=False``.
 
-        This method uses a boundary detection approach on the first query to quickly 
-        determine terminal capabilities by sending both Kitty keyboard and Device 
+        This method uses a boundary detection approach on the first query to quickly
+        determine terminal capabilities by sending both Kitty keyboard and Device
         Attributes (DA1) queries simultaneously, as suggested by Kitty,
         https://sw.kovidgoyal.net/kitty/keyboard-protocol/#detection-of-support-for-this-protocol
         By sending both queries together and checking which responses are
@@ -978,59 +980,60 @@ class Terminal(object):
             # subsequent inquiries will be ignored
             return None
 
-        # Use boundary approach on first query attempt (when not previously attempted and not forced)
+        # Use boundary approach on first query attempt (when not previously
+        # attempted and not forced)
         if not self._kitty_kb_first_query_attempted and not force:
             # Mark that we've attempted the first query
             self._kitty_kb_first_query_attempted = True
-            
+
             # Send both Kitty and DA queries together for boundary detection
             # This allows us to quickly determine which protocols are supported:
             # - Kitty terminal: responds to Kitty query but not DA1
-            # - xterm-like: responds to both Kitty and DA1  
+            # - xterm-like: responds to both Kitty and DA1
             # - Konsole-like: responds to DA1 but not Kitty
             # - Dumb terminals: respond to neither
             boundary_query = u'\x1b[?u\x1b[c'
-            
+
             # Use a simple pattern that captures the full response
             boundary_pattern = re.compile(u'(.+)', re.DOTALL)
-            
+
             match = self._query_response(boundary_query, boundary_pattern, timeout)
-            
+
             # invalid or no response (timeout)
             if match is None:
                 # Set sticky failure flag on first timeout
                 self._kitty_kb_first_query_failed = True
                 return None
-            
+
             response_text = match.group(1)
-            
+
             # Check for Kitty keyboard response first
             kitty_pattern = re.compile(r'\x1b\[\?([0-9]+)u')
             kitty_match = kitty_pattern.search(response_text)
-            
+
             if kitty_match:
                 # Kitty response found - parse and return flags
                 # (doesn't matter if DA1 also responded or not)
                 flags_value = int(kitty_match.group(1))
                 return KittyKeyboardProtocol(flags_value)
-            
+
             # Check for DA1 response
             da1_pattern = re.compile(r'\x1b\[\?([0-9]+)(?:;[0-9]+)*c')
             da1_match = da1_pattern.search(response_text)
-            
+
             if da1_match:
                 # Only DA1 response found, no Kitty support
                 self._kitty_kb_first_query_failed = True
                 return None
-            
+
             # Neither response found - no support
             self._kitty_kb_first_query_failed = True
             return None
-        
+
         # Subsequent calls or forced calls use the standard single-query approach
         query = u'\x1b[?u'
         response_pattern = re.compile(u'\x1b\\[\\?([0-9]+)u')
-        
+
         match = self._query_response(query, response_pattern, timeout)
 
         # invalid or no response (timeout)
@@ -1060,7 +1063,8 @@ class Terminal(object):
         :arg float timeout: Timeout in seconds to await terminal response
         :arg bool force: Force active terminal inquiry even if cached result exists
         :rtype: DeviceAttribute or None
-        :returns: DeviceAttribute instance with terminal capabilities, or None if unsupported/timeout
+        :returns: DeviceAttribute instance with terminal capabilities, or None
+            if unsupported/timeout
 
         .. code-block:: python
 
@@ -1079,7 +1083,7 @@ class Terminal(object):
 
         # Build and send query sequence and expected response pattern
         query = u'\x1b[c'
-        
+
         match = self._query_response(query, _RE_GET_DEVICE_ATTR_RESPONSE, timeout)
 
         # invalid or no response (timeout)
@@ -1199,7 +1203,6 @@ class Terminal(object):
             yield
         finally:
             self._dec_mode_set_enabled(*disabled_modes)
-
 
     @contextlib.contextmanager
     def fullscreen(self):
@@ -1745,7 +1748,6 @@ class Terminal(object):
         byte = os.read(self._keyboard_fd, 1)
         return (decoder or self._keyboard_decoder).decode(byte, final=False)
 
-
     def ungetch(self, text):
         """
         Buffer input data to be discovered by next call to :meth:`~.inkey`.
@@ -1918,13 +1920,14 @@ class Terminal(object):
             self.stream.flush()
 
     @contextlib.contextmanager
-    def enable_kitty_keyboard(self, *, disambiguate=True, report_events=False, 
-                             report_alternates=False, report_all_keys=False, 
-                             report_text=False, mode=1, timeout=None, force=False):
+    def enable_kitty_keyboard(self, *, disambiguate=True, report_events=False,
+                              report_alternates=False, report_all_keys=False,
+                              report_text=False, mode=1, timeout=None, force=False):
         """
         Context manager that enables Kitty keyboard protocol features.
 
-        :arg bool disambiguate: Enable disambiguated escape codes (fixes issues with Esc vs sequences)
+        :arg bool disambiguate: Enable disambiguated escape codes (fixes issues
+            with Esc vs sequences)
         :arg bool report_events: Report key repeat and release events
         :arg bool report_alternates: Report shifted and base layout keys for shortcuts
         :arg bool report_all_keys: Report all keys as escape codes (including text keys)
@@ -1937,7 +1940,7 @@ class Terminal(object):
 
         Example:
             with term.enable_kitty_keyboard(disambiguate=True):
-                # Now Alt+C won't conflict with Ctrl+C 
+                # Now Alt+C won't conflict with Ctrl+C
                 key = term.inkey()
                 if key.alt and key.is_alt('c'):
                     print("Alt+C pressed")
@@ -1976,9 +1979,8 @@ class Terminal(object):
             # Set new flags
             self.stream.write(f'\x1b[={flags};{mode}u')  # Set flags with specified mode
             self.stream.flush()
-            
             yield
-            
+
         finally:
             # Restore previous state
             if previous_flags is not None:
@@ -1991,14 +1993,15 @@ class Terminal(object):
         """
         Context manager that enables xterm's modifyOtherKeys feature.
 
-        :arg int level: ModifyOtherKeys level (0=disable, 1=enable for function keys, 2=enable for all)
+        :arg int level: ModifyOtherKeys level (0=disable, 1=enable for function
+            keys, 2=enable for all)
 
-        This enables modified keys like Ctrl+, and Ctrl+. to be distinguished from their 
+        This enables modified keys like Ctrl+, and Ctrl+. to be distinguished from their
         unmodified counterparts. Level 2 provides the broadest support.
 
         Example:
             with term.modify_other_keys(level=2):
-                key = term.inkey() 
+                key = term.inkey()
                 if key.is_ctrl(','):
                     print("Ctrl+comma detected")
         """
@@ -2010,9 +2013,9 @@ class Terminal(object):
             # Enable modifyOtherKeys at specified level
             self.stream.write(f'\x1b[>4;{level}m')
             self.stream.flush()
-            
+
             yield
-            
+
         finally:
             # Disable modifyOtherKeys
             self.stream.write('\x1b[>4;0m')
@@ -2021,7 +2024,7 @@ class Terminal(object):
     def _is_known_input_prefix(self, text):
         """
         Check if the given text could be the start of a known input sequence.
-        
+
         :arg str text: Text to check
         :rtype: bool
         :returns: True if there are any known input sequences that start with this text
@@ -2030,7 +2033,7 @@ class Terminal(object):
         for sequence in self._keymap.keys():
             if sequence.startswith(text):
                 return True
-        
+
         # Check if text could be the start of specific DEC event patterns
         # Be very precise to avoid interfering with terminal response sequences
         if text.startswith('\x1b['):
@@ -2047,8 +2050,30 @@ class Terminal(object):
             # Only check for the specific SGR format starting with \x1b[<
             if len(text) >= 3 and text.startswith('\x1b[<'):
                 return True
-        
+
         return False
+
+    def flushinp(self, timeout=0):
+        """
+        This method unbuffers and returns all input available within ``timeout``.
+
+        When CSI ``'\x1b['`` is detected in input stream, all remaining bytes
+        are decoded as latin1.
+        """
+        ucs = ''
+        while self._keyboard_buf:
+            ucs += self._keyboard_buf.pop()
+
+        def _getch():
+            decoder = None
+            if '\x1b[' in ucs:
+                decoder = self._keyboard_decoder_latin1
+            return self.getch(decoder)
+
+        # and receive all immediately available bytes
+        while self.kbhit(timeout=timeout):
+            ucs += _getch()
+        return ucs
 
     def inkey(self, timeout=None, esc_delay=DEFAULT_ESCDELAY):
         r"""
@@ -2087,90 +2112,92 @@ class Terminal(object):
         _`ncurses(3)`: https://www.man7.org/linux/man-pages/man3/ncurses.3x.html
         """
         stime = time.time()
-        
+
         ucs = u''
+        mode_1016_active = self._dec_mode_cache.get(1016) == DecModeResponse.SET
+
         def _getch():
             decoder = None
-            if '\x1b[' in ucs:
+            if ucs.startswith('\x1b['):
+                # CSI sequence forthcoming, decode as latin1
                 decoder = self._keyboard_decoder_latin1
             return self.getch(decoder)
 
-        # unbuffer any previously received keystrokes,
-        while self._keyboard_buf:
-            ucs += self._keyboard_buf.pop()
+        # unbuffer and resolve buffered input
+        ucs = self.flushinp()
+        ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                              final=False, mode_1016_active=mode_1016_active)
 
-        # and receive all immediately available bytes
-        while self.kbhit(timeout=0):
-            ucs += _getch()
-
-        # Now maybe *blocking*, with possible non-zero timeout, for enough bytes
-        # to complete at least one full unicode character.
-        ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes)
+        # Without any buffered input, blocking wait for enough bytes to complete
+        # at least one full unicode character until timeout is exceeded.
         while not ks and self.kbhit(timeout=_time_left(stime, timeout)):
-            # recieve any next byte,
+            # receive any next byte,
             ucs += _getch()
 
             # and all other immediately available bytes
             while self.kbhit(timeout=0):
                 ucs += _getch()
 
-            # then, resolve for a sequence
-            ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes)
- 
+            # and then resolve for sequence
+            ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                                  final=False, mode_1016_active=mode_1016_active)
+
         if ks and ks.code == self.KEY_ESCAPE:
-            # Here we go! A slowly received KEY_ESCAPE, '\x1b', or an unknown
-            # sequence or a long one (bracketed paste) with no terminating pattern
-            # yet received kicks off the most complex part of our codebase!  The
-            # logic of determining all of the possible "application keys", arrow,
-            # function keys, maybe with modifiers like alt, shift, and ctrl,
-            # special mouse tracking events, the works!
+            # The escape key on input kicks off the most complex part of our
+            # codebase, mainly because we must be able to receive *all* kinds of
+            # legacy and modern *keyboard* input sequence schemes for special
+            # keys as well as other events like mouse tracking.
             #
-            # This while loop serves to be "greedy" for a final match over
-            # partial ones, reading "all bufferred input" in a loop of timeout 0
-            # has always gaurenteed a complete key sequence, even with
-            # high-latency networks in my experience, mostly one tcp packet per
-            # keystroke. But we also give special consideration for large
-            # multi-packet transmissions like bracketed paste, which is given no
-            # bounds here and could consume all available memory.
+            # Although negotiation for these modes exist and they can be queried
+            # about, there are varying degrees of support for consistent encoding
+            # scheme and response across all terminals, except to take the
+            # approach of supporting as many legacy, modern, and special events
+            # as possible.
             #
-            # All but a few "Legacy VT220" codes begin with Control Sequence
-            # Inducer, CSI ("\x1b[") F1 key, "\x1bOP", for example.
+            # In the case of modes that are "known" to be entered, any small
+            # amount of latency can still cause sequences to be received in
+            # input an indeterminate amount of time and bytes after the sequence
+            # to enter or exit those modes have been written to output -- and so
+            # we only take the approach of determining whether mode 1016
+            # Pixel-coordinated Extended SGR Mouse event is active to re-cast
+            # the 1006 Cell-coordinated Extended SGR Mouse events.
             #
-            # The statement, "ucs in self._keymap_prefixes" has an effect on
-            # keystrokes such as Alt + Z ("\x1b[z" with metaSendsEscape).
-            # Because no known input sequences begin with such phrase, it
-            # allows it to be returned more quickly than esc_delay otherwise
-            # blocks. But Alt + O ("\x1b[O") conflicts with VT220 codes and
-            # will wait up to 'esc_delay'.
-            final = False 
+            # That is to say, we match for *all* possible input event patterns,
+            # except for the patterns negotiated here through the
+            # _query_response method.
+            final = False
             esctime = time.time()
             while ks.code == self.KEY_ESCAPE and not final:
-                # Performance fix: Check if we have a sequence that's clearly not a keyboard sequence.
-                # For terminal responses (like DECRQM replies), we don't want to wait the full
-                # esc_delay since they're not keyboard input sequences.
+                # set 'final' attribute for resolver if bytes received so far do
+                # not appear to be any known sequence keyboard / "event", this
+                # is mostly to quickly return for metaSendsEscape, alt+Char, and
+                # for unsupported sequences without prolonged esc_delay.
                 if len(ucs) > 1 and not self._is_known_input_prefix(ucs):
                     final = True
                 elif not self.kbhit(timeout=_time_left(esctime, esc_delay)):
+                    # otherwise, await the completion of a sequence using
+                    # esc_delay, and, if no further bytes are received, then
+                    # this is either an incomplete sequence, or something that
+                    # can be confused as one, fe. ESC-O as alt+O instead of
+                    # keypad 'enter' ESC-OM we awaited for
                     final = True
                 else:
-                    # recieve any next character,
+                    # successful receipt of any next character under esc_delay,
                     ucs += _getch()
-
-                    # and all others immediately available (greedy!)
                     while self.kbhit(timeout=0):
                         ucs += _getch()
-                    
-                    # Re-check after reading more bytes - if it's still not a known prefix, finalize
+                    # re-check 'final' check after reading more bytes
                     final = len(ucs) and not self._is_known_input_prefix(ucs)
-                
-                ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes, final)
-           
+
+                ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                                      final=final, mode_1016_active=mode_1016_active)
+
         # re-buffer any remaining unmatched sequence text
         self.ungetch(ucs[len(ks):])
         return ks
 
 
-class WINSZ(collections.namedtuple('WINSZ', (# ##
+class WINSZ(collections.namedtuple('WINSZ', (
         'ws_row', 'ws_col', 'ws_xpixel', 'ws_ypixel'))):
     """
     Structure represents return value of :const:`termios.TIOCGWINSZ`.

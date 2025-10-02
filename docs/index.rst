@@ -11,7 +11,6 @@ Welcome to Blessed documentation!
    keyboard
    location
    measuring
-   dec_modes
    examples
    api
    project

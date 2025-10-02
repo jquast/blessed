@@ -258,7 +258,7 @@ def main():
 
             elif inp.event_mode == DecPrivateMode.MOUSE_EXTENDED_SGR:
                 # Handle mouse events
-                mouse_event = inp.get_event_values()
+                mouse_event = inp.mode_values()
                 if isinstance(mouse_event, MouseSGREvent) and not mouse_event.is_release:
                     # Mouse click - move cursor to click position (convert to 0-based)
                     new_y = max(0, min(term.height - 1, mouse_event.y - 1))

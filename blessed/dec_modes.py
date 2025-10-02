@@ -170,6 +170,17 @@ class DecPrivateMode:
     - :attr:`~DecPrivateMode.name`: Mnemonic name or "UNKNOWN" for unrecognized modes
     - :attr:`~DecPrivateMode.long_description`: Full description of mode functionality
     """
+    # These are *not* DecPrivateModes, in that they are not negotiable using the
+    # DEC Private Mode sequences, but are carried in the same way, and attached
+    # to this class for type saftey, as they carry meaning that they have a
+    # "special encoding" that is evaluated on-demand on evaluation of
+    # term.inkey().name as 'KEY_SHIFT_F1' or testing inkey().is_alt_shift('a').
+    # these key "events" have special late-binding evaluations depending on the
+    # 'mode' they were sent as.
+    SpecialInternalLegacyCSIModifier = -3
+    SpecialInternalModifyOtherKeys = -2
+    SpecialInternalKitty = -1
+
     # VT/DEC standard modes (using canonical mnemonics where available) the
     # "official" constants as published should always be used, even if cryptic,
     # at least they are sure to match exactly to existing documentation
@@ -365,6 +376,10 @@ class DecPrivateMode:
     # we wish to have a int-derived and like-type and not do any metaclassing,
     # or otherwise "unpicklable" or difficult to reason about for compatibility
     _LONG_DESCRIPTIONS = {
+        SpecialInternalLegacyCSIModifier: "Non-DEC Mode used internally by Keystroke",
+        SpecialInternalModifyOtherKeys: "Non-DEC Mode used internally by Keystroke",
+        SpecialInternalKitty: "Non_DEC Mode used internally by Keystroke",
+
         # DEC standard modes (1-117)
         DECCKM: "Cursor Keys Mode",
         DECANM: "ANSI/VT52 Mode",
@@ -544,7 +559,7 @@ class DecPrivateMode:
         APPLICATION_MOUSEWHEEL: "Application mousewheel mode",
         BIDI_CURRENT_LINE: "BiDi on current line",
 
-        # Terminal-specific extensions  
+        # Terminal-specific extensions
         TTCTH: "Terminal-to-Computer Talk-back Handler",
         SIXEL_SCROLLING_LEAVES_CURSOR: "Sixel scrolling leaves cursor to right of graphic",
         CHARACTER_MAPPING_SERVICE: "enable/disable character mapping service",

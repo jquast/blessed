@@ -34,14 +34,14 @@ SyncEvent = namedtuple('SyncEvent', 'begin')
 
 
 # Kitty keyboard protocol and xterm ModifyOtherKeys namedtuples
-KittyKeyEvent = namedtuple('KittyKeyEvent', 
-                          'unicode_key shifted_key base_key modifiers event_type text_codepoints')
+KittyKeyEvent = namedtuple('KittyKeyEvent',
+                           'unicode_key shifted_key base_key modifiers event_type int_codepoints')
 ModifyOtherKeysEvent = namedtuple('ModifyOtherKeysEvent', 'key modifiers')
 
 # Legacy CSI modifier key support
-LegacyCSIKeyEvent = namedtuple('LegacyCSIKeyEvent', 'kind key_id modifiers')
-LEGACY_CSI_MODIFIERS_PATTERN = re.compile(r'\x1b\[1;(?P<mod>\d+)(?P<final>[ABCDEFHPQRS])~?')
-LEGACY_CSI_TILDE_PATTERN = re.compile(r'\x1b\[(?P<key_num>\d+);(?P<mod>\d+)~')
+LegacyCSIKeyEvent = namedtuple('LegacyCSIKeyEvent', 'kind key_id modifiers event_type')
+LEGACY_CSI_MODIFIERS_PATTERN = re.compile(r'\x1b\[1;(?P<mod>\d+)(?::(?P<event>\d+))?(?P<final>[ABCDEFHPQRS])~?')
+LEGACY_CSI_TILDE_PATTERN = re.compile(r'\x1b\[(?P<key_num>\d+);(?P<mod>\d+)(?::(?P<event>\d+))?~')
 LEGACY_SS3_FKEYS_PATTERN = re.compile(r'\x1bO(?P<mod>\d)(?P<final>[PQRS])')
 DEC_EVENT_PATTERN = functools.namedtuple("DEC_EVENT_PATTERN", ["mode", "pattern"])
 
@@ -50,15 +50,25 @@ DEC_EVENT_PATTERNS = [
     # Bracketed paste - must be first due to greedy nature; this is more closely
     # married to ESC_DELAY than it first appears -- the full payload and final
     # marker must be received under ESC_DELAY seconds.
-    DEC_EVENT_PATTERN(mode=2004, pattern=(
+    DEC_EVENT_PATTERN(mode=DecPrivateMode.BRACKETED_PASTE, pattern=(
         re.compile(r'\x1b\[200~(?P<text>.*?)\x1b\[201~', re.DOTALL))),
-    # Mouse SGR (1006) - recommended format
-    DEC_EVENT_PATTERN(mode=1006, pattern=(
-        re.compile(r'\x1b\[(?P<b>\d+);(?P<x>\d+);(?P<y>\d+)(?P<type>[mM])'))),
+    # Mouse SGR (1006) - recommended format: CSI < b;x;y m/M
+    # Also supports legacy format without a '<' for backward compatibility,
+    DEC_EVENT_PATTERN(mode=DecPrivateMode.MOUSE_EXTENDED_SGR, pattern=(
+        re.compile(r'\x1b\[<?(?P<b>\d+);(?P<x>\d+);(?P<y>\d+)(?P<type>[mM])'))),
+    # Mouse SGR-Pixels (1016) - identical wire format to 1006!  This helps to
+    # have a matching Keystroke.mode, determined by active enabled modes,
+    # preferring pixels if enabled, the specification would require the *order*
+    # that they were enabled and disabled in case of conflict, too much code to
+    # be practical.
+    DEC_EVENT_PATTERN(mode=DecPrivateMode.MOUSE_EXTENDED_SGR, pattern=(
+        re.compile(r'\x1b\[<?(?P<b>\d+);(?P<x>\d+);(?P<y>\d+)(?P<type>[mM])'))),
     # Legacy mouse (X10/1000/1002/1003) - CSI M followed by 3 bytes
-    DEC_EVENT_PATTERN(mode=1000, pattern=re.compile(r'\x1b\[M(?P<cb>.)(?P<cx>.)(?P<cy>.)')),
-    # Focus tracking
-    DEC_EVENT_PATTERN(mode=1004, pattern=re.compile(r'\x1b\[(?P<io>[IO])'))
+    DEC_EVENT_PATTERN(mode=DecPrivateMode.MOUSE_REPORT_CLICK,
+                      pattern=re.compile(r'\x1b\[M(?P<cb>.)(?P<cx>.)(?P<cy>.)')),
+    # Focus tracking, is just 'I'n or 'O'ut
+    DEC_EVENT_PATTERN(mode=DecPrivateMode.FOCUS_IN_OUT_EVENTS,
+                      pattern=re.compile(r'\x1b\[(?P<io>[IO])'))
 ]
 
 # Match Kitty keyboard protocol: ESC [ ... u
@@ -67,16 +77,15 @@ KITTY_KB_PROTOCOL_PATTERN = re.compile(
     r'\x1b\[(?P<unicode_key>\d+)'
     r'(?::(?P<shifted_key>\d*))?'
     r'(?::(?P<base_key>\d*))?'
-    r'(?:;(?P<modifiers>\d+))?'
+    r'(?:;(?P<modifiers>\d*))?'
     r'(?::(?P<event_type>\d+))?'
     r'(?:;(?P<text_codepoints>[\d:]+))?'
     r'u')
- 
-# Match ModifyOtherKeys pattern: ESC [ 27 ; modifiers ; key [~]
-MODIFY_PATTERN = re.compile(r'\x1b\[27;(?P<modifiers>\d+);(?P<key>\d+)(?P<tilde>~?)') 
-CTRL_CHAR_MAP = {'@': 0, '[': 27, '\\': 28, ']': 29, '^': 30, '_': 31, '?': 127}
-CTRL_CODE_MAP = {v: k for k, v in CTRL_CHAR_MAP.items()}
 
+# Match ModifyOtherKeys pattern: ESC [ 27 ; modifiers ; key [~]
+MODIFY_PATTERN = re.compile(r'\x1b\[27;(?P<modifiers>\d+);(?P<key>\d+)(?P<tilde>~?)')
+CTRL_CHAR_SYMBOLS_MAP = {'@': 0, '[': 27, '\\': 28, ']': 29, '^': 30, '_': 31, '?': 127}
+CTRL_CODE_SYMBOLS_MAP = {v: k for k, v in CTRL_CHAR_SYMBOLS_MAP.items()}
 
 
 class Keystroke(TextType):
@@ -99,7 +108,7 @@ class Keystroke(TextType):
 
     For DEC private mode events (such as bracketed paste, mouse tracking,
     focus events), the :attr:`event_mode` property returns the associated
-    :class:`DecPrivateMode` enum value, and :meth:`get_event_values` returns
+    :class:`DecPrivateMode` enum value, and :meth:`mode_values` returns
     a structured namedtuple with parsed event data.
     """
 
@@ -117,37 +126,39 @@ class Keystroke(TextType):
     def _infer_modifiers(ucs, mode, match):
         """
         Infer modifiers from keystroke data.
-        
+
         Returns modifiers in Kitty format: 1 + bitwise OR of modifier flags
         """
         # Kitty protocol
         if mode is not None and mode < 0 and match is not None:
             return match.modifiers
-       
+
         # Legacy sequences starting with ESC
         if len(ucs) == 2 and ucs[0] == '\x1b':
             char_code = ord(ucs[1])
-            
+
             # Special C0 controls that should be Alt-only per legacy spec
             # These represent common Alt+key combinations that are unambiguous
             if char_code in (0x0d, 0x1b, 0x7f, 0x09):  # Enter, Escape, DEL, Tab
                 return 1 + 0b10  # 1 + alt flag = 3
-            
-            # Other control characters represent Ctrl+Alt combinations 
+
+            # Other control characters represent Ctrl+Alt combinations
             # (ESC prefix for Alt + control char from Ctrl+letter mapping)
             if 0 <= char_code <= 31 or char_code == 127:
                 return 1 + 0b10 + 0b100  # 1 + alt flag + ctrl flag = 7
-            
-            # Printable characters are Alt-only
+
+            # Printable characters - Alt-only unless uppercase letter (which adds Shift)
             if 32 <= char_code <= 126:
-                return 1 + 0b10  # 1 + alt flag = 3
-        
+                ch = ucs[1]
+                shift = 0b1 if ch.isalpha() and ch.isupper() else 0
+                return 1 + 0b10 + shift  # add shift for Alt+uppercase
+
         # Legacy Ctrl: single control character
         if len(ucs) == 1:
             char_code = ord(ucs)
             if 0 <= char_code <= 31 or char_code == 127:
                 return 1 + 0b100  # 1 + ctrl flag = 5
-        
+
         # No modifiers detected
         return 1
 
@@ -165,80 +176,132 @@ class Keystroke(TextType):
     @property
     def name(self):
         """
-        String-name of key sequence, such as ``u'KEY_LEFT'`` (str).
+        Special application key name.
 
-        This is to be called to identify sequences, control characters, and any
-        specially detected combination character, all others return None.
+        This is the best equality attribute to use for special keys, as raw
+        string value of 'F1' key can be received in many different values, the
+        'name' property will return a reliable constant, 'KEY_F1'. This also
+        supports "modifiers", such as 'KEY_CTRL_F1', 'KEY_CTRL_ALT_F1',
+        'KEY_CTRL_ALT_SHIFT_F1'.
+
+        This also supports alphanumerics and symbols when combined with a
+        modifier, such as KEY_ALT_z and KEY_ALT_SHIFT_Z
+
+        When non-None, all phrases begin with ``'KEY'`` with one
+        exception,``'CSI'`` is returned for ``\x1b[`` to indicate the beginning
+        of an unsupported input sequence, the phrase ``'KEY_ALT_['`` is never
+        returned.
+
+        If this value is None, then it can probably be assumed that the
+        ``value`` is an unsurprising textual character without any modifiers.
         """
         if self._name is not None:
             return self._name
-        
-        # Dynamic name generation for modified functional keys
-        if (self._mode in (-1, -2, -3) and  # Modern protocols or legacy CSI modifiers
-            self._code is not None and      # Has a base keycode
-            self.modifiers > 1):            # Has modifiers
-            
-            # Get base key name from keycode
+
+        # Modern matched or legacy CSI sequence identified by code with modifiers
+        if (self._mode is not None and self._mode < 0 and
+                self._code is not None and self.modifiers > 1):
+
+            # turn keycode value into 'base name', eg.
+            # self._code of 265 -> 'KEY_F1' -> 'F1' base_name
             keycodes = get_keyboard_codes()
             base_name = keycodes.get(self._code)
             if base_name and base_name.startswith('KEY_'):
-                base_name = base_name[4:]  # Remove KEY_ prefix
-                
-                # Build modifier prefix using private properties
+                # get "base name" name by, 'KEY_F1' -> 'F1'
+                base_name = base_name[4:]
+
+                # Build possible modifier prefix series (excludes num/capslock)
+                # "Ctrl + Alt + Shift + Super / Meta"
                 mod_parts = []
-                if self._shift:
-                    mod_parts.append('SHIFT')
-                if self._ctrl:
-                    mod_parts.append('CTRL') 
-                if self._alt:
-                    mod_parts.append('ALT')
-                if self._super:
-                    mod_parts.append('SUPER')
-                if self._hyper:
-                    mod_parts.append('HYPER')
-                if self._meta:
-                    mod_parts.append('META')
-                
+                for mod_name in ('ctrl', 'alt', 'shift', 'super', 'meta', 'hyper'):
+                    if getattr(self, f'_{mod_name}'):        # 'if self._shift'
+                        mod_parts.append(mod_name.upper())   # -> 'SHIFT'
                 if mod_parts:
-                    return f"KEY_{'_'.join(mod_parts)}_{base_name}"
-        
-        # Synthesize names for control and alt sequences
+                    base_result = f"KEY_{'_'.join(mod_parts)}_{base_name}"
+                    # Append event type suffix if not a press event
+                    if self.repeated:
+                        return f"{base_result}_REPEATED"
+                    elif self.released:
+                        return f"{base_result}_RELEASED"
+                    return base_result
+
+        # Kitty keyboard protocol letter/digit/symbol name synthesis
+        if (self._mode == DecPrivateMode.SpecialInternalKitty and 
+            hasattr(self._match, 'event_type') and hasattr(self._match, 'unicode_key')):
+            # Only synthesize for keypress events (event_type == 1), not release/repeat
+            if self._match.event_type == 1:
+                # Determine the base key - prefer base_key if available
+                base_codepoint = (self._match.base_key if self._match.base_key is not None 
+                                else self._match.unicode_key)
+                
+                # Special case: '[' always returns 'CSI' regardless of modifiers
+                if base_codepoint == 91:  # '[' 
+                    return 'CSI'
+                
+                # Only proceed if it's an ASCII letter or digit
+                if base_codepoint and ((65 <= base_codepoint <= 90) or   # A-Z
+                                     (97 <= base_codepoint <= 122) or    # a-z
+                                     (48 <= base_codepoint <= 57)):      # 0-9
+                    # For letters: convert to uppercase for consistent naming
+                    # For digits: use as-is
+                    if 65 <= base_codepoint <= 90 or 97 <= base_codepoint <= 122:  # letter
+                        char = chr(base_codepoint).upper()  # Convert to uppercase
+                    else:  # digit
+                        char = chr(base_codepoint)  # Keep as-is
+                    
+                    # Build modifier prefix list in order: CTRL, ALT, SHIFT, SUPER, HYPER, META
+                    mod_parts = []
+                    for mod_name in ('ctrl', 'alt', 'shift', 'super', 'hyper', 'meta'):
+                        if getattr(self, f'_{mod_name}'):
+                            mod_parts.append(mod_name.upper())
+                    
+                    # Only synthesize name if at least one modifier is present
+                    if mod_parts:
+                        return f"{'_'.join(mod_parts)}_{char}"
+
+        # Synthesize names for control characters
         if len(self) == 1:
             # Check for and return CTRL_ for control character
             char_code = ord(self)
             if 1 <= char_code <= 26:
                 # Ctrl+A through Ctrl+Z
                 return f'CTRL_{chr(char_code + ord("A") - 1)}'
-            elif char_code in CTRL_CODE_MAP:
-                return f'CTRL_{CTRL_CODE_MAP[char_code]}'
+            elif char_code in CTRL_CODE_SYMBOLS_MAP:
+                return f'CTRL_{CTRL_CODE_SYMBOLS_MAP[char_code]}'
+
+        # Synthesize for metaSendsEscape, legacy fall-through for \x1b char ->
+        # ALT + char, this can even sometimes be ALT_[ which is CSI and a clear
+        # indication of receiving an unsupported sequence.
         elif len(self) == 2 and self[0] == '\x1b':
-            # Check for ESC + control char - could be Alt-only or Ctrl+Alt based on modifiers
             char_code = ord(self[1])
+            # Check for ESC + control char
             if 0 <= char_code <= 31 or char_code == 127:
+                symbol = None
                 if 1 <= char_code <= 26:
                     # Ctrl+A through Ctrl+Z
                     symbol = chr(char_code + ord("A") - 1)
-                elif char_code in CTRL_CODE_MAP:
-                    symbol = CTRL_CODE_MAP[char_code]
-                else:
-                    symbol = None
-                
+                elif char_code in CTRL_CODE_SYMBOLS_MAP:
+                    # Ctrl+symbol
+                    symbol = CTRL_CODE_SYMBOLS_MAP[char_code]
+
                 if symbol:
-                    # Check if this is Alt-only or Ctrl+Alt based on modifiers
+                    # Check if this is Alt-only or Ctrl+Alt based on modifiers,
+                    # because we represent some ASCII as "application keys"
                     if self.modifiers == 3:  # Alt-only (1 + 2)
                         # Special C0 controls that are Alt-only
                         if char_code == 0x1b:  # ESC
                             return 'ALT_ESCAPE'
                         elif char_code == 0x7f:  # DEL
-                            return 'ALT_BACKSPACE'  
+                            return 'ALT_BACKSPACE'
                         elif char_code == 0x0d:  # CR
                             return 'ALT_ENTER'
                         elif char_code == 0x09:  # TAB
                             return 'ALT_TAB'
-                        # Could extend with other Alt-only C0 names if needed
+                        elif char_code == 0x5b:  # '[', CSI !
+                            return 'CSI'
                     elif self.modifiers == 7:  # Ctrl+Alt (1 + 2 + 4)
                         return f'CTRL_ALT_{symbol}'
-            
+
             # Check for and return ALT_ for "metaSendsEscape"
             if self[1].isprintable():
                 ch = self[1]
@@ -250,7 +313,7 @@ class Keystroke(TextType):
                 else:
                     return f'ALT_{ch}'
             elif self[1] == '\x7f' and self.modifiers == 3:
-                return f'ALT_BACKSPACE'
+                return 'ALT_BACKSPACE'
 
         return self._name
 
@@ -263,13 +326,13 @@ class Keystroke(TextType):
     def modifiers(self):
         """
         Modifier flags in Kitty keyboard protocol format.
-        
+
         :rtype: int
         :returns: Kitty-style modifiers value (1 means no modifiers)
-        
+
         The value is 1 + bitwise OR of modifier flags:
         - shift: 0b1 (1)
-        - alt: 0b10 (2) 
+        - alt: 0b10 (2)
         - ctrl: 0b100 (4)
         - super: 0b1000 (8)
         - hyper: 0b10000 (16)
@@ -283,7 +346,7 @@ class Keystroke(TextType):
     def modifiers_bits(self):
         """
         Raw modifier bit flags without the +1 offset.
-        
+
         :rtype: int
         :returns: Raw bitwise OR of modifier flags (0 means no modifiers)
         """
@@ -293,82 +356,82 @@ class Keystroke(TextType):
     def value(self):
         """
         The textual character represented by this keystroke.
-        
+
         :rtype: str
         :returns: For text keys, returns the base character (ignoring modifiers).
                   For application keys and sequences, returns empty string ''.
-        
+                  For release events, always returns empty string.
+
         Examples:
         - Plain text: 'a', 'A', '1', ';', ' ', 'Ω', emoji with ZWJ sequences
-        - Alt+printable: Alt+a → 'a', Alt+A → 'A' 
+        - Alt+printable: Alt+a → 'a', Alt+A → 'A'
         - Ctrl+letter: Ctrl+A → 'a', Ctrl+Z → 'z'
         - Ctrl+symbol: Ctrl+@ → '@', Ctrl+? → '?', Ctrl+[ → '['
         - Control chars: '\t', '\n', '\x08', '\x1b' (for Enter/Tab/Backspace/Escape keycodes)
         - Application keys: KEY_UP, KEY_F1, etc. → ''
         - DEC events: bracketed paste, mouse, etc. → ''
+        - Release events: always → ''
         """
+        # Release events never have text
+        if self.released:
+            return ''
+        
         # Plain printable characters - return as-is, supports Unicode and multi-codepoint text
         if len(self) == 1 and not self[0] == '\x1b' and self[0].isprintable():
             return TextType(self)
-        
+
         # Alt sequences (ESC + printable) without Ctrl - return the printable part
-        if (len(self) == 2 and self[0] == '\x1b' and 
-            self._alt and not self._ctrl):
+        if (len(self) == 2 and self[0] == '\x1b' and
+                self._alt and not self._ctrl):
             return self[1]  # Return as-is (preserves case and supports Unicode)
-        
+
         # Legacy Ctrl sequences - map back to base character
         if len(self) == 1 and self._ctrl and not self._alt:
             char_code = ord(self)
-            
-            # Ctrl+A through Ctrl+Z (codes 1-26) 
+
+            # Ctrl+A through Ctrl+Z (codes 1-26)
             if 1 <= char_code <= 26:
                 return chr(char_code + ord('a') - 1)  # lowercase
-            
+
             # Ctrl+symbol mappings
-            if char_code in CTRL_CODE_MAP:
-                return CTRL_CODE_MAP[char_code]
-                
+            if char_code in CTRL_CODE_SYMBOLS_MAP:
+                return CTRL_CODE_SYMBOLS_MAP[char_code]
+
             # Don't return raw control chars - only map known ones
             # BS, TAB, LF, CR, ESC, DEL should return empty string for application keys
             # unless they have explicit keycodes handled below
-        
-        # Kitty protocol - extract text from codepoints or unicode_key
-        if self._mode == -1 and hasattr(self._match, 'text_codepoints'):  # Kitty
-            # Use text_codepoints if available (supports composed sequences like emoji+ZWJ)
-            if self._match.text_codepoints:
-                try:
-                    return ''.join(chr(cp) for cp in self._match.text_codepoints)
-                except (ValueError, OverflowError):
-                    pass  # Fall through to unicode_key
-            
-            # Use unicode_key (supports any Unicode codepoint)
+
+        # Kitty protocol
+        if self._mode == DecPrivateMode.SpecialInternalKitty:
+            # prefer text_codepoints if available
+            if self._match.int_codepoints:
+                return ''.join(chr(cp) for cp in self._match.int_codepoints)
+
+            # Use unicode_key (supports any valid Unicode codepoint)
             if hasattr(self._match, 'unicode_key'):
-                try:
-                    return chr(self._match.unicode_key)
-                except (ValueError, OverflowError):
-                    pass  # Invalid codepoint
-        
+                # Check if this is a PUA modifier key (which don't produce text)
+                if (KEY_LEFT_SHIFT <= self._match.unicode_key <= KEY_RIGHT_META):
+                    return ''  # Modifier keys don't produce text
+                return chr(self._match.unicode_key)
+
         # ModifyOtherKeys protocol - extract character from key
-        elif self._mode == -2 and hasattr(self._match, 'key'):  # ModifyOtherKeys
-            try:
-                return chr(self._match.key)
-            except (ValueError, OverflowError):
-                pass  # Invalid codepoint
-        
+        elif self._mode == DecPrivateMode.SpecialInternalModifyOtherKeys:
+            return chr(self._match.key)
+
         # Application keys with known keycodes - map only essential control chars
         if self._code is not None:
             # Map only these essential control characters
             key_mappings = {
                 curses.KEY_ENTER: '\n',      # Enter -> LF
                 KEY_TAB: '\t',               # Tab -> Tab character
-                curses.KEY_BACKSPACE: '\x08', # Backspace -> BS
+                curses.KEY_BACKSPACE: '\x08',  # Backspace -> BS
                 curses.KEY_EXIT: '\x1b',     # Escape -> ESC
             }
-            
+
             mapped_char = key_mappings.get(self._code)
             if mapped_char is not None:
                 return mapped_char
-        
+
         # For all other cases (application keys, complex sequences), return empty string
         return ''
 
@@ -405,15 +468,89 @@ class Keystroke(TextType):
 
     @property
     def _caps_lock(self):
-        """Whether caps lock is active."""
+        """Whether caps lock was known to be active during this sequence."""
         return bool(self.modifiers_bits & 0b1000000)
 
     @property
     def _num_lock(self):
-        """Whether num lock is active."""
+        """Whether num lock was known to be active during this sequence."""
         return bool(self.modifiers_bits & 0b10000000)
 
-    @property 
+    @property
+    def caps_lock(self):
+        """Whether caps lock was known to be active during this sequence."""
+        return bool(self.modifiers_bits & 0b1000000)
+
+    @property
+    def num_lock(self):
+        """Whether num lock was known to be active during this sequence."""
+        return bool(self.modifiers_bits & 0b10000000)
+
+    @property
+    def pressed(self):
+        """
+        Whether this is a key press event.
+
+        :rtype: bool
+        :returns: True if this is a key press event (event_type=1 or not specified),
+                  False for repeat or release events
+        """
+        # Check Kitty protocol
+        if (self._mode == DecPrivateMode.SpecialInternalKitty and 
+            hasattr(self._match, 'event_type')):
+            return self._match.event_type == 1
+        
+        # Check Legacy CSI modifiers
+        if (self._mode == DecPrivateMode.SpecialInternalLegacyCSIModifier and
+            hasattr(self._match, 'event_type')):
+            return self._match.event_type == 1
+        
+        # Default: all other events are considered press events
+        return True
+
+    @property
+    def repeated(self):
+        """
+        Whether this is a key repeat event.
+
+        :rtype: bool
+        :returns: True if this is a key repeat event (event_type=2), False otherwise
+        """
+        # Check Kitty protocol
+        if (self._mode == DecPrivateMode.SpecialInternalKitty and 
+            hasattr(self._match, 'event_type')):
+            return self._match.event_type == 2
+        
+        # Check Legacy CSI modifiers
+        if (self._mode == DecPrivateMode.SpecialInternalLegacyCSIModifier and
+            hasattr(self._match, 'event_type')):
+            return self._match.event_type == 2
+        
+        # Default: not a repeat event
+        return False
+
+    @property
+    def released(self):
+        """
+        Whether this is a key release event.
+
+        :rtype: bool
+        :returns: True if this is a key release event (event_type=3), False otherwise
+        """
+        # Check Kitty protocol
+        if (self._mode == DecPrivateMode.SpecialInternalKitty and 
+            hasattr(self._match, 'event_type')):
+            return self._match.event_type == 3
+        
+        # Check Legacy CSI modifiers
+        if (self._mode == DecPrivateMode.SpecialInternalLegacyCSIModifier and
+            hasattr(self._match, 'event_type')):
+            return self._match.event_type == 3
+        
+        # Default: not a release event
+        return False
+
+    @property
     def event_mode(self):
         """
         DEC Private Mode associated with this keystroke, if any.
@@ -439,25 +576,12 @@ class Keystroke(TextType):
             return DecPrivateMode(self._mode)
         return None
 
-    def get_event_values(self):
-        """
-        Return structured data for DEC private mode events.
-
-        Returns a namedtuple with parsed event data for supported DEC modes:
-
-        - ``BRACKETED_PASTE``: :class:`BracketedPasteEvent` with ``text`` field
-        - ``MOUSE_TRACK_SGR``: :class:`MouseSGREvent` with button, coordinates, and modifier flags
-        - ``MOUSE_REPORT_*``: :class:`MouseLegacyEvent` with button, coordinates, and modifier flags
-        - ``FOCUS_EVENT_REPORTING``: :class:`FocusEvent` with ``gained`` boolean field
-
-        :rtype: namedtuple
-        :returns: Structured event data for this DEC mode event
-        """
-        return self.mode_values()
-
     def mode_values(self):
         """
         Return structured data for DEC private mode events.
+
+        This method should only be called when :attr:`Keystroke.mode` is
+        non-None and greater than 0.
 
         Returns a namedtuple with parsed event data for supported DEC modes:
 
@@ -470,7 +594,7 @@ class Keystroke(TextType):
         :returns: Structured event data for this DEC mode event
         """
         if self._mode is None or self._match is None:
-            raise TypeError("Should only call get_event_values() when event_mode is non-None")
+            raise TypeError("Should only call mode_values() when event_mode is non-None")
 
         # Call appropriate private parser method based on mode
         fn_callback = {
@@ -480,14 +604,16 @@ class Keystroke(TextType):
             DecPrivateMode.MOUSE_ALL_MOTION: self._parse_mouse_legacy,
             DecPrivateMode.FOCUS_IN_OUT_EVENTS: self._parse_focus,
             DecPrivateMode.MOUSE_EXTENDED_SGR: self._parse_mouse_sgr,
+            DecPrivateMode.MOUSE_SGR_PIXELS: self._parse_mouse_sgr,
             DecPrivateMode.BRACKETED_PASTE: self._parse_bracketed_paste,
         }.get(self._mode)
-        if fn_callback is None:
+        if fn_callback is not None:
+            return fn_callback()
+        if self._mode > 0:
             # If you're reading this, you must have added a pattern to
             # DEC_EVENT_PATTERNS, now you should make a namedtuple and
             # write a brief parser and add it to the above list !
             raise TypeError(f"Unknown DEC mode {self._mode}")
-        return fn_callback()
 
     def _parse_mouse_legacy(self):
         """Parse legacy mouse event (X10/1000/1002/1003) from stored regex match."""
@@ -534,7 +660,15 @@ class Keystroke(TextType):
         return FocusEvent(gained=(io == 'I'))
 
     def _parse_mouse_sgr(self):
-        """Parse SGR mouse event from stored regex match."""
+        """
+        Parse SGR mouse event from stored regex match.
+
+        Handles both SGR (mode 1006) and SGR-Pixels (mode 1016) since they
+        use identical wire formats: CSI < b;x;y m/M. The difference is semantic:
+        - Mode 1006: coordinates represent character cell positions
+        - Mode 1016: coordinates represent pixel positions
+        Applications must interpret x,y coordinates based on which mode was enabled.
+        """
         b = int(self._match.group('b'))
         x = int(self._match.group('x'))
         y = int(self._match.group('y'))
@@ -573,39 +707,98 @@ class Keystroke(TextType):
     def __getattr__(self, attr):
         """
         Dynamic compound modifier predicates via __getattr__.
-        
+
         Recognizes attributes starting with "is_" and parses underscore-separated
         modifier tokens to create dynamic predicate functions.
-        
+
         :arg str attr: Attribute name being accessed
         :rtype: callable or raises AttributeError
         :returns: Callable predicate function for modifier combinations
-        
+
         Examples:
         - ks.is_alt('a') - Alt-only with character 'a'
         - ks.is_ctrl_shift() - exactly Ctrl+Shift, no other modifiers
-        - ks.is_meta_alt_ctrl_shift_hyper('z') - all those modifiers with 'z'
+        - ks.is_key_shift_f2_released() - Shift+F2 release event
+        - ks.is_ctrl_a_repeated() - Ctrl+a repeat event
         """
         if attr.startswith('is_'):
-            # Extract modifier tokens after 'is_'
+            # Extract tokens after 'is_'
             tokens_str = attr[3:]  # Remove 'is_' prefix
             if not tokens_str:
-                raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}'")
+                raise AttributeError(
+                    f"'{self.__class__.__name__}' object has no attribute '{attr}'")
+
+            # Check if this matches the keystroke name directly (for key names with event types)
+            # e.g., is_key_shift_f2_released() should match name='KEY_SHIFT_F2_RELEASED'
+            expected_name = tokens_str.upper()
+            if self.name == expected_name:
+                return lambda: True
+            
+            # Try extracting event type suffix
+            event_type = None
+            if tokens_str.endswith('_pressed'):
+                event_type = 'pressed'
+                tokens_str = tokens_str[:-8]  # Remove '_pressed'
+            elif tokens_str.endswith('_released'):
+                event_type = 'released'
+                tokens_str = tokens_str[:-9]  # Remove '_released'
+            elif tokens_str.endswith('_repeated'):
+                event_type = 'repeated'
+                tokens_str = tokens_str[:-9]  # Remove '_repeated'
+            
+            # If event type was found, check if name without suffix matches
+            if event_type:
+                expected_name_without_event = tokens_str.upper()
+                
+                def event_predicate():
+                    """Check if keystroke matches the expected event type."""
+                    # Check if the name matches (with or without event type suffix)
+                    if self.name == expected_name:
+                        # Exact match with event type suffix
+                        name_ok = True
+                    elif self.name == expected_name_without_event:
+                        # Match without event type suffix (for press events mainly)
+                        name_ok = True
+                    elif self.name and self.name.startswith(expected_name_without_event + '_'):
+                        # Name starts with expected prefix
+                        name_ok = True
+                    else:
+                        name_ok = False
+                    
+                    if not name_ok:
+                        return False
+                    
+                    # Check event type
+                    if event_type == 'pressed':
+                        return self.pressed
+                    elif event_type == 'released':
+                        return self.released
+                    elif event_type == 'repeated':
+                        return self.repeated
+                    return False
+                
+                return event_predicate
             
             tokens = tokens_str.split('_')
-            
+
             # Validate tokens - only allow known modifier names
-            valid_tokens = {'shift', 'alt', 'ctrl', 'super', 'hyper', 'meta', 'caps_lock', 'num_lock'}
+            valid_tokens = {
+                'shift',
+                'alt',
+                'ctrl',
+                'super',
+                'hyper',
+                'meta'}
             invalid_tokens = [token for token in tokens if token not in valid_tokens]
             if invalid_tokens:
-                raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}' "
-                                   f"(invalid modifier tokens: {invalid_tokens})")
-            
+                raise AttributeError(f"'{self.__class__.__name__}' object has no attribute "
+                                     f"'{attr}' (invalid modifier tokens: {invalid_tokens})")
+
             # Return a predicate function that checks for the specified modifiers
             def modifier_predicate(char=None, ignore_case=True, exact=True):
                 """
                 Check if keystroke matches the specified modifier combination.
-                
+
                 :arg str char: Character to match (optional)
                 :arg bool ignore_case: Whether to ignore case when comparing char (default True)
                 :arg bool exact: Whether modifiers must match exactly vs. be subset (default True)
@@ -631,56 +824,60 @@ class Keystroke(TextType):
                         expected_bits |= 0b1000000
                     elif token == 'num_lock':
                         expected_bits |= 0b10000000
-                
+
                 # Get effective modifier bits (ignoring caps_lock/num_lock) for exact matching
                 if exact:
-                    effective_bits = self.modifiers_bits & ~(0b1000000 | 0b10000000)  # Strip lock bits
+                    effective_bits = self.modifiers_bits & ~(
+                        0b1000000 | 0b10000000)  # Strip lock bits
                     if effective_bits != expected_bits:
                         return False
                 else:
                     # Subset check - all expected bits must be present
                     if (self.modifiers_bits & expected_bits) != expected_bits:
                         return False
-                
+
                 # If no character specified, just check modifiers
                 if char is None:
                     return True
-                
+
                 # Check character match using same logic as value property
                 keystroke_char = self.value
-                
+
                 # If value is empty or not a single printable character, can't match
-                if not keystroke_char or len(keystroke_char) > 1 or not keystroke_char.isprintable():
+                if not keystroke_char or len(
+                        keystroke_char) > 1 or not keystroke_char.isprintable():
                     return False
-                
+
                 # Compare characters
                 if ignore_case:
                     return keystroke_char.lower() == char.lower()
                 else:
                     return keystroke_char == char
-            
+
             return modifier_predicate
-        
+
         # If not an "is_" attribute, raise AttributeError as normal
         raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}'")
 
 # Device Attributes (DA1) response representation
+
+
 class DeviceAttribute(object):
     """
     Represents a terminal's Device Attributes (DA1) response.
-    
+
     Device Attributes queries allow discovering terminal capabilities and type.
     The primary DA1 query sends CSI c and expects a response like:
     CSI ? Psc ; Ps1 ; Ps2 ; ... ; Psn c
-    
+
     Where Psc is the service class (architectural class) and Ps1...Psn are
     supported extensions/capabilities.
     """
-    
+
     def __init__(self, raw, service_class, extensions):
         """
         Initialize DeviceAttribute instance.
-        
+
         :arg str raw: Original response string from terminal
         :arg int service_class: Service class number (first parameter)
         :arg set extensions: Set of extension numbers (remaining parameters)
@@ -688,22 +885,22 @@ class DeviceAttribute(object):
         self.raw = raw
         self.service_class = service_class
         self.extensions = set(extensions) if extensions else set()
-    
+
     @property
     def supports_sixel(self):
         """
         Whether the terminal supports sixel graphics.
-        
+
         :rtype: bool
         :returns: True if extension 4 (sixel) is present in device attributes
         """
         return 4 in self.extensions
-    
+
     @classmethod
     def from_match(cls, match):
         """
         Create DeviceAttribute from regex match object.
-        
+
         :arg re.Match match: Regex match object with groups for service_class and extensions
         :rtype: DeviceAttribute
         :returns: DeviceAttribute instance parsed from match
@@ -711,21 +908,21 @@ class DeviceAttribute(object):
         service_class = int(match.group(1))
         extensions_str = match.group(2)
         extensions = []
-        
+
         if extensions_str:
             # Remove leading semicolon and split by semicolon
             ext_parts = extensions_str.lstrip(';').split(';')
             for part in ext_parts:
                 if part.strip() and part.isdigit():
                     extensions.append(int(part.strip()))
-        
+
         return cls(match.group(0), service_class, extensions)
-    
-    @classmethod 
+
+    @classmethod
     def from_string(cls, response_str):
         """
         Create DeviceAttribute by parsing response string.
-        
+
         :arg str response_str: DA1 response string like '\x1b[?64;1;2;4;7c'
         :rtype: DeviceAttribute or None
         :returns: DeviceAttribute instance if parsing succeeds, None otherwise
@@ -734,20 +931,20 @@ class DeviceAttribute(object):
         import re
         pattern = re.compile(r'\x1b\[\?([0-9]+)((?:;[0-9]+)*)c')
         match = pattern.match(response_str)
-        
+
         if match:
             return cls.from_match(match)
         return None
-    
+
     def __repr__(self):
         """String representation of DeviceAttribute."""
         return ('DeviceAttribute(service_class={}, extensions={}, supports_sixel={})'
                 .format(self.service_class, sorted(self.extensions), self.supports_sixel))
-    
+
     def __eq__(self, other):
         """Check equality based on service class and extensions."""
         if isinstance(other, DeviceAttribute):
-            return (self.service_class == other.service_class and 
+            return (self.service_class == other.service_class and
                     self.extensions == other.extensions)
         return False
 
@@ -766,6 +963,7 @@ def get_curses_keycodes():
     return {keyname: getattr(curses, keyname) for keyname in _keynames}
 
 
+@functools.lru_cache(maxsize=1)
 def get_keyboard_codes():
     """
     Return mapping of keycode integer values paired by their curses key-name.
@@ -794,10 +992,9 @@ def get_keyboard_codes():
     """
     keycodes = OrderedDict(get_curses_keycodes())
     keycodes.update(CURSES_KEYCODE_OVERRIDE_MIXIN)
-    # merge _CURSES_KEYCODE_ADDINS added to our module space
-    keycodes.update(
-        (name, value) for name, value in globals().copy().items() if name.startswith('KEY_')
-    )
+
+    # merge in homemade KEY_TAB, KEY_KP_*, KEY_MENU added to our module space
+    keycodes.update((k, v) for k, v in globals().items() if k.startswith('KEY_'))
 
     # invert dictionary (key, values) => (values, key), preferring the
     # last-most inserted value ('KEY_DELETE' over 'KEY_DC').
@@ -867,7 +1064,7 @@ def get_keyboard_sequences(term):
             sequence_map.keys(), key=len, reverse=True)))
 
 
-def get_leading_prefixes(sequences):#
+def get_leading_prefixes(sequences):
     """
     Return a set of proper prefixes for given sequence of strings.
 
@@ -886,7 +1083,7 @@ def get_leading_prefixes(sequences):#
     return {seq[:i] for seq in sequences for i in range(1, len(seq))}
 
 
-def resolve_sequence(text, mapper, codes, prefixes, final=False):
+def resolve_sequence(text, mapper, codes, prefixes, final=False, mode_1016_active=None):
     r"""
     Return a single :class:`Keystroke` instance for given sequence ``text``.
 
@@ -895,6 +1092,7 @@ def resolve_sequence(text, mapper, codes, prefixes, final=False):
         paired by their integer value (260)
     :arg dict codes: a :type:`dict` of integer values (such as 260) paired
         by their mnemonic name, such as ``'KEY_LEFT'``.
+    :arg Terminal term: Terminal instance for checking enabled DEC modes (optional)
     :rtype: Keystroke
     :returns: Keystroke instance for the given sequence
 
@@ -909,7 +1107,7 @@ def resolve_sequence(text, mapper, codes, prefixes, final=False):
     """
     # static sequence lookups, from terminal capabilities
     ks = None
-    for match_fn in (_match_dec_event,
+    for match_fn in (functools.partial(_match_dec_event, mode_1016_active=mode_1016_active),
                      _match_kitty_key,
                      _match_modify_other_keys,
                      _match_legacy_csi_modifiers):
@@ -921,12 +1119,12 @@ def resolve_sequence(text, mapper, codes, prefixes, final=False):
             if text.startswith(sequence):
                 ks = Keystroke(ucs=sequence, code=code, name=codes[code])
                 break
-    if ks is not None and ks.code == curses.KEY_EXIT and len(text) >= 2:
+    if ks is not None and ks.code == curses.KEY_EXIT and len(text) > 1:
         if text[1] == '\x7f':
             # alt + backspace
             ks = Keystroke(ucs=text[:2])
-        if final or text[:2] not in prefixes:
-            # KEY_ALT_[..]
+        elif final or text[:2] not in prefixes:
+            # KEY_ALT_[..] - when final is True or when not a known prefix
             ks = Keystroke(ucs=text[:2])
     if ks is None:
         ks = Keystroke(ucs=text and text[0] or u'')
@@ -986,7 +1184,7 @@ def _read_until(term, pattern, timeout):
         # block as long as necessary to ensure at least one character is
         # received on input or remaining timeout has elapsed.
         ucs = term.inkey(timeout=_time_left(stime, timeout))
-        
+
         # while the keyboard buffer is "hot" (has input), we continue to
         # aggregate all awaiting data.  We do this to ensure slow I/O
         # calls do not unnecessarily give up within the first 'while' loop
@@ -1007,18 +1205,21 @@ def _read_until(term, pattern, timeout):
     return match, buf
 
 
-
-def _match_dec_event(text):
+def _match_dec_event(text, mode_1016_active=None):
     """
     Attempt to match text against DEC event patterns.
 
     :arg str text: Input text to match against DEC patterns
+    :arg Terminal term: Terminal instance for checking enabled modes (optional)
     :rtype: Keystroke or None
     :returns: :class:`Keystroke` with DEC event data if matched, ``None`` otherwise
     """
     for mode, pattern in DEC_EVENT_PATTERNS:
         match = pattern.match(text)
         if match:
+            if mode == DecPrivateMode.MOUSE_EXTENDED_SGR and mode_1016_active:
+                # recase mode 1006 match as 1016 when that mode is active
+                mode = DecPrivateMode.MOUSE_EXTENDED_SGR
             return Keystroke(ucs=match.group(0), mode=mode, match=match)
     return None
 
@@ -1026,50 +1227,56 @@ def _match_dec_event(text):
 def _match_kitty_key(text):
     """
     Attempt to match text against Kitty keyboard protocol patterns.
-    
+
     :arg str text: Input text to match against Kitty patterns
     :rtype: Keystroke or None
     :returns: :class:`Keystroke` with Kitty key data if matched, ``None`` otherwise
-    
+
     Supports Kitty keyboard protocol sequences of the form:
     CSI unicode-key-code u                                            # Basic form
-    CSI unicode-key-code ; modifiers u                                # With modifiers  
+    CSI unicode-key-code ; modifiers u                                # With modifiers
     CSI unicode-key-code : shifted-key : base-key ; modifiers u       # With alternate keys
     CSI unicode-key-code ; modifiers : event-type u                   # With event type
     CSI unicode-key-code ; modifiers : event-type ; text-codepoints u # Full form
     """
     match = KITTY_KB_PROTOCOL_PATTERN.match(text)
-    when_non_empty = lambda _m, _key: int(_m.group(_key)) if _m.group(_key) else None
-    when_non_empty_then_1 = lambda _m, _key: int(_m.group(_key)) if _m.group(_key) else 1
+    def int_when_non_empty(_m, _key): return int(_m.group(_key)) if _m.group(_key) else None
+
+    def int_when_non_empty_otherwise_1(
+        _m, _key): return int(
+        _m.group(_key)) if _m.group(_key) else 1
     if match:
-        # TODO: We haven't parsed _text_codepoints yet, i think its something out of this world ..
-        _codepoints_text = match.group('text_codepoints').split(':') if match.group('text_codepoints') else []
-        _text_codepoints = [int(cp) for cp in _codepoints_text if cp]
-        
+        _int_codepoints = tuple()
+        if match.group('text_codepoints'):
+            _codepoints_text = match.group('text_codepoints').split(':')
+            _int_codepoints = tuple(int(cp) for cp in _codepoints_text if cp)
+
         # Create KittyKeyEvent namedtuple
         kitty_event = KittyKeyEvent(
             unicode_key=int(match.group('unicode_key')),
-            shifted_key=when_non_empty(match, 'shifted_key'),
-            base_key=when_non_empty(match, 'base_key'),
-            modifiers=when_non_empty_then_1(match, 'modifiers'),
-            event_type=when_non_empty_then_1(match, 'event_type'),
-            text_codepoints=_text_codepoints
+            shifted_key=int_when_non_empty(match, 'shifted_key'),
+            base_key=int_when_non_empty(match, 'base_key'),
+            modifiers=int_when_non_empty_otherwise_1(match, 'modifiers'),
+            event_type=int_when_non_empty_otherwise_1(match, 'event_type'),
+            int_codepoints=_int_codepoints
         )
-        
+
         # Create Keystroke with special mode to indicate Kitty protocol
-        return Keystroke(ucs=match.group(0), mode=-1, match=kitty_event)
-    
+        return Keystroke(ucs=match.group(0),
+                         mode=DecPrivateMode.SpecialInternalKitty,
+                         match=kitty_event)
+
     return None
 
 
 def _match_modify_other_keys(text):
     """
     Attempt to match text against xterm ModifyOtherKeys patterns.
-    
+
     :arg str text: Input text to match against ModifyOtherKeys patterns
-    :rtype: Keystroke or None  
+    :rtype: Keystroke or None
     :returns: :class:`Keystroke` with ModifyOtherKeys data if matched, ``None`` otherwise
-    
+
     Supports xterm ModifyOtherKeys sequences of the form:
     ESC [ 27 ; modifiers ; key ~     # Standard form
     ESC [ 27 ; modifiers ; key       # Alternative form without trailing ~
@@ -1081,34 +1288,39 @@ def _match_modify_other_keys(text):
             key=int(match.group('key')),
             modifiers=int(match.group('modifiers')))
         # Create Keystroke with special mode to indicate ModifyOtherKeys protocol
-        return Keystroke(ucs=match.group(0), mode=-2, match=modify_event)
-    
+        return Keystroke(ucs=match.group(0),
+                         mode=DecPrivateMode.SpecialInternalModifyOtherKeys,
+                         match=modify_event)
+
     return None
 
 
 def _match_legacy_csi_modifiers(text):
     """
     Attempt to match text against legacy CSI modifier patterns.
-    
+
     :arg str text: Input text to match against legacy CSI modifier patterns
     :rtype: Keystroke or None
     :returns: :class:`Keystroke` with legacy CSI modifier data if matched, ``None`` otherwise
-    
+
     Supports legacy CSI modifier sequences of the form:
     ESC [ 1 ; modifiers [ABCDEFHPQS]  # Arrow keys, Home/End, F1-F4 (letter form)
     ESC [ number ; modifiers ~        # Function keys and others (tilde form)
-    
+
     These sequences may be sent by many terminals even when advanced keyboard
     protocols are not enabled, as it is the only way to transmit about modifier
     + application keys in a common legacy-compatible form.
     """
     # Try letter form: ESC [ 1 ; modifiers [ABCDEFHPQS] with optional '~'
+    legacy_event = None
     match = LEGACY_CSI_MODIFIERS_PATTERN.match(text)
+    match_tilde = LEGACY_CSI_TILDE_PATTERN.match(text)
     if match:
-        matched_text = match.group(0)
+        kind = 'letter'
         modifiers = int(match.group('mod'))
-        final_char = match.group('final')
-        
+        key_id = match.group('final')
+        matched_text = match.group(0)
+
         keycode_match = {
             'A': curses.KEY_UP,
             'B': curses.KEY_DOWN,
@@ -1120,22 +1332,29 @@ def _match_legacy_csi_modifiers(text):
             'Q': curses.KEY_F2,
             'R': curses.KEY_F3,   # this 'f3' is rarely (ever?) transmitted
             'S': curses.KEY_F4,
-            }.get(final_char)
+        }.get(key_id)
+        # Extract event_type, default to 1 if not present
+        event_type = int(match.group('event')) if match.group('event') else 1
+
         if keycode_match is not None:
-            legacy_event = LegacyCSIKeyEvent(
-                kind='letter',
-                key_id=final_char,
-                modifiers=modifiers)
-            return Keystroke(ucs=matched_text, code=keycode_match, mode=-3, match=legacy_event)
-    
+            legacy_event = LegacyCSIKeyEvent(kind=kind, key_id=key_id, modifiers=modifiers, event_type=event_type)
+            return Keystroke(ucs=matched_text,
+                             code=keycode_match,
+                             mode=DecPrivateMode.SpecialInternalLegacyCSIModifier,
+                             match=legacy_event)
+
     # Try tilde form: ESC [ number ; modifiers ~
-    match = LEGACY_CSI_TILDE_PATTERN.match(text)
-    if match:
-        matched_text = match.group(0)
-        key_num = int(match.group('key_num'))
-        modifiers = int(match.group('mod'))
-        
-        # Map tilde key numbers to curses key codes
+    elif match_tilde:
+        kind = 'tilde'
+        modifiers = int(match_tilde.group('mod'))
+        key_id = int(match_tilde.group('key_num'))
+        matched_text = match_tilde.group(0)
+        # Extract event_type, default to 1 if not present
+        event_type = int(match_tilde.group('event')) if match_tilde.group('event') else 1
+
+        # Map tilde key numbers to curses key codes, you can find a table of these here,
+        # https://tomscii.sig7.se/zutty/doc/KEYS.html and somewhat more completely, here:
+        # https://invisible-island.net/xterm/xterm-function-keys.html
         keycode_match = {
             2: curses.KEY_IC,       # Insert
             3: curses.KEY_DC,       # Delete
@@ -1143,87 +1362,106 @@ def _match_legacy_csi_modifiers(text):
             6: curses.KEY_NPAGE,    # Page Down
             7: curses.KEY_HOME,     # Home
             8: curses.KEY_END,      # End
-            13: curses.KEY_F3,      # F3
-            15: curses.KEY_F5,      # F5
-            17: curses.KEY_F6,      # F6
-            18: curses.KEY_F7,      # F7
-            19: curses.KEY_F8,      # F8
-            20: curses.KEY_F9,      # F9
-            21: curses.KEY_F10,     # F10
-            23: curses.KEY_F11,     # F11
-            24: curses.KEY_F12,     # F12
+            11: curses.KEY_F1,      # F1
+            12: curses.KEY_F2,      # ..
+            13: curses.KEY_F3,
+            14: curses.KEY_F4,
+            15: curses.KEY_F5,
+            17: curses.KEY_F6,
+            18: curses.KEY_F7,
+            19: curses.KEY_F8,
+            20: curses.KEY_F9,
+            21: curses.KEY_F10,
+            23: curses.KEY_F11,
+            24: curses.KEY_F12,
+            25: curses.KEY_F13,
+            26: curses.KEY_F14,
+            28: curses.KEY_F15,
+            29: KEY_MENU,          # Menu key  # pylint: disable=undefined-variable
+            31: curses.KEY_F17,
+            32: curses.KEY_F18,
+            33: curses.KEY_F19,
+            34: curses.KEY_F20,
             29: KEY_MENU,           # Menu key  # pylint: disable=undefined-variable
-            }.get(key_num)
-            
+        }.get(key_id)
+
         if keycode_match is not None:
-            legacy_event = LegacyCSIKeyEvent(
-                kind='tilde',
-                key_id=key_num,
-                modifiers=modifiers)
-            return Keystroke(ucs=matched_text, code=keycode_match, mode=-3, match=legacy_event)
-    
+            legacy_event = LegacyCSIKeyEvent(kind=kind, key_id=key_id, modifiers=modifiers, event_type=event_type)
+            return Keystroke(ucs=matched_text,
+                             code=keycode_match,
+                             mode=DecPrivateMode.SpecialInternalLegacyCSIModifier,
+                             match=legacy_event)
+
     # Try SS3 F-key form: ESC O modifier [PQRS] (Konsole)
     match = LEGACY_SS3_FKEYS_PATTERN.match(text)
     if match:
         matched_text = match.group(0)
         modifiers = int(match.group('mod'))
         final_char = match.group('final')
-        
-        # Modifier 0 is invalid - modifiers start from 1 (no modifiers) 
+
+        # Modifier 0 is invalid - modifiers start from 1 (no modifiers)
         if modifiers == 0:
             return None
-        
+
         # Map SS3 F-key final characters to curses key codes
         keycode_match = {
             'P': curses.KEY_F1,     # F1
             'Q': curses.KEY_F2,     # F2
             'R': curses.KEY_F3,     # F3
             'S': curses.KEY_F4,     # F4
-            }.get(final_char)
-            
+        }.get(final_char)
+
         if keycode_match is not None:
+            # SS3 form doesn't support event_type, default to 1 (press)
             legacy_event = LegacyCSIKeyEvent(
                 kind='ss3-fkey',
                 key_id=final_char,
-                modifiers=modifiers)
+                modifiers=modifiers,
+                event_type=1)
             return Keystroke(ucs=matched_text, code=keycode_match, mode=-3, match=legacy_event)
-    
+
     return None
 
 
-#: Though we may determine *keynames* and codes for keyboard input that
-#: generate multibyte sequences, it is also especially useful to aliases
-#: a few basic ASCII characters such as ``KEY_TAB`` instead of ``u'\t'`` for
-#: uniformity. KEY_MENU is missing in curses and so is also added, here.
-#:
-#: many key-names for application keys enabled only by context manager
-#: :meth:`~.Terminal.keypad` are surprisingly absent (KP_), and so they
-#: are artificially recreated.
-_CURSES_KEYCODE_ADDINS = (
-    'TAB',
-    'KP_MULTIPLY',
-    'KP_ADD',
-    'KP_SEPARATOR',
-    'KP_SUBTRACT',
-    'KP_DECIMAL',
-    'KP_DIVIDE',
-    'KP_EQUAL',
-    'KP_0',
-    'KP_1',
-    'KP_2',
-    'KP_3',
-    'KP_4',
-    'KP_5',
-    'KP_6',
-    'KP_7',
-    'KP_8',
-    'KP_9',
-    'MENU')
+# We invent a few to fixup for missing keys in curses, these aren't especially
+# required or useful except to survive as API compatibility for the earliest
+# versions of this software. They must be these values in this order, used as
+# constants for equality checks to Keystroke.code.
+KEY_TAB = 512
+KEY_KP_MULTIPLY = 513
+KEY_KP_ADD = 514
+KEY_KP_SEPARATOR = 515
+KEY_KP_SUBTRACT = 516
+KEY_KP_DECIMAL = 517
+KEY_KP_DIVIDE = 518
+KEY_KP_EQUAL = 519
+KEY_KP_0 = 520
+KEY_KP_1 = 521
+KEY_KP_2 = 522
+KEY_KP_3 = 523
+KEY_KP_4 = 524
+KEY_KP_5 = 525
+KEY_KP_6 = 526
+KEY_KP_7 = 527
+KEY_KP_8 = 528
+KEY_KP_9 = 529
+KEY_MENU = 530
 
-_LASTVAL = max(get_curses_keycodes().values())
-for keycode_name in _CURSES_KEYCODE_ADDINS:
-    _LASTVAL += 1
-    globals()['KEY_' + keycode_name] = _LASTVAL
+# Kitty keyboard protocol PUA (Private Use Area) key codes for modifier keys
+# These are from the functional key definitions in the Kitty keyboard protocol spec
+# PUA starts at 57344 (0xE000)
+KEY_LEFT_SHIFT = 57441          # 0xE061
+KEY_LEFT_CONTROL = 57442        # 0xE062  
+KEY_LEFT_ALT = 57443            # 0xE063
+KEY_LEFT_SUPER = 57444          # 0xE064
+KEY_LEFT_HYPER = 57445          # 0xE065
+KEY_LEFT_META = 57446           # 0xE066
+KEY_RIGHT_SHIFT = 57447         # 0xE067
+KEY_RIGHT_CONTROL = 57448       # 0xE068
+KEY_RIGHT_ALT = 57449           # 0xE069
+KEY_RIGHT_SUPER = 57450         # 0xE06A
+KEY_RIGHT_HYPER = 57451         # 0xE06B
+KEY_RIGHT_META = 57452          # 0xE06C
 
 #: In a perfect world, terminal emulators would always send exactly what
 #: the terminfo(5) capability database plans for them, accordingly by the
@@ -1247,7 +1485,7 @@ DEFAULT_SEQUENCE_MIXIN = (
     (unicode_chr(10), curses.KEY_ENTER),
     (unicode_chr(13), curses.KEY_ENTER),
     (unicode_chr(8), curses.KEY_BACKSPACE),
-    (unicode_chr(9), KEY_TAB),  # noqa  # pylint: disable=undefined-variable
+    (unicode_chr(9), KEY_TAB),
     (unicode_chr(27), curses.KEY_EXIT),
     (unicode_chr(127), curses.KEY_BACKSPACE),
 
@@ -1268,24 +1506,24 @@ DEFAULT_SEQUENCE_MIXIN = (
     # keypad, numlock on -- these sequences cause quite a stir, unlike almost
     # every other kind of application or "special input" keys, they do not begin
     # with CSI !!
-    (u"\x1bOM", curses.KEY_ENTER),  # noqa return
-    (u"\x1bOj", KEY_KP_MULTIPLY),   # noqa *  # pylint: disable=undefined-variable
-    (u"\x1bOk", KEY_KP_ADD),        # noqa +  # pylint: disable=undefined-variable
-    (u"\x1bOl", KEY_KP_SEPARATOR),  # noqa ,  # pylint: disable=undefined-variable
-    (u"\x1bOm", KEY_KP_SUBTRACT),   # noqa -  # pylint: disable=undefined-variable
-    (u"\x1bOn", KEY_KP_DECIMAL),    # noqa .  # pylint: disable=undefined-variable
-    (u"\x1bOo", KEY_KP_DIVIDE),     # noqa /  # pylint: disable=undefined-variable
-    (u"\x1bOX", KEY_KP_EQUAL),      # noqa =  # pylint: disable=undefined-variable
-    (u"\x1bOp", KEY_KP_0),          # noqa 0  # pylint: disable=undefined-variable
-    (u"\x1bOq", KEY_KP_1),          # noqa 1  # pylint: disable=undefined-variable
-    (u"\x1bOr", KEY_KP_2),          # noqa 2  # pylint: disable=undefined-variable
-    (u"\x1bOs", KEY_KP_3),          # noqa 3  # pylint: disable=undefined-variable
-    (u"\x1bOt", KEY_KP_4),          # noqa 4  # pylint: disable=undefined-variable
-    (u"\x1bOu", KEY_KP_5),          # noqa 5  # pylint: disable=undefined-variable
-    (u"\x1bOv", KEY_KP_6),          # noqa 6  # pylint: disable=undefined-variable
-    (u"\x1bOw", KEY_KP_7),          # noqa 7  # pylint: disable=undefined-variable
-    (u"\x1bOx", KEY_KP_8),          # noqa 8  # pylint: disable=undefined-variable
-    (u"\x1bOy", KEY_KP_9),          # noqa 9  # pylint: disable=undefined-variable
+    (u"\x1bOM", curses.KEY_ENTER),
+    (u"\x1bOj", KEY_KP_MULTIPLY),
+    (u"\x1bOk", KEY_KP_ADD),
+    (u"\x1bOl", KEY_KP_SEPARATOR),
+    (u"\x1bOm", KEY_KP_SUBTRACT),
+    (u"\x1bOn", KEY_KP_DECIMAL),
+    (u"\x1bOo", KEY_KP_DIVIDE),
+    (u"\x1bOX", KEY_KP_EQUAL),
+    (u"\x1bOp", KEY_KP_0),
+    (u"\x1bOq", KEY_KP_1),
+    (u"\x1bOr", KEY_KP_2),
+    (u"\x1bOs", KEY_KP_3),
+    (u"\x1bOt", KEY_KP_4),
+    (u"\x1bOu", KEY_KP_5),
+    (u"\x1bOv", KEY_KP_6),
+    (u"\x1bOw", KEY_KP_7),
+    (u"\x1bOx", KEY_KP_8),
+    (u"\x1bOy", KEY_KP_9),
 
     # We wouldn't even bother to detect them unless 'term.smkx' was known to be
     # emitted with a context manager... if it weren't for these "legacy" DEC VT
@@ -1296,6 +1534,15 @@ DEFAULT_SEQUENCE_MIXIN = (
     (u"\x1bOQ", curses.KEY_F2),
     (u"\x1bOR", curses.KEY_F3),
     (u"\x1bOS", curses.KEY_F4),
+
+    # Kitty disambiguate mode: F1-F4 sent as CSI sequences instead of SS3
+    # F1 = CSI P, F2 = CSI Q, F3 = CSI 13~, F4 = CSI S
+    # Note: These must come after longer sequences that start with \x1b[ to avoid
+    # premature matching, but get_keyboard_sequences() sorts by length anyway.
+    (u"\x1b[P", curses.KEY_F1),
+    (u"\x1b[Q", curses.KEY_F2),
+    (u"\x1b[13~", curses.KEY_F3),
+    (u"\x1b[S", curses.KEY_F4),
 
     # keypad, numlock off
     (u"\x1b[1~", curses.KEY_FIND),         # find
@@ -1357,28 +1604,29 @@ def _reinit_escdelay():
 
 _reinit_escdelay()
 
+
 class KittyKeyboardProtocol:
     """
     Represents Kitty keyboard protocol flags.
-    
-    Encapsulates the integer flag value returned by Kitty keyboard protocol 
-    queries and provides properties for individual flag bits and a method 
-    to convert back to enable_kitty_keyboard() arguments.
+
+    Encapsulates the integer flag value returned by Kitty keyboard protocol queries and provides
+    properties for individual flag bits and a method to convert back to enable_kitty_keyboard()
+    arguments.
     """
-    
+
     def __init__(self, value):
         """
         Initialize with raw integer flag value.
-        
+
         :arg int value: Raw integer flags value from Kitty keyboard protocol query
         """
         self.value = int(value)
-    
+
     @property
     def disambiguate(self):
         """Whether disambiguated escape codes are enabled (bit 1)."""
         return bool(self.value & 0b1)
-    
+
     @disambiguate.setter
     def disambiguate(self, enabled):
         """Set whether disambiguated escape codes are enabled (bit 1)."""
@@ -1386,12 +1634,12 @@ class KittyKeyboardProtocol:
             self.value |= 0b1
         else:
             self.value &= ~0b1
-    
-    @property 
+
+    @property
     def report_events(self):
         """Whether key repeat and release events are reported (bit 2)."""
         return bool(self.value & 0b10)
-    
+
     @report_events.setter
     def report_events(self, enabled):
         """Set whether key repeat and release events are reported (bit 2)."""
@@ -1399,12 +1647,12 @@ class KittyKeyboardProtocol:
             self.value |= 0b10
         else:
             self.value &= ~0b10
-    
+
     @property
     def report_alternates(self):
         """Whether shifted and base layout keys are reported for shortcuts (bit 4)."""
         return bool(self.value & 0b100)
-    
+
     @report_alternates.setter
     def report_alternates(self, enabled):
         """Set whether shifted and base layout keys are reported for shortcuts (bit 4)."""
@@ -1412,12 +1660,12 @@ class KittyKeyboardProtocol:
             self.value |= 0b100
         else:
             self.value &= ~0b100
-    
+
     @property
     def report_all_keys(self):
         """Whether all keys are reported as escape codes (bit 8)."""
         return bool(self.value & 0b1000)
-    
+
     @report_all_keys.setter
     def report_all_keys(self, enabled):
         """Set whether all keys are reported as escape codes (bit 8)."""
@@ -1425,12 +1673,12 @@ class KittyKeyboardProtocol:
             self.value |= 0b1000
         else:
             self.value &= ~0b1000
-    
+
     @property
     def report_text(self):
         """Whether associated text is reported with key events (bit 16)."""
         return bool(self.value & 0b10000)
-    
+
     @report_text.setter
     def report_text(self, enabled):
         """Set whether associated text is reported with key events (bit 16)."""
@@ -1438,23 +1686,23 @@ class KittyKeyboardProtocol:
             self.value |= 0b10000
         else:
             self.value &= ~0b10000
-    
+
     def make_arguments(self):
         """
         Return dictionary of arguments suitable for enable_kitty_keyboard().
-        
+
         :rtype: dict
-        :returns: Dictionary with boolean flags suitable for passing as 
-            keyword arguments to enable_kitty_keyboard()
+        :returns: Dictionary with boolean flags suitable for passing as keyword arguments to
+            enable_kitty_keyboard()
         """
         return {
             'disambiguate': self.disambiguate,
-            'report_events': self.report_events, 
+            'report_events': self.report_events,
             'report_alternates': self.report_alternates,
             'report_all_keys': self.report_all_keys,
             'report_text': self.report_text
         }
-    
+
     def __repr__(self):
         """Return string representation of the protocol flags."""
         flags = []
@@ -1468,9 +1716,9 @@ class KittyKeyboardProtocol:
             flags.append('report_all_keys')
         if self.report_text:
             flags.append('report_text')
-        
+
         return f"KittyKeyboardProtocol(value={self.value}, flags=[{', '.join(flags)}])"
-    
+
     def __eq__(self, other):
         """Check equality based on flag values."""
         if isinstance(other, KittyKeyboardProtocol):
@@ -1482,7 +1730,7 @@ class KittyKeyboardProtocol:
 
 __all__ = ('Keystroke', 'get_keyboard_codes', 'get_keyboard_sequences',
            '_match_dec_event', '_match_kitty_key', '_match_modify_other_keys',
-           '_match_legacy_csi_modifiers', 'BracketedPasteEvent', 'MouseSGREvent', 
-           'MouseLegacyEvent', 'FocusEvent', 'SyncEvent', 'KittyKeyEvent', 
+           '_match_legacy_csi_modifiers', 'BracketedPasteEvent', 'MouseSGREvent',
+           'MouseLegacyEvent', 'FocusEvent', 'SyncEvent', 'KittyKeyEvent',
            'ModifyOtherKeysEvent', 'LegacyCSIKeyEvent', 'KittyKeyboardProtocol',
            'DeviceAttribute')
