@@ -28,7 +28,7 @@ setuptools.setup(
     name='blessed',
     version=_get_version(
         fname=os.path.join(HERE, 'version.json')),
-    python_requires=">=2.7",
+    python_requires=">=3.7",
     install_requires=_get_install_requires(
         fname=os.path.join(HERE, 'requirements.txt')),
     long_description=_get_long_description(
@@ -43,14 +43,6 @@ setuptools.setup(
     package_data={
         'blessed': [
             'py.typed',
-            '_capabilities.pyi',
-            'color.pyi',
-            'colorspace.pyi',
-            'formatters.pyi',
-            'keyboard.pyi',
-            'sequences.pyi',
-            'terminal.pyi',
-            'win_terminal.pyi',
         ],
     },
     url='https://github.com/jquast/blessed',
@@ -66,11 +58,7 @@ setuptools.setup(
         'License :: OSI Approved :: MIT License',
         'Operating System :: POSIX',
         'Operating System :: Microsoft :: Windows',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',

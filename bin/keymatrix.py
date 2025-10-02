@@ -9,25 +9,15 @@ from __future__ import division, print_function
 
 # std imports
 import sys
-import functools
 
 # local
 from blessed import Terminal
 
-# python 2/3 compatibility, provide 'echo' function as an
-# alias for "print without newline and flush"
-try:
-    # pylint: disable=invalid-name
-    #         Invalid constant name "echo"
-    echo = functools.partial(print, end='', flush=True)
-    echo(u'')
-except TypeError:
-    # TypeError: 'flush' is an invalid keyword argument for this function
 
-    def echo(text):
-        """Display ``text`` and flush output."""
-        sys.stdout.write(u'{}'.format(text))
-        sys.stdout.flush()
+def echo(text):
+    """Display ``text`` and flush output."""
+    sys.stdout.write(u'{}'.format(text))
+    sys.stdout.flush()
 
 
 def refresh(term, board, level, score, inps):

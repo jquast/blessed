@@ -1,10 +1,16 @@
 """Sub-module providing sequence-formatting functions."""
 # std imports
 import platform
+from typing import TYPE_CHECKING, Set, List, Type, Tuple, Union, TypeVar, Callable, Optional
 
 # local
-from blessed._compat import TextType, StringType
 from blessed.colorspace import CGA_COLORS, X11_COLORNAMES_TO_RGB
+
+if TYPE_CHECKING:
+    # local
+    from blessed.terminal import Terminal
+
+_T = TypeVar("_T")
 
 # isort: off
 # curses
@@ -14,7 +20,7 @@ else:
     import curses
 
 
-def _make_colors():
+def _make_colors() -> Set[str]:
     """
     Return set of valid colors and their derivatives.
 
@@ -39,14 +45,14 @@ def _make_colors():
 
 #: Valid colors and their background (on), bright, and bright-background
 #: derivatives.
-COLORS = _make_colors()
+COLORS: Set[str] = _make_colors()
 
 #: Attributes that may be compounded with colors, by underscore, such as
 #: 'reverse_indigo'.
-COMPOUNDABLES = set('bold underline reverse blink italic standout'.split())
+COMPOUNDABLES: Set[str] = set('bold underline reverse blink italic standout'.split())
 
 
-class ParameterizingString(TextType):
+class ParameterizingString(str):
     r"""
     A Unicode string which can be called as a parameterizing termcap.
 
@@ -56,10 +62,10 @@ class ParameterizingString(TextType):
         >>> term = Terminal()
         >>> color = ParameterizingString(term.color, term.normal, 'color')
         >>> color(9)('color #9')
-        u'\x1b[91mcolor #9\x1b(B\x1b[m'
+        '\x1b[91mcolor #9\x1b(B\x1b[m'
     """
 
-    def __new__(cls, cap, normal=u'', name=u'<not specified>'):
+    def __new__(cls: Type[_T], cap: str, normal: str = '', name: str = '<not specified>') -> _T:
         # pylint: disable = missing-return-doc, missing-return-type-doc
         """
         Class constructor accepting 3 positional arguments.
@@ -68,12 +74,12 @@ class ParameterizingString(TextType):
         :arg str normal: terminating sequence for this capability (optional).
         :arg str name: name of this terminal capability (optional).
         """
-        new = TextType.__new__(cls, cap)
+        new = str.__new__(cls, cap)
         new._normal = normal
         new._name = name
         return new
 
-    def __call__(self, *args):
+    def __call__(self, *args: object) -> "FormattingString":
         """
         Returning :class:`FormattingString` instance for given parameters.
 
@@ -95,7 +101,7 @@ class ParameterizingString(TextType):
         except TypeError as err:
             # If the first non-int (i.e. incorrect) arg was a string, suggest
             # something intelligent:
-            if args and isinstance(args[0], StringType):
+            if args and isinstance(args[0], str):
                 raise TypeError(
                     "Unknown terminal capability, %r, or, TypeError "
                     "for arguments %r: %s" % (self._name, args, err))
@@ -106,12 +112,12 @@ class ParameterizingString(TextType):
             # ignore 'tparm() returned NULL', you won't get any styling,
             # even if does_styling is True. This happens on win32 platforms
             # with http://www.lfd.uci.edu/~gohlke/pythonlibs/#curses installed
-            if "tparm() returned NULL" not in TextType(err):
+            if "tparm() returned NULL" not in str(err):
                 raise
             return NullCallableString()
 
 
-class ParameterizingProxyString(TextType):
+class ParameterizingProxyString(str):
     r"""
     A Unicode string which can be called to proxy missing termcap entries.
 
@@ -127,15 +133,16 @@ class ParameterizingProxyString(TextType):
         >>> term = Terminal('screen')
         >>> hpa = ParameterizingString(term.hpa, term.normal, 'hpa')
         >>> hpa(9)
-        u''
-        >>> fmt = u'\x1b[{0}G'
+        ''
+        >>> fmt = '\x1b[{0}G'
         >>> fmt_arg = lambda *arg: (arg[0] + 1,)
         >>> hpa = ParameterizingProxyString((fmt, fmt_arg), term.normal, 'hpa')
         >>> hpa(9)
-        u'\x1b[10G'
+        '\x1b[10G'
     """
 
-    def __new__(cls, fmt_pair, normal=u'', name=u'<not specified>'):
+    def __new__(cls: Type[_T], fmt_pair: Tuple[str, Callable[..., Tuple[object, ...]]],
+                normal: str = '', name: str = '<not specified>') -> _T:
         # pylint: disable = missing-return-doc, missing-return-type-doc
         """
         Class constructor accepting 4 positional arguments.
@@ -148,13 +155,13 @@ class ParameterizingProxyString(TextType):
         """
         assert isinstance(fmt_pair, tuple), fmt_pair
         assert callable(fmt_pair[1]), fmt_pair[1]
-        new = TextType.__new__(cls, fmt_pair[0])
+        new = str.__new__(cls, fmt_pair[0])
         new._fmt_args = fmt_pair[1]
         new._normal = normal
         new._name = name
         return new
 
-    def __call__(self, *args):
+    def __call__(self, *args: object) -> "FormattingString":
         """
         Returning :class:`FormattingString` instance for given parameters.
 
@@ -170,7 +177,7 @@ class ParameterizingProxyString(TextType):
                                 self._normal)
 
 
-class FormattingString(TextType):
+class FormattingString(str):
     r"""
     A Unicode string which doubles as a callable.
 
@@ -184,12 +191,12 @@ class FormattingString(TextType):
         >>> term = Terminal()
         >>> style = FormattingString(term.bright_blue, term.normal)
         >>> print(repr(style))
-        u'\x1b[94m'
+        '\x1b[94m'
         >>> style('Big Blue')
-        u'\x1b[94mBig Blue\x1b(B\x1b[m'
+        '\x1b[94mBig Blue\x1b(B\x1b[m'
     """
 
-    def __new__(cls, sequence, normal=u''):
+    def __new__(cls: Type[_T], sequence: str, normal: str = '') -> _T:
         # pylint: disable = missing-return-doc, missing-return-type-doc
         """
         Class constructor accepting 2 positional arguments.
@@ -197,11 +204,11 @@ class FormattingString(TextType):
         :arg str sequence: terminal attribute sequence.
         :arg str normal: terminating sequence for this attribute (optional).
         """
-        new = TextType.__new__(cls, sequence)
+        new = str.__new__(cls, sequence)
         new._normal = normal
         return new
 
-    def __call__(self, *args):
+    def __call__(self, *args: str) -> str:
         """
         Return ``text`` joined by ``sequence`` and ``normal``.
 
@@ -215,22 +222,23 @@ class FormattingString(TextType):
         #
         # >>> t.red('This is ', t.bold('extremely'), ' dangerous!')
         for idx, ucs_part in enumerate(args):
-            if not isinstance(ucs_part, StringType):
+            if not isinstance(ucs_part, str):
                 raise TypeError(
                     "TypeError for FormattingString argument, %r, at position %s: expected type "
-                    "%s, got %s" % (ucs_part, idx, StringType.__name__, type(ucs_part).__name__)
+                    "%s, got %s" % (ucs_part, idx, str.__name__, type(ucs_part).__name__)
                 )
-        postfix = u''
+        postfix = ''
         if self and self._normal:
             postfix = self._normal
             _refresh = self._normal + self
-            args = [_refresh.join(ucs_part.split(self._normal))
-                    for ucs_part in args]
+            args_list = [_refresh.join(ucs_part.split(self._normal))
+                         for ucs_part in args]
+            args = tuple(args_list)
 
-        return self + u''.join(args) + postfix
+        return self + ''.join(args) + postfix
 
 
-class FormattingOtherString(TextType):
+class FormattingOtherString(str):
     r"""
     A Unicode string which doubles as a callable for another sequence when called.
 
@@ -241,14 +249,14 @@ class FormattingOtherString(TextType):
         >>> term = Terminal()
         >>> move_right = FormattingOtherString(term.cuf1, term.cuf)
         >>> print(repr(move_right))
-        u'\x1b[C'
+        '\x1b[C'
         >>> print(repr(move_right(666)))
-        u'\x1b[666C'
+        '\x1b[666C'
         >>> print(repr(move_right()))
-        u'\x1b[C'
+        '\x1b[C'
     """
 
-    def __new__(cls, direct, target):
+    def __new__(cls: Type[_T], direct: ParameterizingString, target: ParameterizingString) -> _T:
         # pylint: disable = missing-return-doc, missing-return-type-doc
         """
         Class constructor accepting 2 positional arguments.
@@ -256,20 +264,20 @@ class FormattingOtherString(TextType):
         :arg str direct: capability name for direct formatting, eg ``('x' + term.right)``.
         :arg str target: capability name for callable, eg ``('x' + term.right(99))``.
         """
-        new = TextType.__new__(cls, direct)
+        new = str.__new__(cls, direct)
         new._callable = target
         return new
 
-    def __getnewargs__(self):
+    def __getnewargs__(self) -> Tuple[str, ParameterizingString]:
         # return arguments used for the __new__ method upon unpickling.
-        return TextType.__new__(TextType, self), self._callable
+        return str.__new__(str, self), self._callable
 
-    def __call__(self, *args):
+    def __call__(self, *args: object) -> str:
         """Return ``text`` by ``target``."""
         return self._callable(*args) if args else self
 
 
-class NullCallableString(TextType):
+class NullCallableString(str):
     """
     A dummy callable Unicode alternative to :class:`FormattingString`.
 
@@ -277,11 +285,11 @@ class NullCallableString(TextType):
     unicode that may also act as a callable.
     """
 
-    def __new__(cls):
+    def __new__(cls: Type[_T]) -> _T:
         """Class constructor."""
-        return TextType.__new__(cls, u'')
+        return str.__new__(cls, '')
 
-    def __call__(self, *args):
+    def __call__(self, *args: str) -> str:
         """
         Allow empty string to be callable, returning given string, if any.
 
@@ -303,10 +311,10 @@ class NullCallableString(TextType):
             # without color support, so turtles all the way down: we return
             # another instance.
             return NullCallableString()
-        return u''.join(args)
+        return ''.join(args)
 
 
-def get_proxy_string(term, attr):
+def get_proxy_string(term: 'Terminal', attr: str) -> Optional[ParameterizingProxyString]:
     """
     Proxy and return callable string for proxied attributes.
 
@@ -320,26 +328,26 @@ def get_proxy_string(term, attr):
     """
     # normalize 'screen-256color', or 'ansi.sys' to its basic names
     term_kind = next(iter(_kind for _kind in ('screen', 'ansi',)
-                          if term.kind.startswith(_kind)), term)
-    _proxy_table = {  # pragma: no cover
+                          if term.kind.startswith(_kind)), term.kind)
+    _proxy_table: dict[str, dict[str, object]] = {  # pragma: no cover
         'screen': {
             # proxy move_x/move_y for 'screen' terminal type, used by tmux(1).
             'hpa': ParameterizingProxyString(
-                (u'\x1b[{0}G', lambda *arg: (arg[0] + 1,)), term.normal, attr),
+                ('\x1b[{0}G', lambda *arg: (arg[0] + 1,)), term.normal, attr),
             'vpa': ParameterizingProxyString(
-                (u'\x1b[{0}d', lambda *arg: (arg[0] + 1,)), term.normal, attr),
+                ('\x1b[{0}d', lambda *arg: (arg[0] + 1,)), term.normal, attr),
         },
         'ansi': {
             # proxy show/hide cursor for 'ansi' terminal type.  There is some
             # demand for a richly working ANSI terminal type for some reason.
             'civis': ParameterizingProxyString(
-                (u'\x1b[?25l', lambda *arg: ()), term.normal, attr),
+                ('\x1b[?25l', lambda *arg: ()), term.normal, attr),
             'cnorm': ParameterizingProxyString(
-                (u'\x1b[?25h', lambda *arg: ()), term.normal, attr),
+                ('\x1b[?25h', lambda *arg: ()), term.normal, attr),
             'hpa': ParameterizingProxyString(
-                (u'\x1b[{0}G', lambda *arg: (arg[0] + 1,)), term.normal, attr),
+                ('\x1b[{0}G', lambda *arg: (arg[0] + 1,)), term.normal, attr),
             'vpa': ParameterizingProxyString(
-                (u'\x1b[{0}d', lambda *arg: (arg[0] + 1,)), term.normal, attr),
+                ('\x1b[{0}d', lambda *arg: (arg[0] + 1,)), term.normal, attr),
             'sc': '\x1b[s',
             'rc': '\x1b[u',
         }
@@ -347,7 +355,7 @@ def get_proxy_string(term, attr):
     return _proxy_table.get(term_kind, {}).get(attr, None)
 
 
-def split_compound(compound):
+def split_compound(compound: str) -> List[str]:
     """
     Split compound formatting string into segments.
 
@@ -359,7 +367,7 @@ def split_compound(compound):
     :rtype: list
     :returns: List of formatting string segments
     """
-    merged_segs = []
+    merged_segs: List[str] = []
     # These occur only as prefixes, so they can always be merged:
     mergeable_prefixes = ['on', 'bright', 'on_bright']
     for segment in compound.split('_'):
@@ -370,26 +378,26 @@ def split_compound(compound):
     return merged_segs
 
 
-def resolve_capability(term, attr):
+def resolve_capability(term: 'Terminal', attr: str) -> str:
     """
     Resolve a raw terminal capability using :func:`tigetstr`.
 
     :arg Terminal term: :class:`~.Terminal` instance.
     :arg str attr: terminal capability name.
     :returns: string of the given terminal capability named by ``attr``,
-       which may be empty (u'') if not found or not supported by the
+       which may be empty ('') if not found or not supported by the
        given :attr:`~.Terminal.kind`.
     :rtype: str
     """
     if not term.does_styling:
-        return u''
+        return ''
     val = curses.tigetstr(term._sugar.get(attr, attr))  # pylint: disable=protected-access
     # Decode sequences as latin1, as they are always 8-bit bytes, so when
-    # b'\xff' is returned, this is decoded as u'\xff'.
-    return u'' if val is None else val.decode('latin1')
+    # b'\xff' is returned, this is decoded as '\xff'.
+    return '' if val is None else val.decode('latin1')
 
 
-def resolve_color(term, color):
+def resolve_color(term: 'Terminal', color: str) -> Union[NullCallableString, FormattingString]:
     """
     Resolve a simple color name to a callable capability.
 
@@ -438,11 +446,11 @@ def resolve_color(term, color):
     # - ^[48;2;<r>;<g>;<b>m
     fgbg_seq = ('48' if 'on_' in color else '38')
     assert term.number_of_colors == 1 << 24
-    fmt_attr = u'\x1b[' + fgbg_seq + ';2;{0};{1};{2}m'
+    fmt_attr = '\x1b[' + fgbg_seq + ';2;{0};{1};{2}m'
     return FormattingString(fmt_attr.format(*rgb), term.normal)
 
 
-def resolve_attribute(term, attr):
+def resolve_attribute(term: 'Terminal', attr: str) -> Union[ParameterizingString, FormattingString]:
     """
     Resolve a terminal attribute name into a capability class.
 
@@ -472,7 +480,7 @@ def resolve_attribute(term, attr):
     formatters = split_compound(attr)
     if all((fmt in COLORS or fmt in COMPOUNDABLES) for fmt in formatters):
         resolution = (resolve_attribute(term, fmt) for fmt in formatters)
-        return FormattingString(u''.join(resolution), term.normal)
+        return FormattingString(''.join(resolution), term.normal)
 
     # otherwise, this is our end-game: given a sequence such as 'csr'
     # (change scrolling region), return a ParameterizingString instance,
