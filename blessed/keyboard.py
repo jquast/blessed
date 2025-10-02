@@ -110,7 +110,7 @@ class KittyModifierBits:
              'caps_lock', 'num_lock')
 
     #: Modifiers only, in the generally preferred order in phrasing, eg. "CTRL + ALT + DELETE"
-    #: is, aparently, KEY_CTRL_ALT_SHIFT_SUPER_HYPER_META('a')
+    #: is, apparently, KEY_CTRL_ALT_SHIFT_SUPER_HYPER_META('a')
     names_modifiers_only = ('ctrl', 'alt', 'shift', 'super', 'hyper', 'meta')
 
 
@@ -225,8 +225,8 @@ class Keystroke(str):
         If this value is None, then it can probably be assumed that the
         ``value`` is an unsurprising textual character without any modifiers.
         """
-        # pylint:
-        # disable=too-many-return-statements,too-many-branches,too-many-statements,too-complex
+        # pylint: disable=too-many-return-statements,too-many-branches,too-complex
+        # pylint: disable=too-many-statements
         if self._name is not None:
             return self._name
 

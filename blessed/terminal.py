@@ -1802,10 +1802,9 @@ class Terminal(object):
         """
         Read, decode, and return the next byte from the keyboard stream.
 
+        :arg decoder: Optional decoder, used when parsing some types of escape sequences.
+        :type decoder: codecs.IncrementalDecoder or None
         :rtype: unicode
-        :arg codecs.IncrementalDecoder optional decoder, used when parsing
-            some types of escape sequences.
-
         :returns: a single unicode character, or ``''`` if a multi-byte
             sequence has not yet been fully received.
 
