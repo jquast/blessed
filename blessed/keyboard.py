@@ -369,7 +369,7 @@ class Keystroke(str):
                   For release events, always returns empty string.
 
         Some Examples,
-        
+
         - Plain text: 'a', 'A', '1', ';', ' ', 'Ω', emoji with ZWJ sequences
         - Alt+printable: Alt+a → 'a', Alt+A → 'A'
         - Ctrl+letter: Ctrl+A → 'a', Ctrl+Z → 'z'
@@ -378,7 +378,6 @@ class Keystroke(str):
         - Application keys: KEY_UP, KEY_F1, etc. → ''
         - DEC events: bracketed paste, mouse, etc. → ''
         - Release events: always → ''
-
         """
         # Release events never have text
         if self.released:
@@ -732,7 +731,6 @@ class Keystroke(str):
              ks.is_ctrl_shift()             # - exactly Ctrl+Shift, no other modifiers
              ks.is_key_shift_f2_released()  # - Shift+F2 release event
              ks.is_ctrl_a_repeated()        # - Ctrl+a repeat event
-
         """
         if attr.startswith('is_'):
             # Extract tokens after 'is_'

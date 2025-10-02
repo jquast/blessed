@@ -1982,7 +1982,6 @@ class Terminal(object):
                 key = term.inkey()
                 if key.alt and key.is_alt('c'):
                     print("Alt+C pressed")
-
         """
         if not self.does_styling:
             yield
@@ -2044,7 +2043,6 @@ class Terminal(object):
                 key = term.inkey()
                 if key.is_ctrl(','):
                     print("Ctrl+comma detected")
-
         """
         if not self.does_styling:
             yield
