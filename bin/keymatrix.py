@@ -255,7 +255,7 @@ def format_key_event(key: Any) -> str:
     value_repr = repr(key.value)[:15] if hasattr(key, 'value') else ''
     name_repr = repr(key.name)[:20] if hasattr(key, 'name') else ''
 
-    if key.mode and int(key.mode) != 0:
+    if key.mode and int(key.mode) > 0:
         extra = f'mode={key.mode_values()!r}'[:30]
     else:
         extra = f'mods={key.modifiers}' if hasattr(key, 'modifiers') else ''
