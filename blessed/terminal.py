@@ -24,7 +24,7 @@ else:
     SupportsIndex = int  # type: ignore
 
 # local
-from .color import COLOR_DISTANCE_ALGORITHMS
+from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
 from .keyboard import (DEFAULT_ESCDELAY,
                        Keystroke,
                        _time_left,
@@ -77,6 +77,10 @@ else:
         HAS_TTY = False
 
 _CUR_TERM = None  # See comments at end of file
+_RE_GET_FGCOLOR_RESPONSE = re.compile(
+    '\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+_RE_GET_BGCOLOR_RESPONSE = re.compile(
+    '\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
 
 
 class Terminal(object):
@@ -711,12 +715,7 @@ class Terminal(object):
         The foreground color is determined by emitting an `OSC 10 color query
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
         """
-        match = self._query_response(
-            '\x1b]10;?\x07',
-            re.compile('\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07').pattern,
-            timeout
-        )
-
+        match = self._query_response('\x1b]10;?\x07', _RE_GET_FGCOLOR_RESPONSE, timeout)
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
 
     def get_bgcolor(self, timeout: Optional[float] = None) -> Tuple[int, int, int]:
@@ -732,12 +731,7 @@ class Terminal(object):
         The background color is determined by emitting an `OSC 11 color query
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
         """
-        match = self._query_response(
-            '\x1b]11;?\x07',
-            re.compile('\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07').pattern,
-            timeout
-        )
-
+        match = self._query_response('\x1b]11;?\x07', _RE_GET_BGCOLOR_RESPONSE, timeout)
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
 
     @contextlib.contextmanager
@@ -928,29 +922,45 @@ class Terminal(object):
         """
         Translate an RGB color to a color code of the terminal's color depth.
 
+        This method is only be used to downconvert for terminals of 256 or fewer colors.
+
         :arg int red: RGB value of Red (0-255).
         :arg int green: RGB value of Green (0-255).
         :arg int blue: RGB value of Blue (0-255).
         :rtype: int
         :returns: Color code of downconverted RGB color
         """
-        # Though pre-computing all 1 << 24 options is memory-intensive, a pre-computed
-        # "k-d tree" of 256 (x,y,z) vectors of a colorspace in 3 dimensions, such as a
-        # cone of HSV, or simply 255x255x255 RGB square, any given rgb value is just a
-        # nearest-neighbor search of 256 points, which k-d should be much faster by
-        # sub-dividing / culling search points, rather than our "search all 256 points
-        # always" approach.
+        # pylint: disable=too-many-locals
+
+        if self.number_of_colors == 0:
+            # bit of a waste to downconvert to no color at all, the final
+            # formatting string will be empty, we play along with color #7
+            return 7
+
+        target_rgb = (red, green, blue)
         fn_distance = COLOR_DISTANCE_ALGORITHMS[self.color_distance_algorithm]
-        color_idx = 7
-        shortest_distance = None
-        for cmp_depth, cmp_rgb in enumerate(RGB_256TABLE):
-            cmp_distance = fn_distance(cmp_rgb, (red, green, blue))
-            if shortest_distance is None or cmp_distance < shortest_distance:
-                shortest_distance = cmp_distance
-                color_idx = cmp_depth
-            if cmp_depth >= self.number_of_colors:
-                break
-        return color_idx
+
+        if self.number_of_colors < 256:  # 8 or 16 colors
+            # because there just are not very many colors, we can use a color distance
+            # algorithm to measure all of 8 or 16 colors, selecting the nearest match.
+            best_idx = 7
+            best_distance = float('inf')
+            for idx in range(min(self.number_of_colors, 16)):
+                distance = fn_distance(RGB_256TABLE[idx], target_rgb)
+                if distance < best_distance:
+                    best_distance = distance
+                    best_idx = idx
+            return best_idx
+
+        # For 256-color terminals, use *only* cube (16-231) and grayscale
+        # (232-255) color matches, avoid ANSI colors 0-15 altogether, to prevent
+        # interference from user themes, and its fastest for our purpose,
+        # anyway! We chose the nearest distance of either color.
+        cube_idx, cube_rgb = xterm256color_from_rgb(red, green, blue)
+        gray_idx, gray_rgb = xterm256gray_from_rgb(red, green, blue)
+        cube_distance = fn_distance(cube_rgb, target_rgb)
+        gray_distance = fn_distance(gray_rgb, target_rgb)
+        return cube_idx if cube_distance <= gray_distance else gray_idx
 
     @property
     def normal(self) -> str:
@@ -1037,7 +1047,8 @@ class Terminal(object):
         Color distance algorithm used by :meth:`rgb_downconvert`.
 
         The slowest, but most accurate, 'cie2000', is default. Other available options are 'rgb',
-        'rgb-weighted', 'cie76', and 'cie94'.
+        'rgb-weighted', 'cie76', and 'cie94'. This function is only be used to downconvert for
+        terminals of 256 or fewer colors.
         """
         return self._color_distance_algorithm
 
@@ -1370,15 +1381,15 @@ class Terminal(object):
 
         Although both :meth:`cbreak` and :meth:`raw` modes allow each keystroke
         to be read immediately after it is pressed, Raw mode disables
-        processing of input and output.
+        processing of input and output by the terminal driver.
 
         In cbreak mode, special input characters such as ``^C`` or ``^S`` are
         interpreted by the terminal driver and excluded from the stdin stream.
         In raw mode these values are received by the :meth:`inkey` method.
 
-        Because output processing is not done, the newline ``'\n'`` is not
-        enough, you must also print carriage return to ensure that the cursor
-        is returned to the first column::
+        Because output processing is not done by the terminal driver, the
+        newline ``'\n'`` is not enough, you must also print carriage return to
+        ensure that the cursor is returned to the first column::
 
             with term.raw():
                 print("printing in raw mode", end="\r\n")

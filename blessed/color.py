@@ -242,3 +242,74 @@ COLOR_DISTANCE_ALGORITHMS: Dict[str,
                                                     'cie76': dist_cie76,
                                                     'cie94': dist_cie94,
                                                     'cie2000': dist_cie2000}
+
+# Precomputed lookup tables for fast 256-color xterm cube mapping
+# Based on xterm's 256colres.pl: levels [0, 95, 135, 175, 215, 255] for 6x6x6 cube
+_CUBE_LEVELS = (0, 95, 135, 175, 215, 255)
+
+# Precomputed RGB to cube index mapping "level", (0-5) for each RGB value (0-255)
+# Uses xterm thresholds based on midpoints between cube levels [0,95,135,175,215,255]
+# Thresholds: 48, 115, 155, 195, 235
+_RGB_TO_CUBE_IDX = tuple(
+    0 if v < 48 else 1 if v < 115 else 2 if v < 155 else 3 if v < 195 else 4 if v < 235 else 5
+    for v in range(256)
+)
+
+# Precomputed RGB to cube value mapping for each RGB value (0-255)
+_RGB_TO_CUBE_VAL = tuple(_CUBE_LEVELS[_RGB_TO_CUBE_IDX[v]] for v in range(256))
+
+# Precomputed grayscale index mapping from brightness value (0-255) to gray index (0-23)
+# Formula: 8 + 10*i gives gray values, so i = (v-8)/10, clamped to [0,23]
+_GRAY_IDX_FROM_V = tuple(
+    0 if v < 8 else 23 if v > 238 else int(round((v - 8) / 10.0))
+    for v in range(256)
+)
+
+# Precomputed gray values for each gray index (0-23)
+_GRAY_VAL_FROM_IDX = tuple(8 + 10 * i for i in range(24))
+
+
+def xterm256color_from_rgb(red: int, green: int, blue: int) -> Tuple[int, _RGB]:
+    """
+    Convert RGB values to xterm 256-color cube index and RGB approximation.
+
+    Uses the 6x6x6 color cube (indices 16-231) with levels [0,95,135,175,215,255].
+
+    :arg int red: RGB value of Red (0-255).
+    :arg int green: RGB value of Green (0-255).
+    :arg int blue: RGB value of Blue (0-255).
+    :returns: Tuple (cube_index, (r, g, b)) representing the xterm cube index and RGB approximation
+    :rtype: tuple
+    """
+    # Find nearest candidate by "6x6x6 cube", (indices 16-231):
+    # 6x6x6 cube with levels [0,95,135,175,215,255]
+    r_idx = _RGB_TO_CUBE_IDX[red]
+    g_idx = _RGB_TO_CUBE_IDX[green]
+    b_idx = _RGB_TO_CUBE_IDX[blue]
+    cube_idx = 16 + 36 * r_idx + 6 * g_idx + b_idx
+    cube_rgb = (_RGB_TO_CUBE_VAL[red], _RGB_TO_CUBE_VAL[green], _RGB_TO_CUBE_VAL[blue])
+
+    return cube_idx, cube_rgb
+
+
+def xterm256gray_from_rgb(red: int, green: int, blue: int) -> Tuple[int, _RGB]:
+    """
+    Convert RGB values to xterm 256-color grayscale index and RGB approximation.
+
+    Uses the 24 grayscale entries (indices 232-255) with values 8+10*i.
+
+    :arg int red: RGB value of Red (0-255).
+    :arg int green: RGB value of Green (0-255).
+    :arg int blue: RGB value of Blue (0-255).
+    :returns: Tuple (gray_index, (r, g, b)) representing the xterm gray index and RGB approximation
+    :rtype: tuple
+    """
+    # Grayscale candidate (indices 232-255):
+    # 24 grays with values 8+10*i
+    brightness = (red + green + blue) // 3
+    gray_idx_offset = _GRAY_IDX_FROM_V[brightness]
+    gray_idx = 232 + gray_idx_offset
+    gray_val = _GRAY_VAL_FROM_IDX[gray_idx_offset]
+    gray_rgb = (gray_val, gray_val, gray_val)
+
+    return gray_idx, gray_rgb
