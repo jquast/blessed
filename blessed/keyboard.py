@@ -4,12 +4,16 @@
 import os
 import re
 import time
+import typing
 import platform
 import functools
 from collections import OrderedDict, namedtuple
+from typing import Optional, Dict, Set, Tuple, Match, TypeVar
 
 # local
 from blessed.dec_modes import DecPrivateMode
+
+_T = TypeVar('_T', bound='Keystroke')
 
 # isort: off
 # curses
@@ -111,7 +115,9 @@ class Keystroke(str):
     a structured namedtuple with parsed event data.
     """
 
-    def __new__(cls, ucs='', code=None, name=None, mode=None, match=None):
+    def __new__(cls: typing.Type[_T], ucs: str = '', code: typing.Optional[int] = None,
+                name: typing.Optional[str] = None, mode: typing.Optional[int] = None,
+                match: typing.Any = None) -> _T:
         """Class constructor."""
         new = str.__new__(cls, ucs)
         new._name = name
@@ -122,7 +128,7 @@ class Keystroke(str):
         return new
 
     @staticmethod
-    def _infer_modifiers(ucs, mode, match):
+    def _infer_modifiers(ucs: str, mode: Optional[int], match: typing.Any) -> int:
         """
         Infer modifiers from keystroke data.
 
@@ -162,18 +168,18 @@ class Keystroke(str):
         return 1
 
     @property
-    def is_sequence(self):
+    def is_sequence(self) -> bool:
         """Whether the value represents a multibyte sequence (bool)."""
         return self._code is not None or self._mode is not None or len(self) > 1
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Docstring overwritten."""
         return (str.__repr__(self) if self._name is None else
                 self._name)
     __repr__.__doc__ = str.__doc__
 
     @property
-    def name(self):
+    def name(self) -> Optional[str]:
         """
         Special application key name.
 
@@ -317,12 +323,12 @@ class Keystroke(str):
         return self._name
 
     @property
-    def code(self):
+    def code(self) -> Optional[int]:
         """Integer keycode value of multibyte sequence (int)."""
         return self._code
 
     @property
-    def modifiers(self):
+    def modifiers(self) -> int:
         """
         Modifier flags in Kitty keyboard protocol format.
 
@@ -342,7 +348,7 @@ class Keystroke(str):
         return self._modifiers
 
     @property
-    def modifiers_bits(self):
+    def modifiers_bits(self) -> int:
         """
         Raw modifier bit flags without the +1 offset.
 
@@ -352,7 +358,7 @@ class Keystroke(str):
         return max(0, self._modifiers - 1)
 
     @property
-    def value(self):
+    def value(self) -> str:
         """
         The textual character represented by this keystroke.
 
@@ -436,57 +442,57 @@ class Keystroke(str):
 
     # Private modifier flag properties (internal use)
     @property
-    def _shift(self):
+    def _shift(self) -> bool:
         """Whether the shift modifier is active."""
         return bool(self.modifiers_bits & 0b1)
 
     @property
-    def _alt(self):
+    def _alt(self) -> bool:
         """Whether the alt modifier is active."""
         return bool(self.modifiers_bits & 0b10)
 
     @property
-    def _ctrl(self):
+    def _ctrl(self) -> bool:
         """Whether the ctrl modifier is active."""
         return bool(self.modifiers_bits & 0b100)
 
     @property
-    def _super(self):
+    def _super(self) -> bool:
         """Whether the super (Windows/Cmd) modifier is active."""
         return bool(self.modifiers_bits & 0b1000)
 
     @property
-    def _hyper(self):
+    def _hyper(self) -> bool:
         """Whether the hyper modifier is active."""
         return bool(self.modifiers_bits & 0b10000)
 
     @property
-    def _meta(self):
+    def _meta(self) -> bool:
         """Whether the meta modifier is active."""
         return bool(self.modifiers_bits & 0b100000)
 
     @property
-    def _caps_lock(self):
+    def _caps_lock(self) -> bool:
         """Whether caps lock was known to be active during this sequence."""
         return bool(self.modifiers_bits & 0b1000000)
 
     @property
-    def _num_lock(self):
+    def _num_lock(self) -> bool:
         """Whether num lock was known to be active during this sequence."""
         return bool(self.modifiers_bits & 0b10000000)
 
     @property
-    def caps_lock(self):
+    def caps_lock(self) -> bool:
         """Whether caps lock was known to be active during this sequence."""
         return bool(self.modifiers_bits & 0b1000000)
 
     @property
-    def num_lock(self):
+    def num_lock(self) -> bool:
         """Whether num lock was known to be active during this sequence."""
         return bool(self.modifiers_bits & 0b10000000)
 
     @property
-    def pressed(self):
+    def pressed(self) -> bool:
         """
         Whether this is a key press event.
 
@@ -508,7 +514,7 @@ class Keystroke(str):
         return True
 
     @property
-    def repeated(self):
+    def repeated(self) -> bool:
         """
         Whether this is a key repeat event.
 
@@ -529,7 +535,7 @@ class Keystroke(str):
         return False
 
     @property
-    def released(self):
+    def released(self) -> bool:
         """
         Whether this is a key release event.
 
@@ -550,7 +556,7 @@ class Keystroke(str):
         return False
 
     @property
-    def event_mode(self):
+    def event_mode(self) -> Optional[DecPrivateMode]:
         """
         DEC Private Mode associated with this keystroke, if any.
 
@@ -563,7 +569,7 @@ class Keystroke(str):
         return None
 
     @property
-    def mode(self):
+    def mode(self) -> Optional[DecPrivateMode]:
         """
         DEC Private Mode associated with this keystroke, if any.
 
@@ -575,7 +581,7 @@ class Keystroke(str):
             return DecPrivateMode(self._mode)
         return None
 
-    def mode_values(self):
+    def mode_values(self) -> typing.Union[BracketedPasteEvent, MouseSGREvent, MouseLegacyEvent, FocusEvent]:
         """
         Return structured data for DEC private mode events.
 
@@ -613,8 +619,10 @@ class Keystroke(str):
             # DEC_EVENT_PATTERNS, now you should make a namedtuple and
             # write a brief parser and add it to the above list !
             raise TypeError(f"Unknown DEC mode {self._mode}")
+        # This should never be reached, but mypy needs a return path
+        raise TypeError("Should only call mode_values() when event_mode is non-None")
 
-    def _parse_mouse_legacy(self):
+    def _parse_mouse_legacy(self) -> MouseLegacyEvent:
         """Parse legacy mouse event (X10/1000/1002/1003) from stored regex match."""
         cb = ord(self._match.group('cb')) - 32
         cx = ord(self._match.group('cx')) - 32
@@ -653,12 +661,12 @@ class Keystroke(str):
             is_wheel=is_wheel
         )
 
-    def _parse_focus(self):
+    def _parse_focus(self) -> FocusEvent:
         """Parse focus event from stored regex match."""
         io = self._match.group('io')
         return FocusEvent(gained=(io == 'I'))
 
-    def _parse_mouse_sgr(self):
+    def _parse_mouse_sgr(self) -> MouseSGREvent:
         """
         Parse SGR mouse event from stored regex match.
 
@@ -699,11 +707,11 @@ class Keystroke(str):
             is_wheel=is_wheel
         )
 
-    def _parse_bracketed_paste(self):
+    def _parse_bracketed_paste(self) -> BracketedPasteEvent:
         """Parse bracketed paste event from stored regex match."""
         return BracketedPasteEvent(text=self._match.group('text'))
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str) -> typing.Any:
         """
         Dynamic compound modifier predicates via __getattr__.
 
@@ -873,7 +881,7 @@ class DeviceAttribute(object):
     supported extensions/capabilities.
     """
 
-    def __init__(self, raw, service_class, extensions):
+    def __init__(self, raw: str, service_class: int, extensions: typing.Optional[typing.List[int]]) -> None:
         """
         Initialize DeviceAttribute instance.
 
@@ -886,7 +894,7 @@ class DeviceAttribute(object):
         self.extensions = set(extensions) if extensions else set()
 
     @property
-    def supports_sixel(self):
+    def supports_sixel(self) -> bool:
         """
         Whether the terminal supports sixel graphics.
 
@@ -896,7 +904,7 @@ class DeviceAttribute(object):
         return 4 in self.extensions
 
     @classmethod
-    def from_match(cls, match):
+    def from_match(cls, match: Match[str]) -> 'DeviceAttribute':
         """
         Create DeviceAttribute from regex match object.
 
@@ -906,7 +914,7 @@ class DeviceAttribute(object):
         """
         service_class = int(match.group(1))
         extensions_str = match.group(2)
-        extensions = []
+        extensions: typing.List[int] = []
 
         if extensions_str:
             # Remove leading semicolon and split by semicolon
@@ -918,7 +926,7 @@ class DeviceAttribute(object):
         return cls(match.group(0), service_class, extensions)
 
     @classmethod
-    def from_string(cls, response_str):
+    def from_string(cls, response_str: str) -> Optional['DeviceAttribute']:
         """
         Create DeviceAttribute by parsing response string.
 
@@ -935,12 +943,12 @@ class DeviceAttribute(object):
             return cls.from_match(match)
         return None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """String representation of DeviceAttribute."""
         return ('DeviceAttribute(service_class={}, extensions={}, supports_sixel={})'
                 .format(self.service_class, sorted(self.extensions), self.supports_sixel))
 
-    def __eq__(self, other):
+    def __eq__(self, other: typing.Any) -> bool:
         """Check equality based on service class and extensions."""
         if isinstance(other, DeviceAttribute):
             return (self.service_class == other.service_class and
@@ -948,7 +956,7 @@ class DeviceAttribute(object):
         return False
 
 
-def get_curses_keycodes():
+def get_curses_keycodes() -> Dict[str, int]:
     """
     Return mapping of curses key-names paired by their keycode integer value.
 
@@ -963,7 +971,7 @@ def get_curses_keycodes():
 
 
 @functools.lru_cache(maxsize=1)
-def get_keyboard_codes():
+def get_keyboard_codes() -> Dict[int, str]:
     """
     Return mapping of keycode integer values paired by their curses key-name.
 
@@ -1000,7 +1008,7 @@ def get_keyboard_codes():
     return dict(zip(keycodes.values(), keycodes.keys()))
 
 
-def _alternative_left_right(term):
+def _alternative_left_right(term: typing.Any) -> Dict[str, int]:
     r"""
     Determine and return mapping of left and right arrow keys sequences.
 
@@ -1025,7 +1033,7 @@ def _alternative_left_right(term):
     return keymap
 
 
-def get_keyboard_sequences(term):
+def get_keyboard_sequences(term: typing.Any) -> 'OrderedDict[str, int]':
     r"""
     Return mapping of keyboard sequences paired by keycodes.
 
@@ -1063,7 +1071,7 @@ def get_keyboard_sequences(term):
             sequence_map.keys(), key=len, reverse=True)))
 
 
-def get_leading_prefixes(sequences):
+def get_leading_prefixes(sequences: typing.Iterable[str]) -> Set[str]:
     """
     Return a set of proper prefixes for given sequence of strings.
 
@@ -1082,7 +1090,9 @@ def get_leading_prefixes(sequences):
     return {seq[:i] for seq in sequences for i in range(1, len(seq))}
 
 
-def resolve_sequence(text, mapper, codes, prefixes, final=False, mode_1016_active=None):
+def resolve_sequence(text: str, mapper: 'OrderedDict[str, int]', codes: Dict[int, str],
+                     prefixes: Set[str], final: bool = False,
+                     mode_1016_active: Optional[bool] = None) -> Keystroke:
     r"""
     Return a single :class:`Keystroke` instance for given sequence ``text``.
 
@@ -1130,7 +1140,7 @@ def resolve_sequence(text, mapper, codes, prefixes, final=False, mode_1016_activ
     return ks
 
 
-def _time_left(stime, timeout):
+def _time_left(stime: float, timeout: Optional[float]) -> Optional[float]:
     """
     Return time remaining since ``stime`` before given ``timeout``.
 
@@ -1147,7 +1157,8 @@ def _time_left(stime, timeout):
     return max(0, timeout - (time.time() - stime)) if timeout else timeout
 
 
-def _read_until(term, pattern, timeout):
+def _read_until(term: typing.Any, pattern: str, timeout: Optional[float]) -> Tuple[Optional[Match[str]],
+                                                                                    str]:
     """
     Convenience read-until-pattern function, supporting :meth:`~.get_location`.
 
@@ -1588,7 +1599,7 @@ CURSES_KEYCODE_OVERRIDE_MIXIN = (
 DEFAULT_ESCDELAY = 0.35
 
 
-def _reinit_escdelay():
+def _reinit_escdelay() -> None:
     # pylint: disable=W0603
     # Using the global statement: this is necessary to
     # allow test coverage without complex module reload

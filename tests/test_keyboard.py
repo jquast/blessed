@@ -10,7 +10,7 @@ import functools
 import pytest
 
 # local
-from blessed._compat import unicode_chr
+
 from .accessories import TestTerminal, as_subprocess
 from .conftest import IS_WINDOWS
 
@@ -693,12 +693,12 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
                                     prefixes=term._keymap_prefixes,
                                     final=True)
 
-        assert resolve(unicode_chr(10)).name == "KEY_ENTER"
-        assert resolve(unicode_chr(13)).name == "KEY_ENTER"
-        assert resolve(unicode_chr(8)).name == "KEY_BACKSPACE"
-        assert resolve(unicode_chr(9)).name == "KEY_TAB"
-        assert resolve(unicode_chr(27)).name == "KEY_ESCAPE"
-        assert resolve(unicode_chr(127)).name == "KEY_BACKSPACE"
+        assert resolve(chr(10)).name == "KEY_ENTER"
+        assert resolve(chr(13)).name == "KEY_ENTER"
+        assert resolve(chr(8)).name == "KEY_BACKSPACE"
+        assert resolve(chr(9)).name == "KEY_TAB"
+        assert resolve(chr(27)).name == "KEY_ESCAPE"
+        assert resolve(chr(127)).name == "KEY_BACKSPACE"
         assert resolve(u"\x1b[A").name == "KEY_UP"
         assert resolve(u"\x1b[B").name == "KEY_DOWN"
         assert resolve(u"\x1b[C").name == "KEY_RIGHT"

@@ -14,9 +14,18 @@ import platform
 import warnings
 import contextlib
 import collections
+from typing import Optional, Tuple, List, Generator, Union, Match, IO
+
+# SupportsIndex was added in Python 3.8
+if sys.version_info >= (3, 8):
+    # std imports
+    from typing import SupportsIndex
+else:
+    SupportsIndex = int  # type: ignore
+
 
 # local
-from .color import COLOR_DISTANCE_ALGORITHMS
+from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
 from .keyboard import (DEFAULT_ESCDELAY,
                        _time_left,
                        _read_until,
@@ -78,10 +87,10 @@ else:
 
 _CUR_TERM = None  # See comments at end of file
 _RE_GET_FGCOLOR_RESPONSE = re.compile(
-    u'\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+    '\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
 _RE_GET_BGCOLOR_RESPONSE = re.compile(
-    u'\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
-_RE_GET_DEVICE_ATTR_RESPONSE = re.compile(u'\x1b\\[\\?([0-9]+)((?:;[0-9]+)*)c')
+    '\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+_RE_GET_DEVICE_ATTR_RESPONSE = re.compile('\x1b\\[\\?([0-9]+)((?:;[0-9]+)*)c')
 
 
 class Terminal(object):
@@ -282,7 +291,7 @@ class Terminal(object):
             except ValueError as err:
                 self.errors.append('Unable to determine __stdout__ file descriptor: %s' % err)
 
-    def __init__color_capabilities(self):
+    def __init__color_capabilities(self) -> None:
         self._color_distance_algorithm = 'cie2000'
         if not self.does_styling:
             self.number_of_colors = 0
@@ -291,11 +300,11 @@ class Terminal(object):
         else:
             self.number_of_colors = max(0, curses.tigetnum('colors') or -1)
 
-    def __clear_color_capabilities(self):
+    def __clear_color_capabilities(self) -> None:
         for cached_color_cap in set(dir(self)) & COLORS:
             delattr(self, cached_color_cap)
 
-    def __init__capabilities(self):
+    def __init__capabilities(self) -> None:
         # important that we lay these in their ordered direction, so that our
         # preferred, 'color' over 'set_a_attributes1', for example.
         self.caps = collections.OrderedDict()
@@ -340,7 +349,7 @@ class Terminal(object):
             '({0})'.format(cap.pattern) for cap in self.caps.values()
         ) + '|(.)')
 
-    def __init__keycodes(self):
+    def __init__keycodes(self) -> None:
         # Initialize keyboard data determined by capability.
         # Build database of int code <=> KEY_NAME.
         self._keycodes = get_keyboard_codes()
@@ -382,7 +391,11 @@ class Terminal(object):
             # which are not valid UTF-8 but are valid in latin-1 encoding
             self._keyboard_decoder_latin1 = codecs.getincrementaldecoder('latin-1')()
 
-    def __getattr__(self, attr):
+    def __getattr__(self,
+                    attr: str) -> Union[NullCallableString,
+                    ParameterizingString,
+                    FormattingString]:
+
         r"""
         Return a terminal capability as Unicode string.
 
@@ -417,7 +430,7 @@ class Terminal(object):
         return val
 
     @property
-    def kind(self):
+    def kind(self) -> str:
         """
         Read-only property: Terminal kind determined on class initialization.
 
@@ -426,7 +439,7 @@ class Terminal(object):
         return self._kind
 
     @property
-    def does_styling(self):
+    def does_styling(self) -> bool:
         """
         Read-only property: Whether this class instance may emit sequences.
 
@@ -435,7 +448,7 @@ class Terminal(object):
         return self._does_styling
 
     @property
-    def is_a_tty(self):
+    def is_a_tty(self) -> bool:
         """
         Read-only property: Whether :attr:`~.stream` is a terminal.
 
@@ -444,7 +457,7 @@ class Terminal(object):
         return self._is_a_tty
 
     @property
-    def height(self):
+    def height(self) -> int:
         """
         Read-only property: Height of the terminal (in number of lines).
 
@@ -453,7 +466,7 @@ class Terminal(object):
         return self._height_and_width().ws_row
 
     @property
-    def width(self):
+    def width(self) -> int:
         """
         Read-only property: Width of the terminal (in number of columns).
 
@@ -462,7 +475,7 @@ class Terminal(object):
         return self._height_and_width().ws_col
 
     @property
-    def pixel_height(self):
+    def pixel_height(self) -> int:
         """
         Read-only property: Height of the terminal (in pixels).
 
@@ -471,7 +484,7 @@ class Terminal(object):
         return self._height_and_width().ws_ypixel
 
     @property
-    def pixel_width(self):
+    def pixel_width(self) -> int:
         """
         Read-only property: Width of terminal (in pixels).
 
@@ -480,7 +493,7 @@ class Terminal(object):
         return self._height_and_width().ws_xpixel
 
     @staticmethod
-    def _winsize(fd):
+    def _winsize(fd):  # type: ignore[no-untyped-def]
         """
         Return named tuple describing size of the terminal by ``fd``.
 
@@ -508,7 +521,7 @@ class Terminal(object):
             return WINSZ(*struct.unpack(WINSZ._FMT, data))
         return WINSZ(ws_row=25, ws_col=80, ws_xpixel=0, ws_ypixel=0)
 
-    def _height_and_width(self):
+    def _height_and_width(self) -> WINSZ:
         """
         Return a tuple of (terminal height, terminal width).
 
@@ -642,7 +655,7 @@ class Terminal(object):
             self.stream.write(self.restore)
             self.stream.flush()
 
-    def get_location(self, timeout=None):
+    def get_location(self, timeout: Optional[float] = None) -> Tuple[int, int]:
         r"""
         Return tuple (row, column) of cursor position.
 
@@ -691,9 +704,9 @@ class Terminal(object):
         # >  u7   cursor position request (equiv. to VT100/ANSI/ECMA-48 DSR 6)
         # >  u6   cursor position report (equiv. to ANSI/ECMA-48 CPR)
 
-        response_str = getattr(self, self.caps['cursor_report'].attribute) or u'\x1b[%i%d;%dR'
+        response_str = getattr(self, self.caps['cursor_report'].attribute) or '\x1b[%i%d;%dR'
         match = self._query_response(
-            self.u7 or u'\x1b[6n', self.caps['cursor_report'].re_compiled, timeout
+            self.u7 or '\x1b[6n', self.caps['cursor_report'].re_compiled, timeout
         )
 
         if match:
@@ -707,7 +720,7 @@ class Terminal(object):
             # If the string contains the sequence %i, it is taken as an
             # instruction to decrement each value after reading it (this is
             # the inverse sense from the cup string).
-            if u'%i' in response_str:
+            if '%i' in response_str:
                 row -= 1
                 col -= 1
             return row, col
@@ -717,7 +730,7 @@ class Terminal(object):
         # rather than crowbarring such logic into an exception handler.
         return -1, -1
 
-    def get_fgcolor(self, timeout=None):
+    def get_fgcolor(self, timeout: Optional[float] = None) -> Tuple[int, int, int]:
         """
         Return tuple (r, g, b) of foreground color.
 
@@ -730,11 +743,11 @@ class Terminal(object):
         The foreground color is determined by emitting an `OSC 10 color query
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
         """
-        match = self._query_response(u'\x1b]10;?\x07', _RE_GET_FGCOLOR_RESPONSE, timeout)
+        match = self._query_response('\x1b]10;?\x07', _RE_GET_FGCOLOR_RESPONSE, timeout)
 
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
 
-    def get_bgcolor(self, timeout=None):
+    def get_bgcolor(self, timeout: Optional[float] = None) -> Tuple[int, int, int]:
         """
         Return tuple (r, g, b) of background color.
 
@@ -747,7 +760,7 @@ class Terminal(object):
         The background color is determined by emitting an `OSC 11 color query
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
         """
-        match = self._query_response(u'\x1b]11;?\x07', _RE_GET_BGCOLOR_RESPONSE, timeout)
+        match = self._query_response('\x1b]11;?\x07', _RE_GET_BGCOLOR_RESPONSE, timeout)
 
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
 
@@ -783,7 +796,7 @@ class Terminal(object):
         if not self.does_styling or not mode_numbers:
             return
 
-        sequence = u'\x1b[?{0}h'.format(';'.join(str(val) for val in mode_numbers))
+        sequence = '\x1b[?{0}h'.format(';'.join(str(val) for val in mode_numbers))
         self.stream.write(sequence)
         self.stream.flush()
 
@@ -823,7 +836,7 @@ class Terminal(object):
         if not self.does_styling or not modes:
             return
 
-        sequence = u'\x1b[?{0}l'.format(';'.join(str(val) for val in mode_numbers))
+        sequence = '\x1b[?{0}l'.format(';'.join(str(val) for val in mode_numbers))
         self.stream.write(sequence)
         self.stream.flush()
 
@@ -897,8 +910,8 @@ class Terminal(object):
             return DecModeResponse(mode, cached_value)
 
         # Build and send query sequence and expected response pattern
-        query = u'\x1b[?{0:d}$p'.format(int(mode))
-        response_pattern = re.compile(u'\x1b\\[\\?{0:d};([0-4])\\$y'.format(int(mode)))
+        query = '\x1b[?{0:d}$p'.format(int(mode))
+        response_pattern = re.compile('\x1b\\[\\?{0:d};([0-4])\\$y'.format(int(mode)))
 
         match = self._query_response(query, response_pattern, timeout)
 
@@ -992,10 +1005,10 @@ class Terminal(object):
             # - xterm-like: responds to both Kitty and DA1
             # - Konsole-like: responds to DA1 but not Kitty
             # - Dumb terminals: respond to neither
-            boundary_query = u'\x1b[?u\x1b[c'
+            boundary_query = '\x1b[?u\x1b[c'
 
             # Use a simple pattern that captures the full response
-            boundary_pattern = re.compile(u'(.+)', re.DOTALL)
+            boundary_pattern = re.compile('(.+)', re.DOTALL)
 
             match = self._query_response(boundary_query, boundary_pattern, timeout)
 
@@ -1031,8 +1044,8 @@ class Terminal(object):
             return None
 
         # Subsequent calls or forced calls use the standard single-query approach
-        query = u'\x1b[?u'
-        response_pattern = re.compile(u'\x1b\\[\\?([0-9]+)u')
+        query = '\x1b[?u'
+        response_pattern = re.compile('\x1b\\[\\?([0-9]+)u')
 
         match = self._query_response(query, response_pattern, timeout)
 
@@ -1082,7 +1095,7 @@ class Terminal(object):
             return self._device_attributes_cache
 
         # Build and send query sequence and expected response pattern
-        query = u'\x1b[c'
+        query = '\x1b[c'
 
         match = self._query_response(query, _RE_GET_DEVICE_ATTR_RESPONSE, timeout)
 
@@ -1205,7 +1218,7 @@ class Terminal(object):
             self._dec_mode_set_enabled(*disabled_modes)
 
     @contextlib.contextmanager
-    def fullscreen(self):
+    def fullscreen(self) -> Generator[None, None, None]:
         """
         Context manager that switches to secondary screen, restoring on exit.
 
@@ -1230,7 +1243,7 @@ class Terminal(object):
             self.stream.flush()
 
     @contextlib.contextmanager
-    def hidden_cursor(self):
+    def hidden_cursor(self) -> Generator[None, None, None]:
         """
         Context manager that hides the cursor, setting visibility on exit.
 
@@ -1248,7 +1261,7 @@ class Terminal(object):
             self.stream.write(self.normal_cursor)
             self.stream.flush()
 
-    def move_xy(self, x, y):
+    def move_xy(self, x: int, y: int) -> str:
         """
         A callable string that moves the cursor to the given ``(x, y)`` screen coordinates.
 
@@ -1263,7 +1276,7 @@ class Terminal(object):
         # alias.
         return self.move(y, x)
 
-    def move_yx(self, y, x):
+    def move_yx(self, y: int, x: int) -> str:
         """
         A callable string that moves the cursor to the given ``(y, x)`` screen coordinates.
 
@@ -1275,27 +1288,27 @@ class Terminal(object):
         return self.move(y, x)
 
     @property
-    def move_left(self):
+    def move_left(self) -> FormattingOtherString:
         """Move cursor 1 cells to the left, or callable string for n>1 cells."""
         return FormattingOtherString(self.cub1, ParameterizingString(self.cub))
 
     @property
-    def move_right(self):
+    def move_right(self) -> FormattingOtherString:
         """Move cursor 1 or more cells to the right, or callable string for n>1 cells."""
         return FormattingOtherString(self.cuf1, ParameterizingString(self.cuf))
 
     @property
-    def move_up(self):
+    def move_up(self) -> FormattingOtherString:
         """Move cursor 1 or more cells upwards, or callable string for n>1 cells."""
         return FormattingOtherString(self.cuu1, ParameterizingString(self.cuu))
 
     @property
-    def move_down(self):
+    def move_down(self) -> FormattingOtherString:
         """Move cursor 1 or more cells downwards, or callable string for n>1 cells."""
         return FormattingOtherString(self.cud1, ParameterizingString(self.cud))
 
     @property
-    def color(self):
+    def color(self) -> Union[NullCallableString, ParameterizingString]:
         """
         A callable string that sets the foreground color.
 
@@ -1313,7 +1326,7 @@ class Terminal(object):
 
         return NullCallableString()
 
-    def color_rgb(self, red, green, blue):
+    def color_rgb(self, red: int, green: int, blue: int) -> FormattingString:
         """
         Provides callable formatting string to set foreground color to the specified RGB color.
 
@@ -1328,7 +1341,7 @@ class Terminal(object):
         """
         if self.number_of_colors == 1 << 24:
             # "truecolor" 24-bit
-            fmt_attr = u'\x1b[38;2;{0};{1};{2}m'.format(red, green, blue)
+            fmt_attr = '\x1b[38;2;{0};{1};{2}m'.format(red, green, blue)
             return FormattingString(fmt_attr, self.normal)
 
         # color by approximation to 256 or 16-color terminals
@@ -1336,7 +1349,7 @@ class Terminal(object):
         return FormattingString(self._foreground_color(color_idx), self.normal)
 
     @property
-    def on_color(self):
+    def on_color(self) -> Union[NullCallableString, ParameterizingString]:
         """
         A callable capability that sets the background color.
 
@@ -1347,7 +1360,7 @@ class Terminal(object):
 
         return NullCallableString()
 
-    def on_color_rgb(self, red, green, blue):
+    def on_color_rgb(self, red: int, green: int, blue: int):
         """
         Provides callable formatting string to set background color to the specified RGB color.
 
@@ -1361,13 +1374,13 @@ class Terminal(object):
         color will be determined using :py:attr:`color_distance_algorithm`.
         """
         if self.number_of_colors == 1 << 24:
-            fmt_attr = u'\x1b[48;2;{0};{1};{2}m'.format(red, green, blue)
+            fmt_attr = '\x1b[48;2;{0};{1};{2}m'.format(red, green, blue)
             return FormattingString(fmt_attr, self.normal)
 
         color_idx = self.rgb_downconvert(red, green, blue)
         return FormattingString(self._background_color(color_idx), self.normal)
 
-    def formatter(self, value):
+    def formatter(self, value) -> Union[NullCallableString, FormattingString]:
         """
         Provides callable formatting string to set color and other text formatting options.
 
@@ -1388,7 +1401,7 @@ class Terminal(object):
 
         return NullCallableString()
 
-    def rgb_downconvert(self, red, green, blue):
+    def rgb_downconvert(self, red: int, green: int, blue: int) -> int:
         """
         Translate an RGB color to a color code of the terminal's color depth.
 
@@ -1398,26 +1411,40 @@ class Terminal(object):
         :rtype: int
         :returns: Color code of downconverted RGB color
         """
-        # Though pre-computing all 1 << 24 options is memory-intensive, a pre-computed
-        # "k-d tree" of 256 (x,y,z) vectors of a colorspace in 3 dimensions, such as a
-        # cone of HSV, or simply 255x255x255 RGB square, any given rgb value is just a
-        # nearest-neighbor search of 256 points, which k-d should be much faster by
-        # sub-dividing / culling search points, rather than our "search all 256 points
-        # always" approach.
+        # pylint: disable=too-many-locals
+
+        if self.number_of_colors == 0:
+            # bit of a waste to downconvert to no color at all, the final
+            # formatting string will be empty, we play along with color #7
+            return 7
+
+        target_rgb = (red, green, blue)
         fn_distance = COLOR_DISTANCE_ALGORITHMS[self.color_distance_algorithm]
-        color_idx = 7
-        shortest_distance = None
-        for cmp_depth, cmp_rgb in enumerate(RGB_256TABLE):
-            cmp_distance = fn_distance(cmp_rgb, (red, green, blue))
-            if shortest_distance is None or cmp_distance < shortest_distance:
-                shortest_distance = cmp_distance
-                color_idx = cmp_depth
-            if cmp_depth >= self.number_of_colors:
-                break
-        return color_idx
+
+        if self.number_of_colors < 256:  # 8 or 16 colors
+            # because there just are not very many colors, we can use a color distance
+            # algorithm to measure all of 8 or 16 colors, selecting the nearest match.
+            best_idx = 7
+            best_distance = float('inf')
+            for idx in range(min(self.number_of_colors, 16)):
+                distance = fn_distance(RGB_256TABLE[idx], target_rgb)
+                if distance < best_distance:
+                    best_distance = distance
+                    best_idx = idx
+            return best_idx
+        # For 256-color terminals, use *only* cube (16-231) and grayscale
+        # (232-255) color matches, avoid ANSI colors 0-15 altogether, to prevent
+        # interference from user themes, and its fastest for our purpose,
+        # anyway! We chose the nearest distance of either color.
+        cube_idx, cube_rgb = xterm256color_from_rgb(red, green, blue)
+        gray_idx, gray_rgb = xterm256gray_from_rgb(red, green, blue)
+        cube_distance = fn_distance(cube_rgb, target_rgb)
+        gray_distance = fn_distance(gray_rgb, target_rgb)
+        return cube_idx if cube_distance <= gray_distance else gray_idx
+        
 
     @property
-    def normal(self):
+    def normal(self) -> str:
         """
         A capability that resets all video attributes.
 
@@ -1432,7 +1459,7 @@ class Terminal(object):
         self._normal = resolve_capability(self, 'normal')
         return self._normal
 
-    def link(self, url, text, url_id=''):
+    def link(self, url: str, text: str, url_id='') -> str:
         """
         Display ``text`` that when touched or clicked, navigates to ``url``.
 
@@ -1459,7 +1486,7 @@ class Terminal(object):
                 '\x1b]8;;\x1b\\'.format(params, url, text))
 
     @property
-    def stream(self):
+    def stream(self) -> IO[str]:
         """
         Read-only property: stream the terminal outputs to.
 
@@ -1470,7 +1497,7 @@ class Terminal(object):
         return self._stream
 
     @property
-    def number_of_colors(self):
+    def number_of_colors(self) -> int:
         """
         Number of colors supported by terminal.
 
@@ -1496,7 +1523,7 @@ class Terminal(object):
         self.__clear_color_capabilities()
 
     @property
-    def color_distance_algorithm(self):
+    def color_distance_algorithm(self) -> str:
         """
         Color distance algorithm used by :meth:`rgb_downconvert`.
 
@@ -1506,13 +1533,13 @@ class Terminal(object):
         return self._color_distance_algorithm
 
     @color_distance_algorithm.setter
-    def color_distance_algorithm(self, value):
+    def color_distance_algorithm(self, value: str) -> None:
         assert value in COLOR_DISTANCE_ALGORITHMS
         self._color_distance_algorithm = value
         self.__clear_color_capabilities()
 
     @property
-    def _foreground_color(self):
+    def _foreground_color(self):  # type: ignore[no-untyped-def]
         """
         Convenience capability to support :attr:`~.on_color`.
 
@@ -1523,7 +1550,7 @@ class Terminal(object):
         return self.setaf or self.setf
 
     @property
-    def _background_color(self):
+    def _background_color(self):  # type: ignore[no-untyped-def]
         """
         Convenience capability to support :attr:`~.on_color`.
 
@@ -1533,7 +1560,7 @@ class Terminal(object):
         """
         return self.setab or self.setb
 
-    def ljust(self, text, width=None, fillchar=u' '):
+    def ljust(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
         Left-align ``text``, which may contain terminal sequences.
 
@@ -1550,7 +1577,7 @@ class Terminal(object):
             width = self.width
         return Sequence(text, self).ljust(width, fillchar)
 
-    def rjust(self, text, width=None, fillchar=u' '):
+    def rjust(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
         Right-align ``text``, which may contain terminal sequences.
 
@@ -1565,7 +1592,7 @@ class Terminal(object):
             width = self.width
         return Sequence(text, self).rjust(width, fillchar)
 
-    def center(self, text, width=None, fillchar=u' '):
+    def center(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
         Center ``text``, which may contain terminal sequences.
 
@@ -1580,7 +1607,7 @@ class Terminal(object):
             width = self.width
         return Sequence(text, self).center(width, fillchar)
 
-    def truncate(self, text, width=None):
+    def truncate(self, text: str, width: Optional[SupportsIndex] = None) -> str:
         r"""
         Truncate ``text`` to maximum ``width`` printable characters, retaining terminal sequences.
 
@@ -1589,15 +1616,15 @@ class Terminal(object):
         :rtype: str
         :returns: ``text`` truncated to at most ``width`` printable characters
 
-        >>> term.truncate(u'xyz\x1b[0;3m', 2)
-        u'xy\x1b[0;3m'
+        >>> term.truncate('xyz\x1b[0;3m', 2)
+        'xy\x1b[0;3m'
         """
         if width is None:
             width = self.width
         return Sequence(text, self).truncate(width)
 
-    def length(self, text):
-        u"""
+    def length(self, text: str) -> int:
+        """
         Return printable length of a string containing sequences.
 
         :arg str text: String to measure. May contain terminal sequences.
@@ -1608,7 +1635,7 @@ class Terminal(object):
         Wide characters that consume 2 character cells are supported:
 
         >>> term = Terminal()
-        >>> term.length(term.clear + term.red(u'コンニチハ'))
+        >>> term.length(term.clear + term.red('コンニチハ'))
         10
 
         .. note:: Sequences such as 'clear', which is considered as a
@@ -1618,53 +1645,53 @@ class Terminal(object):
         """
         return Sequence(text, self).length()
 
-    def strip(self, text, chars=None):
+    def strip(self, text: str, chars: Optional[str] = None) -> str:
         r"""
         Return ``text`` without sequences and leading or trailing whitespace.
 
         :rtype: str
         :returns: Text with leading and trailing whitespace removed
 
-        >>> term.strip(u' \x1b[0;3m xyz ')
-        u'xyz'
+        >>> term.strip(' \x1b[0;3m xyz ')
+        'xyz'
         """
         return Sequence(text, self).strip(chars)
 
-    def rstrip(self, text, chars=None):
+    def rstrip(self, text: str, chars: Optional[str] = None) -> str:
         r"""
         Return ``text`` without terminal sequences or trailing whitespace.
 
         :rtype: str
         :returns: Text with terminal sequences and trailing whitespace removed
 
-        >>> term.rstrip(u' \x1b[0;3m xyz ')
-        u'  xyz'
+        >>> term.rstrip(' \x1b[0;3m xyz ')
+        '  xyz'
         """
         return Sequence(text, self).rstrip(chars)
 
-    def lstrip(self, text, chars=None):
+    def lstrip(self, text: str, chars: Optional[str] = None) -> str:
         r"""
         Return ``text`` without terminal sequences or leading whitespace.
 
         :rtype: str
         :returns: Text with terminal sequences and leading whitespace removed
 
-        >>> term.lstrip(u' \x1b[0;3m xyz ')
-        u'xyz '
+        >>> term.lstrip(' \x1b[0;3m xyz ')
+        'xyz '
         """
         return Sequence(text, self).lstrip(chars)
 
-    def strip_seqs(self, text):
+    def strip_seqs(self, text: str):
         r"""
         Return ``text`` stripped of only its terminal sequences.
 
         :rtype: str
         :returns: Text with terminal sequences removed
 
-        >>> term.strip_seqs(u'\x1b[0;3mxyz')
-        u'xyz'
-        >>> term.strip_seqs(term.cuf(5) + term.red(u'test'))
-        u'     test'
+        >>> term.strip_seqs('\x1b[0;3mxyz')
+        'xyz'
+        >>> term.strip_seqs(term.cuf(5) + term.red('test'))
+        '     test'
 
         .. note:: Non-destructive sequences that adjust horizontal distance
             (such as ``\b`` or ``term.cuf(5)``) are replaced by destructive
@@ -1672,7 +1699,7 @@ class Terminal(object):
         """
         return Sequence(text, self).strip_seqs()
 
-    def split_seqs(self, text, maxsplit=0):
+    def split_seqs(self, text: str, maxsplit: int=0) -> List[str]:
         r"""
         Return ``text`` split by individual character elements and sequences.
 
@@ -1683,10 +1710,10 @@ class Terminal(object):
         :rtype: list[str]
         :returns: List of sequences and individual characters
 
-        >>> term.split_seqs(term.underline(u'xyz'))
+        >>> term.split_seqs(term.underline('xyz'))
         ['\x1b[4m', 'x', 'y', 'z', '\x1b(B', '\x1b[m']
 
-        >>> term.split_seqs(term.underline(u'xyz'), 1)
+        >>> term.split_seqs(term.underline('xyz'), 1)
         ['\x1b[4m', r'xyz\x1b(B\x1b[m']
         """
         pattern = self._caps_unnamed_any
@@ -1719,13 +1746,13 @@ class Terminal(object):
         """
         width = self.width if width is None else width
         wrapper = SequenceTextWrapper(width=width, term=self, **kwargs)
-        lines = []
+        lines: List[str] = []
         for line in text.splitlines():
-            lines.extend(iter(wrapper.wrap(line)) if line.strip() else (u'',))
+            lines.extend(iter(wrapper.wrap(line)) if line.strip() else ('',))
 
         return lines
 
-    def getch(self, decoder=None):
+    def getch(self, decoder=None) -> str:
         """
         Read, decode, and return the next byte from the keyboard stream.
 
@@ -1733,7 +1760,7 @@ class Terminal(object):
         :arg codecs.IncrementalDecoder optional decoder, used when parsing
             some types of escape sequences.
 
-        :returns: a single unicode character, or ``u''`` if a multi-byte
+        :returns: a single unicode character, or ``''`` if a multi-byte
             sequence has not yet been fully received.
 
         This method name and behavior mimics curses ``getch(void)``, and
@@ -1748,7 +1775,7 @@ class Terminal(object):
         byte = os.read(self._keyboard_fd, 1)
         return (decoder or self._keyboard_decoder).decode(byte, final=False)
 
-    def ungetch(self, text):
+    def ungetch(self, text: str) -> None:
         """
         Buffer input data to be discovered by next call to :meth:`~.inkey`.
 
@@ -1756,7 +1783,7 @@ class Terminal(object):
         """
         self._keyboard_buf.extendleft(text)
 
-    def kbhit(self, timeout=None):
+    def kbhit(self, timeout: Optional[float] = None) -> bool:
         """
         Return whether a keypress has been detected on the keyboard.
 
@@ -1778,33 +1805,8 @@ class Terminal(object):
         ready_r = [None, ]
         check_r = [self._keyboard_fd] if self._keyboard_fd is not None else []
 
-        while HAS_TTY:
-            try:
-                ready_r, _, _ = select.select(check_r, [], [], timeout)
-            except InterruptedError:
-                # Beginning with python3.5, IntrruptError is no longer thrown
-                # https://www.python.org/dev/peps/pep-0475/
-                #
-                # For previous versions of python, we take special care to
-                # retry select on InterruptedError exception, namely to handle
-                # a custom SIGWINCH handler. When installed, it would cause
-                # select() to be interrupted with errno 4 (EAGAIN).
-                #
-                # Just as in python3.5, it is ignored, and a new timeout value
-                # is derived from the previous unless timeout becomes negative.
-                # because the signal handler has blocked beyond timeout, then
-                # False is returned. Otherwise, when timeout is None, we
-                # continue to block indefinitely (default).
-                if timeout is not None:
-                    # subtract time already elapsed,
-                    timeout -= time.time() - stime
-                    if timeout > 0:
-                        continue
-                    # no time remains after handling exception (rare)
-                    ready_r = []        # pragma: no cover
-                    break               # pragma: no cover
-            else:
-                break
+        if HAS_TTY:
+            ready_r, _, _ = select.select(check_r, [], [], timeout)
 
         return False if self._keyboard_fd is None else check_r == ready_r
 
@@ -2075,7 +2077,8 @@ class Terminal(object):
             ucs += _getch()
         return ucs
 
-    def inkey(self, timeout=None, esc_delay=DEFAULT_ESCDELAY):
+    def inkey(self, timeout: Optional[float] = None,
+              esc_delay: float = DEFAULT_ESCDELAY) -> Keystroke:
         r"""
         Read and return the next keyboard event within given timeout.
 
@@ -2095,7 +2098,7 @@ class Terminal(object):
            the value as an argument to this function will override any
            such preference.
         :rtype: :class:`~.Keystroke`.
-        :returns: :class:`~.Keystroke`, which may be empty (``u''``) if
+        :returns: :class:`~.Keystroke`, which may be empty (``''``) if
            ``timeout`` is specified and keystroke is not received.
 
         .. note:: When used without the context manager :meth:`cbreak`, or
@@ -2113,7 +2116,7 @@ class Terminal(object):
         """
         stime = time.time()
 
-        ucs = u''
+        ucs = ''
         mode_1016_active = self._dec_mode_cache.get(1016) == DecModeResponse.SET
 
         def _getch():
