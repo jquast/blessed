@@ -11,16 +11,13 @@ References,
 
 # std imports
 from math import cos, exp, sin, sqrt, atan2
+from typing import Dict, Tuple, Callable
+from functools import lru_cache
 
-# isort: off
-try:
-    from functools import lru_cache
-except ImportError:
-    # lru_cache was added in Python 3.2
-    from backports.functools_lru_cache import lru_cache
+_RGB = Tuple[int, int, int]
 
 
-def rgb_to_xyz(red, green, blue):
+def rgb_to_xyz(red: int, green: int, blue: int) -> Tuple[float, float, float]:
     """
     Convert standard RGB color to XYZ color.
 
@@ -33,8 +30,8 @@ def rgb_to_xyz(red, green, blue):
     :rtype: tuple
     """
     rgb = []
-    for val in red, green, blue:
-        val /= 255.0
+    for int_val in red, green, blue:
+        val = float(int_val) / 255.0
         if val > 0.04045:
             val = pow((val + 0.055) / 1.055, 2.4)
         else:
@@ -42,15 +39,15 @@ def rgb_to_xyz(red, green, blue):
         val *= 100
         rgb.append(val)
 
-    red, green, blue = rgb  # pylint: disable=unbalanced-tuple-unpacking
-    x_val = red * 0.4124 + green * 0.3576 + blue * 0.1805
-    y_val = red * 0.2126 + green * 0.7152 + blue * 0.0722
-    z_val = red * 0.0193 + green * 0.1192 + blue * 0.9505
+    r_float, g_float, b_float = rgb  # pylint: disable=unbalanced-tuple-unpacking
+    x_val = r_float * 0.4124 + g_float * 0.3576 + b_float * 0.1805
+    y_val = r_float * 0.2126 + g_float * 0.7152 + b_float * 0.0722
+    z_val = r_float * 0.0193 + g_float * 0.1192 + b_float * 0.9505
 
     return x_val, y_val, z_val
 
 
-def xyz_to_lab(x_val, y_val, z_val):
+def xyz_to_lab(x_val: float, y_val: float, z_val: float) -> Tuple[float, float, float]:
     """
     Convert XYZ color to CIE-Lab color.
 
@@ -61,21 +58,21 @@ def xyz_to_lab(x_val, y_val, z_val):
     :rtype: tuple  D65/2° standard illuminant
     """
     xyz = []
-    for val, ref in (x_val, 95.047), (y_val, 100.0), (z_val, 108.883):
-        val /= ref
+    for float_val, ref in (x_val, 95.047), (y_val, 100.0), (z_val, 108.883):
+        val = float_val / ref
         val = pow(val, 1 / 3.0) if val > 0.008856 else 7.787 * val + 16 / 116.0
         xyz.append(val)
 
-    x_val, y_val, z_val = xyz  # pylint: disable=unbalanced-tuple-unpacking
-    cie_l = 116 * y_val - 16
-    cie_a = 500 * (x_val - y_val)
-    cie_b = 200 * (y_val - z_val)
+    x_float, y_float, z_float = xyz  # pylint: disable=unbalanced-tuple-unpacking
+    cie_l = 116 * y_float - 16
+    cie_a = 500 * (x_float - y_float)
+    cie_b = 200 * (y_float - z_float)
 
     return cie_l, cie_a, cie_b
 
 
 @lru_cache(maxsize=256)
-def rgb_to_lab(red, green, blue):
+def rgb_to_lab(red: int, green: int, blue: int) -> Tuple[float, float, float]:
     """
     Convert RGB color to CIE-Lab color.
 
@@ -88,7 +85,7 @@ def rgb_to_lab(red, green, blue):
     return xyz_to_lab(*rgb_to_xyz(red, green, blue))
 
 
-def dist_rgb(rgb1, rgb2):
+def dist_rgb(rgb1: _RGB, rgb2: _RGB) -> float:
     """
     Determine distance between two rgb colors.
 
@@ -109,7 +106,7 @@ def dist_rgb(rgb1, rgb2):
     return sum(pow(rgb1[idx] - rgb2[idx], 2) for idx in (0, 1, 2))
 
 
-def dist_rgb_weighted(rgb1, rgb2):
+def dist_rgb_weighted(rgb1: _RGB, rgb2: _RGB) -> float:
     """
     Determine the weighted distance between two rgb colors.
 
@@ -127,7 +124,7 @@ def dist_rgb_weighted(rgb1, rgb2):
             (2 + (255 - red_mean) / 256) * pow(rgb1[2] - rgb2[2], 2))
 
 
-def dist_cie76(rgb1, rgb2):
+def dist_cie76(rgb1: _RGB, rgb2: _RGB) -> float:
     """
     Determine distance between two rgb colors using the CIE76 algorithm.
 
@@ -142,7 +139,7 @@ def dist_cie76(rgb1, rgb2):
     return pow(l_1 - l_2, 2) + pow(a_1 - a_2, 2) + pow(b_1 - b_2, 2)
 
 
-def dist_cie94(rgb1, rgb2):
+def dist_cie94(rgb1: _RGB, rgb2: _RGB) -> float:
     # pylint: disable=too-many-locals
     """
     Determine distance between two rgb colors using the CIE94 algorithm.
@@ -175,7 +172,7 @@ def dist_cie94(rgb1, rgb2):
             (delta_h / (k_h * s_h)) ** 2)
 
 
-def dist_cie2000(rgb1, rgb2):
+def dist_cie2000(rgb1: _RGB, rgb2: _RGB) -> float:
     # pylint: disable=too-many-locals
     """
     Determine distance between two rgb colors using the CIE2000 algorithm.
@@ -186,7 +183,7 @@ def dist_cie2000(rgb1, rgb2):
     :rtype: float For efficiency, the square of the distance is returned which is sufficient for
         comparisons
     """
-    s_l = k_l = k_c = k_h = 1
+    s_l = k_l = k_c = k_h = 1.0
 
     l_1, a_1, b_1 = rgb_to_lab(*rgb1)
     l_2, a_2, b_2 = rgb_to_lab(*rgb2)
@@ -204,7 +201,7 @@ def dist_cie2000(rgb1, rgb2):
     h_2 = atan2(b_2, a_2 + (a_2 / 2) * (1 - g_x)) % 360
 
     if 0 in (c_1, c_2):
-        delta_h_prime = 0
+        delta_h_prime = 0.0
         h_mean = h_1 + h_2
     else:
         delta_h_prime = h_2 - h_1
@@ -212,9 +209,9 @@ def dist_cie2000(rgb1, rgb2):
             h_mean = (h_1 + h_2) / 2
         else:
             if h_2 <= h_1:
-                delta_h_prime += 360
+                delta_h_prime += 360.0
             else:
-                delta_h_prime -= 360
+                delta_h_prime -= 360.0
             h_mean = (h_1 + h_2 + 360) / 2 if h_1 + h_2 < 360 else (h_1 + h_2 - 360) / 2
 
     delta_h = 2 * sqrt(c_1 * c_2) * sin(delta_h_prime / 2)
@@ -236,13 +233,14 @@ def dist_cie2000(rgb1, rgb2):
 
     return delta_l ** 2 + delta_c ** 2 + delta_h ** 2 + r_t * delta_c * delta_h
 
-
-COLOR_DISTANCE_ALGORITHMS = {'rgb': dist_rgb,
-                             'rgb-weighted': dist_rgb_weighted,
-                             'cie76': dist_cie76,
-                             'cie94': dist_cie94,
-                             'cie2000': dist_cie2000}
-
+COLOR_DISTANCE_ALGORITHMS: Dict[str,
+                                Callable[[_RGB,
+                                          _RGB],
+                                         float]] = {'rgb': dist_rgb,
+                                                    'rgb-weighted': dist_rgb_weighted,
+                                                    'cie76': dist_cie76,
+                                                    'cie94': dist_cie94,
+                                                    'cie2000': dist_cie2000}
 
 # Precomputed lookup tables for fast 256-color xterm cube mapping
 # Based on xterm's 256colres.pl: levels [0, 95, 135, 175, 215, 255] for 6x6x6 cube

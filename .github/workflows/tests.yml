@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version:  ['3.5', '3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version:  ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
         test_quick: [1]
 
         include:
@@ -33,6 +33,7 @@ jobs:
           - python-version: '3.14'
             container: 'python:3.14-rc'
             optional: true
+            test_quick: 0
 
           - python-version: '3.13'
             test_keyboard: 1
@@ -43,10 +44,6 @@ jobs:
             os: windows-latest
             test_quick: 0
 
-          - python-version: '2.7'
-            test_keyboard: 1
-            test_raw: 1
-            test_quick: 0
 
     env:
       TOXENV: ${{ matrix.toxenv || format('py{0}', matrix.python-version) }}
@@ -56,10 +53,6 @@ jobs:
       TOXPYTHON: python${{ matrix.toxpython || matrix.python-version }}
 
     steps:
-      # This is only needed for Python 3.6 and earlier because Tox 4 requires 3.7+
-      - name: Fix TOXENV
-        run: echo "TOXENV=$(echo $TOXENV | sed 's/\.//g')" >> $GITHUB_ENV
-        if: ${{ contains(fromJson('["2.7", "3.5", "3.6"]'), matrix.python-version) }}
 
       - name: Install OS Dependencies
         run: apt update && apt -y install ${{ join(matrix.os-deps, ' ') }}
@@ -77,57 +70,7 @@ jobs:
         run: tox
 
       - name: Upload to Codecov
-        if: ${{ matrix.label != 'linting' && !contains(fromJson('["2.7", "3.5"]'), matrix.python-version) }}
-        uses: codecov/codecov-action@v5
-        with:
-          verbose: true
-          name: ${{ matrix.label || matrix.python-version }} ${{ startsWith(matrix.os, 'windows') && '(Windows)' || '' }}
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
-          os: ${{ startsWith(matrix.os, 'windows') && 'windows' || 'linux' }}
-          env_vars: TOXENV,TEST_QUICK,TEST_KEYBOARD,TEST_RAW
-
-         # Work around for https://github.com/codecov/codecov-action/issues/1277
-      - name: Upload to Codecov Workaround
-        if: ${{ matrix.label != 'linting' && contains(fromJson('["2.7", "3.5"]'), matrix.python-version) }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage.${{ matrix.python-version }}.xml
-          path: coverage.xml
-          retention-days: 1
-
-# Another Job to upload Codecov reports for older versions
-  Codecov-Upload-Workaround:
-    needs: Tests
-    runs-on: 'ubuntu-latest'
-    name: Codecov Upload (${{ matrix.python-version }})
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version:  ['3.5']
-        test_quick: [1]
-        include:
-          - python-version: '2.7'
-            test_keyboard: 1
-            test_raw: 1
-            test_quick: 0
-    env:
-      TOXENV: ${{ matrix.toxenv || format('py{0}', matrix.python-version) }}
-      TEST_QUICK: ${{ matrix.test_quick || 0 }}
-      TEST_KEYBOARD: ${{ matrix.test_keyboard || 0 }}
-      TEST_RAW: ${{ matrix.test_raw || 0 }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Upload to Codecov Workaround
-        if: ${{ matrix.label != 'linting' && contains(fromJson('["2.7", "3.5"]'), matrix.python-version) }}
-        uses: actions/download-artifact@v4
-        with:
-          name: coverage.${{ matrix.python-version }}.xml
-          path: coverage.xml
-
-      - name: Upload to Codecov
+        if: ${{ matrix.label != 'linting' }}
         uses: codecov/codecov-action@v5
         with:
           verbose: true

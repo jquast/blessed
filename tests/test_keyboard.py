@@ -10,19 +10,22 @@ import functools
 import pytest
 
 # local
-from blessed._compat import unicode_chr
-from .accessories import TestTerminal, as_subprocess
 from .conftest import IS_WINDOWS
+from .accessories import TestTerminal, as_subprocess
 
 try:
+    # std imports
     from unittest import mock
 except ImportError:
+    # 3rd party
     import mock
 
 if platform.system() != 'Windows':
-    import curses
+    # std imports
     import tty  # pylint: disable=unused-import  # NOQA
+    import curses
 else:
+    # 3rd party
     import jinxed as curses
 
 
@@ -83,33 +86,35 @@ def test_notty_kb_is_None():
 
 def test_keystroke_default_args():
     """Test keyboard.Keystroke constructor with default arguments."""
+    # local
     from blessed.keyboard import Keystroke
     ks = Keystroke()
     assert ks._name is None
     assert ks.name == ks._name
     assert ks._code is None
     assert ks.code == ks._code
-    assert u'x' + ks == u'x'
+    assert 'x' + ks == 'x'
     assert not ks.is_sequence
-    assert repr(ks) in {"u''",  # py26, 27
-                        "''"}  # py33
+    assert repr(ks) == "''"
 
 
 def test_a_keystroke():
     """Test keyboard.Keystroke constructor with set arguments."""
+    # local
     from blessed.keyboard import Keystroke
-    ks = Keystroke(ucs=u'x', code=1, name=u'the X')
-    assert ks._name == u'the X'
+    ks = Keystroke(ucs='x', code=1, name='the X')
+    assert ks._name == 'the X'
     assert ks.name == ks._name
     assert ks._code == 1
     assert ks.code == ks._code
-    assert u'x' + ks == u'xx'
+    assert 'x' + ks == 'xx'
     assert ks.is_sequence
     assert repr(ks) == "the X"
 
 
 def test_get_keyboard_codes():
     """Test all values returned by get_keyboard_codes are from curses."""
+    # local
     import blessed.keyboard
     exemptions = dict(blessed.keyboard.CURSES_KEYCODE_OVERRIDE_MIXIN)
     for value, keycode in blessed.keyboard.get_keyboard_codes().items():
@@ -127,23 +132,25 @@ def test_get_keyboard_codes():
 
 def test_alternative_left_right():
     """Test _alternative_left_right behavior for space/backspace."""
+    # local
     from blessed.keyboard import _alternative_left_right
     term = mock.Mock()
-    term._cuf1 = u''
-    term._cub1 = u''
+    term._cuf1 = ''
+    term._cub1 = ''
     assert not bool(_alternative_left_right(term))
-    term._cuf1 = u' '
-    term._cub1 = u'\b'
+    term._cuf1 = ' '
+    term._cub1 = '\b'
     assert not bool(_alternative_left_right(term))
-    term._cuf1 = u'seq-right'
-    term._cub1 = u'seq-left'
+    term._cuf1 = 'seq-right'
+    term._cub1 = 'seq-left'
     assert (_alternative_left_right(term) == {
-        u'seq-right': curses.KEY_RIGHT,
-        u'seq-left': curses.KEY_LEFT})
+        'seq-right': curses.KEY_RIGHT,
+        'seq-left': curses.KEY_LEFT})
 
 
 def test_cuf1_and_cub1_as_RIGHT_LEFT(all_terms):
     """Test that cuf1 and cub1 are assigned KEY_RIGHT and KEY_LEFT."""
+    # local
     from blessed.keyboard import get_keyboard_sequences
 
     @as_subprocess
@@ -180,6 +187,7 @@ def test_get_keyboard_sequences_sort_order():
 
 def test_get_keyboard_sequence(monkeypatch):
     """Test keyboard.get_keyboard_sequence."""
+    # local
     import blessed.keyboard
 
     (KEY_SMALL, KEY_LARGE, KEY_MIXIN) = range(3)
@@ -221,72 +229,73 @@ def test_get_keyboard_sequence(monkeypatch):
 
 def test_resolve_sequence():
     """Test resolve_sequence for order-dependent mapping."""
-    from blessed.keyboard import resolve_sequence, OrderedDict
-    mapper = OrderedDict(((u'SEQ1', 1),
-                          (u'SEQ2', 2),
+    # local
+    from blessed.keyboard import OrderedDict, resolve_sequence
+    mapper = OrderedDict((('SEQ1', 1),
+                          ('SEQ2', 2),
                           # takes precedence over LONGSEQ, first-match
-                          (u'KEY_LONGSEQ_longest', 3),
-                          (u'LONGSEQ', 4),
+                          ('KEY_LONGSEQ_longest', 3),
+                          ('LONGSEQ', 4),
                           # won't match, LONGSEQ is first-match in this order
-                          (u'LONGSEQ_longer', 5),
+                          ('LONGSEQ_longer', 5),
                           # falls through for L{anything_else}
-                          (u'L', 6)))
-    codes = {1: u'KEY_SEQ1',
-             2: u'KEY_SEQ2',
-             3: u'KEY_LONGSEQ_longest',
-             4: u'KEY_LONGSEQ',
-             5: u'KEY_LONGSEQ_longer',
-             6: u'KEY_L'}
-    ks = resolve_sequence(u'', mapper, codes)
-    assert ks == u''
+                          ('L', 6)))
+    codes = {1: 'KEY_SEQ1',
+             2: 'KEY_SEQ2',
+             3: 'KEY_LONGSEQ_longest',
+             4: 'KEY_LONGSEQ',
+             5: 'KEY_LONGSEQ_longer',
+             6: 'KEY_L'}
+    ks = resolve_sequence('', mapper, codes)
+    assert ks == ''
     assert ks.name is None
     assert ks.code is None
     assert not ks.is_sequence
-    assert repr(ks) in {"u''",  # py26, 27
-                        "''"}  # py33
+    assert repr(ks) == "''"
 
-    ks = resolve_sequence(u'notfound', mapper=mapper, codes=codes)
-    assert ks == u'n'
+    ks = resolve_sequence('notfound', mapper=mapper, codes=codes)
+    assert ks == 'n'
     assert ks.name is None
     assert ks.code is None
     assert not ks.is_sequence
-    assert repr(ks) in {u"u'n'", "'n'"}
+    assert repr(ks) == "'n'"
 
-    ks = resolve_sequence(u'SEQ1', mapper, codes)
-    assert ks == u'SEQ1'
-    assert ks.name == u'KEY_SEQ1'
+    ks = resolve_sequence('SEQ1', mapper, codes)
+    assert ks == 'SEQ1'
+    assert ks.name == 'KEY_SEQ1'
     assert ks.code == 1
     assert ks.is_sequence
-    assert repr(ks) == u"KEY_SEQ1"
+    assert repr(ks) == "KEY_SEQ1"
 
-    ks = resolve_sequence(u'LONGSEQ_longer', mapper, codes)
-    assert ks == u'LONGSEQ'
-    assert ks.name == u'KEY_LONGSEQ'
+    ks = resolve_sequence('LONGSEQ_longer', mapper, codes)
+    assert ks == 'LONGSEQ'
+    assert ks.name == 'KEY_LONGSEQ'
     assert ks.code == 4
     assert ks.is_sequence
-    assert repr(ks) == u"KEY_LONGSEQ"
+    assert repr(ks) == "KEY_LONGSEQ"
 
-    ks = resolve_sequence(u'LONGSEQ', mapper, codes)
-    assert ks == u'LONGSEQ'
-    assert ks.name == u'KEY_LONGSEQ'
+    ks = resolve_sequence('LONGSEQ', mapper, codes)
+    assert ks == 'LONGSEQ'
+    assert ks.name == 'KEY_LONGSEQ'
     assert ks.code == 4
     assert ks.is_sequence
-    assert repr(ks) == u"KEY_LONGSEQ"
+    assert repr(ks) == "KEY_LONGSEQ"
 
-    ks = resolve_sequence(u'Lxxxxx', mapper, codes)
-    assert ks == u'L'
-    assert ks.name == u'KEY_L'
+    ks = resolve_sequence('Lxxxxx', mapper, codes)
+    assert ks == 'L'
+    assert ks.name == 'KEY_L'
     assert ks.code == 6
     assert ks.is_sequence
-    assert repr(ks) == u"KEY_L"
+    assert repr(ks) == "KEY_L"
 
 
 def test_keyboard_prefixes():
     """Test keyboard.prefixes."""
+    # local
     from blessed.keyboard import get_leading_prefixes
     keys = ['abc', 'abdf', 'e', 'jkl']
     pfs = get_leading_prefixes(keys)
-    assert pfs == {u'a', u'ab', u'abd', u'j', u'jk'}
+    assert pfs == {'a', 'ab', 'abd', 'j', 'jk'}
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no multiprocess")
@@ -302,63 +311,64 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
     @as_subprocess
     def child(kind):  # pylint: disable=too-many-statements
         term = TestTerminal(kind=kind, force_styling=True)
+        # local
         from blessed.keyboard import resolve_sequence
 
         resolve = functools.partial(resolve_sequence,
                                     mapper=term._keymap,
                                     codes=term._keycodes)
 
-        assert resolve(unicode_chr(10)).name == "KEY_ENTER"
-        assert resolve(unicode_chr(13)).name == "KEY_ENTER"
-        assert resolve(unicode_chr(8)).name == "KEY_BACKSPACE"
-        assert resolve(unicode_chr(9)).name == "KEY_TAB"
-        assert resolve(unicode_chr(27)).name == "KEY_ESCAPE"
-        assert resolve(unicode_chr(127)).name == "KEY_BACKSPACE"
-        assert resolve(u"\x1b[A").name == "KEY_UP"
-        assert resolve(u"\x1b[B").name == "KEY_DOWN"
-        assert resolve(u"\x1b[C").name == "KEY_RIGHT"
-        assert resolve(u"\x1b[D").name == "KEY_LEFT"
-        assert resolve(u"\x1b[U").name == "KEY_PGDOWN"
-        assert resolve(u"\x1b[V").name == "KEY_PGUP"
-        assert resolve(u"\x1b[H").name == "KEY_HOME"
-        assert resolve(u"\x1b[F").name == "KEY_END"
-        assert resolve(u"\x1b[K").name == "KEY_END"
-        assert resolve(u"\x1bOM").name == "KEY_ENTER"
-        assert resolve(u"\x1bOj").name == "KEY_KP_MULTIPLY"
-        assert resolve(u"\x1bOk").name == "KEY_KP_ADD"
-        assert resolve(u"\x1bOl").name == "KEY_KP_SEPARATOR"
-        assert resolve(u"\x1bOm").name == "KEY_KP_SUBTRACT"
-        assert resolve(u"\x1bOn").name == "KEY_KP_DECIMAL"
-        assert resolve(u"\x1bOo").name == "KEY_KP_DIVIDE"
-        assert resolve(u"\x1bOX").name == "KEY_KP_EQUAL"
-        assert resolve(u"\x1bOp").name == "KEY_KP_0"
-        assert resolve(u"\x1bOq").name == "KEY_KP_1"
-        assert resolve(u"\x1bOr").name == "KEY_KP_2"
-        assert resolve(u"\x1bOs").name == "KEY_KP_3"
-        assert resolve(u"\x1bOt").name == "KEY_KP_4"
-        assert resolve(u"\x1bOu").name == "KEY_KP_5"
-        assert resolve(u"\x1bOv").name == "KEY_KP_6"
-        assert resolve(u"\x1bOw").name == "KEY_KP_7"
-        assert resolve(u"\x1bOx").name == "KEY_KP_8"
-        assert resolve(u"\x1bOy").name == "KEY_KP_9"
-        assert resolve(u"\x1b[1~").name == "KEY_FIND"
-        assert resolve(u"\x1b[2~").name == "KEY_INSERT"
-        assert resolve(u"\x1b[3~").name == "KEY_DELETE"
-        assert resolve(u"\x1b[4~").name == "KEY_SELECT"
-        assert resolve(u"\x1b[5~").name == "KEY_PGUP"
-        assert resolve(u"\x1b[6~").name == "KEY_PGDOWN"
-        assert resolve(u"\x1b[7~").name == "KEY_HOME"
-        assert resolve(u"\x1b[8~").name == "KEY_END"
-        assert resolve(u"\x1b[OA").name == "KEY_UP"
-        assert resolve(u"\x1b[OB").name == "KEY_DOWN"
-        assert resolve(u"\x1b[OC").name == "KEY_RIGHT"
-        assert resolve(u"\x1b[OD").name == "KEY_LEFT"
-        assert resolve(u"\x1b[OF").name == "KEY_END"
-        assert resolve(u"\x1b[OH").name == "KEY_HOME"
-        assert resolve(u"\x1bOP").name == "KEY_F1"
-        assert resolve(u"\x1bOQ").name == "KEY_F2"
-        assert resolve(u"\x1bOR").name == "KEY_F3"
-        assert resolve(u"\x1bOS").name == "KEY_F4"
+        assert resolve(chr(10)).name == "KEY_ENTER"
+        assert resolve(chr(13)).name == "KEY_ENTER"
+        assert resolve(chr(8)).name == "KEY_BACKSPACE"
+        assert resolve(chr(9)).name == "KEY_TAB"
+        assert resolve(chr(27)).name == "KEY_ESCAPE"
+        assert resolve(chr(127)).name == "KEY_BACKSPACE"
+        assert resolve("\x1b[A").name == "KEY_UP"
+        assert resolve("\x1b[B").name == "KEY_DOWN"
+        assert resolve("\x1b[C").name == "KEY_RIGHT"
+        assert resolve("\x1b[D").name == "KEY_LEFT"
+        assert resolve("\x1b[U").name == "KEY_PGDOWN"
+        assert resolve("\x1b[V").name == "KEY_PGUP"
+        assert resolve("\x1b[H").name == "KEY_HOME"
+        assert resolve("\x1b[F").name == "KEY_END"
+        assert resolve("\x1b[K").name == "KEY_END"
+        assert resolve("\x1bOM").name == "KEY_ENTER"
+        assert resolve("\x1bOj").name == "KEY_KP_MULTIPLY"
+        assert resolve("\x1bOk").name == "KEY_KP_ADD"
+        assert resolve("\x1bOl").name == "KEY_KP_SEPARATOR"
+        assert resolve("\x1bOm").name == "KEY_KP_SUBTRACT"
+        assert resolve("\x1bOn").name == "KEY_KP_DECIMAL"
+        assert resolve("\x1bOo").name == "KEY_KP_DIVIDE"
+        assert resolve("\x1bOX").name == "KEY_KP_EQUAL"
+        assert resolve("\x1bOp").name == "KEY_KP_0"
+        assert resolve("\x1bOq").name == "KEY_KP_1"
+        assert resolve("\x1bOr").name == "KEY_KP_2"
+        assert resolve("\x1bOs").name == "KEY_KP_3"
+        assert resolve("\x1bOt").name == "KEY_KP_4"
+        assert resolve("\x1bOu").name == "KEY_KP_5"
+        assert resolve("\x1bOv").name == "KEY_KP_6"
+        assert resolve("\x1bOw").name == "KEY_KP_7"
+        assert resolve("\x1bOx").name == "KEY_KP_8"
+        assert resolve("\x1bOy").name == "KEY_KP_9"
+        assert resolve("\x1b[1~").name == "KEY_FIND"
+        assert resolve("\x1b[2~").name == "KEY_INSERT"
+        assert resolve("\x1b[3~").name == "KEY_DELETE"
+        assert resolve("\x1b[4~").name == "KEY_SELECT"
+        assert resolve("\x1b[5~").name == "KEY_PGUP"
+        assert resolve("\x1b[6~").name == "KEY_PGDOWN"
+        assert resolve("\x1b[7~").name == "KEY_HOME"
+        assert resolve("\x1b[8~").name == "KEY_END"
+        assert resolve("\x1b[OA").name == "KEY_UP"
+        assert resolve("\x1b[OB").name == "KEY_DOWN"
+        assert resolve("\x1b[OC").name == "KEY_RIGHT"
+        assert resolve("\x1b[OD").name == "KEY_LEFT"
+        assert resolve("\x1b[OF").name == "KEY_END"
+        assert resolve("\x1b[OH").name == "KEY_HOME"
+        assert resolve("\x1bOP").name == "KEY_F1"
+        assert resolve("\x1bOQ").name == "KEY_F2"
+        assert resolve("\x1bOR").name == "KEY_F3"
+        assert resolve("\x1bOS").name == "KEY_F4"
 
     child('xterm')
 
@@ -367,6 +377,7 @@ def test_ESCDELAY_unset_unchanged():
     """Unset ESCDELAY leaves DEFAULT_ESCDELAY unchanged in _reinit_escdelay()."""
     if 'ESCDELAY' in os.environ:
         del os.environ['ESCDELAY']
+    # local
     import blessed.keyboard
     prev_value = blessed.keyboard.DEFAULT_ESCDELAY
     blessed.keyboard._reinit_escdelay()
@@ -376,6 +387,7 @@ def test_ESCDELAY_unset_unchanged():
 def test_ESCDELAY_bad_value_unchanged():
     """Invalid ESCDELAY leaves DEFAULT_ESCDELAY unchanged in _reinit_escdelay()."""
     os.environ['ESCDELAY'] = 'XYZ123!'
+    # local
     import blessed.keyboard
     prev_value = blessed.keyboard.DEFAULT_ESCDELAY
     blessed.keyboard._reinit_escdelay()
@@ -386,6 +398,7 @@ def test_ESCDELAY_bad_value_unchanged():
 def test_ESCDELAY_10ms():
     """Verify ESCDELAY modifies DEFAULT_ESCDELAY in _reinit_escdelay()."""
     os.environ['ESCDELAY'] = '1234'
+    # local
     import blessed.keyboard
     blessed.keyboard._reinit_escdelay()
     assert blessed.keyboard.DEFAULT_ESCDELAY == 1.234
