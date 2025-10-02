@@ -1,11 +1,5 @@
 # -*- coding: utf-8 -*-
 """Tests specific to Kitty keyboard protocol features."""
-from blessed.keyboard import (
-    KEY_LEFT_SHIFT, KEY_LEFT_CONTROL, KEY_LEFT_ALT,
-    KEY_RIGHT_SHIFT, KEY_RIGHT_CONTROL, KEY_RIGHT_ALT,
-    KEY_LEFT_SUPER, KEY_LEFT_HYPER, KEY_LEFT_META,
-    _match_legacy_csi_modifiers
-)
 import io
 import os
 import sys
@@ -13,9 +7,13 @@ import time
 import math
 import pytest
 
-from blessed.keyboard import (_match_kitty_key, KittyKeyEvent, Keystroke, KittyKeyboardProtocol)
+from blessed.keyboard import (
+    KEY_LEFT_SHIFT, KEY_LEFT_CONTROL,
+    _match_legacy_csi_modifiers,
+    _match_kitty_key, KittyKeyEvent, Keystroke, KittyKeyboardProtocol
+)
 from blessed import Terminal
-from tests.accessories import (as_subprocess, SEMAPHORE, SEND_SEMAPHORE, TestTerminal,
+from tests.accessories import (as_subprocess, SEMAPHORE, TestTerminal,
                                echo_off, read_until_eof, read_until_semaphore,
                                init_subproc_coverage)
 from tests.conftest import IS_WINDOWS, TEST_KEYBOARD
@@ -139,7 +137,7 @@ def test_kitty_modifier_encoding():
         'ctrl+alt': 7,   # 1 + 2 + 4
     }
 
-    for name, mod_value in modifiers.items():
+    for mod_value in modifiers.values():
         ks = _match_kitty_key(f'\x1b[97;{mod_value}u')  # 'a' with modifier
         assert ks is not None
         assert ks._match.modifiers == mod_value
@@ -268,7 +266,7 @@ def test_kitty_functional_keys():
         '\x1b[57363u': 'MENU',          # 57363 u
     }
 
-    for sequence, expected_key in functional_keys.items():
+    for sequence in functional_keys:
         ks = _match_kitty_key(sequence)
         assert ks is not None
         assert ks._mode == DecPrivateMode.SpecialInternalKitty
@@ -286,7 +284,7 @@ def test_kitty_f_keys():
         '\x1b[57398u': 'F35',  # 57398 u
     }
 
-    for sequence, expected_key in f_keys.items():
+    for sequence in f_keys:
         ks = _match_kitty_key(sequence)
         assert ks is not None
         assert ks._mode == DecPrivateMode.SpecialInternalKitty
