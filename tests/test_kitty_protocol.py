@@ -1,23 +1,26 @@
 # -*- coding: utf-8 -*-
+# pylint: disable=too-many-lines
 """Tests specific to Kitty keyboard protocol features."""
 import io
 import os
 import sys
+import pty
 import time
 import math
 import pytest
 
-from blessed.keyboard import (
-    KEY_LEFT_SHIFT, KEY_LEFT_CONTROL,
-    _match_legacy_csi_modifiers,
-    _match_kitty_key, KittyKeyEvent, Keystroke, KittyKeyboardProtocol
-)
 from blessed import Terminal
+from blessed.keyboard import (
+    KEY_LEFT_SHIFT, KEY_LEFT_CONTROL, KEY_RIGHT_ALT,
+    _match_legacy_csi_modifiers,
+    _match_kitty_key, KittyKeyEvent, Keystroke, KittyKeyboardProtocol, resolve_sequence,
+)
+
+from blessed.dec_modes import DecPrivateMode
 from tests.accessories import (as_subprocess, SEMAPHORE, TestTerminal,
                                echo_off, read_until_eof, read_until_semaphore,
                                init_subproc_coverage)
 from tests.conftest import IS_WINDOWS, TEST_KEYBOARD
-from blessed.dec_modes import DecPrivateMode
 
 # Skip PTY tests on Windows and build farms
 pytestmark = pytest.mark.skipif(
@@ -447,7 +450,6 @@ def test_kitty_keyboard_protocol_equality():
 @pytest.mark.skipif(not TEST_KEYBOARD, reason="TEST_KEYBOARD not specified")
 def test_get_kitty_keyboard_state_pty_success():
     """PTY test: get_kitty_keyboard_state with successful terminal response."""
-    import pty
     pid, master_fd = pty.fork()
     if pid == 0:  # child
         cov = init_subproc_coverage('test_get_kitty_keyboard_state_pty_success')
@@ -489,7 +491,6 @@ def test_get_kitty_keyboard_state_pty_success():
 @pytest.mark.skipif(not TEST_KEYBOARD, reason="TEST_KEYBOARD not specified")
 def test_enable_kitty_keyboard_pty_success():
     """PTY test: enable_kitty_keyboard with set and restore sequences."""
-    import pty
     pid, master_fd = pty.fork()
     if pid == 0:  # child
         cov = init_subproc_coverage('test_enable_kitty_keyboard_pty_success')
@@ -1022,8 +1023,6 @@ def test_kitty_keyboard_protocol_setters_all_combinations():
 
 def test_kitty_digit_name_synthesis():
     """Test Kitty keyboard protocol digit name synthesis with modifiers."""
-    from blessed.keyboard import _match_kitty_key
-
     # Test digit name synthesis for Kitty sequences
     digit_test_cases = [
         ('\x1b[49;3u', 'ALT_1', 'Alt+1'),       # ASCII '1' = 49
@@ -1053,8 +1052,6 @@ def test_kitty_digit_name_synthesis():
 
 def test_kitty_letter_name_synthesis_basic_modifiers():
     """Test Kitty protocol letter name synthesis for basic modifier combinations."""
-    from blessed.keyboard import _match_kitty_key
-
     # Test basic modifier combinations for letter 'a' (unicode_key=97)
     test_cases = [
         ('\x1b[97;5u', 'CTRL_A', 'Ctrl+a'),
@@ -1075,8 +1072,6 @@ def test_kitty_letter_name_synthesis_basic_modifiers():
 
 def test_kitty_letter_name_synthesis_different_letters():
     """Test Kitty letter name synthesis works for different letters."""
-    from blessed.keyboard import _match_kitty_key
-
     # Test various letters with Ctrl modifier
     letters_test_cases = [
         ('\x1b[65;5u', 'CTRL_A', 'A'),  # uppercase A
@@ -1095,8 +1090,6 @@ def test_kitty_letter_name_synthesis_different_letters():
 
 def test_kitty_letter_name_synthesis_base_key_preference():
     """Test that base_key is preferred over unicode_key for letter naming."""
-    from blessed.keyboard import _match_kitty_key
-
     # Test Cyrillic 'С' (unicode_key=1089) with base_key='c' (99)
     # Should synthesize name based on base_key 'c' -> 'CTRL_C'
     ks = _match_kitty_key('\x1b[1089::99;5u')  # Ctrl+Cyrillic С with base_key c
@@ -1111,8 +1104,6 @@ def test_kitty_letter_name_synthesis_base_key_preference():
 
 def test_kitty_letter_name_synthesis_event_type_filtering():
     """Test that only keypress events (event_type=1) get synthesized names."""
-    from blessed.keyboard import _match_kitty_key
-
     # Test keypress event (event_type=1) - should get name
     ks = _match_kitty_key('\x1b[97;5:1u')  # Ctrl+a keypress
     assert ks is not None
@@ -1136,8 +1127,6 @@ def test_kitty_letter_name_synthesis_event_type_filtering():
 
 def test_kitty_letter_name_synthesis_non_letters_no_name():
     """Test that non-letter, non-digit keys do not get synthesized names."""
-    from blessed.keyboard import _match_kitty_key
-
     # Test symbols and space - should not get names even with modifiers
     # (digits now DO get names with modifiers, so they're excluded from this test)
     # Special case: '[' always gets 'CSI' name
@@ -1161,8 +1150,6 @@ def test_kitty_letter_name_synthesis_non_letters_no_name():
 
 def test_kitty_letter_name_synthesis_no_modifiers_no_name():
     """Test that plain letters without modifiers do not get synthesized names."""
-    from blessed.keyboard import _match_kitty_key
-
     # Test plain letters (modifiers=1, meaning no modifiers) - should not get names
     plain_letter_cases = [
         ('\x1b[97;1u', 'a'),   # plain 'a'
@@ -1180,8 +1167,6 @@ def test_kitty_letter_name_synthesis_no_modifiers_no_name():
 
 def test_kitty_letter_name_synthesis_supports_advanced_modifiers():
     """Test that advanced modifiers (super/hyper/meta) are supported in letter naming."""
-    from blessed.keyboard import _match_kitty_key
-
     # Test that super/hyper/meta DO appear in letter names (new behavior)
     advanced_modifier_cases = [
         ('\x1b[97;9u', 'SUPER_A', 'Super+a'),       # super (1+8=9) - should get name
@@ -1199,8 +1184,6 @@ def test_kitty_letter_name_synthesis_supports_advanced_modifiers():
 
 def test_kitty_letter_name_synthesis_preserves_explicit_names():
     """Test that explicitly set names are preserved over synthesized names."""
-    from blessed.keyboard import Keystroke, KittyKeyEvent
-
     # Create a Kitty keystroke with explicit name - should preserve it
     kitty_event = KittyKeyEvent(unicode_key=97, shifted_key=None, base_key=None,
                                 modifiers=5, event_type=1, int_codepoints=())
@@ -1214,7 +1197,6 @@ def test_kitty_letter_name_synthesis_integration():
     """Test Kitty letter name synthesis integration with existing Terminal.inkey()."""
     @as_subprocess
     def child():
-        from blessed import Terminal
         term = Terminal(force_styling=True)
 
         # Test that Terminal.inkey() correctly synthesizes Kitty letter names
@@ -1238,8 +1220,6 @@ def test_kitty_letter_name_synthesis_integration():
 
 def test_kitty_letter_name_synthesis_case_normalization():
     """Test that letter names are normalized to uppercase regardless of input case."""
-    from blessed.keyboard import _match_kitty_key
-
     # Test both uppercase and lowercase unicode keys produce uppercase names
     case_test_cases = [
         ('\x1b[97;5u', 'CTRL_A', 'lowercase a'),   # lowercase 'a' -> 'CTRL_A'
@@ -1256,8 +1236,6 @@ def test_kitty_letter_name_synthesis_case_normalization():
 
 def test_kitty_letter_name_synthesis_modifier_ordering():
     """Test that modifier ordering in names follows legacy pattern: CTRL_ALT_SHIFT."""
-    from blessed.keyboard import _match_kitty_key
-
     # Test various combinations to ensure consistent ordering
     ordering_test_cases = [
         ('\x1b[97;6u', 'CTRL_SHIFT_A', 'Ctrl+Shift'),     # ctrl+shift (1+4+1=6)
@@ -1275,8 +1253,6 @@ def test_disambiguate_f1_f4_csi_sequences():
     """Test that F1-F4 are recognized in disambiguate mode (CSI format)."""
     @as_subprocess
     def child():
-        from blessed import Terminal
-        from blessed.keyboard import resolve_sequence
         term = Terminal(force_styling=True)
 
         # Get keyboard sequences and codes for resolution
@@ -1305,8 +1281,6 @@ def test_disambiguate_f1_f4_via_inkey():
     """Test that F1-F4 disambiguate sequences work through Terminal.inkey()."""
     @as_subprocess
     def child():
-        import io
-        from blessed import Terminal
         term = Terminal(stream=io.StringIO(), force_styling=True)
 
         # Test F1-F4 in disambiguate CSI format
@@ -1331,8 +1305,6 @@ def test_disambiguate_f1_f4_not_confused_with_alt():
     """Test that disambiguate F1-F4 are not confused with ALT+[ sequences."""
     @as_subprocess
     def child():
-        import io
-        from blessed import Terminal
         term = Terminal(stream=io.StringIO(), force_styling=True)
 
         # F1 should be \x1b[P, not confused with ALT+[ followed by P
@@ -1353,8 +1325,6 @@ def test_disambiguate_f1_f4_not_confused_with_alt():
 
 def test_kitty_letter_name_synthesis_boundary_conditions():
     """Test boundary conditions for letter detection."""
-    from blessed.keyboard import _match_kitty_key
-
     # Test edge cases around ASCII letter ranges
     boundary_cases = [
         ('\x1b[64;5u', None, '@'),     # ASCII 64, just before 'A' (65) - no name

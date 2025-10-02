@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# pylint: disable=too-many-lines
 """Tests for keyboard support."""
 # std imports
 import os
@@ -1477,8 +1478,6 @@ def test_terminal_inkey_legacy_csi_modifiers():
 
 def test_terminal_inkey_fallback_to_legacy():
     """Test that legacy sequences still work when new protocols don't match."""
-    from blessed import Terminal
-
     @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
@@ -1489,10 +1488,9 @@ def test_terminal_inkey_fallback_to_legacy():
 
         ks = term.inkey(timeout=0)
 
-        # Should be parsed as legacy sequence with traditional keycode
         assert ks == legacy_sequence
-        assert ks._code is not None  # Should have a traditional keycode
-        assert ks._mode != -1 and ks._mode != -2 and ks._mode != -3  # Not new protocols
+        assert ks._code is not None
+        assert ks._mode >= 0
     child()
 
 
