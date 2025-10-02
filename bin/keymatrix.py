@@ -17,9 +17,6 @@ from collections import deque
 # local
 from blessed import Terminal, DecPrivateMode
 
-# 3rd party
-import wcwidth
-
 
 class DecModeManager:
     """Manages DEC Private Mode probing, tracking, and toggling."""

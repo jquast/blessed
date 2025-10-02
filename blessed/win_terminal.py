@@ -7,6 +7,7 @@ from __future__ import absolute_import
 import time
 import msvcrt  # pylint: disable=import-error
 import contextlib
+from typing import Optional, Generator
 
 # 3rd party
 from jinxed import win32  # pylint: disable=import-error
@@ -19,12 +20,12 @@ from .terminal import Terminal as _Terminal
 class Terminal(_Terminal):
     """Windows subclass of :class:`Terminal`."""
 
-    def getch(self):
+    def getch(self) -> str:
         r"""
         Read, decode, and return the next byte from the keyboard stream.
 
         :rtype: unicode
-        :returns: a single unicode character, or ``u''`` if a multi-byte
+        :returns: a single unicode character, or ``''`` if a multi-byte
             sequence has not yet been fully received.
 
         For versions of Windows 10.0.10586 and later, the console is expected
@@ -43,7 +44,7 @@ class Terminal(_Terminal):
             rtn += msvcrt.getwch()
         return rtn
 
-    def kbhit(self, timeout=None):
+    def kbhit(self, timeout: Optional[float] = None) -> bool:
         """
         Return whether a keypress has been detected on the keyboard.
 
@@ -73,7 +74,7 @@ class Terminal(_Terminal):
         return False
 
     @staticmethod
-    def _winsize(fd):
+    def _winsize(fd: int) -> WINSZ:
         """
         Return named tuple describing size of the terminal by ``fd``.
 
@@ -95,7 +96,7 @@ class Terminal(_Terminal):
                      ws_xpixel=0, ws_ypixel=0)
 
     @contextlib.contextmanager
-    def cbreak(self):
+    def cbreak(self) -> Generator[None, None, None]:
         """
         Allow each keystroke to be read immediately after it is pressed.
 
@@ -133,7 +134,7 @@ class Terminal(_Terminal):
             yield
 
     @contextlib.contextmanager
-    def raw(self):
+    def raw(self) -> Generator[None, None, None]:
         """
         A context manager for ``jinxed.w32.setcbreak()``.
 

@@ -9,7 +9,6 @@ import functools
 from collections import OrderedDict, namedtuple
 
 # local
-from blessed._compat import TextType, unicode_chr
 from blessed.dec_modes import DecPrivateMode
 
 # isort: off
@@ -88,7 +87,7 @@ CTRL_CHAR_SYMBOLS_MAP = {'@': 0, '[': 27, '\\': 28, ']': 29, '^': 30, '_': 31, '
 CTRL_CODE_SYMBOLS_MAP = {v: k for k, v in CTRL_CHAR_SYMBOLS_MAP.items()}
 
 
-class Keystroke(TextType):
+class Keystroke(str):
     """
     A unicode-derived class for describing a single keystroke.
 
@@ -114,7 +113,7 @@ class Keystroke(TextType):
 
     def __new__(cls, ucs='', code=None, name=None, mode=None, match=None):
         """Class constructor."""
-        new = TextType.__new__(cls, ucs)
+        new = str.__new__(cls, ucs)
         new._name = name
         new._code = code
         new._mode = mode  # DEC private mode integer
@@ -169,9 +168,9 @@ class Keystroke(TextType):
 
     def __repr__(self):
         """Docstring overwritten."""
-        return (TextType.__repr__(self) if self._name is None else
+        return (str.__repr__(self) if self._name is None else
                 self._name)
-    __repr__.__doc__ = TextType.__doc__
+    __repr__.__doc__ = str.__doc__
 
     @property
     def name(self):
@@ -378,7 +377,7 @@ class Keystroke(TextType):
         
         # Plain printable characters - return as-is, supports Unicode and multi-codepoint text
         if len(self) == 1 and not self[0] == '\x1b' and self[0].isprintable():
-            return TextType(self)
+            return str(self)
 
         # Alt sequences (ESC + printable) without Ctrl - return the printable part
         if (len(self) == 2 and self[0] == '\x1b' and
@@ -1482,12 +1481,12 @@ KEY_RIGHT_META = 57452          # 0xE06C
 DEFAULT_SEQUENCE_MIXIN = (
     # these common control characters (and 127, ctrl+'?') mapped to
     # an application key definition.
-    (unicode_chr(10), curses.KEY_ENTER),
-    (unicode_chr(13), curses.KEY_ENTER),
-    (unicode_chr(8), curses.KEY_BACKSPACE),
-    (unicode_chr(9), KEY_TAB),
-    (unicode_chr(27), curses.KEY_EXIT),
-    (unicode_chr(127), curses.KEY_BACKSPACE),
+    (chr(10), curses.KEY_ENTER),
+    (chr(13), curses.KEY_ENTER),
+    (chr(8), curses.KEY_BACKSPACE),
+    (chr(9), KEY_TAB),
+    (chr(27), curses.KEY_EXIT),
+    (chr(127), curses.KEY_BACKSPACE),
 
     (u"\x1b[A", curses.KEY_UP),
     (u"\x1b[B", curses.KEY_DOWN),

@@ -2,15 +2,31 @@
 """Module providing 'sequence awareness'."""
 # std imports
 import re
+import sys
 import math
 import textwrap
+from typing import TYPE_CHECKING
 
 # 3rd party
 from wcwidth import wcwidth
 
 # local
-from blessed._compat import TextType
 from blessed._capabilities import CAPABILITIES_CAUSE_MOVEMENT, CAPABILITIES_HORIZONTAL_DISTANCE
+
+if TYPE_CHECKING:
+    from blessed.terminal import Terminal
+
+# std imports
+from typing import Type, Tuple, Pattern, TypeVar, Iterator, Optional
+
+# SupportsIndex was added in Python 3.8
+if sys.version_info >= (3, 8):
+    # std imports
+    from typing import SupportsIndex
+else:
+    SupportsIndex = int
+
+_T = TypeVar("_T")
 
 __all__ = ('Sequence', 'SequenceTextWrapper', 'iter_parse', 'measure_length')
 
@@ -20,7 +36,7 @@ __all__ = ('Sequence', 'SequenceTextWrapper', 'iter_parse', 'measure_length')
 class Termcap(object):
     """Terminal capability of given variable name and pattern."""
 
-    def __init__(self, name, pattern, attribute, nparams=0):
+    def __init__(self, name: str, pattern: str, attribute: str, nparams: int = 0) -> None:
         """
         Class initializer.
 
@@ -34,31 +50,31 @@ class Termcap(object):
         self.pattern = pattern
         self.attribute = attribute
         self.nparams = nparams
-        self._re_compiled = None
+        self._re_compiled: Optional[Pattern[str]] = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         # pylint: disable=redundant-keyword-arg
         return '<Termcap {self.name}:{self.pattern!r}>'.format(self=self)
 
     @property
-    def named_pattern(self):
+    def named_pattern(self) -> str:
         """Regular expression pattern for capability with named group."""
         # pylint: disable=redundant-keyword-arg
         return '(?P<{self.name}>{self.pattern})'.format(self=self)
 
     @property
-    def re_compiled(self):
+    def re_compiled(self) -> Pattern[str]:
         """Compiled regular expression pattern for capability."""
         if self._re_compiled is None:
             self._re_compiled = re.compile(self.pattern)
         return self._re_compiled
 
     @property
-    def will_move(self):
+    def will_move(self) -> bool:
         """Whether capability causes cursor movement."""
         return self.name in CAPABILITIES_CAUSE_MOVEMENT
 
-    def horizontal_distance(self, text):
+    def horizontal_distance(self, text: str) -> int:
         """
         Horizontal carriage adjusted by capability, may be negative.
 
@@ -72,15 +88,17 @@ class Termcap(object):
             return 0
 
         if self.nparams:
-            return value * int(self.re_compiled.match(text).group(1))
+            match = self.re_compiled.match(text)
+            if match:
+                return value * int(match.group(1))
 
         return value
 
     # pylint: disable=too-many-positional-arguments
     @classmethod
-    def build(cls, name, capability, attribute, nparams=0,
-              numeric=99, match_grouped=False, match_any=False,
-              match_optional=False):
+    def build(cls, name: str, capability: str, attribute: str, nparams: int = 0,
+              numeric: int = 99, match_grouped: bool = False, match_any: bool = False,
+              match_optional: bool = False) -> "Termcap":
         r"""
         Class factory builder for given capability definition.
 
@@ -134,7 +152,7 @@ class Termcap(object):
 class SequenceTextWrapper(textwrap.TextWrapper):
     """Docstring overridden."""
 
-    def __init__(self, width, term, **kwargs):
+    def __init__(self, width: int, term: 'Terminal', **kwargs: object) -> None:
         """
         Class initializer.
 
@@ -143,7 +161,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         self.term = term
         textwrap.TextWrapper.__init__(self, width, **kwargs)
 
-    def _wrap_chunks(self, chunks):
+    def _wrap_chunks(self, chunks):    # type: ignore[no-untyped-def]
         """
         Sequence-aware variant of :meth:`textwrap.TextWrapper._wrap_chunks`.
 
@@ -156,7 +174,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         also break consider sequences part of a "word" that may be broken by hyphen (``-``), where
         this implementation corrects both.
         """
-        lines = []
+        lines: list[str] = []
         if self.width <= 0 or not isinstance(self.width, int):
             raise ValueError(
                 "invalid width {0!r}({1!r}) (must be integer > 0)"
@@ -167,7 +185,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
                                       ) or self.drop_whitespace
         chunks.reverse()
         while chunks:
-            cur_line = []
+            cur_line: list[str] = []
             cur_len = 0
             indent = self.subsequent_indent if lines else self.initial_indent
             width = self.width - len(indent)
@@ -186,10 +204,11 @@ class SequenceTextWrapper(textwrap.TextWrapper):
                     cur_line and Sequence(cur_line[-1], term).strip() == ''):
                 del cur_line[-1]
             if cur_line:
-                lines.append(indent + u''.join(cur_line))
+                lines.append(indent + ''.join(cur_line))
         return lines
 
-    def _handle_long_word(self, reversed_chunks, cur_line, cur_len, width):
+    def _handle_long_word(self,  # type: ignore[no-untyped-def]
+                          reversed_chunks, cur_line, cur_len, width):
         """
         Sequence-aware :meth:`textwrap.TextWrapper._handle_long_word`.
 
@@ -247,7 +266,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
 SequenceTextWrapper.__doc__ = textwrap.TextWrapper.__doc__
 
 
-class Sequence(TextType):
+class Sequence(str):
     """
     A "sequence-aware" version of the base :class:`str` class.
 
@@ -256,7 +275,7 @@ class Sequence(TextType):
     :meth:`ljust`, :meth:`center`, and :meth:`length`.
     """
 
-    def __new__(cls, sequence_text, term):
+    def __new__(cls: Type[_T], sequence_text: str, term: 'Terminal') -> _T:
         # pylint: disable = missing-return-doc, missing-return-type-doc
         """
         Class constructor.
@@ -264,11 +283,11 @@ class Sequence(TextType):
         :arg str sequence_text: A string that may contain sequences.
         :arg blessed.Terminal term: :class:`~.Terminal` instance.
         """
-        new = TextType.__new__(cls, sequence_text)
+        new = str.__new__(cls, sequence_text)
         new._term = term
         return new
 
-    def ljust(self, width, fillchar=u' '):
+    def ljust(self, width: SupportsIndex, fillchar: str = ' ') -> str:
         """
         Return string containing sequences, left-adjusted.
 
@@ -280,9 +299,9 @@ class Sequence(TextType):
         """
         rightside = fillchar * int(
             (max(0.0, float(width.__index__() - self.length()))) / float(len(fillchar)))
-        return u''.join((self, rightside))
+        return ''.join((self, rightside))
 
-    def rjust(self, width, fillchar=u' '):
+    def rjust(self, width: SupportsIndex, fillchar: str = ' ') -> str:
         """
         Return string containing sequences, right-adjusted.
 
@@ -294,9 +313,9 @@ class Sequence(TextType):
         """
         leftside = fillchar * int(
             (max(0.0, float(width.__index__() - self.length()))) / float(len(fillchar)))
-        return u''.join((leftside, self))
+        return ''.join((leftside, self))
 
-    def center(self, width, fillchar=u' '):
+    def center(self, width: SupportsIndex, fillchar: str = ' ') -> str:
         """
         Return string containing sequences, centered.
 
@@ -311,9 +330,9 @@ class Sequence(TextType):
             (max(0.0, math.floor(split))) / float(len(fillchar)))
         rightside = fillchar * int(
             (max(0.0, math.ceil(split))) / float(len(fillchar)))
-        return u''.join((leftside, self, rightside))
+        return ''.join((leftside, self, rightside))
 
-    def truncate(self, width):
+    def truncate(self, width: SupportsIndex) -> str:
         """
         Truncate a string in a sequence-aware manner.
 
@@ -342,7 +361,7 @@ class Sequence(TextType):
         # Return with remaining caps appended
         return output + ''.join(text for text, cap in parsed_seq if cap)
 
-    def length(self):
+    def length(self) -> int:
         r"""
         Return the printable length of string containing sequences.
 
@@ -360,7 +379,7 @@ class Sequence(TextType):
             >>> from blessed import Terminal
             >>> from blessed.sequences import Sequence
             >>> term = Terminal()
-            >>> msg = term.clear + term.red(u'コンニチハ')
+            >>> msg = term.clear + term.red('コンニチハ')
             >>> Sequence(msg, term).length()
             10
 
@@ -371,7 +390,7 @@ class Sequence(TextType):
         # because control characters may return -1, "clip" their length to 0.
         return sum(max(wcwidth(w_char), 0) for w_char in self.padd(strip=True))
 
-    def strip(self, chars=None):
+    def strip(self, chars: Optional[str] = None) -> str:
         """
         Return string of sequences, leading and trailing whitespace removed.
 
@@ -381,7 +400,7 @@ class Sequence(TextType):
         """
         return self.strip_seqs().strip(chars)
 
-    def lstrip(self, chars=None):
+    def lstrip(self, chars: Optional[str] = None) -> str:
         """
         Return string of all sequences and leading whitespace removed.
 
@@ -391,7 +410,7 @@ class Sequence(TextType):
         """
         return self.strip_seqs().lstrip(chars)
 
-    def rstrip(self, chars=None):
+    def rstrip(self, chars: Optional[str] = None) -> str:
         """
         Return string of all sequences and trailing whitespace removed.
 
@@ -401,7 +420,7 @@ class Sequence(TextType):
         """
         return self.strip_seqs().rstrip(chars)
 
-    def strip_seqs(self):
+    def strip_seqs(self) -> str:
         """
         Return ``text`` stripped of only its terminal sequences.
 
@@ -410,7 +429,7 @@ class Sequence(TextType):
         """
         return self.padd(strip=True)
 
-    def padd(self, strip=False):
+    def padd(self, strip: bool = False) -> str:
         """
         Return non-destructive horizontal movement as destructive spacing.
 
@@ -420,13 +439,13 @@ class Sequence(TextType):
         """
         data = self
         if self._term.caps_compiled.search(data) is None:
-            return TextType(data)
+            return str(data)
         if strip:  # strip all except CAPABILITIES_HORIZONTAL_DISTANCE
             # pylint: disable-next=protected-access
             data = self._term._caps_compiled_without_hdist.sub("", data)
 
             if self._term.caps_compiled.search(data) is None:
-                return TextType(data)
+                return str(data)
 
         outp = ''
         last_end = 0
@@ -441,7 +460,10 @@ class Sequence(TextType):
             last_end = match.end()
 
             text = match.group(match.lastgroup)
-            value = self._term.caps[match.lastgroup].horizontal_distance(text)
+            if match.lastgroup is not None:
+                value = self._term.caps[match.lastgroup].horizontal_distance(text)
+            else:
+                value = 0
 
             if value > 0:
                 outp += ' ' * value
@@ -457,7 +479,7 @@ class Sequence(TextType):
         return outp
 
 
-def iter_parse(term, text):
+def iter_parse(term: 'Terminal', text: str) -> Iterator[Tuple[str, Optional[Termcap]]]:
     """
     Generator yields (text, capability) for characters of ``text``.
 
@@ -467,14 +489,14 @@ def iter_parse(term, text):
     """
     for match in term._caps_compiled_any.finditer(text):  # pylint: disable=protected-access
         name = match.lastgroup
-        value = match.group(name)
+        value = match.group(name) if name else ''
         if name == 'MISMATCH':
             yield (value, None)
         else:
-            yield value, term.caps[name]
+            yield value, term.caps.get(name, '')
 
 
-def measure_length(text, term):
+def measure_length(text: str, term: 'Terminal') -> int:
     """
     .. deprecated:: 1.12.0.
 
