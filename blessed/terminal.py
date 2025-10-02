@@ -276,11 +276,11 @@ class Terminal(object):
 
         if not hasattr(self._stream, 'fileno'):
             self.errors.append('stream has no fileno method')
-        elif not callable(self._stream.fileno):
+        elif not callable(self._stream.fileno):  # type: ignore
             self.errors.append('stream.fileno is not callable')
         else:
             try:
-                stream_fd = self._stream.fileno()  # type: ignore[union-attr]
+                stream_fd = self._stream.fileno()  # type: ignore
             except ValueError as err:
                 # The stream is not a file, such as the case of StringIO, or, when it has been
                 # "detached", such as might be the case of stdout in some test scenarios.
@@ -293,7 +293,8 @@ class Terminal(object):
         # Keyboard valid as stdin only when output stream is stdout or stderr and is a tty.
         if self._stream in (sys.__stdout__, sys.__stderr__):
             try:
-                self._keyboard_fd = sys.__stdin__.fileno()  # type: ignore[union-attr]
+                if sys.__stdin__ is not None:
+                    self._keyboard_fd = sys.__stdin__.fileno()
             except (AttributeError, ValueError) as err:
                 self.errors.append('Unable to determine input stream file descriptor: %s' % err)
             else:
@@ -1546,7 +1547,7 @@ class Terminal(object):
         return self._number_of_colors
 
     @number_of_colors.setter
-    def number_of_colors(self, value) -> int:
+    def number_of_colors(self, value: int) -> None:
         assert value in (0, 4, 8, 16, 88, 256, 1 << 24)
         # Because 88 colors is rare and we can't guarantee consistent behavior,
         # when 88 colors is detected, it is treated as 16 colors
@@ -1570,7 +1571,7 @@ class Terminal(object):
         self.__clear_color_capabilities()
 
     @property
-    def _foreground_color(self):  # type: ignore[no-untyped-def]
+    def _foreground_color(self) -> Union[NullCallableString, ParameterizingString]:
         """
         Convenience capability to support :attr:`~.on_color`.
 
@@ -1581,7 +1582,7 @@ class Terminal(object):
         return self.setaf or self.setf
 
     @property
-    def _background_color(self):  # type: ignore[no-untyped-def]
+    def _background_color(self) -> Union[NullCallableString, ParameterizingString]:
         """
         Convenience capability to support :attr:`~.on_color`.
 
@@ -1837,11 +1838,10 @@ class Terminal(object):
 
         if HAS_TTY:
             ready_r, _, _ = select.select(check_r, [], [], timeout)
-
-        # Ensure boolean return type
-        if self._keyboard_fd is None:
-            return False
-        return check_r == ready_r
+            # Ensure boolean return type - check_r equals ready_r means key is available
+            if self._keyboard_fd is not None and check_r == ready_r:
+                return True
+        return False
 
     @contextlib.contextmanager
     def cbreak(self) -> Generator[None, None, None]:
@@ -2154,7 +2154,7 @@ class Terminal(object):
         ucs = ''
         mode_1016_active = self._dec_mode_cache.get(1016) == DecModeResponse.SET
 
-        def _getch()-> str: 
+        def _getch() -> str:
             decoder = None
             if ucs.startswith('\x1b['):
                 # CSI sequence forthcoming, decode as latin1

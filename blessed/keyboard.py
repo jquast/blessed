@@ -804,7 +804,8 @@ class Keystroke(str):
                                      f"'{attr}' (invalid modifier tokens: {invalid_tokens})")
 
             # Return a predicate function that checks for the specified modifiers
-            def modifier_predicate(char=None, ignore_case=True, exact=True) -> bool:
+            def modifier_predicate(char: Optional[str] = None, ignore_case: bool = True,
+                                   exact: bool = True) -> bool:
                 # Build expected modifier bits from tokens
                 expected_bits = 0
                 for token in tokens:
