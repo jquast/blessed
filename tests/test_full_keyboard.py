@@ -51,11 +51,11 @@ def test_kbhit_interrupted():
     if pid == 0:
         cov = init_subproc_coverage('test_kbhit_interrupted')
 
-        global got_sigwinch
+        global got_sigwinch  # pylint: disable=global-statement
         got_sigwinch = False
 
         def on_resize(sig, action):
-            global got_sigwinch
+            global got_sigwinch  # pylint: disable=global-statement
             got_sigwinch = True
 
         term = TestTerminal()

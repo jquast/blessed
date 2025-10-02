@@ -2,13 +2,11 @@
 """Tests for DEC Private Modes functionality."""
 # std imports
 import io
-import re
 
 # 3rd party
 import pytest
 
 # local
-from blessed import Terminal
 from blessed.dec_modes import DecPrivateMode, DecModeResponse
 from .accessories import TestTerminal, as_subprocess
 
@@ -125,7 +123,7 @@ def test_dec_private_mode_descriptions_consistency():
     for constant_name, mode_value in mode_constants.items():
         if mode_value not in DecPrivateMode._LONG_DESCRIPTIONS:
             missing_descriptions.append(f"{constant_name}({mode_value})")
-    assert missing_descriptions == []
+    assert not missing_descriptions
 
     # Check for extra descriptions (descriptions for non-existent constants)
     extra_descriptions = []
@@ -133,7 +131,7 @@ def test_dec_private_mode_descriptions_consistency():
     for mode_value in DecPrivateMode._LONG_DESCRIPTIONS:
         if mode_value >= 0 and mode_value not in defined_mode_values:
             extra_descriptions.append(f"mode {mode_value}")
-    assert extra_descriptions == []
+    assert not extra_descriptions
 
     # Verify each description is a non-empty string
     for mode_value, description in DecPrivateMode._LONG_DESCRIPTIONS.items():
