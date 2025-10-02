@@ -233,6 +233,7 @@ def dist_cie2000(rgb1: _RGB, rgb2: _RGB) -> float:
 
     return delta_l ** 2 + delta_c ** 2 + delta_h ** 2 + r_t * delta_c * delta_h
 
+
 COLOR_DISTANCE_ALGORITHMS: Dict[str,
                                 Callable[[_RGB,
                                           _RGB],
@@ -268,7 +269,7 @@ _GRAY_IDX_FROM_V = tuple(
 _GRAY_VAL_FROM_IDX = tuple(8 + 10 * i for i in range(24))
 
 
-def xterm256color_from_rgb(red, green, blue):
+def xterm256color_from_rgb(red: int, green: int, blue: int) -> Tuple[int, _RGB]:
     """
     Convert RGB values to xterm 256-color cube index and RGB approximation.
 
@@ -291,7 +292,7 @@ def xterm256color_from_rgb(red, green, blue):
     return cube_idx, cube_rgb
 
 
-def xterm256gray_from_rgb(red, green, blue):
+def xterm256gray_from_rgb(red: int, green: int, blue: int) -> Tuple[int, _RGB]:
     """
     Convert RGB values to xterm 256-color grayscale index and RGB approximation.
 
