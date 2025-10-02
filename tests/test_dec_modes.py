@@ -502,11 +502,11 @@ def test_dec_modes_enabled_unsupported_mode():
 
             with term.dec_modes_enabled(DecPrivateMode.DECTCEM, timeout=0.5):
                 # Should not enable unsupported mode
-                mock_set_enabled.assert_called_once_with()  # Called with empty args since no modes to enable
+                mock_set_enabled.assert_called_once_with()
                 mock_set_enabled.reset_mock()
 
             # Should not disable unsupported mode
-            mock_set_disabled.assert_called_once_with()  # Called with empty args since no modes to disable
+            mock_set_disabled.assert_called_once_with()
     child()
 
 
@@ -554,11 +554,11 @@ def test_dec_modes_disabled_already_disabled():
 
             with term.dec_modes_disabled(DecPrivateMode.DECTCEM, timeout=0.5):
                 # Should not disable already disabled mode
-                mock_set_disabled.assert_called_once_with()  # Called with empty args since no modes to disable
+                mock_set_disabled.assert_called_once_with()
                 mock_set_disabled.reset_mock()
 
             # Should not enable mode that wasn't disabled by us
-            mock_set_enabled.assert_called_once_with()  # Called with empty args since no modes to enable
+            mock_set_enabled.assert_called_once_with()
     child()
 
 

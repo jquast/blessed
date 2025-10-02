@@ -724,7 +724,8 @@ def test_enable_kitty_keyboard_comprehensive_flags():
         stream = io.StringIO()
         term = Terminal(stream=stream, force_styling=True)
 
-        # Test comprehensive mode (should set disambiguate + report_events + report_all_keys + report_text)
+        # Test comprehensive mode, should set:
+        # disambiguate + report_events + report_all_keys + report_text)
         # flags = 1 + 2 + 8 + 16 = 27
         with term.enable_kitty_keyboard(
             disambiguate=True,

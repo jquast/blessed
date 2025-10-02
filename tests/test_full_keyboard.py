@@ -543,7 +543,7 @@ def test_esc_delay_cbreak_prefix_sequence():
     assert key_repr == u"'\\x1b['", ready_out
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
-    assert int(given_esc_delay * 10) <= int(duration_ms) <= int(given_esc_delay * 10) + 10, duration_ms
+    assert int(given_esc_delay * 10) <= int(duration_ms) <= int(given_esc_delay * 10) + 10
 
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")

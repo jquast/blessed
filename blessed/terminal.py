@@ -14,7 +14,7 @@ import platform
 import warnings
 import contextlib
 import collections
-from typing import IO, List, Match, Tuple, Union, Optional, Generator
+from typing import IO, Dict, List, Match, Tuple, Union, Optional, Generator
 
 # SupportsIndex was added in Python 3.8
 if sys.version_info >= (3, 8):
@@ -165,7 +165,8 @@ class Terminal(object):
         'terminal_enquire': 'u9',
     }
 
-    def __init__(self, kind=None, stream=None, force_styling=False):
+    def __init__(self, kind: Optional[str] = None, stream: Optional[IO[str]] = None,
+                 force_styling: Union[bool, None] = False) -> None:
         """
         Initialize the terminal.
 
@@ -252,7 +253,7 @@ class Terminal(object):
     def __init__dec_private_modes(self) -> None:
         """Initialize DEC Private Mode caching and state tracking."""
         # Cache for queried DEC private modes to avoid repeated queries
-        self._dec_mode_cache = {}
+        self._dec_mode_cache: Dict[int, int] = {}
         # Global timeout tracking state
         self._dec_any_query_succeeded = False
         self._dec_first_query_failed = False
@@ -262,9 +263,9 @@ class Terminal(object):
         self._kitty_kb_first_query_attempted = False
 
         # Device Attributes (DA1) cache
-        self._device_attributes_cache = None
+        self._device_attributes_cache: Optional[DeviceAttribute] = None
 
-    def __init__streams(self):
+    def __init__streams(self) -> None:
         # pylint: disable=too-complex,too-many-branches
         #         Agree to disagree !
         stream_fd = None
@@ -275,7 +276,7 @@ class Terminal(object):
 
         if not hasattr(self._stream, 'fileno'):
             self.errors.append('stream has no fileno method')
-        elif not callable(self._stream.fileno):  # type: ignore[union-attr]
+        elif not callable(self._stream.fileno):
             self.errors.append('stream.fileno is not callable')
         else:
             try:
@@ -310,7 +311,7 @@ class Terminal(object):
         self._init_descriptor = stream_fd
         if stream_fd is None:
             try:
-                self._init_descriptor = sys.__stdout__.fileno()  # type: ignore[union-attr]
+                self._init_descriptor = sys.__stdout__.fileno()  # type: ignore
             except ValueError as err:
                 self.errors.append('Unable to determine __stdout__ file descriptor: %s' % err)
 
@@ -389,7 +390,7 @@ class Terminal(object):
         self._keymap_prefixes = get_leading_prefixes(self._keymap)
 
         # keyboard stream buffer
-        self._keyboard_buf = collections.deque()
+        self._keyboard_buf: collections.deque[str] = collections.deque()
 
         if self._keyboard_fd is not None:
             # set input encoding and initialize incremental decoder
@@ -626,7 +627,8 @@ class Terminal(object):
         return match
 
     @contextlib.contextmanager
-    def location(self, x=None, y=None):
+    def location(self, x: Optional[int] = None,
+                 y: Optional[int] = None) -> Generator[None, None, None]:
         """
         Context manager for temporarily moving the cursor.
 
@@ -787,7 +789,7 @@ class Terminal(object):
 
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
 
-    def _dec_mode_set_enabled(self, *modes):
+    def _dec_mode_set_enabled(self, *modes: Union[int, DecPrivateMode]) -> None:
         """
         Enable one or more DEC Private Modes (DECSET).
 
@@ -827,7 +829,7 @@ class Terminal(object):
         for mode_num in mode_numbers:
             self._dec_mode_cache[mode_num] = DecModeResponse.SET
 
-    def _dec_mode_set_disabled(self, *modes):
+    def _dec_mode_set_disabled(self, *modes: Union[int, DecPrivateMode]) -> None:
         """
         Disable one or more DEC Private Modes (DECRST).
 
@@ -867,7 +869,8 @@ class Terminal(object):
         for mode_num in mode_numbers:
             self._dec_mode_cache[mode_num] = DecModeResponse.RESET
 
-    def get_dec_mode(self, mode, timeout=None, force=False):
+    def get_dec_mode(self, mode: Union[int, DecPrivateMode],
+                     timeout: Optional[float] = None, force: bool = False) -> DecModeResponse:
         """
         Query the state of a DEC Private Mode (DECRQM).
 
@@ -958,7 +961,8 @@ class Terminal(object):
         self._dec_any_query_succeeded = True
         return DecModeResponse(mode, response_value)
 
-    def get_kitty_keyboard_state(self, timeout=None, force=False):
+    def get_kitty_keyboard_state(self, timeout: Optional[float] = None,
+                                 force: bool = False) -> Optional[KittyKeyboardProtocol]:
         """
         Query the current Kitty keyboard protocol flags.
 
@@ -1082,7 +1086,8 @@ class Terminal(object):
         flags_value = int(match.group(1))
         return KittyKeyboardProtocol(flags_value)
 
-    def get_device_attributes(self, timeout=None, force=True):
+    def get_device_attributes(self, timeout: Optional[float] = None,
+                              force: bool = True) -> Optional[DeviceAttribute]:
         """
         Query the terminal's Device Attributes (DA1).
 
@@ -1131,7 +1136,7 @@ class Terminal(object):
         self._device_attributes_cache = device_attr
         return device_attr
 
-    def does_sixel(self, timeout=None):
+    def does_sixel(self, timeout: Optional[float] = None) -> bool:
         """
         Return whether the terminal supports sixel graphics.
 
@@ -1159,7 +1164,8 @@ class Terminal(object):
         return da.supports_sixel if da is not None else False
 
     @contextlib.contextmanager
-    def dec_modes_enabled(self, *modes, timeout=None):
+    def dec_modes_enabled(self, *modes: Union[int, DecPrivateMode],
+                          timeout: Optional[float] = None) -> Generator[None, None, None]:
         """
         Context manager for temporarily enabling DEC Private Modes.
 
@@ -1206,7 +1212,8 @@ class Terminal(object):
             self._dec_mode_set_disabled(*enabled_modes)
 
     @contextlib.contextmanager
-    def dec_modes_disabled(self, *modes, timeout=None):
+    def dec_modes_disabled(self, *modes: Union[int, DecPrivateMode],
+                           timeout: Optional[float] = None) -> Generator[None, None, None]:
         """
         Context manager for temporarily disabling DEC Private Modes.
 
@@ -1483,7 +1490,7 @@ class Terminal(object):
         self._normal = resolve_capability(self, 'normal')
         return self._normal
 
-    def link(self, url: str, text: str, url_id: str ='') -> str:
+    def link(self, url: str, text: str, url_id: str = '') -> str:
         """
         Display ``text`` that when touched or clicked, navigates to ``url``.
 
@@ -1539,7 +1546,7 @@ class Terminal(object):
         return self._number_of_colors
 
     @number_of_colors.setter
-    def number_of_colors(self, value):
+    def number_of_colors(self, value) -> int:
         assert value in (0, 4, 8, 16, 88, 256, 1 << 24)
         # Because 88 colors is rare and we can't guarantee consistent behavior,
         # when 88 colors is detected, it is treated as 16 colors
@@ -1831,7 +1838,10 @@ class Terminal(object):
         if HAS_TTY:
             ready_r, _, _ = select.select(check_r, [], [], timeout)
 
-        return False if self._keyboard_fd is None else check_r == ready_r
+        # Ensure boolean return type
+        if self._keyboard_fd is None:
+            return False
+        return check_r == ready_r
 
     @contextlib.contextmanager
     def cbreak(self) -> Generator[None, None, None]:
@@ -1945,9 +1955,11 @@ class Terminal(object):
             self.stream.flush()
 
     @contextlib.contextmanager
-    def enable_kitty_keyboard(self, *, disambiguate=True, report_events=False,
-                              report_alternates=False, report_all_keys=False,
-                              report_text=False, mode=1, timeout=None, force=False):
+    def enable_kitty_keyboard(self, *, disambiguate: bool = True, report_events: bool = False,
+                              report_alternates: bool = False, report_all_keys: bool = False,
+                              report_text: bool = False, mode: int = 1,
+                              timeout: Optional[float] = None,
+                              force: bool = False) -> Generator[None, None, None]:
         """
         Context manager that enables Kitty keyboard protocol features.
 
@@ -2014,7 +2026,7 @@ class Terminal(object):
                 self.stream.flush()
 
     @contextlib.contextmanager
-    def modify_other_keys(self, level=2):
+    def modify_other_keys(self, level: int = 2) -> Generator[None, None, None]:
         """
         Context manager that enables xterm's modifyOtherKeys feature.
 
@@ -2046,7 +2058,7 @@ class Terminal(object):
             self.stream.write('\x1b[>4;0m')
             self.stream.flush()
 
-    def _is_known_input_prefix(self, text):
+    def _is_known_input_prefix(self, text: str) -> bool:
         """
         Check if the given text could be the start of a known input sequence.
 
@@ -2078,7 +2090,7 @@ class Terminal(object):
 
         return False
 
-    def flushinp(self, timeout=0):
+    def flushinp(self, timeout: float = 0) -> str:
         """
         This method unbuffers and returns all input available within ``timeout``.
 
@@ -2089,7 +2101,7 @@ class Terminal(object):
         while self._keyboard_buf:
             ucs += self._keyboard_buf.pop()
 
-        def _getch():
+        def _getch() -> str:
             decoder = None
             if '\x1b[' in ucs:
                 decoder = self._keyboard_decoder_latin1
@@ -2142,7 +2154,7 @@ class Terminal(object):
         ucs = ''
         mode_1016_active = self._dec_mode_cache.get(1016) == DecModeResponse.SET
 
-        def _getch():
+        def _getch()-> str: 
             decoder = None
             if ucs.startswith('\x1b['):
                 # CSI sequence forthcoming, decode as latin1
@@ -2213,7 +2225,7 @@ class Terminal(object):
                     while self.kbhit(timeout=0):
                         ucs += _getch()
                     # re-check 'final' check after reading more bytes
-                    final = len(ucs) and not self._is_known_input_prefix(ucs)
+                    final = bool(ucs) and not self._is_known_input_prefix(ucs)
 
                 ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
                                       final=final, mode_1016_active=mode_1016_active)

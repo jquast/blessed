@@ -759,7 +759,7 @@ class Keystroke(str):
             if event_type:
                 expected_name_without_event = tokens_str.upper()
 
-                def event_predicate():
+                def event_predicate() -> bool:
                     """Check if keystroke matches the expected event type."""
                     # Check if the name matches (with or without event type suffix)
                     if self.name == expected_name:
@@ -804,16 +804,7 @@ class Keystroke(str):
                                      f"'{attr}' (invalid modifier tokens: {invalid_tokens})")
 
             # Return a predicate function that checks for the specified modifiers
-            def modifier_predicate(char=None, ignore_case=True, exact=True):
-                """
-                Check if keystroke matches the specified modifier combination.
-
-                :arg str char: Character to match (optional)
-                :arg bool ignore_case: Whether to ignore case when comparing char (default True)
-                :arg bool exact: Whether modifiers must match exactly vs. be subset (default True)
-                :rtype: bool
-                :returns: True if keystroke matches the specified criteria
-                """
+            def modifier_predicate(char=None, ignore_case=True, exact=True) -> bool:
                 # Build expected modifier bits from tokens
                 expected_bits = 0
                 for token in tokens:
@@ -1218,7 +1209,7 @@ def _read_until(term: typing.Any, pattern: str,
     return match, buf
 
 
-def _match_dec_event(text, mode_1016_active=None):
+def _match_dec_event(text: str, mode_1016_active: Optional[bool] = None) -> Optional[Keystroke]:
     """
     Attempt to match text against DEC event patterns.
 
@@ -1237,7 +1228,7 @@ def _match_dec_event(text, mode_1016_active=None):
     return None
 
 
-def _match_kitty_key(text):
+def _match_kitty_key(text: str) -> Optional[Keystroke]:
     """
     Attempt to match text against Kitty keyboard protocol patterns.
 
@@ -1253,13 +1244,16 @@ def _match_kitty_key(text):
     CSI unicode-key-code ; modifiers : event-type ; text-codepoints u # Full form
     """
     match = KITTY_KB_PROTOCOL_PATTERN.match(text)
-    def int_when_non_empty(_m, _key): return int(_m.group(_key)) if _m.group(_key) else None
+
+    def int_when_non_empty(_m: Match[str], _key: str) -> Optional[int]:
+        return int(_m.group(_key)) if _m.group(_key) else None
 
     def int_when_non_empty_otherwise_1(
-        _m, _key): return int(
-        _m.group(_key)) if _m.group(_key) else 1
+            _m: Match[str], _key: str) -> int:
+        return int(_m.group(_key)) if _m.group(_key) else 1
+
     if match:
-        _int_codepoints = tuple()
+        _int_codepoints: Tuple[int, ...] = tuple()
         if match.group('text_codepoints'):
             _codepoints_text = match.group('text_codepoints').split(':')
             _int_codepoints = tuple(int(cp) for cp in _codepoints_text if cp)
@@ -1282,7 +1276,7 @@ def _match_kitty_key(text):
     return None
 
 
-def _match_modify_other_keys(text):
+def _match_modify_other_keys(text: str) -> Optional[Keystroke]:
     """
     Attempt to match text against xterm ModifyOtherKeys patterns.
 
@@ -1308,7 +1302,7 @@ def _match_modify_other_keys(text):
     return None
 
 
-def _match_legacy_csi_modifiers(text):
+def _match_legacy_csi_modifiers(text: str) -> Optional[Keystroke]:
     """
     Attempt to match text against legacy CSI modifier patterns.
 
@@ -1635,7 +1629,7 @@ class KittyKeyboardProtocol:
     arguments.
     """
 
-    def __init__(self, value):
+    def __init__(self, value: int) -> None:
         """
         Initialize with raw integer flag value.
 
@@ -1644,12 +1638,12 @@ class KittyKeyboardProtocol:
         self.value = int(value)
 
     @property
-    def disambiguate(self):
+    def disambiguate(self) -> bool:
         """Whether disambiguated escape codes are enabled (bit 1)."""
         return bool(self.value & 0b1)
 
     @disambiguate.setter
-    def disambiguate(self, enabled):
+    def disambiguate(self, enabled: bool) -> None:
         """Set whether disambiguated escape codes are enabled (bit 1)."""
         if enabled:
             self.value |= 0b1
@@ -1657,12 +1651,12 @@ class KittyKeyboardProtocol:
             self.value &= ~0b1
 
     @property
-    def report_events(self):
+    def report_events(self) -> bool:
         """Whether key repeat and release events are reported (bit 2)."""
         return bool(self.value & 0b10)
 
     @report_events.setter
-    def report_events(self, enabled):
+    def report_events(self, enabled: bool) -> None:
         """Set whether key repeat and release events are reported (bit 2)."""
         if enabled:
             self.value |= 0b10
@@ -1670,12 +1664,12 @@ class KittyKeyboardProtocol:
             self.value &= ~0b10
 
     @property
-    def report_alternates(self):
+    def report_alternates(self) -> bool:
         """Whether shifted and base layout keys are reported for shortcuts (bit 4)."""
         return bool(self.value & 0b100)
 
     @report_alternates.setter
-    def report_alternates(self, enabled):
+    def report_alternates(self, enabled: bool) -> None:
         """Set whether shifted and base layout keys are reported for shortcuts (bit 4)."""
         if enabled:
             self.value |= 0b100
@@ -1683,12 +1677,12 @@ class KittyKeyboardProtocol:
             self.value &= ~0b100
 
     @property
-    def report_all_keys(self):
+    def report_all_keys(self) -> bool:
         """Whether all keys are reported as escape codes (bit 8)."""
         return bool(self.value & 0b1000)
 
     @report_all_keys.setter
-    def report_all_keys(self, enabled):
+    def report_all_keys(self, enabled: bool) -> None:
         """Set whether all keys are reported as escape codes (bit 8)."""
         if enabled:
             self.value |= 0b1000
@@ -1696,19 +1690,19 @@ class KittyKeyboardProtocol:
             self.value &= ~0b1000
 
     @property
-    def report_text(self):
+    def report_text(self) -> bool:
         """Whether associated text is reported with key events (bit 16)."""
         return bool(self.value & 0b10000)
 
     @report_text.setter
-    def report_text(self, enabled):
+    def report_text(self, enabled: bool) -> None:
         """Set whether associated text is reported with key events (bit 16)."""
         if enabled:
             self.value |= 0b10000
         else:
             self.value &= ~0b10000
 
-    def make_arguments(self):
+    def make_arguments(self) -> Dict[str, bool]:
         """
         Return dictionary of arguments suitable for enable_kitty_keyboard().
 
@@ -1724,7 +1718,7 @@ class KittyKeyboardProtocol:
             'report_text': self.report_text
         }
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return string representation of the protocol flags."""
         flags = []
         if self.disambiguate:
@@ -1740,7 +1734,7 @@ class KittyKeyboardProtocol:
 
         return f"KittyKeyboardProtocol(value={self.value}, flags=[{', '.join(flags)}])"
 
-    def __eq__(self, other):
+    def __eq__(self, other: typing.Any) -> bool:
         """Check equality based on flag values."""
         if isinstance(other, KittyKeyboardProtocol):
             return self.value == other.value

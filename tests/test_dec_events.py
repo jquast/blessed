@@ -173,7 +173,7 @@ def test_mode_values_errors(mode, expected_error):
 
 
 def test_keystroke_with_dec_mode():
-    """Test keystroke with DEC mode - minimal test since Keystroke is covered in test_keyboard.py."""
+    """Test keystroke with DEC mode - minimal test."""
     match = re.match(r'\x1b\[200~(?P<text>.*?)\x1b\[201~', '\x1b[200~test\x1b[201~')
     ks = Keystroke('\x1b[200~test\x1b[201~', mode=2004, match=match)
     assert ks.event_mode == DecPrivateMode.BRACKETED_PASTE

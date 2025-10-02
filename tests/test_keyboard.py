@@ -392,20 +392,21 @@ def test_ss3_no_modifier_sequences():
         codes = get_keyboard_codes()
         prefixes = set()
 
-        def resolve(seq): return resolve_sequence(seq, keymap, codes, prefixes, final=True)
+        def resolve(seq):
+            return resolve_sequence(seq, keymap, codes, prefixes, final=True)
 
         # Test SS3 sequences from DEFAULT_SEQUENCE_MIXIN
         ss3_cases = [
-            ('\x1bOP', 'F1', curses.KEY_F1),      # SS3 P
-            ('\x1bOQ', 'F2', curses.KEY_F2),      # SS3 Q
-            ('\x1bOR', 'F3', curses.KEY_F3),      # SS3 R
-            ('\x1bOS', 'F4', curses.KEY_F4),      # SS3 S
-            ('\x1bOA', 'Up', curses.KEY_UP),      # SS3 A
-            ('\x1bOB', 'Down', curses.KEY_DOWN),  # SS3 B
+            ('\x1bOP', 'F1', curses.KEY_F1),        # SS3 P
+            ('\x1bOQ', 'F2', curses.KEY_F2),        # SS3 Q
+            ('\x1bOR', 'F3', curses.KEY_F3),        # SS3 R
+            ('\x1bOS', 'F4', curses.KEY_F4),        # SS3 S
+            ('\x1bOA', 'Up', curses.KEY_UP),        # SS3 A
+            ('\x1bOB', 'Down', curses.KEY_DOWN),    # SS3 B
             ('\x1bOC', 'Right', curses.KEY_RIGHT),  # SS3 C
-            ('\x1bOD', 'Left', curses.KEY_LEFT),   # SS3 D
-            ('\x1bOH', 'Home', curses.KEY_HOME),   # SS3 H
-            ('\x1bOF', 'End', curses.KEY_END),     # SS3 F
+            ('\x1bOD', 'Left', curses.KEY_LEFT),    # SS3 D
+            ('\x1bOH', 'Home', curses.KEY_HOME),    # SS3 H
+            ('\x1bOF', 'End', curses.KEY_END),      # SS3 F
         ]
 
         for sequence, description, expected_code in ss3_cases:
