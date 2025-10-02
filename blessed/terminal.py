@@ -55,10 +55,6 @@ from ._capabilities import (CAPABILITY_DATABASE,
 
 # isort: off
 
-# Alias py2 exception to py3
-if sys.version_info[:2] < (3, 3):
-    InterruptedError = select.error  # pylint: disable=redefined-builtin
-
 
 HAS_TTY = True
 if platform.system() == 'Windows':
@@ -253,7 +249,7 @@ class Terminal(object):
         self.__init__keycodes()
         self.__init__dec_private_modes()
 
-    def __init__dec_private_modes(self):
+    def __init__dec_private_modes(self) -> None:
         """Initialize DEC Private Mode caching and state tracking."""
         # Cache for queried DEC private modes to avoid repeated queries
         self._dec_mode_cache = {}
@@ -279,11 +275,11 @@ class Terminal(object):
 
         if not hasattr(self._stream, 'fileno'):
             self.errors.append('stream has no fileno method')
-        elif not callable(self._stream.fileno):
+        elif not callable(self._stream.fileno):  # type: ignore[union-attr]
             self.errors.append('stream.fileno is not callable')
         else:
             try:
-                stream_fd = self._stream.fileno()
+                stream_fd = self._stream.fileno()  # type: ignore[union-attr]
             except ValueError as err:
                 # The stream is not a file, such as the case of StringIO, or, when it has been
                 # "detached", such as might be the case of stdout in some test scenarios.
@@ -296,7 +292,7 @@ class Terminal(object):
         # Keyboard valid as stdin only when output stream is stdout or stderr and is a tty.
         if self._stream in (sys.__stdout__, sys.__stderr__):
             try:
-                self._keyboard_fd = sys.__stdin__.fileno()
+                self._keyboard_fd = sys.__stdin__.fileno()  # type: ignore[union-attr]
             except (AttributeError, ValueError) as err:
                 self.errors.append('Unable to determine input stream file descriptor: %s' % err)
             else:
@@ -314,7 +310,7 @@ class Terminal(object):
         self._init_descriptor = stream_fd
         if stream_fd is None:
             try:
-                self._init_descriptor = sys.__stdout__.fileno()
+                self._init_descriptor = sys.__stdout__.fileno()  # type: ignore[union-attr]
             except ValueError as err:
                 self.errors.append('Unable to determine __stdout__ file descriptor: %s' % err)
 
@@ -584,7 +580,8 @@ class Terminal(object):
                      ws_xpixel=None,
                      ws_ypixel=None)
 
-    def _query_response(self, query_str, response_re, timeout):
+    def _query_response(self, query_str: str, response_re: str,
+                        timeout: Optional[float]) -> Optional[Match[str]]:
         """
         Sends a query string to the terminal and waits for a response.
 
@@ -1386,7 +1383,7 @@ class Terminal(object):
 
         return NullCallableString()
 
-    def on_color_rgb(self, red: int, green: int, blue: int):
+    def on_color_rgb(self, red: int, green: int, blue: int) -> FormattingString:
         """
         Provides callable formatting string to set background color to the specified RGB color.
 
@@ -1406,7 +1403,7 @@ class Terminal(object):
         color_idx = self.rgb_downconvert(red, green, blue)
         return FormattingString(self._background_color(color_idx), self.normal)
 
-    def formatter(self, value) -> Union[NullCallableString, FormattingString]:
+    def formatter(self, value: str) -> Union[NullCallableString, FormattingString]:
         """
         Provides callable formatting string to set color and other text formatting options.
 
@@ -1430,6 +1427,8 @@ class Terminal(object):
     def rgb_downconvert(self, red: int, green: int, blue: int) -> int:
         """
         Translate an RGB color to a color code of the terminal's color depth.
+
+        This method is only be used to downconvert for terminals of 256 or fewer colors.
 
         :arg int red: RGB value of Red (0-255).
         :arg int green: RGB value of Green (0-255).
@@ -1484,7 +1483,7 @@ class Terminal(object):
         self._normal = resolve_capability(self, 'normal')
         return self._normal
 
-    def link(self, url: str, text: str, url_id='') -> str:
+    def link(self, url: str, text: str, url_id: str ='') -> str:
         """
         Display ``text`` that when touched or clicked, navigates to ``url``.
 
@@ -1706,7 +1705,7 @@ class Terminal(object):
         """
         return Sequence(text, self).lstrip(chars)
 
-    def strip_seqs(self, text: str):
+    def strip_seqs(self, text: str) -> str:
         r"""
         Return ``text`` stripped of only its terminal sequences.
 
@@ -1752,7 +1751,7 @@ class Terminal(object):
                 break
         return result
 
-    def wrap(self, text, width=None, **kwargs):
+    def wrap(self, text: str, width: Optional[int] = None, **kwargs: object) -> List[str]:
         r"""
         Text-wrap a string, returning a list of wrapped lines.
 
@@ -1777,7 +1776,7 @@ class Terminal(object):
 
         return lines
 
-    def getch(self, decoder=None) -> str:
+    def getch(self, decoder: Optional[codecs.IncrementalDecoder] = None) -> str:
         """
         Read, decode, and return the next byte from the keyboard stream.
 
@@ -1826,7 +1825,6 @@ class Terminal(object):
             attached to this terminal.  When input is not a terminal, False is
             always returned.
         """
-        stime = time.time()
         ready_r = [None, ]
         check_r = [self._keyboard_fd] if self._keyboard_fd is not None else []
 
@@ -1836,7 +1834,7 @@ class Terminal(object):
         return False if self._keyboard_fd is None else check_r == ready_r
 
     @contextlib.contextmanager
-    def cbreak(self):
+    def cbreak(self) -> Generator[None, None, None]:
         """
         Allow each keystroke to be read immediately after it is pressed.
 
@@ -1884,7 +1882,7 @@ class Terminal(object):
             yield
 
     @contextlib.contextmanager
-    def raw(self):
+    def raw(self) -> Generator[None, None, None]:
         r"""
         A context manager for :func:`tty.setraw`.
 
@@ -1921,7 +1919,7 @@ class Terminal(object):
             yield
 
     @contextlib.contextmanager
-    def keypad(self):
+    def keypad(self) -> Generator[None, None, None]:
         r"""
         Context manager that enables directional keypad input.
 

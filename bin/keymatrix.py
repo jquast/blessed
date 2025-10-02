@@ -211,7 +211,6 @@ def render_keymatrix(term: Terminal, n_header_rows: int, raw_sequences: deque,
     """Render the key matrix display with raw sequences bar and formatted table."""
     # Calculate bar width (1/3 of terminal width)
     bar_width = term.width // 3
-    bar_padding = (term.width - bar_width) // 2
     bar_y = n_header_rows + 3
 
     # remove raw sequences tracked until they fit
@@ -278,7 +277,7 @@ def main():
     do_exit = False
 
     # Probe terminal capabilities
-    mode_messages = dec_manager.probe(timeout=1.0)
+    dec_manager.probe(timeout=1.0)
     if not dec_manager.available_modes:
         header.append(f"All DEC Private Modes {term.bold_red('fail support')}")
 
