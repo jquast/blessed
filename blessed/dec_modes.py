@@ -172,7 +172,7 @@ class DecPrivateMode:
     """
     # These are *not* DecPrivateModes, in that they are not negotiable using the
     # DEC Private Mode sequences, but are carried in the same way, and attached
-    # to this class for type saftey, as they carry meaning that they have a
+    # to this class for type safety, as they carry meaning that they have a
     # "special encoding" that is evaluated on-demand on evaluation of
     # term.inkey().name as 'KEY_SHIFT_F1' or testing inkey().is_alt_shift('a').
     # these key "events" have special late-binding evaluations depending on the
@@ -619,7 +619,7 @@ class DecPrivateMode:
         """
         if isinstance(other, DecPrivateMode):
             return self.value == other.value
-        elif isinstance(other, int):
+        if isinstance(other, int):
             return self.value == other
         return False
 

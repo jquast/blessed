@@ -1,5 +1,5 @@
 """Sub-module providing 'keyboard awareness'."""
-
+# pylint: disable=too-many-lines
 # std imports
 import os
 import re
@@ -47,32 +47,32 @@ LEGACY_CSI_MODIFIERS_PATTERN = re.compile(
     r'\x1b\[1;(?P<mod>\d+)(?::(?P<event>\d+))?(?P<final>[ABCDEFHPQRS])~?')
 LEGACY_CSI_TILDE_PATTERN = re.compile(r'\x1b\[(?P<key_num>\d+);(?P<mod>\d+)(?::(?P<event>\d+))?~')
 LEGACY_SS3_FKEYS_PATTERN = re.compile(r'\x1bO(?P<mod>\d)(?P<final>[PQRS])')
-DEC_EVENT_PATTERN = functools.namedtuple("DEC_EVENT_PATTERN", ["mode", "pattern"])
+DECEventPattern = functools.namedtuple("DEC_EVENT_PATTERN", ["mode", "pattern"])
 
 # DEC event patterns - compiled regexes with metadata
 DEC_EVENT_PATTERNS = [
     # Bracketed paste - must be first due to greedy nature; this is more closely
     # married to ESC_DELAY than it first appears -- the full payload and final
     # marker must be received under ESC_DELAY seconds.
-    DEC_EVENT_PATTERN(mode=DecPrivateMode.BRACKETED_PASTE, pattern=(
+    DECEventPattern(mode=DecPrivateMode.BRACKETED_PASTE, pattern=(
         re.compile(r'\x1b\[200~(?P<text>.*?)\x1b\[201~', re.DOTALL))),
     # Mouse SGR (1006) - recommended format: CSI < b;x;y m/M
     # Also supports legacy format without a '<' for backward compatibility,
-    DEC_EVENT_PATTERN(mode=DecPrivateMode.MOUSE_EXTENDED_SGR, pattern=(
+    DECEventPattern(mode=DecPrivateMode.MOUSE_EXTENDED_SGR, pattern=(
         re.compile(r'\x1b\[<?(?P<b>\d+);(?P<x>\d+);(?P<y>\d+)(?P<type>[mM])'))),
     # Mouse SGR-Pixels (1016) - identical wire format to 1006!  This helps to
     # have a matching Keystroke.mode, determined by active enabled modes,
     # preferring pixels if enabled, the specification would require the *order*
     # that they were enabled and disabled in case of conflict, too much code to
     # be practical.
-    DEC_EVENT_PATTERN(mode=DecPrivateMode.MOUSE_EXTENDED_SGR, pattern=(
+    DECEventPattern(mode=DecPrivateMode.MOUSE_EXTENDED_SGR, pattern=(
         re.compile(r'\x1b\[<?(?P<b>\d+);(?P<x>\d+);(?P<y>\d+)(?P<type>[mM])'))),
     # Legacy mouse (X10/1000/1002/1003) - CSI M followed by 3 bytes
-    DEC_EVENT_PATTERN(mode=DecPrivateMode.MOUSE_REPORT_CLICK,
-                      pattern=re.compile(r'\x1b\[M(?P<cb>.)(?P<cx>.)(?P<cy>.)')),
+    DECEventPattern(mode=DecPrivateMode.MOUSE_REPORT_CLICK,
+                    pattern=re.compile(r'\x1b\[M(?P<cb>.)(?P<cx>.)(?P<cy>.)')),
     # Focus tracking, is just 'I'n or 'O'ut
-    DEC_EVENT_PATTERN(mode=DecPrivateMode.FOCUS_IN_OUT_EVENTS,
-                      pattern=re.compile(r'\x1b\[(?P<io>[IO])'))
+    DECEventPattern(mode=DecPrivateMode.FOCUS_IN_OUT_EVENTS,
+                    pattern=re.compile(r'\x1b\[(?P<io>[IO])'))
 ]
 
 # Match Kitty keyboard protocol: ESC [ ... u
@@ -90,6 +90,28 @@ KITTY_KB_PROTOCOL_PATTERN = re.compile(
 MODIFY_PATTERN = re.compile(r'\x1b\[27;(?P<modifiers>\d+);(?P<key>\d+)(?P<tilde>~?)')
 CTRL_CHAR_SYMBOLS_MAP = {'@': 0, '[': 27, '\\': 28, ']': 29, '^': 30, '_': 31, '?': 127}
 CTRL_CODE_SYMBOLS_MAP = {v: k for k, v in CTRL_CHAR_SYMBOLS_MAP.items()}
+
+
+class KittyModifierBits:
+    """Kitty keyboard protocol modifier bit flags."""
+    # pylint: disable=too-few-public-methods
+
+    shift = 0b1
+    alt = 0b10
+    ctrl = 0b100
+    super = 0b1000
+    hyper = 0b10000
+    meta = 0b100000
+    caps_lock = 0b1000000
+    num_lock = 0b10000000
+
+    #: Names of (kitty-derived) bitwise flags attached to this class
+    names = ('shift', 'alt', 'ctrl', 'super', 'hyper', 'meta',
+             'caps_lock', 'num_lock')
+
+    #: Modifiers only, in the generally preferred order in phrasing, eg. "CTRL + ALT + DELETE"
+    #: is, aparently, KEY_CTRL_ALT_SHIFT_SUPER_HYPER_META('a')
+    names_modifiers_only = ('ctrl', 'alt', 'shift', 'super', 'hyper', 'meta')
 
 
 class Keystroke(str):
@@ -116,9 +138,10 @@ class Keystroke(str):
     a structured namedtuple with parsed event data.
     """
 
-    def __new__(cls: typing.Type[_T], ucs: str = '', code: typing.Optional[int] = None,
-                name: typing.Optional[str] = None, mode: typing.Optional[int] = None,
-                match: typing.Any = None) -> _T:
+    def __new__(   # pylint: disable=too-many-positional-arguments
+            cls: typing.Type[_T], ucs: str = '', code: typing.Optional[int] = None,
+            name: typing.Optional[str] = None, mode: typing.Optional[int] = None,
+            match: typing.Any = None) -> _T:
         """Class constructor."""
         new = str.__new__(cls, ucs)
         new._name = name
@@ -146,24 +169,25 @@ class Keystroke(str):
             # Special C0 controls that should be Alt-only per legacy spec
             # These represent common Alt+key combinations that are unambiguous
             if char_code in (0x0d, 0x1b, 0x7f, 0x09):  # Enter, Escape, DEL, Tab
-                return 1 + 0b10  # 1 + alt flag = 3
+                return 1 + KittyModifierBits.alt  # 1 + alt flag = 3
 
             # Other control characters represent Ctrl+Alt combinations
             # (ESC prefix for Alt + control char from Ctrl+letter mapping)
             if 0 <= char_code <= 31 or char_code == 127:
-                return 1 + 0b10 + 0b100  # 1 + alt flag + ctrl flag = 7
+                # 1 + alt flag + ctrl flag = 7
+                return 1 + KittyModifierBits.alt + KittyModifierBits.ctrl
 
             # Printable characters - Alt-only unless uppercase letter (which adds Shift)
             if 32 <= char_code <= 126:
                 ch = ucs[1]
-                shift = 0b1 if ch.isalpha() and ch.isupper() else 0
-                return 1 + 0b10 + shift  # add shift for Alt+uppercase
+                shift = KittyModifierBits.shift if ch.isalpha() and ch.isupper() else 0
+                return 1 + KittyModifierBits.alt + shift  # add shift for Alt+uppercase
 
         # Legacy Ctrl: single control character
         if len(ucs) == 1:
             char_code = ord(ucs)
             if 0 <= char_code <= 31 or char_code == 127:
-                return 1 + 0b100  # 1 + ctrl flag = 5
+                return 1 + KittyModifierBits.ctrl  # 1 + ctrl flag = 5
 
         # No modifiers detected
         return 1
@@ -201,6 +225,8 @@ class Keystroke(str):
         If this value is None, then it can probably be assumed that the
         ``value`` is an unsurprising textual character without any modifiers.
         """
+        # pylint:
+        # disable=too-many-return-statements,too-many-branches,too-many-statements,too-complex
         if self._name is not None:
             return self._name
 
@@ -219,7 +245,7 @@ class Keystroke(str):
                 # Build possible modifier prefix series (excludes num/capslock)
                 # "Ctrl + Alt + Shift + Super / Meta"
                 mod_parts = []
-                for mod_name in ('ctrl', 'alt', 'shift', 'super', 'meta', 'hyper'):
+                for mod_name in KittyModifierBits.names_modifiers_only:
                     if getattr(self, f'_{mod_name}'):        # 'if self._shift'
                         mod_parts.append(mod_name.upper())   # -> 'SHIFT'
                 if mod_parts:
@@ -227,7 +253,7 @@ class Keystroke(str):
                     # Append event type suffix if not a press event
                     if self.repeated:
                         return f"{base_result}_REPEATED"
-                    elif self.released:
+                    if self.released:
                         return f"{base_result}_RELEASED"
                     return base_result
 
@@ -257,7 +283,7 @@ class Keystroke(str):
 
                     # Build modifier prefix list in order: CTRL, ALT, SHIFT, SUPER, HYPER, META
                     mod_parts = []
-                    for mod_name in ('ctrl', 'alt', 'shift', 'super', 'hyper', 'meta'):
+                    for mod_name in KittyModifierBits.names_modifiers_only:
                         if getattr(self, f'_{mod_name}'):
                             mod_parts.append(mod_name.upper())
 
@@ -272,7 +298,7 @@ class Keystroke(str):
             if 1 <= char_code <= 26:
                 # Ctrl+A through Ctrl+Z
                 return f'CTRL_{chr(char_code + ord("A") - 1)}'
-            elif char_code in CTRL_CODE_SYMBOLS_MAP:
+            if char_code in CTRL_CODE_SYMBOLS_MAP:
                 return f'CTRL_{CTRL_CODE_SYMBOLS_MAP[char_code]}'
 
         # Synthesize for metaSendsEscape, legacy fall-through for \x1b char ->
@@ -297,13 +323,13 @@ class Keystroke(str):
                         # Special C0 controls that are Alt-only
                         if char_code == 0x1b:  # ESC
                             return 'ALT_ESCAPE'
-                        elif char_code == 0x7f:  # DEL
+                        if char_code == 0x7f:  # DEL
                             return 'ALT_BACKSPACE'
-                        elif char_code == 0x0d:  # CR
+                        if char_code == 0x0d:  # CR
                             return 'ALT_ENTER'
-                        elif char_code == 0x09:  # TAB
+                        if char_code == 0x09:  # TAB
                             return 'ALT_TAB'
-                        elif char_code == 0x5b:  # '[', CSI !
+                        if char_code == 0x5b:  # '[', CSI !
                             return 'CSI'
                     elif self.modifiers == 7:  # Ctrl+Alt (1 + 2 + 4)
                         return f'CTRL_ALT_{symbol}'
@@ -314,11 +340,9 @@ class Keystroke(str):
                 if ch.isalpha():
                     if ch.isupper():
                         return f'ALT_SHIFT_{ch}'
-                    else:
-                        return f'ALT_{ch.upper()}'
-                else:
-                    return f'ALT_{ch}'
-            elif self[1] == '\x7f' and self.modifiers == 3:
+                    return f'ALT_{ch.upper()}'
+                return f'ALT_{ch}'
+            if self[1] == '\x7f' and self.modifiers == 3:
                 return 'ALT_BACKSPACE'
 
         return self._name
@@ -337,6 +361,7 @@ class Keystroke(str):
         :returns: Kitty-style modifiers value (1 means no modifiers)
 
         The value is 1 + bitwise OR of modifier flags:
+
         - shift: 0b1 (1)
         - alt: 0b10 (2)
         - ctrl: 0b100 (4)
@@ -379,6 +404,7 @@ class Keystroke(str):
         - DEC events: bracketed paste, mouse, etc. → ''
         - Release events: always → ''
         """
+        # pylint: disable=too-many-return-statements,too-many-branches disable=too-complex
         # Release events never have text
         if self.released:
             return ''
@@ -417,7 +443,7 @@ class Keystroke(str):
             # Use unicode_key (supports any valid Unicode codepoint)
             if hasattr(self._match, 'unicode_key'):
                 # Check if this is a PUA modifier key (which don't produce text)
-                if (KEY_LEFT_SHIFT <= self._match.unicode_key <= KEY_RIGHT_META):
+                if KEY_LEFT_SHIFT <= self._match.unicode_key <= KEY_RIGHT_META:
                     return ''  # Modifier keys don't produce text
                 return chr(self._match.unicode_key)
 
@@ -446,52 +472,52 @@ class Keystroke(str):
     @property
     def _shift(self) -> bool:
         """Whether the shift modifier is active."""
-        return bool(self.modifiers_bits & 0b1)
+        return bool(self.modifiers_bits & KittyModifierBits.shift)
 
     @property
     def _alt(self) -> bool:
         """Whether the alt modifier is active."""
-        return bool(self.modifiers_bits & 0b10)
+        return bool(self.modifiers_bits & KittyModifierBits.alt)
 
     @property
     def _ctrl(self) -> bool:
         """Whether the ctrl modifier is active."""
-        return bool(self.modifiers_bits & 0b100)
+        return bool(self.modifiers_bits & KittyModifierBits.ctrl)
 
     @property
     def _super(self) -> bool:
         """Whether the super (Windows/Cmd) modifier is active."""
-        return bool(self.modifiers_bits & 0b1000)
+        return bool(self.modifiers_bits & KittyModifierBits.super)
 
     @property
     def _hyper(self) -> bool:
         """Whether the hyper modifier is active."""
-        return bool(self.modifiers_bits & 0b10000)
+        return bool(self.modifiers_bits & KittyModifierBits.hyper)
 
     @property
     def _meta(self) -> bool:
         """Whether the meta modifier is active."""
-        return bool(self.modifiers_bits & 0b100000)
+        return bool(self.modifiers_bits & KittyModifierBits.meta)
 
     @property
     def _caps_lock(self) -> bool:
         """Whether caps lock was known to be active during this sequence."""
-        return bool(self.modifiers_bits & 0b1000000)
+        return bool(self.modifiers_bits & KittyModifierBits.caps_lock)
 
     @property
     def _num_lock(self) -> bool:
         """Whether num lock was known to be active during this sequence."""
-        return bool(self.modifiers_bits & 0b10000000)
+        return bool(self.modifiers_bits & KittyModifierBits.num_lock)
 
-    @property
-    def caps_lock(self) -> bool:
-        """Whether caps lock was known to be active during this sequence."""
-        return bool(self.modifiers_bits & 0b1000000)
-
-    @property
-    def num_lock(self) -> bool:
-        """Whether num lock was known to be active during this sequence."""
-        return bool(self.modifiers_bits & 0b10000000)
+#    @property
+#    def caps_lock(self) -> bool:
+#        """Whether caps lock was known to be active during this sequence."""
+#        return self._caps_lock
+#
+#    @property
+#    def num_lock(self) -> bool:
+#        """Whether num lock was known to be active during this sequence."""
+#        return self.num_lock
 
     @property
     def pressed(self) -> bool:
@@ -600,6 +626,7 @@ class Keystroke(str):
 
         :rtype: namedtuple
         :returns: Structured event data for this DEC mode event
+        :raises TypeError: If mode is None or if mode is an unsupported DEC mode
         """
         if self._mode is None or self._match is None:
             raise TypeError("Should only call mode_values() when event_mode is non-None")
@@ -633,7 +660,7 @@ class Keystroke(str):
 
         # Extract button and modifiers from cb
         button = cb & 3
-        is_release = (button == 3)
+        is_release = button == 3
         if is_release:
             button = 0  # Release doesn't specify which button
 
@@ -647,7 +674,7 @@ class Keystroke(str):
         is_drag = is_motion and not is_release
 
         # Wheel events
-        is_wheel = (cb >= 64)
+        is_wheel = cb >= 64
         if is_wheel:
             button = cb - 64  # 0=wheel up, 1=wheel down
 
@@ -666,8 +693,8 @@ class Keystroke(str):
 
     def _parse_focus(self) -> FocusEvent:
         """Parse focus event from stored regex match."""
-        io = self._match.group('io')
-        return FocusEvent(gained=(io == 'I'))
+        gained = bool(self._match.group('io') == 'I')
+        return FocusEvent(gained=gained)
 
     def _parse_mouse_sgr(self) -> MouseSGREvent:
         """
@@ -684,7 +711,7 @@ class Keystroke(str):
         y = int(self._match.group('y'))
         event_type = self._match.group('type')
 
-        is_release = (event_type == 'm')
+        is_release = event_type == 'm'
 
         # Extract modifiers from button code
         shift = bool(b & 4)
@@ -693,7 +720,7 @@ class Keystroke(str):
 
         # Extract event type flags
         is_drag = bool(b & 32)
-        is_wheel = (b == 64 or b == 65)  # wheel up/down
+        is_wheel = b in (64, 65)  # wheel up/down
 
         # Get base button (0-2 for left/middle/right, or 64-65 for wheel)
         button = b & 3 if not is_wheel else b
@@ -732,6 +759,7 @@ class Keystroke(str):
              ks.is_key_shift_f2_released()  # - Shift+F2 release event
              ks.is_ctrl_a_repeated()        # - Ctrl+a repeat event
         """
+        # pylint: disable=too-complex
         if attr.startswith('is_'):
             # Extract tokens after 'is_'
             tokens_str = attr[3:]  # Remove 'is_' prefix
@@ -780,27 +808,16 @@ class Keystroke(str):
                         return False
 
                     # Check event type
-                    if event_type == 'pressed':
-                        return self.pressed
-                    elif event_type == 'released':
-                        return self.released
-                    elif event_type == 'repeated':
-                        return self.repeated
-                    return False
-
+                    return {'pressed': self.pressed,
+                            'released': self.released,
+                            'repeated': self.repeated}.get(event_type, False)
                 return event_predicate
 
             tokens = tokens_str.split('_')
 
             # Validate tokens - only allow known modifier names
-            valid_tokens = {
-                'shift',
-                'alt',
-                'ctrl',
-                'super',
-                'hyper',
-                'meta'}
-            invalid_tokens = [token for token in tokens if token not in valid_tokens]
+            invalid_tokens = [token for token in tokens
+                              if token not in KittyModifierBits.names_modifiers_only]
             if invalid_tokens:
                 raise AttributeError(f"'{self.__class__.__name__}' object has no attribute "
                                      f"'{attr}' (invalid modifier tokens: {invalid_tokens})")
@@ -811,33 +828,18 @@ class Keystroke(str):
                 # Build expected modifier bits from tokens
                 expected_bits = 0
                 for token in tokens:
-                    if token == 'shift':
-                        expected_bits |= 0b1
-                    elif token == 'alt':
-                        expected_bits |= 0b10
-                    elif token == 'ctrl':
-                        expected_bits |= 0b100
-                    elif token == 'super':
-                        expected_bits |= 0b1000
-                    elif token == 'hyper':
-                        expected_bits |= 0b10000
-                    elif token == 'meta':
-                        expected_bits |= 0b100000
-                    elif token == 'caps_lock':
-                        expected_bits |= 0b1000000
-                    elif token == 'num_lock':
-                        expected_bits |= 0b10000000
+                    expected_bits |= getattr(KittyModifierBits, token)
 
-                # Get effective modifier bits (ignoring caps_lock/num_lock) for exact matching
+                # Get effective modifier bits for exact matching
                 if exact:
+                    # even with 'exact', Strip lock bits to ignore caps_lock and num_lock
                     effective_bits = self.modifiers_bits & ~(
-                        0b1000000 | 0b10000000)  # Strip lock bits
+                        KittyModifierBits.caps_lock | KittyModifierBits.num_lock)
                     if effective_bits != expected_bits:
                         return False
-                else:
-                    # Subset check - all expected bits must be present
-                    if (self.modifiers_bits & expected_bits) != expected_bits:
-                        return False
+                # Subset check - all expected bits must be present
+                elif (self.modifiers_bits & expected_bits) != expected_bits:
+                    return False
 
                 # If no character specified, just check modifiers
                 if char is None:
@@ -854,8 +856,7 @@ class Keystroke(str):
                 # Compare characters
                 if ignore_case:
                     return keystroke_char.lower() == char.lower()
-                else:
-                    return keystroke_char == char
+                return keystroke_char == char
 
             return modifier_predicate
 
@@ -932,7 +933,6 @@ class DeviceAttribute(object):
         :returns: DeviceAttribute instance if parsing succeeds, None otherwise
         """
         # Match pattern: ESC [ ? service_class ; extension1 ; extension2 ; ... c
-        import re
         pattern = re.compile(r'\x1b\[\?([0-9]+)((?:;[0-9]+)*)c')
         match = pattern.match(response_str)
 
@@ -1087,9 +1087,10 @@ def get_leading_prefixes(sequences: typing.Iterable[str]) -> Set[str]:
     return {seq[:i] for seq in sequences for i in range(1, len(seq))}
 
 
-def resolve_sequence(text: str, mapper: 'OrderedDict[str, int]', codes: Dict[int, str],
-                     prefixes: Set[str], final: bool = False,
-                     mode_1016_active: Optional[bool] = None) -> Keystroke:
+def resolve_sequence(  # pylint: disable=too-many-positional-arguments
+        text: str, mapper: 'OrderedDict[str, int]', codes: Dict[int, str],
+        prefixes: Set[str], final: bool = False,
+        mode_1016_active: Optional[bool] = None) -> Keystroke:
     r"""
     Return a single :class:`Keystroke` instance for given sequence ``text``.
 
@@ -1098,7 +1099,9 @@ def resolve_sequence(text: str, mapper: 'OrderedDict[str, int]', codes: Dict[int
         paired by their integer value (260)
     :arg dict codes: a :type:`dict` of integer values (such as 260) paired
         by their mnemonic name, such as ``'KEY_LEFT'``.
-    :arg Terminal term: Terminal instance for checking enabled DEC modes (optional)
+    :arg set prefixes: Set of all valid sequence prefixes for quick matching
+    :arg bool final: Whether this is the final resolution attempt (no more input expected)
+    :arg bool mode_1016_active: Whether SGR-Pixels mouse mode (1016) is active
     :rtype: Keystroke
     :returns: Keystroke instance for the given sequence
 
@@ -1391,12 +1394,11 @@ def _match_legacy_csi_modifiers(text: str) -> Optional[Keystroke]:
             25: curses.KEY_F13,
             26: curses.KEY_F14,
             28: curses.KEY_F15,
-            29: KEY_MENU,          # Menu key  # pylint: disable=undefined-variable
+            29: KEY_MENU,
             31: curses.KEY_F17,
             32: curses.KEY_F18,
             33: curses.KEY_F19,
             34: curses.KEY_F20,
-            29: KEY_MENU,           # Menu key  # pylint: disable=undefined-variable
         }.get(key_id)
 
         if keycode_match is not None:
@@ -1741,7 +1743,7 @@ class KittyKeyboardProtocol:
         """Check equality based on flag values."""
         if isinstance(other, KittyKeyboardProtocol):
             return self.value == other.value
-        elif isinstance(other, int):
+        if isinstance(other, int):
             return self.value == other
         return False
 

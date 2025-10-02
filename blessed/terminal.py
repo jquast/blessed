@@ -263,6 +263,7 @@ class Terminal(object):
         self._kitty_kb_first_query_attempted = False
 
         # Device Attributes (DA1) cache
+        # pylint: disable=attribute-defined-outside-init
         self._device_attributes_cache: Optional[DeviceAttribute] = None
 
     def __init__streams(self) -> None:
@@ -903,11 +904,13 @@ class Terminal(object):
         to recognize the new settings rather than to repeatidly re-inquire about
         their latest value!
 
-        :arg DecPrivateMode | int mode: DEC Private Mode
+        :arg mode: DEC Private Mode to query
+        :type mode: DecPrivateMode | int
         :arg float timeout: Timeout in seconds to await terminal response
         :arg bool force: Force active terminal inquery in all cases
         :rtype: DecModeResponse
         :returns: DecModeResponse instance
+        :raises TypeError: If mode is not DecPrivateMode or int
 
         .. code-block:: python
 
@@ -918,7 +921,8 @@ class Terminal(object):
             if response.is_supported():
                 print("Synchronized output is available")
         """
-        if not (isinstance(mode, int) or isinstance(mode, DecPrivateMode)):
+        # pylint: disable=too-many-return-statements
+        if not isinstance(mode, (int, DecPrivateMode)):
             raise TypeError("Invalid mode argument, got {0!r}, "
                             "DecPrivateMode or int expected".format(mode))
 
@@ -941,6 +945,9 @@ class Terminal(object):
         response_pattern = re.compile('\x1b\\[\\?{0:d};([0-4])\\$y'.format(int(mode)))
 
         match = self._query_response(query, response_pattern, timeout)
+
+        # pylint issues with _dec_first_query_failed and _dec_any_query_succeeded
+        # ignored, pylint: disable=attribute-defined-outside-init
 
         # invalid or no response (timeout)
         if match is None:
@@ -1012,6 +1019,7 @@ class Terminal(object):
         :rtype: KittyKeyboardProtocol or None
         :returns: KittyKeyboardProtocol instance with current flags, or None if unsupported/timeout
         """
+        # pylint: disable=too-many-return-statements
         if not self.does_styling or not self.is_a_tty:
             # no query is ever done for terminals where does_styling or is_a_tty is False
             return None
@@ -1020,6 +1028,10 @@ class Terminal(object):
             # When the first query is not responded, we can safely assume all
             # subsequent inquiries will be ignored
             return None
+
+        # ignore pylint problem with '_kitty_kb_first_query_attempted', because this
+        # variable is defined outside of init (__init__dec_private_modes)
+        # pylint: disable=attribute-defined-outside-init
 
         # Use boundary approach on first query attempt (when not previously
         # attempted and not forced)
@@ -1133,9 +1145,9 @@ class Terminal(object):
             return None
 
         # parse, cache, and return the response
-        device_attr = DeviceAttribute.from_match(match)
-        self._device_attributes_cache = device_attr
-        return device_attr
+        # pylint: disable=attribute-defined-outside-init
+        self._device_attributes_cache = DeviceAttribute.from_match(match)
+        return self._device_attributes_cache
 
     def does_sixel(self, timeout: Optional[float] = None) -> bool:
         """
@@ -1178,6 +1190,7 @@ class Terminal(object):
 
         :arg modes: One or more DEC Private Mode numbers or enum members
         :arg float timeout: Timeout in seconds for get_dec_mode calls
+        :raises TypeError: If mode is not DecPrivateMode or int
 
         .. code-block:: python
 
@@ -1224,6 +1237,7 @@ class Terminal(object):
 
         :arg modes: One or more DEC Private Mode numbers or enum members
         :arg float timeout: Timeout in seconds for get_dec_mode calls
+        :raises TypeError: If mode is not DecPrivateMode or int
         """
         # Track modes disabled ('RESET") to be re-enabled ('SET') after the yield
         disabled_modes = []

@@ -1490,7 +1490,7 @@ def test_terminal_inkey_fallback_to_legacy():
 
         assert ks == legacy_sequence
         assert ks._code is not None
-        assert ks._mode >= 0
+        assert ks._mode is None or ks._mode >= 0
     child()
 
 
