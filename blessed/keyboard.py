@@ -181,7 +181,7 @@ class Keystroke(str):
 
     @property
     def name(self) -> Optional[str]:
-        """
+        r"""
         Special application key name.
 
         This is the best equality attribute to use for special keys, as raw
@@ -360,7 +360,7 @@ class Keystroke(str):
 
     @property
     def value(self) -> str:
-        """
+        r"""
         The textual character represented by this keystroke.
 
         :rtype: str
@@ -368,7 +368,8 @@ class Keystroke(str):
                   For application keys and sequences, returns empty string ''.
                   For release events, always returns empty string.
 
-        Examples:
+        Some Examples,
+        
         - Plain text: 'a', 'A', '1', ';', ' ', 'Ω', emoji with ZWJ sequences
         - Alt+printable: Alt+a → 'a', Alt+A → 'A'
         - Ctrl+letter: Ctrl+A → 'a', Ctrl+Z → 'z'
@@ -377,6 +378,7 @@ class Keystroke(str):
         - Application keys: KEY_UP, KEY_F1, etc. → ''
         - DEC events: bracketed paste, mouse, etc. → ''
         - Release events: always → ''
+
         """
         # Release events never have text
         if self.released:
@@ -724,11 +726,13 @@ class Keystroke(str):
         :rtype: callable or raises AttributeError
         :returns: Callable predicate function for modifier combinations
 
-        Examples:
-        - ks.is_alt('a') - Alt-only with character 'a'
-        - ks.is_ctrl_shift() - exactly Ctrl+Shift, no other modifiers
-        - ks.is_key_shift_f2_released() - Shift+F2 release event
-        - ks.is_ctrl_a_repeated() - Ctrl+a repeat event
+        Examples::
+
+             ks.is_alt('a')                 # - Alt-only with character 'a'
+             ks.is_ctrl_shift()             # - exactly Ctrl+Shift, no other modifiers
+             ks.is_key_shift_f2_released()  # - Shift+F2 release event
+             ks.is_ctrl_a_repeated()        # - Ctrl+a repeat event
+
         """
         if attr.startswith('is_'):
             # Extract tokens after 'is_'
@@ -922,10 +926,10 @@ class DeviceAttribute(object):
 
     @classmethod
     def from_string(cls, response_str: str) -> Optional['DeviceAttribute']:
-        """
+        r"""
         Create DeviceAttribute by parsing response string.
 
-        :arg str response_str: DA1 response string like '\x1b[?64;1;2;4;7c'
+        :arg str response_str: DA1 response string like ``\x1b[?64;1;2;4;7c``
         :rtype: DeviceAttribute or None
         :returns: DeviceAttribute instance if parsing succeeds, None otherwise
         """

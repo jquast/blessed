@@ -1975,12 +1975,14 @@ class Terminal(object):
 
         Always queries current state before setting new flags and restores previous state on exit.
 
-        Example:
+        Example::
+
             with term.enable_kitty_keyboard(disambiguate=True):
                 # Now Alt+C won't conflict with Ctrl+C
                 key = term.inkey()
                 if key.alt and key.is_alt('c'):
                     print("Alt+C pressed")
+
         """
         if not self.does_styling:
             yield
@@ -2036,11 +2038,13 @@ class Terminal(object):
         This enables modified keys like Ctrl+, and Ctrl+. to be distinguished from their
         unmodified counterparts. Level 2 provides the broadest support.
 
-        Example:
+        Example::
+
             with term.modify_other_keys(level=2):
                 key = term.inkey()
                 if key.is_ctrl(','):
                     print("Ctrl+comma detected")
+
         """
         if not self.does_styling:
             yield
@@ -2091,8 +2095,8 @@ class Terminal(object):
         return False
 
     def flushinp(self, timeout: float = 0) -> str:
-        """
-        This method unbuffers and returns all input available within ``timeout``.
+        r"""
+        Unbuffer and return all input available within ``timeout``.
 
         When CSI ``'\x1b['`` is detected in input stream, all remaining bytes
         are decoded as latin1.
