@@ -70,7 +70,7 @@ class TestDECEventMatching:
         """Test that invalid sequences return None."""
         assert _match_dec_event(sequence) is None
 
-    def test_bracketed_paste_detection(self, bracketed_paste_sequence):  # pylint: disable=redefined-outer-name
+    def test_bracketed_paste_detection(self, bracketed_paste_sequence):
         """Test bracketed paste sequence detection."""
         ks = _match_dec_event(bracketed_paste_sequence)
 
@@ -83,7 +83,7 @@ class TestDECEventMatching:
         assert isinstance(values, BracketedPasteEvent)
         assert values.text == 'hello world'
 
-    def test_bracketed_paste_multiline(self, multiline_paste_sequence):  # pylint: disable=redefined-outer-name
+    def test_bracketed_paste_multiline(self, multiline_paste_sequence):
         """Test bracketed paste with multiline content."""
         ks = _match_dec_event(multiline_paste_sequence)
 
@@ -91,7 +91,7 @@ class TestDECEventMatching:
         values = ks.mode_values()
         assert values.text == 'line1\nline2\tindented'
 
-    def test_mouse_sgr_events(self, sgr_mouse_sequences):  # pylint: disable=redefined-outer-name
+    def test_mouse_sgr_events(self, sgr_mouse_sequences):
         """Test SGR mouse events using fixtures."""
         # Test press event
         ks_press = _match_dec_event(sgr_mouse_sequences['press'])
@@ -126,7 +126,7 @@ class TestDECEventMatching:
         values_down = ks_wheel_down.mode_values()
         assert values_down.button == 65 and values_down.is_wheel
 
-    def test_mouse_legacy_events(self, legacy_mouse_sequences):  # pylint: disable=redefined-outer-name
+    def test_mouse_legacy_events(self, legacy_mouse_sequences):
         """Test legacy mouse events using fixtures."""
         # Test press event
         ks_press = _match_dec_event(legacy_mouse_sequences['press'])
@@ -142,7 +142,7 @@ class TestDECEventMatching:
         values = ks_release.mode_values()
         assert values.is_release and values.button == 0
 
-    def test_focus_events(self, focus_sequences):  # pylint: disable=redefined-outer-name
+    def test_focus_events(self, focus_sequences):
         """Test focus events using fixtures."""
         # Test focus gained
         ks_gained = _match_dec_event(focus_sequences['gained'])
