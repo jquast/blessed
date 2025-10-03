@@ -1,7 +1,6 @@
 # std imports
 import os
 import sys
-import json
 import runpy
 import functools
 
@@ -99,9 +98,7 @@ copyright = '2011 Erik Rose, Jeff Quast, Avram Lubkin'
 # built documents.
 #
 # The short X.Y version.
-version = json.load(
-    open(os.path.join(HERE, os.pardir, 'version.json'), 'r')
-)['version']
+from blessed import __version__ as version  # isort:skip # noqa
 
 # The full version, including alpha/beta/rc tags.
 release = version

@@ -1,0 +1,66 @@
+[build-system]
+requires = ['setuptools >= 68']
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = 'blessed'
+description = """\
+    Easy, practical library for making terminal apps, by providing an elegant, \
+    well-documented interface to Colors, Keyboard input, and screen Positioning capabilities.\
+"""
+authors = [
+    {name = 'Jeff Quast, Erik Rose, Avram Lubkin', email = 'contact@jeffquast.com'},
+]
+
+classifiers = [
+    'Intended Audience :: Developers',
+    'Natural Language :: English',
+    'Development Status :: 5 - Production/Stable',
+    'Environment :: Console',
+    'Environment :: Console :: Curses',
+    'Operating System :: POSIX',
+    'Operating System :: Microsoft :: Windows',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Topic :: Software Development :: Libraries',
+    'Topic :: Software Development :: User Interfaces',
+    'Topic :: Terminals',
+    'Typing :: Typed',
+]
+dynamic = ['dependencies', 'version']
+
+# The license spec changed with Setuptools 77, but that requires Python >=3.9
+# license = 'MIT'
+# license-files = ['LICENSE']
+license = {text = 'MIT'}
+
+
+keywords = ['terminal', 'sequences', 'tty', 'curses', 'ncurses', 'formatting',
+            'style', 'color', 'console', 'keyboard', 'ansi', 'xterm']
+readme = 'docs/intro.rst'
+requires-python = '>=3.7'
+
+[project.urls]
+Homepage = 'https://github.com/jquast/blessed'
+Documentation = 'https://blessed.readthedocs.io'
+Repository = 'https://github.com/jquast/blessed'
+Issues = 'https://github.com/jquast/blessed/issues'
+Changelog = 'https://blessed.readthedocs.io/en/latest/history.html'
+
+[tool.setuptools]
+# license-files is no longer needed after Setuptools 77
+license-files = ['LICENSE']
+packages = ['blessed']
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+version = {attr = 'blessed.__version__'}
+
+[tool.setuptools.package-data]
+'blessed' = ['py.typed']
