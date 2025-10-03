@@ -37,10 +37,10 @@ class Terminal(_Terminal):
         automatically retrieved.
         """
         if win32.VTMODE_SUPPORTED:
-            return super(Terminal, self).getch()
+            return super().getch()
 
         rtn = msvcrt.getwch()
-        if rtn in ('\x00', '\xe0'):
+        if rtn in {'\x00', '\xe0'}:
             rtn += msvcrt.getwch()
         return rtn
 
@@ -122,7 +122,7 @@ class Terminal(_Terminal):
             save_mode = win32.get_console_mode(filehandle)
             save_line_buffered = self._line_buffered
             win32.setcbreak(filehandle)
-            # pylint: disable=attribute-defined-outside-init
+
             try:
                 self._line_buffered = False
                 yield
@@ -154,7 +154,7 @@ class Terminal(_Terminal):
             save_mode = win32.get_console_mode(filehandle)
             save_line_buffered = self._line_buffered
             win32.setraw(filehandle)
-            # pylint: disable=attribute-defined-outside-init
+
             try:
                 self._line_buffered = False
                 yield

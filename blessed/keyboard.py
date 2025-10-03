@@ -477,7 +477,7 @@ DEFAULT_ESCDELAY = 0.35
 
 
 def _reinit_escdelay() -> None:
-    # pylint: disable=W0603
+    # pylint: disable=global-statement
     # Using the global statement: this is necessary to
     # allow test coverage without complex module reload
     global DEFAULT_ESCDELAY

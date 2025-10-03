@@ -26,7 +26,7 @@ if platform.system() != 'Windows':
     import curses
 else:
     # 3rd party
-    import jinxed as curses
+    import jinxed as curses  # pylint: disable=import-error
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="?")

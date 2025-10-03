@@ -66,7 +66,6 @@ class ParameterizingString(str):
     """
 
     def __new__(cls: Type[_T], cap: str, normal: str = '', name: str = '<not specified>') -> _T:
-        # pylint: disable = missing-return-doc, missing-return-type-doc
         """
         Class constructor accepting 3 positional arguments.
 
@@ -103,8 +102,8 @@ class ParameterizingString(str):
             # something intelligent:
             if args and isinstance(args[0], str):
                 raise TypeError(
-                    "Unknown terminal capability, %r, or, TypeError "
-                    "for arguments %r: %s" % (self._name, args, err))
+                    f"Unknown terminal capability, {self._name!r}, or, TypeError "
+                    f"for arguments {args!r}: {err}") from err
             # Somebody passed a non-string; I don't feel confident
             # guessing what they were trying to do.
             raise
@@ -143,7 +142,6 @@ class ParameterizingProxyString(str):
 
     def __new__(cls: Type[_T], fmt_pair: Tuple[str, Callable[..., Tuple[object, ...]]],
                 normal: str = '', name: str = '<not specified>') -> _T:
-        # pylint: disable = missing-return-doc, missing-return-type-doc
         """
         Class constructor accepting 4 positional arguments.
 
@@ -197,7 +195,6 @@ class FormattingString(str):
     """
 
     def __new__(cls: Type[_T], sequence: str, normal: str = '') -> _T:
-        # pylint: disable = missing-return-doc, missing-return-type-doc
         """
         Class constructor accepting 2 positional arguments.
 
@@ -224,8 +221,8 @@ class FormattingString(str):
         for idx, ucs_part in enumerate(args):
             if not isinstance(ucs_part, str):
                 raise TypeError(
-                    "TypeError for FormattingString argument, %r, at position %s: expected type "
-                    "%s, got %s" % (ucs_part, idx, str.__name__, type(ucs_part).__name__)
+                    f"TypeError for FormattingString argument, {ucs_part!r}, at position {idx}: "
+                    f"expected type {str.__name__}, got {type(ucs_part).__name__}"
                 )
         postfix = ''
         if self and self._normal:
@@ -257,7 +254,6 @@ class FormattingOtherString(str):
     """
 
     def __new__(cls: Type[_T], direct: ParameterizingString, target: ParameterizingString) -> _T:
-        # pylint: disable = missing-return-doc, missing-return-type-doc
         """
         Class constructor accepting 2 positional arguments.
 
@@ -427,8 +423,7 @@ def resolve_color(term: 'Terminal', color: str) -> Union[NullCallableString, For
         # bright colors at 8-15:
         offset = 8 if 'bright_' in color else 0
         base_color = color.rsplit('_', 1)[-1]
-        attr = 'COLOR_%s' % (base_color.upper(),)
-        fmt_attr = vga_color_cap(getattr(curses, attr) + offset)
+        fmt_attr = vga_color_cap(getattr(curses, f'COLOR_{base_color.upper()}') + offset)
         return FormattingString(fmt_attr, term.normal)
 
     assert base_color in X11_COLORNAMES_TO_RGB, (

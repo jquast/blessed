@@ -38,9 +38,7 @@ def test_SequenceWrapper_invalid_width():
         try:
             my_wrapped = term.wrap('------- -------------', WIDTH)
         except ValueError as err:
-            assert err.args[0] == (
-                "invalid width %r(%s) (must be integer > 0)" % (
-                    WIDTH, type(WIDTH)))
+            assert err.args[0] == f"invalid width {WIDTH}({type(WIDTH)}) (must be integer > 0)"
         else:
             assert False, 'Previous stmt should have raised exception.'
             del my_wrapped  # assigned but never used
