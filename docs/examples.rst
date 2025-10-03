@@ -28,15 +28,6 @@ https://github.com/jquast/blessed/blob/master/bin/bounce.py
 This is a very brief, basic primitive non-interactive version of a "classic tennis" video game. It
 demonstrates basic timed refresh of a bouncing terminal cell.
 
-.. _cnn.py:
-
-cnn.py
--------------------
-https://github.com/jquast/blessed/blob/master/bin/cnn.py
-
-This program uses 3rd-party BeautifulSoup and requests library to fetch the cnn website and display
-news article titles using the :meth:`~.Terminal.link` method, so that they may be clicked.
-
 .. _detect-multibyte.py:
 
 detect-multibyte.py

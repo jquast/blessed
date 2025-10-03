@@ -1,20 +1,19 @@
 # -*- coding: utf-8 -*-
-"""Tests for capturing keyboard input"""
+"""More advanced tests for capturing keyboard input, sometimes using pty"""
 
 # std imports
+import io
 import os
 import sys
 import math
 import time
 import signal
 import platform
-from io import StringIO
 
 # 3rd party
 import pytest
 
 # local
-from .conftest import TEST_RAW, IS_WINDOWS, TEST_QUICK, TEST_KEYBOARD
 from .accessories import (SEMAPHORE,
                           RECV_SEMAPHORE,
                           SEND_SEMAPHORE,
@@ -24,12 +23,11 @@ from .accessories import (SEMAPHORE,
                           read_until_eof,
                           read_until_semaphore,
                           init_subproc_coverage)
+from .conftest import IS_WINDOWS, TEST_KEYBOARD, TEST_QUICK, TEST_RAW
 
 try:
-    # std imports
     from unittest import mock
 except ImportError:
-    # 3rd party
     import mock
 
 got_sigwinch = False
@@ -39,23 +37,25 @@ pytestmark = pytest.mark.skipif(
     reason="Timing-sensitive tests please do not run on build farms.")
 
 
+def assert_elapsed_range(start_time, min_ms, max_ms):
+    """Assert that elapsed time in milliseconds is within range."""
+    elapsed_ms = (time.time() - start_time) * 100
+    assert min_ms <= int(elapsed_ms) <= max_ms, f"elapsed: {int(elapsed_ms)}ms"
+
+
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_kbhit_interrupted():
-    """kbhit() should not be interrupted with a signal handler."""
-    # pylint: disable=global-statement
-
-    # std imports
+    """kbhit() survives signal handler."""
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:
         cov = init_subproc_coverage('test_kbhit_interrupted')
 
-        # child pauses, writes semaphore and begins awaiting input
-        global got_sigwinch
+        global got_sigwinch  # pylint: disable=global-statement
         got_sigwinch = False
 
         def on_resize(sig, action):
-            global got_sigwinch
+            global got_sigwinch  # pylint: disable=global-statement
             got_sigwinch = True
 
         term = TestTerminal()
@@ -63,7 +63,7 @@ def test_kbhit_interrupted():
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.raw():
-            assert term.inkey(timeout=1.05) == ''
+            assert term.inkey(timeout=0.2) == u''
         os.write(sys.__stdout__.fileno(), b'complete')
         assert got_sigwinch
         if cov is not None:
@@ -80,9 +80,9 @@ def test_kbhit_interrupted():
         output = read_until_eof(master_fd)
 
     pid, status = os.waitpid(pid, 0)
-    assert output == 'complete'
+    assert output == u'complete'
     assert os.WEXITSTATUS(status) == 0
-    assert math.floor(time.time() - stime) == 1.0
+    assert_elapsed_range(stime, 15, 80)
 
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
@@ -90,7 +90,6 @@ def test_kbhit_interrupted_nonetype():
     """kbhit() should also allow interruption with timeout of None."""
     # pylint: disable=global-statement
 
-    # std imports
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:
@@ -131,7 +130,7 @@ def test_kbhit_interrupted_nonetype():
         output = read_until_eof(master_fd)
 
     pid, status = os.waitpid(pid, 0)
-    assert output == 'complete'
+    assert output == u'complete'
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0
 
@@ -140,11 +139,11 @@ def test_kbhit_no_kb():
     """kbhit() always immediately returns False without a keyboard."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
+        term = TestTerminal(stream=io.StringIO())
         stime = time.time()
         assert term._keyboard_fd is None
-        assert not term.kbhit(timeout=1.1)
-        assert math.floor(time.time() - stime) == 1.0
+        assert not term.kbhit(timeout=0.3)
+        assert_elapsed_range(stime, 25, 80)
     child()
 
 
@@ -153,70 +152,36 @@ def test_kbhit_no_tty():
     @as_subprocess
     def child():
         with mock.patch('blessed.terminal.HAS_TTY', False):
-            term = TestTerminal(stream=StringIO())
+            term = TestTerminal(stream=io.StringIO())
             stime = time.time()
             assert term.kbhit(timeout=1.1) is False
             assert math.floor(time.time() - stime) == 0
     child()
 
 
-def test_keystroke_0s_cbreak_noinput():
-    """0-second keystroke without input; '' should be returned."""
+@pytest.mark.parametrize(
+    'use_stream,timeout,expected_cs_range', [
+        (False, 0, (0, 5)), (True, 0, (0, 5)), pytest.param(
+            False, 0.3, (25, 80), marks=pytest.mark.skipif(
+                TEST_QUICK, reason="TEST_QUICK specified")), pytest.param(
+                    True, 0.3, (25, 80), marks=pytest.mark.skipif(
+                        TEST_QUICK, reason="TEST_QUICK specified")), ])
+def test_keystroke_cbreak_noinput(use_stream, timeout, expected_cs_range):
+    """Test keystroke without input with various timeout/stream combinations."""
     @as_subprocess
-    def child():
-        term = TestTerminal()
+    def child(use_stream, timeout, expected_cs_range):
+        stream = io.StringIO() if use_stream else None
+        term = TestTerminal(stream=stream)
         with term.cbreak():
             stime = time.time()
-            inp = term.inkey(timeout=0)
-            assert (inp == '')
-            assert (math.floor(time.time() - stime) == 0.0)
-    child()
-
-
-def test_keystroke_0s_cbreak_noinput_nokb():
-    """0-second keystroke without data in input stream and no keyboard/tty."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO())
-        with term.cbreak():
-            stime = time.time()
-            inp = term.inkey(timeout=0)
-            assert (inp == '')
-            assert (math.floor(time.time() - stime) == 0.0)
-    child()
-
-
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
-def test_keystroke_1s_cbreak_noinput():
-    """1-second keystroke without input; '' should be returned after ~1 second."""
-    @as_subprocess
-    def child():
-        term = TestTerminal()
-        with term.cbreak():
-            stime = time.time()
-            inp = term.inkey(timeout=1)
-            assert (inp == '')
-            assert (math.floor(time.time() - stime) == 1.0)
-    child()
-
-
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
-def test_keystroke_1s_cbreak_noinput_nokb():
-    """1-second keystroke without input or keyboard."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO())
-        with term.cbreak():
-            stime = time.time()
-            inp = term.inkey(timeout=1)
-            assert (inp == '')
-            assert (math.floor(time.time() - stime) == 1.0)
-    child()
+            inp = term.inkey(timeout=timeout)
+            assert inp == u''
+            assert_elapsed_range(stime, *expected_cs_range)
+    child(use_stream, timeout, expected_cs_range)
 
 
 def test_keystroke_0s_cbreak_with_input():
     """0-second keystroke with input; Keypress should be immediately returned."""
-    # std imports
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:
@@ -235,20 +200,19 @@ def test_keystroke_0s_cbreak_with_input():
 
     with echo_off(master_fd):
         os.write(master_fd, SEND_SEMAPHORE)
-        os.write(master_fd, 'x'.encode('ascii'))
+        os.write(master_fd, u'x'.encode('ascii'))
         read_until_semaphore(master_fd)
         stime = time.time()
         output = read_until_eof(master_fd)
 
     pid, status = os.waitpid(pid, 0)
-    assert output == 'x'
+    assert output == u'x'
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
 
 
 def test_keystroke_cbreak_with_input_slowly():
     """0-second keystroke with input; Keypress should be immediately returned."""
-    # std imports
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:
@@ -270,19 +234,19 @@ def test_keystroke_cbreak_with_input_slowly():
 
     with echo_off(master_fd):
         os.write(master_fd, SEND_SEMAPHORE)
-        os.write(master_fd, 'a'.encode('ascii'))
+        os.write(master_fd, u'a'.encode('ascii'))
         time.sleep(0.1)
-        os.write(master_fd, 'b'.encode('ascii'))
+        os.write(master_fd, u'b'.encode('ascii'))
         time.sleep(0.1)
-        os.write(master_fd, 'cdefgh'.encode('ascii'))
+        os.write(master_fd, u'cdefgh'.encode('ascii'))
         time.sleep(0.1)
-        os.write(master_fd, 'X'.encode('ascii'))
+        os.write(master_fd, u'X'.encode('ascii'))
         read_until_semaphore(master_fd)
         stime = time.time()
         output = read_until_eof(master_fd)
 
     pid, status = os.waitpid(pid, 0)
-    assert output == 'abcdefghX'
+    assert output == u'abcdefghX'
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
 
@@ -290,7 +254,6 @@ def test_keystroke_cbreak_with_input_slowly():
 def test_keystroke_0s_cbreak_multibyte_utf8():
     """0-second keystroke with multibyte utf-8 input; should decode immediately."""
     # utf-8 bytes represent "latin capital letter upsilon".
-    # std imports
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:  # child
@@ -308,12 +271,12 @@ def test_keystroke_0s_cbreak_multibyte_utf8():
 
     with echo_off(master_fd):
         os.write(master_fd, SEND_SEMAPHORE)
-        os.write(master_fd, '\u01b1'.encode('utf-8'))
+        os.write(master_fd, u'\u01b1'.encode('utf-8'))
         read_until_semaphore(master_fd)
         stime = time.time()
         output = read_until_eof(master_fd)
     pid, status = os.waitpid(pid, 0)
-    assert output == 'Ʊ'
+    assert output == u'Ʊ'
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
 
@@ -325,7 +288,6 @@ def test_keystroke_0s_cbreak_multibyte_utf8():
                     reason='os.write() raises OSError: [Errno 5] Input/output error')
 def test_keystroke_0s_raw_input_ctrl_c():
     """0-second keystroke with raw allows receiving ^C."""
-    # std imports
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:  # child
@@ -346,19 +308,18 @@ def test_keystroke_0s_raw_input_ctrl_c():
         # ensure child is in raw mode before sending ^C,
         read_until_semaphore(master_fd)
         time.sleep(0.05)
-        os.write(master_fd, '\x03'.encode('latin1'))
+        os.write(master_fd, u'\x03'.encode('latin1'))
         stime = time.time()
         output = read_until_eof(master_fd)
     pid, status = os.waitpid(pid, 0)
-    assert (output == '\x03' or
-            output == '' and not os.isatty(0))
+    assert (output == u'\x03' or
+            output == u'' and not os.isatty(0))
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
 
 
 def test_keystroke_0s_cbreak_sequence():
     """0-second keystroke with multibyte sequence; should decode immediately."""
-    # std imports
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:  # child
@@ -375,12 +336,12 @@ def test_keystroke_0s_cbreak_sequence():
         os._exit(0)
 
     with echo_off(master_fd):
-        os.write(master_fd, '\x1b[D'.encode('ascii'))
+        os.write(master_fd, u'\x1b[D'.encode('ascii'))
         read_until_semaphore(master_fd)
         stime = time.time()
         output = read_until_eof(master_fd)
     pid, status = os.waitpid(pid, 0)
-    assert output == 'KEY_LEFT'
+    assert output == u'KEY_LEFT'
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
 
@@ -388,7 +349,6 @@ def test_keystroke_0s_cbreak_sequence():
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_keystroke_1s_cbreak_with_input():
     """1-second keystroke w/multibyte sequence; should return after ~1 second."""
-    # std imports
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:  # child
@@ -396,7 +356,7 @@ def test_keystroke_1s_cbreak_with_input():
         term = TestTerminal()
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
-            inp = term.inkey(timeout=3)
+            inp = term.inkey(timeout=1)
             os.write(sys.__stdout__.fileno(), inp.name.encode('utf-8'))
             sys.stdout.flush()
         if cov is not None:
@@ -407,20 +367,19 @@ def test_keystroke_1s_cbreak_with_input():
     with echo_off(master_fd):
         read_until_semaphore(master_fd)
         stime = time.time()
-        time.sleep(1)
-        os.write(master_fd, '\x1b[C'.encode('ascii'))
+        time.sleep(0.3)
+        os.write(master_fd, u'\x1b[C'.encode('ascii'))
         output = read_until_eof(master_fd)
 
     pid, status = os.waitpid(pid, 0)
-    assert output == 'KEY_RIGHT'
+    assert output == u'KEY_RIGHT'
     assert os.WEXITSTATUS(status) == 0
-    assert math.floor(time.time() - stime) == 1.0
+    assert_elapsed_range(stime, 25, 80)
 
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_esc_delay_cbreak_035():
-    """esc_delay will cause a single ESC (\\x1b) to delay for 0.35."""
-    # std imports
+    """esc_delay will cause a single ESC (\\x1b) to delay for 0.15."""
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:  # child
@@ -429,7 +388,7 @@ def test_esc_delay_cbreak_035():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            inp = term.inkey(timeout=5)
+            inp = term.inkey(timeout=1, esc_delay=0.15)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
                 '%s %i' % (inp.name, measured_time,)).encode('ascii'))
@@ -442,20 +401,19 @@ def test_esc_delay_cbreak_035():
     with echo_off(master_fd):
         read_until_semaphore(master_fd)
         stime = time.time()
-        os.write(master_fd, '\x1b'.encode('ascii'))
+        os.write(master_fd, u'\x1b'.encode('ascii'))
         key_name, duration_ms = read_until_eof(master_fd).split()
 
     pid, status = os.waitpid(pid, 0)
-    assert key_name == 'KEY_ESCAPE'
+    assert key_name == u'KEY_ESCAPE'
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
-    assert 34 <= int(duration_ms) <= 45, duration_ms
+    assert 14 <= int(duration_ms) <= 25, duration_ms
 
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_esc_delay_cbreak_135():
-    """esc_delay=1.35 will cause a single ESC (\\x1b) to delay for 1.35."""
-    # std imports
+    """esc_delay=0.25 will cause a single ESC (\\x1b) to delay for 0.25."""
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:  # child
@@ -464,7 +422,7 @@ def test_esc_delay_cbreak_135():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            inp = term.inkey(timeout=5, esc_delay=1.35)
+            inp = term.inkey(timeout=1, esc_delay=0.25)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
                 '%s %i' % (inp.name, measured_time,)).encode('ascii'))
@@ -477,19 +435,17 @@ def test_esc_delay_cbreak_135():
     with echo_off(master_fd):
         read_until_semaphore(master_fd)
         stime = time.time()
-        os.write(master_fd, '\x1b'.encode('ascii'))
+        os.write(master_fd, u'\x1b'.encode('ascii'))
         key_name, duration_ms = read_until_eof(master_fd).split()
 
     pid, status = os.waitpid(pid, 0)
-    assert key_name == 'KEY_ESCAPE'
+    assert key_name == u'KEY_ESCAPE'
     assert os.WEXITSTATUS(status) == 0
-    assert math.floor(time.time() - stime) == 1.0
-    assert 134 <= int(duration_ms) <= 145, int(duration_ms)
+    assert 24 <= int(duration_ms) <= 35, int(duration_ms)
 
 
 def test_esc_delay_cbreak_timout_0():
     """esc_delay still in effect with timeout of 0 ("nonblocking")."""
-    # std imports
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:  # child
@@ -498,7 +454,7 @@ def test_esc_delay_cbreak_timout_0():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            inp = term.inkey(timeout=0)
+            inp = term.inkey(timeout=0, esc_delay=0.15)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
                 '%s %i' % (inp.name, measured_time,)).encode('ascii'))
@@ -509,21 +465,20 @@ def test_esc_delay_cbreak_timout_0():
         os._exit(0)
 
     with echo_off(master_fd):
-        os.write(master_fd, '\x1b'.encode('ascii'))
+        os.write(master_fd, u'\x1b'.encode('ascii'))
         read_until_semaphore(master_fd)
         stime = time.time()
         key_name, duration_ms = read_until_eof(master_fd).split()
 
     pid, status = os.waitpid(pid, 0)
-    assert key_name == 'KEY_ESCAPE'
+    assert key_name == u'KEY_ESCAPE'
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
-    assert 34 <= int(duration_ms) <= 45, int(duration_ms)
+    assert 14 <= int(duration_ms) <= 25, int(duration_ms)
 
 
 def test_esc_delay_cbreak_nonprefix_sequence():
-    """ESC a (\\x1ba) will return an ESC immediately."""
-    # std imports
+    """ESC a (\\x1ba) will return ALT_A immediately (new meta behavior)."""
     import pty
     pid, master_fd = pty.fork()
     if pid == 0:  # child
@@ -532,11 +487,10 @@ def test_esc_delay_cbreak_nonprefix_sequence():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            esc = term.inkey(timeout=5)
-            inp = term.inkey(timeout=5)
+            keystroke = term.inkey(timeout=5)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
-                '%s %s %i' % (esc.name, inp, measured_time,)).encode('ascii'))
+                '%s %i' % (keystroke.name, measured_time,)).encode('ascii'))
             sys.stdout.flush()
         if cov is not None:
             cov.stop()
@@ -546,21 +500,20 @@ def test_esc_delay_cbreak_nonprefix_sequence():
     with echo_off(master_fd):
         read_until_semaphore(master_fd)
         stime = time.time()
-        os.write(master_fd, '\x1ba'.encode('ascii'))
-        key1_name, key2, duration_ms = read_until_eof(master_fd).split()
+        os.write(master_fd, u'\x1ba'.encode('ascii'))
+        key_name, duration_ms = read_until_eof(master_fd).split()
 
     pid, status = os.waitpid(pid, 0)
-    assert key1_name == 'KEY_ESCAPE'
-    assert key2 == 'a'
+    assert key_name == u'KEY_ALT_A'
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
     assert -1 <= int(duration_ms) <= 15, duration_ms
 
 
-def test_esc_delay_cbreak_prefix_sequence():
-    """An unfinished multibyte sequence (\\x1b[) will delay an ESC by .35."""
-    # std imports
+def test_esc_delay_cbreak_with_csi_only():
+    """A lone CSI (\\x1b[) will delay, and ultimately return 'CSI'."""
     import pty
+    given_esc_delay = 0.1
     pid, master_fd = pty.fork()
     if pid == 0:  # child
         cov = init_subproc_coverage('test_esc_delay_cbreak_prefix_sequence')
@@ -568,11 +521,10 @@ def test_esc_delay_cbreak_prefix_sequence():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            esc = term.inkey(timeout=5)
-            inp = term.inkey(timeout=5)
+            esc = term.inkey(timeout=5, esc_delay=given_esc_delay)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
-                '%s %s %i' % (esc.name, inp, measured_time,)).encode('ascii'))
+                '%s %s %i' % (esc.name, repr(esc), measured_time,)).encode('ascii'))
             sys.stdout.flush()
         if cov is not None:
             cov.stop()
@@ -582,22 +534,64 @@ def test_esc_delay_cbreak_prefix_sequence():
     with echo_off(master_fd):
         read_until_semaphore(master_fd)
         stime = time.time()
-        os.write(master_fd, '\x1b['.encode('ascii'))
-        key1_name, key2, duration_ms = read_until_eof(master_fd).split()
+        os.write(master_fd, u'\x1b['.encode('ascii'))
+        ready_out = read_until_eof(master_fd)
+        key_name, key_repr, duration_ms = ready_out.split()
 
     pid, status = os.waitpid(pid, 0)
-    assert key1_name == 'KEY_ESCAPE'
-    assert key2 == '['
+    assert key_name == u'CSI', ready_out
+    assert key_repr == u"'\\x1b['", ready_out
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
-    assert 34 <= int(duration_ms) <= 45, duration_ms
+    assert int(given_esc_delay * 10) <= int(duration_ms) <= int(given_esc_delay * 10) + 10
+
+
+@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
+def test_esc_delay_cbreak_ambiguous_alt_o():
+    """ESC O (\\x1bO) waits esc_delay for possible F1 (\\x1bOP) before returning ALT_O.
+
+    This test demonstrates the ambiguous case where Alt+O sends "\\x1bO" which is also
+    the prefix for the vt220 F1 key sequence "\\x1bOP". The terminal waits up to
+    esc_delay (~150ms) to see if a 'P' follows, and when it doesn't, falls back to
+    interpreting the sequence as Alt+O rather than returning separate ESC and 'O' keystrokes.
+    """
+    import pty
+    pid, master_fd = pty.fork()
+    if pid == 0:  # child
+        cov = init_subproc_coverage('test_esc_delay_cbreak_ambiguous_alt_o')
+        term = TestTerminal()
+        os.write(sys.__stdout__.fileno(), SEMAPHORE)
+        with term.cbreak():
+            stime = time.time()
+            keystroke = term.inkey(timeout=1, esc_delay=0.15)
+            measured_time = (time.time() - stime) * 100
+            os.write(sys.__stdout__.fileno(), (
+                '%s %i' % (keystroke.name, measured_time,)).encode('ascii'))
+            sys.stdout.flush()
+        if cov is not None:
+            cov.stop()
+            cov.save()
+        os._exit(0)
+
+    with echo_off(master_fd):
+        read_until_semaphore(master_fd)
+        stime = time.time()
+        os.write(master_fd, u'\x1bO'.encode('ascii'))  # Alt+O, but could be start of F1
+        key_name, duration_ms = read_until_eof(master_fd).split()
+
+    pid, status = os.waitpid(pid, 0)
+    assert key_name == u'KEY_ALT_SHIFT_O'
+    assert os.WEXITSTATUS(status) == 0
+    assert math.floor(time.time() - stime) == 0.0
+    # Should have waited ~esc_delay (150ms) before giving up on F1 and returning Alt+O
+    assert 14 <= int(duration_ms) <= 25, duration_ms
 
 
 def test_get_location_0s():
     """0-second get_location call without response."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
+        term = TestTerminal(stream=io.StringIO())
         stime = time.time()
         y, x = term.get_location(timeout=0)
         assert (math.floor(time.time() - stime) == 0.0)
@@ -611,7 +605,6 @@ def test_get_location_0s():
 @pytest.mark.skipif(not TEST_RAW, reason="TEST_RAW not specified")
 def test_get_location_0s_under_raw():
     """0-second get_location call without response under raw mode."""
-    # std imports
     import pty
     pid, _ = pty.fork()
     if pid == 0:
@@ -637,7 +630,6 @@ def test_get_location_0s_under_raw():
 @pytest.mark.skipif(not TEST_RAW, reason="TEST_RAW not specified")
 def test_get_location_0s_reply_via_ungetch_under_raw():
     """0-second get_location call with response under raw mode."""
-    # std imports
     import pty
     pid, _ = pty.fork()
     if pid == 0:
@@ -646,7 +638,7 @@ def test_get_location_0s_reply_via_ungetch_under_raw():
         with term.raw():
             stime = time.time()
             # monkey patch in an invalid response !
-            term.ungetch('\x1b[10;10R')
+            term.ungetch(u'\x1b[10;10R')
 
             y, x = term.get_location(timeout=0.01)
             assert (math.floor(time.time() - stime) == 0.0)
@@ -667,10 +659,10 @@ def test_get_location_0s_reply_via_ungetch():
     """0-second get_location call with response."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
+        term = TestTerminal(stream=io.StringIO())
         stime = time.time()
         # monkey patch in an invalid response !
-        term.ungetch('\x1b[10;10R')
+        term.ungetch(u'\x1b[10;10R')
 
         y, x = term.get_location(timeout=0.01)
         assert (math.floor(time.time() - stime) == 0.0)
@@ -680,19 +672,18 @@ def test_get_location_0s_reply_via_ungetch():
 
 def test_get_location_0s_nonstandard_u6():
     """u6 without %i should not be decremented."""
-    # local
     from blessed.formatters import ParameterizingString
 
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
+        term = TestTerminal(stream=io.StringIO())
 
         stime = time.time()
         # monkey patch in an invalid response !
-        term.ungetch('\x1b[10;10R')
+        term.ungetch(u'\x1b[10;10R')
 
         with mock.patch.object(term, 'u6') as mock_u6:
-            mock_u6.return_value = ParameterizingString('\x1b[%d;%dR', term.normal, 'u6')
+            mock_u6.return_value = ParameterizingString(u'\x1b[%d;%dR', term.normal, 'u6')
             y, x = term.get_location(timeout=0.01)
         assert (math.floor(time.time() - stime) == 0.0)
         assert (y, x) == (10, 10)
@@ -703,13 +694,13 @@ def test_get_location_styling_indifferent():
     """Ensure get_location() behavior is the same regardless of styling"""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True)
-        term.ungetch('\x1b[10;10R')
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        term.ungetch(u'\x1b[10;10R')
         y, x = term.get_location(timeout=0.01)
         assert (y, x) == (9, 9)
 
-        term = TestTerminal(stream=StringIO(), force_styling=False)
-        term.ungetch('\x1b[10;10R')
+        term = TestTerminal(stream=io.StringIO(), force_styling=False)
+        term.ungetch(u'\x1b[10;10R')
         y, x = term.get_location(timeout=0.01)
         assert (y, x) == (9, 9)
     child()
@@ -719,10 +710,10 @@ def test_get_location_timeout():
     """0-second get_location call with response."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
+        term = TestTerminal(stream=io.StringIO())
         stime = time.time()
         # monkey patch in an invalid response !
-        term.ungetch('\x1b[0n')
+        term.ungetch(u'\x1b[0n')
 
         y, x = term.get_location(timeout=0.2)
         assert (math.floor(time.time() - stime) == 0.0)
@@ -734,7 +725,7 @@ def test_get_fgcolor_0s():
     """0-second get_fgcolor call without response."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
+        term = TestTerminal(stream=io.StringIO())
         stime = time.time()
         rgb = term.get_fgcolor(timeout=0)
         assert math.floor(time.time() - stime) == 0.0
@@ -746,9 +737,9 @@ def test_get_fgcolor_0s_reply_via_ungetch():
     """0-second get_fgcolor call with response."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
+        term = TestTerminal(stream=io.StringIO())
         stime = time.time()
-        term.ungetch('\x1b]10;rgb:a0/52/2d\x07')  # sienna
+        term.ungetch(u'\x1b]10;rgb:a0/52/2d\x07')  # sienna
 
         rgb = term.get_fgcolor(timeout=0.01)
         assert math.floor(time.time() - stime) == 0.0
@@ -760,13 +751,13 @@ def test_get_fgcolor_styling_indifferent():
     """Ensure get_fgcolor() behavior is the same regardless of styling"""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True)
-        term.ungetch('\x1b]10;rgb:d2/b4/8c\x07')  # tan
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        term.ungetch(u'\x1b]10;rgb:d2/b4/8c\x07')  # tan
         rgb = term.get_fgcolor(timeout=0.01)
         assert rgb == (210, 180, 140)
 
-        term = TestTerminal(stream=StringIO(), force_styling=False)
-        term.ungetch('\x1b]10;rgb:40/e0/d0\x07')  # turquoise
+        term = TestTerminal(stream=io.StringIO(), force_styling=False)
+        term.ungetch(u'\x1b]10;rgb:40/e0/d0\x07')  # turquoise
         rgb = term.get_fgcolor(timeout=0.01)
         assert rgb == (64, 224, 208)
     child()
@@ -776,7 +767,7 @@ def test_get_bgcolor_0s():
     """0-second get_bgcolor call without response."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
+        term = TestTerminal(stream=io.StringIO())
         stime = time.time()
         rgb = term.get_bgcolor(timeout=0)
         assert math.floor(time.time() - stime) == 0.0
@@ -788,9 +779,9 @@ def test_get_bgcolor_0s_reply_via_ungetch():
     """0-second get_bgcolor call with response."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
+        term = TestTerminal(stream=io.StringIO())
         stime = time.time()
-        term.ungetch('\x1b]11;rgb:99/32/cc\x07')  # darkorchid
+        term.ungetch(u'\x1b]11;rgb:99/32/cc\x07')  # darkorchid
 
         rgb = term.get_bgcolor(timeout=0.01)
         assert math.floor(time.time() - stime) == 0.0
@@ -802,21 +793,43 @@ def test_get_bgcolor_styling_indifferent():
     """Ensure get_bgcolor() behavior is the same regardless of styling"""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True)
-        term.ungetch('\x1b]11;rgb:ff/e4/c4\x07')  # bisque
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        term.ungetch(u'\x1b]11;rgb:ff/e4/c4\x07')  # bisque
         rgb = term.get_bgcolor(timeout=0.01)
         assert rgb == (255, 228, 196)
 
-        term = TestTerminal(stream=StringIO(), force_styling=False)
-        term.ungetch('\x1b]11;rgb:de/b8/87\x07')  # burlywood
+        term = TestTerminal(stream=io.StringIO(), force_styling=False)
+        term.ungetch(u'\x1b]11;rgb:de/b8/87\x07')  # burlywood
         rgb = term.get_bgcolor(timeout=0.01)
         assert rgb == (222, 184, 135)
     child()
 
 
+def test_get_location_excludes_response_from_buffer():
+    """get_location should exclude response from buffer while preserving other data."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=io.StringIO())
+        # Buffer unrelated data before and after the cursor position report
+        term.ungetch(u'abc' + u'\x1b[10;10R' + u'xyz')
+
+        # get_location should parse and consume only the u6 response
+        y, x = term.get_location(timeout=0.01)
+        assert (y, x) == (9, 9)  # %i decrements from 10,10 to 9,9
+
+        # Remaining data should still be available for subsequent input
+        remaining = u''
+        while True:
+            ks = term.inkey(timeout=0)
+            if ks == u'':
+                break
+            remaining += ks
+        assert remaining == u'abcxyz'
+    child()
+
+
 def test_detached_stdout():
     """Ensure detached __stdout__ does not raise an exception"""
-    # std imports
     import pty
     pid, _ = pty.fork()
     if pid == 0:
@@ -835,3 +848,73 @@ def test_detached_stdout():
     pid, status = os.waitpid(pid, 0)
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
+
+
+def test_get_device_attributes_with_sixel():
+    """get_device_attributes() returns DeviceAttribute with sixel support."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=io.StringIO())
+        stime = time.time()
+        # Mock a VT510 response with sixel support
+        term.ungetch(u'\x1b[?64;1;2;4;7;8;9;15;18;21c')
+
+        da = term.get_device_attributes(timeout=0.01, force=True)
+        assert math.floor(time.time() - stime) == 0.0
+        assert da is not None
+        assert da.service_class == 64
+        assert 4 in da.extensions  # sixel support
+        assert da.supports_sixel is True
+        assert term.does_sixel(timeout=0.01) is True
+
+        # Test cache behavior - should return same object without force
+        da2 = term.get_device_attributes(timeout=0.01, force=False)
+        assert da2 is da  # Should be same cached object
+    child()
+
+
+def test_get_device_attributes_without_sixel():
+    """get_device_attributes() returns DeviceAttribute without sixel support."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=io.StringIO())
+        stime = time.time()
+        # Mock a terminal response without sixel support (missing 4)
+        term.ungetch(u'\x1b[?64;1;2;7;8;9;15;18;21c')
+
+        da = term.get_device_attributes(timeout=0.01, force=True)
+        assert math.floor(time.time() - stime) == 0.0
+        assert da is not None
+        assert da.service_class == 64
+        assert 4 not in da.extensions  # no sixel support
+        assert da.supports_sixel is False
+        assert term.does_sixel(timeout=0.01) is False
+    child()
+
+
+@pytest.mark.skipif(not TEST_RAW, reason="TEST_RAW not specified")
+def test_get_device_attributes_no_response():
+    """get_device_attributes() returns None when terminal doesn't respond."""
+    import pty
+    pid, _ = pty.fork()
+    if pid == 0:
+        cov = init_subproc_coverage('test_get_device_attributes_no_response')
+        term = TestTerminal()
+
+        stime = time.time()
+        da = term.get_device_attributes(timeout=0.05, force=True)
+        elapsed = time.time() - stime
+
+        # Should return None and take approximately the timeout duration
+        assert da is None
+        assert 0.04 <= elapsed <= 0.1  # Allow some variance
+        assert term.does_sixel(timeout=0.05) is False
+
+        if cov is not None:
+            cov.stop()
+            cov.save()
+        os._exit(0)
+
+    stime = time.time()
+    pid, status = os.waitpid(pid, 0)
+    assert os.WEXITSTATUS(status) == 0

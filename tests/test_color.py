@@ -21,7 +21,7 @@ def all_algorithms(request):
     return request.param
 
 
-def test_same_color(all_algorithms):   # pylint: disable=redefined-outer-name
+def test_same_color(all_algorithms):
     """The same color should have 0 distance."""
     color = (0, 0, 0)
     assert COLOR_DISTANCE_ALGORITHMS[all_algorithms](color, color) == 0
@@ -31,7 +31,7 @@ def test_same_color(all_algorithms):   # pylint: disable=redefined-outer-name
     assert COLOR_DISTANCE_ALGORITHMS[all_algorithms](color, color) == 0
 
 
-def test_different_color(all_algorithms):   # pylint: disable=redefined-outer-name
+def test_different_color(all_algorithms):
     """Different colors should have positive distance."""
     color1 = (0, 0, 0)
     color2 = (0, 0, 1)
