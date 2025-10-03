@@ -504,7 +504,7 @@ def test_esc_delay_cbreak_nonprefix_sequence():
         key_name, duration_ms = read_until_eof(master_fd).split()
 
     pid, status = os.waitpid(pid, 0)
-    assert key_name == u'ALT_A'
+    assert key_name == u'KEY_ALT_A'
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
     assert -1 <= int(duration_ms) <= 15, duration_ms
@@ -539,7 +539,7 @@ def test_esc_delay_cbreak_prefix_sequence():
         key_name, key_repr, duration_ms = ready_out.split()
 
     pid, status = os.waitpid(pid, 0)
-    assert key_name == u'ALT_[', ready_out
+    assert key_name == u'KEY_ALT_[', ready_out
     assert key_repr == u"'\\x1b['", ready_out
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
@@ -580,7 +580,7 @@ def test_esc_delay_cbreak_ambiguous_alt_o():
         key_name, duration_ms = read_until_eof(master_fd).split()
 
     pid, status = os.waitpid(pid, 0)
-    assert key_name == u'ALT_SHIFT_O'
+    assert key_name == u'KEY_ALT_SHIFT_O'
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
     # Should have waited ~esc_delay (150ms) before giving up on F1 and returning Alt+O

@@ -1513,3 +1513,39 @@ def test_plain_keystroke_defaults_to_pressed():
     assert ks.pressed is True
     assert ks.repeated is False
     assert ks.released is False
+
+
+def test_event_type_names_without_modifiers():
+    """Test that release/repeat events without modifiers get proper names."""
+    # Test UP arrow release without modifiers (modifiers=1, event_type=3)
+    ks_release = _match_legacy_csi_modifiers('\x1b[1;1:3A')
+    assert ks_release is not None
+    assert ks_release.name == 'KEY_UP_RELEASED'
+    assert ks_release.modifiers == 1
+    assert ks_release.released is True
+    assert ks_release.pressed is False
+    assert ks_release.value == ''
+
+    # Test UP arrow repeat without modifiers (modifiers=1, event_type=2)
+    ks_repeat = _match_legacy_csi_modifiers('\x1b[1;1:2A')
+    assert ks_repeat is not None
+    assert ks_repeat.name == 'KEY_UP_REPEATED'
+    assert ks_repeat.modifiers == 1
+    assert ks_repeat.repeated is True
+    assert ks_repeat.pressed is False
+    assert ks_repeat.value == ''
+
+    # Test UP arrow press without modifiers (modifiers=1, event_type=1 or default)
+    ks_press = _match_legacy_csi_modifiers('\x1b[1;1A')
+    assert ks_press is not None
+    assert ks_press.name == 'KEY_UP'  # Plain press gets standard name
+    assert ks_press.modifiers == 1
+    assert ks_press.pressed is True
+    assert ks_press.released is False
+
+    # Test F2 release without modifiers
+    ks_f2_release = _match_legacy_csi_modifiers('\x1b[1;1:3Q')
+    assert ks_f2_release is not None
+    assert ks_f2_release.name == 'KEY_F2_RELEASED'
+    assert ks_f2_release.modifiers == 1
+    assert ks_f2_release.released is True

@@ -103,10 +103,10 @@ def test_legacy_ctrl_alt_edge_cases():
         assert ks[0] == '\x1b'
 
     alt_only_cases = [
-        ('\x1b\x1b', 'alt+escape', 'ALT_ESCAPE'),
-        ('\x1b\x7f', 'alt+backspace', 'ALT_BACKSPACE'),
-        ('\x1b\x0d', 'alt+enter', 'ALT_ENTER'),
-        ('\x1b\x09', 'alt+tab', 'ALT_TAB'),
+        ('\x1b\x1b', 'alt+escape', 'KEY_ALT_ESCAPE'),
+        ('\x1b\x7f', 'alt+backspace', 'KEY_ALT_BACKSPACE'),
+        ('\x1b\x0d', 'alt+enter', 'KEY_ALT_ENTER'),
+        ('\x1b\x09', 'alt+tab', 'KEY_ALT_TAB'),
     ]
 
     for sequence, description, expected_name in alt_only_cases:
@@ -158,14 +158,14 @@ def test_legacy_ctrl_alt_doesnt_affect_other_sequences():
     assert ks_alt_a.modifiers == 3  # 1 + 2 (alt only)
     assert ks_alt_a._ctrl is False
     assert ks_alt_a._alt is True
-    assert ks_alt_a.name == 'ALT_A'
+    assert ks_alt_a.name == 'KEY_ALT_A'
 
     # Regular Ctrl sequences should still work (single control char)
     ks_ctrl_a = Keystroke('\x01')  # Ctrl+a
     assert ks_ctrl_a.modifiers == 5  # 1 + 4 (ctrl only)
     assert ks_ctrl_a._ctrl is True
     assert ks_ctrl_a._alt is False
-    assert ks_ctrl_a.name == 'CTRL_A'
+    assert ks_ctrl_a.name == 'KEY_CTRL_A'
 
     # Regular printable characters should have no modifiers
     ks_regular = Keystroke('a')
@@ -180,10 +180,10 @@ def test_keystroke_legacy_ctrl_alt_name_generation():
 
     # Test basic letter mappings
     test_cases = [
-        ('\x1b\x17', 'CTRL_ALT_W'),  # ESC + Ctrl+W (0x17 = 23, W = 23rd letter)
-        ('\x1b\x01', 'CTRL_ALT_A'),  # ESC + Ctrl+A
-        ('\x1b\x02', 'CTRL_ALT_B'),  # ESC + Ctrl+B
-        ('\x1b\x1a', 'CTRL_ALT_Z'),  # ESC + Ctrl+Z
+        ('\x1b\x17', 'KEY_CTRL_ALT_W'),  # ESC + Ctrl+W (0x17 = 23, W = 23rd letter)
+        ('\x1b\x01', 'KEY_CTRL_ALT_A'),  # ESC + Ctrl+A
+        ('\x1b\x02', 'KEY_CTRL_ALT_B'),  # ESC + Ctrl+B
+        ('\x1b\x1a', 'KEY_CTRL_ALT_Z'),  # ESC + Ctrl+Z
     ]
 
     for sequence, expected_name in test_cases:
@@ -197,12 +197,12 @@ def test_keystroke_legacy_ctrl_alt_name_generation():
 
     # Test special symbol mappings for Ctrl+Alt (not C0 exceptions)
     symbol_test_cases = [
-        ('\x1b\x00', 'CTRL_ALT_@'),   # ESC + Ctrl+@ (NUL) - Ctrl+Alt
-        ('\x1b\x1c', 'CTRL_ALT_\\'),  # ESC + Ctrl+\ (FS) - Ctrl+Alt
-        ('\x1b\x1d', 'CTRL_ALT_]'),   # ESC + Ctrl+] (GS) - Ctrl+Alt
-        ('\x1b\x1e', 'CTRL_ALT_^'),   # ESC + Ctrl+^ (RS) - Ctrl+Alt
-        ('\x1b\x1f', 'CTRL_ALT__'),   # ESC + Ctrl+_ (US) - Ctrl+Alt
-        ('\x1b\x08', 'CTRL_ALT_H'),   # ESC + Ctrl+H (BS) - Ctrl+Alt Backspace
+        ('\x1b\x00', 'KEY_CTRL_ALT_@'),   # ESC + Ctrl+@ (NUL) - Ctrl+Alt
+        ('\x1b\x1c', 'KEY_CTRL_ALT_\\'),  # ESC + Ctrl+\ (FS) - Ctrl+Alt
+        ('\x1b\x1d', 'KEY_CTRL_ALT_]'),   # ESC + Ctrl+] (GS) - Ctrl+Alt
+        ('\x1b\x1e', 'KEY_CTRL_ALT_^'),   # ESC + Ctrl+^ (RS) - Ctrl+Alt
+        ('\x1b\x1f', 'KEY_CTRL_ALT__'),   # ESC + Ctrl+_ (US) - Ctrl+Alt
+        ('\x1b\x08', 'KEY_CTRL_ALT_H'),   # ESC + Ctrl+H (BS) - Ctrl+Alt Backspace
     ]
 
     for sequence, expected_name in symbol_test_cases:
@@ -216,8 +216,8 @@ def test_keystroke_legacy_ctrl_alt_name_generation():
 
     # Test C0 exceptions that should be Alt-only
     alt_only_symbol_cases = [
-        ('\x1b\x1b', 'ALT_ESCAPE'),   # ESC + ESC - Alt+Escape per legacy spec
-        ('\x1b\x7f', 'ALT_BACKSPACE'),  # ESC + DEL - Alt+Backspace per legacy spec
+        ('\x1b\x1b', 'KEY_ALT_ESCAPE'),   # ESC + ESC - Alt+Escape per legacy spec
+        ('\x1b\x7f', 'KEY_ALT_BACKSPACE'),  # ESC + DEL - Alt+Backspace per legacy spec
     ]
 
     for sequence, expected_name in alt_only_symbol_cases:
@@ -231,19 +231,19 @@ def test_keystroke_legacy_ctrl_alt_name_generation():
 
     # Test that existing naming is unchanged
     # Regular Alt sequences (ESC + printable)
-    assert Keystroke('\x1ba').name == 'ALT_A'  # Alt+a
-    assert Keystroke('\x1bz').name == 'ALT_Z'  # Alt+z
-    assert Keystroke('\x1b1').name == 'ALT_1'  # Alt+1
+    assert Keystroke('\x1ba').name == 'KEY_ALT_A'  # Alt+a
+    assert Keystroke('\x1bz').name == 'KEY_ALT_Z'  # Alt+z
+    assert Keystroke('\x1b1').name == 'KEY_ALT_1'  # Alt+1
 
     # Test new ALT_SHIFT naming for uppercase letters
-    assert Keystroke('\x1bA').name == 'ALT_SHIFT_A'  # Alt+A (uppercase)
-    assert Keystroke('\x1bZ').name == 'ALT_SHIFT_Z'  # Alt+Z (uppercase)
+    assert Keystroke('\x1bA').name == 'KEY_ALT_SHIFT_A'  # Alt+A (uppercase)
+    assert Keystroke('\x1bZ').name == 'KEY_ALT_SHIFT_Z'  # Alt+Z (uppercase)
 
     # Regular Ctrl sequences (single control char)
-    assert Keystroke('\x01').name == 'CTRL_A'  # Ctrl+a
-    assert Keystroke('\x1a').name == 'CTRL_Z'  # Ctrl+z
-    assert Keystroke('\x00').name == 'CTRL_@'  # Ctrl+@
-    assert Keystroke('\x7f').name == 'CTRL_?'  # Ctrl+?
+    assert Keystroke('\x01').name == 'KEY_CTRL_A'  # Ctrl+a
+    assert Keystroke('\x1a').name == 'KEY_CTRL_Z'  # Ctrl+z
+    assert Keystroke('\x00').name == 'KEY_CTRL_@'  # Ctrl+@
+    assert Keystroke('\x7f').name == 'KEY_CTRL_?'  # Ctrl+?
 
     # Test that explicit names are preserved
     ks_with_name = Keystroke('\x1b\x17', name='CUSTOM_NAME')
@@ -813,22 +813,22 @@ def test_keystroke_ctrl_alt_names():
     from blessed.keyboard import Keystroke
 
     # Test CTRL names
-    assert Keystroke('\x01').name == 'CTRL_A'
-    assert Keystroke('\x1a').name == 'CTRL_Z'
-    assert Keystroke('\x00').name == 'CTRL_@'
-    assert Keystroke('\x1b').name == 'CTRL_['
-    assert Keystroke('\x1c').name == 'CTRL_\\'
-    assert Keystroke('\x1d').name == 'CTRL_]'
-    assert Keystroke('\x1e').name == 'CTRL_^'
-    assert Keystroke('\x1f').name == 'CTRL__'
-    assert Keystroke('\x7f').name == 'CTRL_?'
+    assert Keystroke('\x01').name == 'KEY_CTRL_A'
+    assert Keystroke('\x1a').name == 'KEY_CTRL_Z'
+    assert Keystroke('\x00').name == 'KEY_CTRL_@'
+    assert Keystroke('\x1b').name == 'KEY_CTRL_['
+    assert Keystroke('\x1c').name == 'KEY_CTRL_\\'
+    assert Keystroke('\x1d').name == 'KEY_CTRL_]'
+    assert Keystroke('\x1e').name == 'KEY_CTRL_^'
+    assert Keystroke('\x1f').name == 'KEY_CTRL__'
+    assert Keystroke('\x7f').name == 'KEY_CTRL_?'
 
     # Test ALT names
-    assert Keystroke('\x1ba').name == 'ALT_A'
-    assert Keystroke('\x1bz').name == 'ALT_Z'
-    assert Keystroke('\x1bA').name == 'ALT_SHIFT_A'
-    assert Keystroke('\x1b1').name == 'ALT_1'
-    assert Keystroke('\x1b!').name == 'ALT_!'
+    assert Keystroke('\x1ba').name == 'KEY_ALT_A'
+    assert Keystroke('\x1bz').name == 'KEY_ALT_Z'
+    assert Keystroke('\x1bA').name == 'KEY_ALT_SHIFT_A'
+    assert Keystroke('\x1b1').name == 'KEY_ALT_1'
+    assert Keystroke('\x1b!').name == 'KEY_ALT_!'
 
     # Test that existing names are preserved
     ks_with_name = Keystroke('\x01', name='EXISTING_NAME')
@@ -1213,20 +1213,20 @@ def test_alt_uppercase_sets_shift_modifier_and_name():
     assert ks_lower.modifiers == 3  # 1 + 2 (alt only)
     assert ks_lower._alt is True
     assert ks_lower._shift is False
-    assert ks_lower.name == 'ALT_J'
+    assert ks_lower.name == 'KEY_ALT_J'
 
     # Test uppercase Alt+J - should be Alt+Shift
     ks_upper = Keystroke('\x1bJ')  # Alt+Shift+J
     assert ks_upper.modifiers == 4  # 1 + 2 (alt) + 1 (shift) = 4
     assert ks_upper._alt is True
     assert ks_upper._shift is True
-    assert ks_upper.name == 'ALT_SHIFT_J'
+    assert ks_upper.name == 'KEY_ALT_SHIFT_J'
 
     # Test various uppercase letters
     test_cases = [
-        ('\x1bA', 'ALT_SHIFT_A'),
-        ('\x1bZ', 'ALT_SHIFT_Z'),
-        ('\x1bM', 'ALT_SHIFT_M'),
+        ('\x1bA', 'KEY_ALT_SHIFT_A'),
+        ('\x1bZ', 'KEY_ALT_SHIFT_Z'),
+        ('\x1bM', 'KEY_ALT_SHIFT_M'),
     ]
 
     for sequence, expected_name in test_cases:
@@ -1238,10 +1238,10 @@ def test_alt_uppercase_sets_shift_modifier_and_name():
 
     # Test that non-alphabetic printable characters remain Alt-only
     non_alpha_cases = [
-        ('\x1b1', 'ALT_1', 3),  # Alt+1
-        ('\x1b!', 'ALT_!', 3),  # Alt+!
-        ('\x1b;', 'ALT_;', 3),  # Alt+;
-        ('\x1b ', 'ALT_ ', 3),  # Alt+space (though space might not have a name)
+        ('\x1b1', 'KEY_ALT_1', 3),  # Alt+1
+        ('\x1b!', 'KEY_ALT_!', 3),  # Alt+!
+        ('\x1b;', 'KEY_ALT_;', 3),  # Alt+;
+        ('\x1b ', 'KEY_ALT_ ', 3),  # Alt+space (though space might not have a name)
     ]
 
     for sequence, expected_name, expected_modifiers in non_alpha_cases:
@@ -1270,8 +1270,8 @@ def test_compatibility_with_existing_behavior():
     assert ks.is_sequence is True
 
     # Legacy control and alt names should still work
-    assert Keystroke('\x01').name == 'CTRL_A'
-    assert Keystroke('\x1ba').name == 'ALT_A'
+    assert Keystroke('\x01').name == 'KEY_CTRL_A'
+    assert Keystroke('\x1ba').name == 'KEY_ALT_A'
 
 
 @pytest.mark.parametrize('sequence,expected_key,expected_modifiers,description', [

@@ -208,9 +208,9 @@ class Keystroke(str):
         Get name for modern/legacy CSI sequence with modifiers.
 
         Returns name like 'KEY_CTRL_ALT_F1' or 'KEY_SHIFT_UP_RELEASED'.
+        Also handles release/repeat events for keys without modifiers.
         """
-        if not (self._mode is not None and self._mode < 0 and
-                self._code is not None and self.modifiers > 1):
+        if not (self._mode is not None and self._mode < 0 and self._code is not None):
             return None
 
         # turn keycode value into 'base name', eg.
@@ -229,10 +229,17 @@ class Keystroke(str):
         for mod_name in KittyModifierBits.names_modifiers_only:
             if getattr(self, f'_{mod_name}'):        # 'if self._shift'
                 mod_parts.append(mod_name.upper())   # -> 'SHIFT'
-        if not mod_parts:
+
+        # For press events with no modifiers, return None (no special name needed)
+        if not mod_parts and not (self.released or self.repeated):
             return None
 
-        base_result = f"KEY_{'_'.join(mod_parts)}_{base_name}"
+        # Build base result with modifiers (if any)
+        if mod_parts:
+            base_result = f"KEY_{'_'.join(mod_parts)}_{base_name}"
+        else:
+            base_result = f"KEY_{base_name}"
+
         # Append event type suffix if not a press event
         if self.repeated:
             return f"{base_result}_REPEATED"
@@ -245,10 +252,9 @@ class Keystroke(str):
         """
         Get name for Kitty keyboard protocol letter/digit/symbol.
 
-        Returns name like 'CTRL_ALT_A' or 'ALT_SHIFT_5'.
+        Returns name like 'KEY_CTRL_ALT_A' or 'KEY_ALT_SHIFT_5'.
         """
-        if not (self._mode == DecPrivateMode.SpecialInternalKitty and
-                hasattr(self._match, 'event_type') and hasattr(self._match, 'unicode_key')):
+        if self._mode != DecPrivateMode.SpecialInternalKitty:
             return None
 
         # Only synthesize for keypress events (event_type == 1), not release/repeat
@@ -286,14 +292,14 @@ class Keystroke(str):
 
         # Only synthesize name if at least one modifier is present
         if mod_parts:
-            return f"{'_'.join(mod_parts)}_{char}"
+            return f"KEY_{'_'.join(mod_parts)}_{char}"
         return None
 
     def _get_control_char_name(self) -> Optional[str]:
         """
         Get name for single-character control sequences.
 
-        Returns name like 'CTRL_A' or 'CTRL_@'.
+        Returns name like 'KEY_CTRL_A' or 'KEY_CTRL_@'.
         """
         if len(self) != 1:
             return None
@@ -301,9 +307,9 @@ class Keystroke(str):
         char_code = ord(self)
         if 1 <= char_code <= 26:
             # Ctrl+A through Ctrl+Z
-            return f'CTRL_{chr(char_code + ord("A") - 1)}'
+            return f'KEY_CTRL_{chr(char_code + ord("A") - 1)}'
         if char_code in CTRL_CODE_SYMBOLS_MAP:
-            return f'CTRL_{CTRL_CODE_SYMBOLS_MAP[char_code]}'
+            return f'KEY_CTRL_{CTRL_CODE_SYMBOLS_MAP[char_code]}'
         return None
 
     def _get_control_symbol(self, char_code: int) -> Optional[str]:
@@ -324,14 +330,14 @@ class Keystroke(str):
         """
         Get name for Alt-only special control characters.
 
-        Returns names like 'ALT_ESCAPE', 'ALT_BACKSPACE', etc.
+        Returns names like 'KEY_ALT_ESCAPE', 'KEY_ALT_BACKSPACE', etc.
         """
         control_names = {
-            0x1b: 'ALT_ESCAPE',   # ESC
-            0x7f: 'ALT_BACKSPACE',  # DEL
-            0x0d: 'ALT_ENTER',    # CR
-            0x09: 'ALT_TAB',      # TAB
-            0x5b: 'CSI'           # '[', CSI !
+            0x1b: 'KEY_ALT_ESCAPE',     # ESC
+            0x7f: 'KEY_ALT_BACKSPACE',  # DEL
+            0x0d: 'KEY_ALT_ENTER',      # CR
+            0x09: 'KEY_ALT_TAB',        # TAB
+            0x5b: 'CSI'                 # CSI '['
         }
         return control_names.get(char_code)
 
@@ -340,7 +346,7 @@ class Keystroke(str):
         """
         Get name for metaSendsEscape sequences (ESC + char).
 
-        Returns name like 'ALT_A', 'ALT_SHIFT_Z', 'CTRL_ALT_C', or 'ALT_ESCAPE'.
+        Returns name like 'KEY_ALT_A', 'KEY_ALT_SHIFT_Z', 'KEY_CTRL_ALT_C', or 'KEY_ALT_ESCAPE'.
         """
         if len(self) != 2 or self[0] != '\x1b':
             return None
@@ -359,18 +365,20 @@ class Keystroke(str):
                     if alt_name:
                         return alt_name
                 elif self.modifiers == 7:  # Ctrl+Alt (1 + 2 + 4)
-                    return f'CTRL_ALT_{symbol}'
+                    return f'KEY_CTRL_ALT_{symbol}'
 
-        # Check for and return ALT_ for "metaSendsEscape"
+        # Check for and return KEY_ALT_ for "metaSendsEscape"
         if self[1].isprintable():
             ch = self[1]
             if ch.isalpha():
                 if ch.isupper():
-                    return f'ALT_SHIFT_{ch}'
-                return f'ALT_{ch.upper()}'
-            return f'ALT_{ch}'
+                    return f'KEY_ALT_SHIFT_{ch}'
+                return f'KEY_ALT_{ch.upper()}'
+            if ch == '[':
+                return 'CSI'
+            return f'KEY_ALT_{ch}'
         if self[1] == '\x7f' and self.modifiers == 3:
-            return 'ALT_BACKSPACE'
+            return 'KEY_ALT_BACKSPACE'
         return None
 
     @property
@@ -507,12 +515,10 @@ class Keystroke(str):
             if self._match.int_codepoints:
                 return ''.join(chr(cp) for cp in self._match.int_codepoints)
 
-            # Use unicode_key (supports any valid Unicode codepoint)
-            if hasattr(self._match, 'unicode_key'):
-                # Check if this is a PUA modifier key (which don't produce text)
-                if KEY_LEFT_SHIFT <= self._match.unicode_key <= KEY_RIGHT_META:
-                    return ''  # Modifier keys don't produce text
-                return chr(self._match.unicode_key)
+            # Check if this is a PUA modifier key (which don't produce text)
+            if KEY_LEFT_SHIFT <= self._match.unicode_key <= KEY_RIGHT_META:
+                return ''  # Modifier keys don't produce text
+            return chr(self._match.unicode_key)
 
         # ModifyOtherKeys protocol - extract character from key
         elif self._mode == DecPrivateMode.SpecialInternalModifyOtherKeys:
@@ -639,17 +645,10 @@ class Keystroke(str):
         :returns: True if this is a key press event (event_type=1 or not specified), False for
             repeat or release events
         """
-        # Check Kitty protocol
-        if (self._mode == DecPrivateMode.SpecialInternalKitty and
-                hasattr(self._match, 'event_type')):
+        if self._mode in (DecPrivateMode.SpecialInternalKitty,
+                          DecPrivateMode.SpecialInternalLegacyCSIModifier):
             return self._match.event_type == 1
-
-        # Check Legacy CSI modifiers
-        if (self._mode == DecPrivateMode.SpecialInternalLegacyCSIModifier and
-                hasattr(self._match, 'event_type')):
-            return self._match.event_type == 1
-
-        # Default: all other events are considered press events
+        # Default: always a 'pressed' event
         return True
 
     @property
@@ -660,16 +659,9 @@ class Keystroke(str):
         :rtype: bool
         :returns: True if this is a key repeat event (event_type=2), False otherwise
         """
-        # Check Kitty protocol
-        if (self._mode == DecPrivateMode.SpecialInternalKitty and
-                hasattr(self._match, 'event_type')):
+        if self._mode in (DecPrivateMode.SpecialInternalKitty,
+                          DecPrivateMode.SpecialInternalLegacyCSIModifier):
             return self._match.event_type == 2
-
-        # Check Legacy CSI modifiers
-        if (self._mode == DecPrivateMode.SpecialInternalLegacyCSIModifier and
-                hasattr(self._match, 'event_type')):
-            return self._match.event_type == 2
-
         # Default: not a repeat event
         return False
 
@@ -681,14 +673,8 @@ class Keystroke(str):
         :rtype: bool
         :returns: True if this is a key release event (event_type=3), False otherwise
         """
-        # Check Kitty protocol
-        if (self._mode == DecPrivateMode.SpecialInternalKitty and
-                hasattr(self._match, 'event_type')):
-            return self._match.event_type == 3
-
-        # Check Legacy CSI modifiers
-        if (self._mode == DecPrivateMode.SpecialInternalLegacyCSIModifier and
-                hasattr(self._match, 'event_type')):
+        if self._mode in (DecPrivateMode.SpecialInternalKitty,
+                          DecPrivateMode.SpecialInternalLegacyCSIModifier):
             return self._match.event_type == 3
 
         # Default: not a release event
@@ -967,9 +953,9 @@ class Keystroke(str):
         event_type = None
         for match_name in ('pressed', 'released', 'repeated'):
             if tokens_str.endswith(f'_{match_name}'):
-                # Remove '_pressed', etc.
+                # Remove '_pressed', etc. (length + 1 for the underscore)
                 event_type = match_name
-                tokens_str = tokens_str[:-len(match_name) + 1]
+                tokens_str = tokens_str[:-len(match_name) - 1]
                 break
 
         # If event type was found, return event predicate
@@ -1000,7 +986,10 @@ class DeviceAttribute(object):
 
     Device Attributes queries allow discovering terminal capabilities and type.
     The primary DA1 query sends CSI c and expects a response like:
+
+    ```
     CSI ? Psc ; Ps1 ; Ps2 ; ... ; Psn c
+    ```
 
     Where Psc is the service class (architectural class) and Ps1...Psn are
     supported extensions/capabilities.
@@ -1374,11 +1363,14 @@ def _match_kitty_key(text: str) -> Optional[Keystroke]:
     :returns: :class:`Keystroke` with Kitty key data if matched, ``None`` otherwise
 
     Supports Kitty keyboard protocol sequences of the form:
+
+    ```
     CSI unicode-key-code u                                            # Basic form
     CSI unicode-key-code ; modifiers u                                # With modifiers
     CSI unicode-key-code : shifted-key : base-key ; modifiers u       # With alternate keys
     CSI unicode-key-code ; modifiers : event-type u                   # With event type
     CSI unicode-key-code ; modifiers : event-type ; text-codepoints u # Full form
+    ```
     """
     match = KITTY_KB_PROTOCOL_PATTERN.match(text)
 

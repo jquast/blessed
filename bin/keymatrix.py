@@ -3,7 +3,7 @@
 Advanced keyboard and special modes interaction example.
 
 Usage:
-- F1-F10: Toggle DEC private modes (bracketed paste, mouse, etc.)
+- F1-F11: Toggle DEC private modes (bracketed paste, mouse, etc.)
 - Shift+F1-F5: Toggle Kitty keyboard protocol flags
 - Ctrl+C: Exit
 
@@ -12,6 +12,7 @@ All modes that elicit responses are activated for demonstration.
 # std imports
 import sys
 from typing import Dict, List, Tuple, Optional, Any
+import functools
 from collections import deque
 
 # local
@@ -83,6 +84,15 @@ class DecModeManager:
 
         return ""
 
+    def toggle_keynames(self) -> List[str]:
+        """Return list of key names that toggle DEC modes."""
+        return [f'KEY_F{i}' for i in range(1, 12)]
+
+    def get_index_by_key(self, key_name: str) -> int:
+        """Convert key name to toggle index."""
+        f_num = int(key_name.split('_')[-1][1:])
+        return f_num - 1
+
     def cleanup(self) -> None:
         """Clean up all active context managers."""
         for cm in self.active_contexts.values():
@@ -108,7 +118,8 @@ class KittyKeyboardManager:
         if self.kitty_flags is None:
             return False, "Kitty Keyboard Protocol not supported!", None
 
-        header = f"Kitty Keyboard Protocol: {self.kitty_flags!r} [Shift+F1..F5] to toggle"
+        header = (f"Kitty Keyboard Protocol: {self.kitty_flags!r} "
+                  + self.term.reverse(f"[Shift+F1..F5]" + " to toggle"))
         initial_log = f'{self.kitty_flags!r}'
         return True, header, initial_log
 
@@ -139,6 +150,15 @@ class KittyKeyboardManager:
         """Return string representation of current flags."""
         return f"{self.kitty_flags!r}" if self.kitty_flags else ""
 
+    def toggle_keynames(self) -> List[str]:
+        """Return list of key names that toggle Kitty keyboard flags."""
+        return [f'KEY_SHIFT_F{i}' for i in range(1, 6)]
+
+    def get_index_by_key(self, key_name: str) -> int:
+        """Convert key name to toggle index."""
+        f_num = int(key_name.split('_')[-1][1:])
+        return f_num - 1
+
     def cleanup(self) -> None:
         """Clean up active context manager."""
         if self.active_context is not None:
@@ -165,21 +185,15 @@ def get_test_modes() -> Tuple[DecPrivateMode, ...]:
     )
 
 
-def render_header(term: Terminal, header: List[str], dec_manager: DecModeManager,
-                  kitty_manager: KittyKeyboardManager) -> int:
+def render_header(term: Terminal, header: List[str], dec_manager: DecModeManager) -> int:
     """
     Render the header section.
 
     Returns number of rows used.
     """
     row_count = 0
-    print(term.home, end='', flush=False)
-
-    # Kitty header line
-    if kitty_manager.kitty_flags is not None:
-        print(f"{kitty_manager.repr_flags()} [Shift+F1..F5] to toggle",
-              end=term.clear_eol + '\r\n', flush=False)
-        row_count += 1
+    echo = functools.partial(print, end=term.clear_eol + '\r\n', flush=False)
+    echo(term.home, end='')
 
     # Display DEC modes table
     if dec_manager.entries():
@@ -188,19 +202,18 @@ def render_header(term: Terminal, header: List[str], dec_manager: DecModeManager
             idx = dec_manager.test_modes.index(mode)
             status = "  IS  " if enabled else "IS NOT"
             f_key = f"F{idx + 1}"
-            print(f"{repr(mode):<{maxlen}} "
-                  f"{term.reverse(status)} Enabled, "
-                  f"toggle using {f_key}: {mode.long_description}",
-                  end=term.normal + term.clear_eol + '\r\n', flush=False)
+            echo(f"{repr(mode):<{maxlen}} "
+                 f"{term.reverse(status)} Enabled, "
+                 f"[{term.reverse(f_key)}] toggles: {mode.long_description}")
             row_count += 1
 
     # Separator and header
-    print('-' * term.width, end=term.clear_eol + '\r\n', flush=False)
+    echo('-' * term.width)
     row_count += 1
     for line in header:
-        print(line, end=term.clear_eol + '\r\n', flush=False)
+        echo(line)
         row_count += 1
-    print('-' * term.width, end=term.clear_eol + '\r\n', flush=False)
+    echo('-' * term.width)
     row_count += 1
 
     return row_count
@@ -215,11 +228,15 @@ def render_keymatrix(term: Terminal, n_header_rows: int, raw_sequences: deque,
 
     # remove raw sequences tracked until they fit
     def _fmt(i, sequence):
-        rs = repr(sequence)
-        if rs.startswith("'"):
+        if sequence.is_sequence:
+            rs = repr(str(sequence))
+        else:
+            rs = repr(sequence)
+        if rs.startswith("'") and rs.endswith("'"):
             rs = rs.strip("'")
-        elif rs.startswith('"'):
+        elif rs.startswith('"') and rs.endswith('"'):
             rs = rs.strip('"')
+
         if i % 2 == 0:
             return term.reverse(rs)
         return rs
@@ -232,10 +249,10 @@ def render_keymatrix(term: Terminal, n_header_rows: int, raw_sequences: deque,
             break
         raw_sequences.popleft()
 
-    print(term.move_yx(bar_y, (term.width // 3) - 3) +
-          bar_content, end=term.clear_eol + '\r\n', flush=False)
-    print(end=term.clear_eol + '\r\n', flush=False)
-    print(end=term.clear_eol + '\r\n', flush=False)
+    echo = functools.partial(print, end=term.clear_eol + '\r\n', flush=False)
+    echo(term.move_yx(bar_y, (term.width // 3) - 3) + bar_content)
+    echo()
+    echo()
 
     # Calculate available space for formatted events table
     max_event_rows = min(10, max(2, term.height - bar_y))
@@ -244,23 +261,24 @@ def render_keymatrix(term: Terminal, n_header_rows: int, raw_sequences: deque,
     events_to_display = list(formatted_events)[-max_event_rows:]
 
     for event_line in events_to_display:
-        print(event_line, end=term.clear_eol + '\r\n', flush=False)
-    print('', end=term.clear_eos, flush=True)
+        echo(event_line)
+    echo('', end=term.clear_eos, flush=True)
 
 
-def format_key_event(key: Any) -> str:
+def format_key_event(term, keystroke) -> str:
     """Format a key event for columnar display."""
     # Build columns: sequence | value | name | modifiers/mode_values
-    seq_repr = repr(str(key))[:20]
-    value_repr = repr(key.value)[:15] if hasattr(key, 'value') else ''
-    name_repr = repr(key.name)[:20] if hasattr(key, 'name') else ''
+    value_repr = repr(keystroke.value)[:6]
+    seq_repr = repr(str(keystroke))[:20]
+    name_repr = repr(keystroke.name)[:25]
 
-    if key.mode and int(key.mode) > 0:
-        extra = f'mode={key.mode_values()!r}'[:30]
+    if keystroke.mode and int(keystroke.mode) > 0:
+        extra = f'{keystroke.mode}:{keystroke.mode_values()!r}'
     else:
-        extra = f'mods={key.modifiers}' if hasattr(key, 'modifiers') else ''
+        extra = f'modifiers?={keystroke.modifiers!r}'
 
-    return f"{seq_repr:<22} {value_repr:<17} {name_repr:<22} {extra}"
+    trim_mode = max(10, term.width - 25 - 20 - 6 - 3)
+    return f"{value_repr:<6} {seq_repr:<20} {name_repr:<25} {extra[:trim_mode]}"
 
 
 def main():
@@ -300,7 +318,7 @@ def main():
         n_header_rows = 0
 
         # Initial full render
-        n_header_rows = render_header(term, header, dec_manager, kitty_manager)
+        n_header_rows = render_header(term, header, dec_manager)
         render_keymatrix(term, n_header_rows, raw_sequences, formatted_events)
 
         while True:
@@ -310,37 +328,23 @@ def main():
                 exit(0)
 
             # Handle user input
-            key = term.inkey()
+            inp = term.inkey()
+            for mgr in (dec_manager, kitty_manager):
+                if inp.name in mgr.toggle_keynames():
+                    index = mgr.get_index_by_key(inp.name)
+                    message = mgr.toggle_by_index(index)
+                    break
 
-            # Process F1-F10 for DEC mode toggles
-            if key.name and key.name.startswith('KEY_F') and not key.name.startswith('KEY_SHIFT_'):
-                try:
-                    f_num = int(key.name.split('_')[-1][1:])
-                    if 1 <= f_num <= 10:
-                        message = dec_manager.toggle_by_index(f_num - 1)
-                except (ValueError, IndexError):
-                    pass
-
-            # Process Shift+F1-F5 for Kitty keyboard flag toggles
-            elif key.name and key.name.startswith('KEY_SHIFT_F'):
-                try:
-                    f_num = int(key.name.split('_')[-1][1:])
-                    if 1 <= f_num <= 5:
-                        message = kitty_manager.toggle_by_index(f_num - 1)
-                except (ValueError, IndexError):
-                    pass
-
-            elif key.name == 'CTRL_C':
+            if inp.name == 'KEY_CTRL_C':
                 do_exit = True
 
-            for char in str(key):
-                raw_sequences.append(char)
-            formatted_events.append(format_key_event(key))
+            raw_sequences.append(inp)
+            formatted_events.append(format_key_event(term, inp))
 
             # If mode was toggled, re-render header and flush input
             if message:
                 formatted_events.append(f">> {message}")
-                n_header_rows = render_header(term, header, dec_manager, kitty_manager)
+                n_header_rows = render_header(term, header, dec_manager)
                 message = None
 
             # Always render key matrix (efficient, only updates changed area)
