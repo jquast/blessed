@@ -1,6 +1,6 @@
 [build-system]
-requires = ['setuptools >= 68']
-build-backend = 'setuptools.build_meta'
+requires = ['flit_core >=3.11,<4']
+build-backend = 'flit_core.buildapi'
 
 [project]
 name = 'blessed'
@@ -33,14 +33,13 @@ classifiers = [
     'Topic :: Terminals',
     'Typing :: Typed',
 ]
-dynamic = ['dependencies', 'version']
-
-# The license spec changed with Setuptools 77, but that requires Python >=3.9
-# license = 'MIT'
-# license-files = ['LICENSE']
-license = {text = 'MIT'}
-
-
+dependencies = [
+    'wcwidth>=0.1.4',
+    'jinxed>=1.1.0; platform_system == "Windows"',
+]
+dynamic = ['version']
+license = 'MIT'
+license-files = ['LICENSE']
 keywords = ['terminal', 'sequences', 'tty', 'curses', 'ncurses', 'formatting',
             'style', 'color', 'console', 'keyboard', 'ansi', 'xterm']
 readme = 'docs/intro.rst'
@@ -52,18 +51,6 @@ Documentation = 'https://blessed.readthedocs.io'
 Repository = 'https://github.com/jquast/blessed'
 Issues = 'https://github.com/jquast/blessed/issues'
 Changelog = 'https://blessed.readthedocs.io/en/latest/history.html'
-
-[tool.setuptools]
-# license-files is no longer needed after Setuptools 77
-license-files = ['LICENSE']
-packages = ['blessed']
-
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
-version = {attr = 'blessed.__version__'}
-
-[tool.setuptools.package-data]
-'blessed' = ['py.typed']
 
 [tool.pylint.main]
 load-plugins = [
