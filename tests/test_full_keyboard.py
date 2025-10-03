@@ -510,8 +510,8 @@ def test_esc_delay_cbreak_nonprefix_sequence():
     assert -1 <= int(duration_ms) <= 15, duration_ms
 
 
-def test_esc_delay_cbreak_prefix_sequence():
-    """A lone CSI (\\x1b[) will delay and ultimately return ALT_[."""
+def test_esc_delay_cbreak_with_csi_only():
+    """A lone CSI (\\x1b[) will delay, and ultimately return 'CSI'."""
     import pty
     given_esc_delay = 0.1
     pid, master_fd = pty.fork()
@@ -539,7 +539,7 @@ def test_esc_delay_cbreak_prefix_sequence():
         key_name, key_repr, duration_ms = ready_out.split()
 
     pid, status = os.waitpid(pid, 0)
-    assert key_name == u'KEY_ALT_[', ready_out
+    assert key_name == u'CSI', ready_out
     assert key_repr == u"'\\x1b['", ready_out
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0

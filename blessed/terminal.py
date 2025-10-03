@@ -417,10 +417,8 @@ class Terminal(object):
             # which are not valid UTF-8 but are valid in latin-1 encoding
             self._keyboard_decoder_latin1 = codecs.getincrementaldecoder('latin-1')()
 
-    def __getattr__(self,
-                    attr: str) -> Union[NullCallableString,
-                                        ParameterizingString,
-                                        FormattingString]:
+    def __getattr__(self, attr: str) -> Union[
+            NullCallableString, ParameterizingString, FormattingString]:
         r"""
         Return a terminal capability as Unicode string.
 

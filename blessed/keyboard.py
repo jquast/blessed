@@ -348,6 +348,7 @@ class Keystroke(str):
 
         Returns name like 'KEY_ALT_A', 'KEY_ALT_SHIFT_Z', 'KEY_CTRL_ALT_C', or 'KEY_ALT_ESCAPE'.
         """
+        # pylint: disable=too-complex
         if len(self) != 2 or self[0] != '\x1b':
             return None
 
@@ -521,29 +522,21 @@ class Keystroke(str):
             return chr(self._match.unicode_key)
 
         # ModifyOtherKeys protocol - extract character from key
-        elif self._mode == DecPrivateMode.SpecialInternalModifyOtherKeys:
+        if self._mode == DecPrivateMode.SpecialInternalModifyOtherKeys:
             return chr(self._match.key)
 
         return None
 
-    def _get_keycode_value(self) -> Optional[str]:
+    def _get_ascii_value(self) -> Optional[str]:
         """
-        Get value for application keys with known keycodes.
-
-        Maps essential control character keycodes to their characters.
+        Get value for keys matched by curses-imitated keycodes.
         """
-        if self._code is None:
-            return None
-
-        # Map only these essential control characters
-        key_mappings = {
-            curses.KEY_ENTER: '\n',      # Enter -> LF
-            KEY_TAB: '\t',               # Tab -> Tab character
-            curses.KEY_BACKSPACE: '\x08',  # Backspace -> BS
-            curses.KEY_EXIT: '\x1b',     # Escape -> ESC
-        }
-
-        return key_mappings.get(self._code)
+        return {
+            curses.KEY_ENTER: '\n',
+            KEY_TAB: '\t',
+            curses.KEY_BACKSPACE: '\x08',
+            curses.KEY_EXIT: '\x1b',
+        }.get(self._code)
 
     @property
     def value(self) -> str:
@@ -571,29 +564,12 @@ class Keystroke(str):
         if self.released:
             return ''
 
-        # Try each helper method in sequence
-        result = self._get_plain_char_value()
-        if result is not None:
-            return result
-
-        result = self._get_alt_sequence_value()
-        if result is not None:
-            return result
-
-        result = self._get_ctrl_sequence_value()
-        if result is not None:
-            return result
-
-        result = self._get_protocol_value()
-        if result is not None:
-            return result
-
-        result = self._get_keycode_value()
-        if result is not None:
-            return result
-
-        # For all other cases (application keys, complex sequences), return empty string
-        return ''
+        return (self._get_plain_char_value()
+                or self._get_alt_sequence_value()
+                or self._get_ctrl_sequence_value()
+                or self._get_protocol_value()
+                or self._get_ascii_value()
+                or '')
 
     # Private modifier flag properties (internal use)
     @property
@@ -873,7 +849,8 @@ class Keystroke(str):
                     'repeated': self.repeated}.get(event_type, False)
         return event_predicate
 
-    def _build_modifier_predicate(self, tokens: typing.List[str]) -> typing.Callable:
+    def _build_modifier_predicate(
+            self, tokens: typing.List[str]) -> typing.Callable[[Optional[str], bool, bool], bool]:
         """
         Build a predicate function for modifier checking.
 
@@ -916,7 +893,7 @@ class Keystroke(str):
 
         return modifier_predicate
 
-    def __getattr__(self, attr: str) -> typing.Any:
+    def __getattr__(self, attr: str) -> typing.Callable[..., bool]:
         """
         Dynamic compound modifier predicates via __getattr__.
 
@@ -1248,13 +1225,14 @@ def resolve_sequence(  # pylint: disable=too-many-positional-arguments
             if text.startswith(sequence):
                 ks = Keystroke(ucs=sequence, code=code, name=codes[code])
                 break
-    if ks is not None and ks.code == curses.KEY_EXIT and len(text) > 1:
-        if text[1] == '\x7f':
-            # alt + backspace
-            ks = Keystroke(ucs=text[:2])
-        elif final or text[:2] not in prefixes:
-            # KEY_ALT_[..] - when final is True or when not a known prefix
-            ks = Keystroke(ucs=text[:2])
+
+    # Resolve for alt+backspace and metaSendsEscape, KEY_ALT_[..],
+    # when the sequence so far is not a 'known prefix', or, when
+    # final is True, we return the ambigously matched KEY_ALT_[...]
+    if (ks is not None and ks.code == curses.KEY_EXIT and len(text) > 1
+        ) and ((final or text[1] == '\x7f' or text[:2] not in prefixes)):
+        ks = Keystroke(ucs=text[:2])
+    # final match is just simple resolution of the first codepoint of text,
     if ks is None:
         ks = Keystroke(ucs=text and text[0] or u'')
     return ks
