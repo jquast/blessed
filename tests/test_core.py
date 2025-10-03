@@ -180,12 +180,63 @@ def test_force_styling_none(all_terms):
     """If ``force_styling=None`` is used, don't ever do styling."""
     @as_subprocess
     def child(kind):
-        t = TestTerminal(kind=kind, force_styling=None)
-        assert (t.save == '')
-        assert (t.color(9) == '')
-        assert (t.bold('oi') == 'oi')
+        t = TestTerminal(force_styling=None)
+        assert not t.does_styling
 
     child(all_terms)
+
+
+def test_force_styling_none_but_FORCE_COLOR(all_terms):
+    """``force_styling=None``, but FORCE_COLOR or CLICOLOR_FORCE is non-empty, does styling."""
+    @as_subprocess
+    def child(envkey):
+        os.environ[envkey] = '1'
+        t = TestTerminal(force_styling=None)
+        assert t.does_styling
+        del os.environ[envkey]
+
+    child('FORCE_COLOR')
+    child('CLICOLOR_FORCE')
+
+
+def test_force_styling_none_and_unset_FORCE_COLOR(all_terms):
+    """
+    ``force_styling=None``, but FORCE_COLOR/CLICOLOR_FORCE is set, but empty, do not style.
+    """
+    @as_subprocess
+    def child(envkey):
+        os.environ[envkey] = ''
+        t = TestTerminal(force_styling=None)
+        assert not t.does_styling
+        del os.environ[envkey]
+
+    child('FORCE_COLOR')
+    child('CLICOLOR_FORCE')
+
+
+def test_force_styling_False_but_FORCE_COLOR():
+    """``force_styling=False``, but FORCE_COLOR or CLICOLOR_FORCE is non-empty, do styling."""
+    @as_subprocess
+    def child(envkey):
+        os.environ[envkey] = '1'
+        t = TestTerminal(force_styling=False)
+        assert t.does_styling
+        del os.environ[envkey]
+
+    child('FORCE_COLOR')
+    child('CLICOLOR_FORCE')
+
+
+def test_force_styling_True_but_NO_COLOR():
+    """``force_styling=True``, but NO_COLOR is non-empty, do not style."""
+    @as_subprocess
+    def child(envkey):
+        os.environ[envkey] = '1'
+        t = TestTerminal(force_styling=True)
+        assert not t.does_styling
+        del os.environ[envkey]
+
+    child('NO_COLOR')
 
 
 def test_setupterm_singleton_issue_33():
