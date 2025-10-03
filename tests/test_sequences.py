@@ -209,9 +209,7 @@ def test_inject_move_x():
             with t.location(x=COL):
                 pass
         expected_output = ''.join(
-            (unicode_cap('sc') or '\x1b[s',
-             f'\x1b[{COL + 1}G'.format(COL + 1),
-             unicode_cap('rc') or '\x1b[u'),
+            (unicode_cap('sc') or '\x1b[s', f'\x1b[{COL + 1}G', unicode_cap('rc') or '\x1b[u'),
         )
         assert t.stream.getvalue() == expected_output
         assert t.move_x(COL) == f'\x1b[{COL + 1}G'
@@ -318,22 +316,22 @@ def test_callable_numeric_colors(all_terms):
     def child(kind):
         t = TestTerminal(kind=kind)
         if t.magenta:
-            assert t.color(5)('smoo') == t.magenta + 'smoo' + t.normal
+            assert t.color(5)('smoo') == f'{t.magenta}smoo{t.normal}'
         else:
             assert t.color(5)('smoo') == 'smoo'
 
         if t.on_magenta:
-            assert t.on_color(5)('smoo') == t.on_magenta + 'smoo' + t.normal
+            assert t.on_color(5)('smoo') == f'{t.on_magenta}smoo{t.normal}'
         else:
             assert t.color(5)('smoo') == 'smoo'
 
         if t.color(4):
-            assert t.color(4)('smoo') == t.color(4) + 'smoo' + t.normal
+            assert t.color(4)('smoo') == f'{t.color(4)}smoo{t.normal}'
         else:
             assert t.color(4)('smoo') == 'smoo'
 
         if t.on_green:
-            assert t.on_color(2)('smoo') == t.on_green + 'smoo' + t.normal
+            assert t.on_color(2)('smoo') == f'{t.on_green}smoo{t.normal}'
         else:
             assert t.on_color(2)('smoo') == 'smoo'
 
@@ -533,7 +531,7 @@ def test_split_seqs(all_terms):
         term = Terminal(kind)
 
         if term.sc and term.rc:
-            given_text = term.sc + 'AB' + term.rc + 'CD'
+            given_text = f'{term.sc}AB{term.rc}CD'
             expected = [term.sc, 'A', 'B', term.rc, 'C', 'D']
             result = list(term.split_seqs(given_text))
             assert result == expected
@@ -550,7 +548,7 @@ def test_split_seqs_maxsplit1(all_terms):
         term = Terminal(kind)
 
         if term.bold:
-            given_text = term.bold + 'bbq'
+            given_text = f'{term.bold}bbq'
             expected = [term.bold, 'bbq']
             result = list(term.split_seqs(given_text, 1))
             assert result == expected
@@ -567,7 +565,7 @@ def test_split_seqs_term_right(all_terms):
         term = Terminal(kind)
 
         if term.move_up:
-            given_text = 'XY' + term.move_right + 'VK'
+            given_text = f'XY{term.move_right}VK'
             expected = ['X', 'Y', term.move_right, 'V', 'K']
             result = list(term.split_seqs(given_text))
             assert result == expected
@@ -584,13 +582,13 @@ def test_split_seqs_maxsplit3_and_term_right(all_terms):
         term = Terminal(kind)
 
         if term.move_right(32):
-            given_text = 'PQ' + term.move_right(32) + 'RS'
+            given_text = f'PQ{term.move_right(32)}RS'
             expected = ['P', 'Q', term.move_right(32), 'RS']
             result = list(term.split_seqs(given_text, 3))
             assert result == expected
 
         if term.move_up(45):
-            given_text = 'XY' + term.move_up(45) + 'VK'
+            given_text = f'XY{term.move_up(45)}VK'
             expected = ['X', 'Y', term.move_up(45), 'V', 'K']
             result = list(term.split_seqs(given_text))
             assert result == expected
@@ -657,16 +655,19 @@ def test_truncate(all_terms):
         from blessed import Terminal
         term = Terminal(kind)
 
-        test_string = term.red("Testing ") + term.yellow("makes ") +\
-            term.green("me ") + term.blue("feel ") +\
-            term.indigo("good") + term.normal
+        test_string = (
+            f'{term.red("Testing")} {term.yellow("makes")} {term.green("me")} '
+            f'{term.blue("feel")} {term.indigo("good")}{term.normal}'
+        )
         stripped_string = term.strip_seqs(test_string)
         for i in range(len(stripped_string)):
             test_l = term.length(term.truncate(test_string, i))
             assert test_l == len(stripped_string[:i])
-        test_nogood = term.red("Testing ") + term.yellow("makes ") +\
-            term.green("me ") + term.blue("feel ") +\
-            term.indigo("") + term.normal
+
+        test_nogood = (
+            f'{term.red("Testing")} {term.yellow("makes")} {term.green("me")} '
+            f'{term.blue("feel")} {term.indigo("")}{term.normal}'
+        )
         trunc = term.truncate(test_string, term.length(test_string) - len("good"))
         assert trunc == test_nogood
 
@@ -709,7 +710,7 @@ def test_truncate_padding(all_terms):
         term = Terminal(kind)
 
         if term.move_right(5):
-            test_right_string = term.blue("one" + term.move_right(5) + "two")
+            test_right_string = term.blue(f"one{term.move_right(5)}two")
             assert term.truncate(test_right_string, 9) == term.blue("one     t")
 
         test_bs_string = term.blue("one\b\b\btwo")
@@ -727,7 +728,7 @@ def test_truncate_default(all_terms):
         # local
         from blessed import Terminal
         term = Terminal(kind)
-        test = "Testing " + term.red("attention ") + term.blue("please.")
+        test = f'Testing {term.red("attention ")}{term.blue("please.")}'
         trunc = term.truncate(test)
         assert term.length(trunc) <= term.width
         assert term.truncate(term.red('x' * 1000)) == term.red('x' * term.width)

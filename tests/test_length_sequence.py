@@ -295,7 +295,7 @@ def test_sequence_length(all_terms):
         assert term.length(term.move_right) == 1
 
         if term.cub:
-            assert term.length(('_' * 10) + term.cub(10)) == 0
+            assert term.length(f'{"_" * 10}{term.cub(10)}') == 0
 
         if term.cuf:
             assert term.length(term.cuf(10)) == 10

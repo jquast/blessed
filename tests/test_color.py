@@ -51,8 +51,8 @@ def test_color_rgb():
         t = TestTerminal(force_styling=True)
         color_patterns = rf"{t.caps['color'].pattern}|{t.caps['color256'].pattern}"
         t.number_of_colors = 1 << 24
-        assert t.color_rgb(0, 0, 0)('smoo') == '\x1b[38;2;0;0;0msmoo' + t.normal
-        assert t.color_rgb(84, 192, 233)('smoo') == '\x1b[38;2;84;192;233msmoo' + t.normal
+        assert t.color_rgb(0, 0, 0)('smoo') == f'\x1b[38;2;0;0;0msmoo{t.normal}'
+        assert t.color_rgb(84, 192, 233)('smoo') == f'\x1b[38;2;84;192;233msmoo{t.normal}'
 
         t.number_of_colors = 256
         # In 256-color mode, (0,0,0) maps to cube index 16, not ANSI black (0)
@@ -70,8 +70,8 @@ def test_on_color_rgb():
         t = TestTerminal(force_styling=True)
         color_patterns = rf"{t.caps['color'].pattern}|{t.caps['on_color256'].pattern}"
         t.number_of_colors = 1 << 24
-        assert t.on_color_rgb(0, 0, 0)('smoo') == '\x1b[48;2;0;0;0msmoo' + t.normal
-        assert t.on_color_rgb(84, 192, 233)('smoo') == '\x1b[48;2;84;192;233msmoo' + t.normal
+        assert t.on_color_rgb(0, 0, 0)('smoo') == f'\x1b[48;2;0;0;0msmoo{t.normal}'
+        assert t.on_color_rgb(84, 192, 233)('smoo') == f'\x1b[48;2;84;192;233msmoo{t.normal}'
 
         t.number_of_colors = 256
         assert t.on_color_rgb(0, 0, 0)('smoo') == f'{t.on_color(16)}smoo{t.normal}'

@@ -36,9 +36,9 @@ what key we pressed.
            if not val:
               print("It sure is quiet in here ...")
            elif val.is_sequence:
-              print("got sequence: {0}.".format((str(val), val.name, val.code)))
+              print(f"got sequence: {val}, {val.name}, {val.code})
            elif val:
-              print("got {0}.".format(val))
+              print(f"got {val}.")
        print(f'bye!{term.normal}')
 
 .. image:: https://dxtz6bzwq9sxx.cloudfront.net/demo_cbreak_inkey.gif

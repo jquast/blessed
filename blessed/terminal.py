@@ -229,12 +229,12 @@ class Terminal():
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
         if os.getenv('NO_COLOR'):
-            self.errors.append('NO_COLOR=' + repr(os.getenv('NO_COLOR')))
+            self.errors.append(f'NO_COLOR={os.getenv("NO_COLOR")!r}')
         elif os.getenv('FORCE_COLOR'):
-            self.errors.append('FORCE_COLOR=' + repr(os.getenv('FORCE_COLOR')))
+            self.errors.append(f'FORCE_COLOR={os.getenv("FORCE_COLOR")!r}')
             self._does_styling = True
         elif os.getenv('CLICOLOR_FORCE'):
-            self.errors.append('CLICOLOR_FORCE=' + repr(os.getenv('CLICOLOR_FORCE')))
+            self.errors.append(f'CLICOLOR_FORCE={os.getenv("CLICOLOR_FORCE")!r}')
             self._does_styling = True
         elif force_styling is None and self.is_a_tty:
             self.errors.append('force_styling is None')
@@ -342,11 +342,11 @@ class Terminal():
         )
         # for tokenizer, the '.lastgroup' is the primary lookup key for
         # 'self.caps', unless 'MISMATCH'; then it is an unmatched character.
-        self._caps_compiled_any = re.compile('|'.join(
-            cap.named_pattern for cap in self.caps.values()
-        ) + '|(?P<MISMATCH>.)')
+        self._caps_compiled_any = re.compile(
+            f'{"|".join(cap.named_pattern for cap in self.caps.values())}|(?P<MISMATCH>.)'
+        )
         self._caps_unnamed_any = re.compile(
-            '|'.join(f'({cap.pattern})' for cap in self.caps.values()) + '|(.)'
+            f'{"|".join(f"({cap.pattern})" for cap in self.caps.values())}|(.)'
         )
 
     def __init__keycodes(self) -> None:

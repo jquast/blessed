@@ -255,10 +255,11 @@ def test_setupterm_singleton_issue_33():
             term = TestTerminal(kind=next_kind, force_styling=True)
         except UserWarning as err:
             assert (err.args[0].startswith(
-                    'A terminal of kind "' + next_kind + '" has been requested')
-                    ), err.args[0]
-            assert ('a terminal of kind "' + first_kind + '" will '
-                    'continue to be returned' in err.args[0]), err.args[0]
+                f'A terminal of kind "{next_kind}" has been requested')
+            ), err.args[0]
+            assert (
+                f'a terminal of kind "{first_kind}" will continue to be returned' in err.args[0]
+            ), err.args[0]
         else:
             # unless term is not a tty and setupterm() is not called
             assert not term.is_a_tty, 'Should have thrown exception'

@@ -430,8 +430,8 @@ def test_esc_delay_cbreak_035():
         with term.cbreak():
             stime = time.time()
             inp = term.inkey(timeout=5)
-            measured_time = (time.time() - stime) * 100
-            os.write(sys.__stdout__.fileno(), f'{inp.name} {measured_time:d}'.encode('ascii'))
+            measured_time = int((time.time() - stime) * 100)
+            os.write(sys.__stdout__.fileno(), f'{inp.name} {measured_time}'.encode('ascii'))
             sys.stdout.flush()
         if cov is not None:
             cov.stop()
@@ -465,7 +465,7 @@ def test_esc_delay_cbreak_135():
             stime = time.time()
             inp = term.inkey(timeout=5, esc_delay=1.35)
             measured_time = (time.time() - stime) * 100
-            os.write(sys.__stdout__.fileno(), f'{inp.name} {measured_time:d}'.encode('ascii'))
+            os.write(sys.__stdout__.fileno(), f'{inp.name} {measured_time:.0f}'.encode('ascii'))
             sys.stdout.flush()
         if cov is not None:
             cov.stop()
@@ -498,7 +498,7 @@ def test_esc_delay_cbreak_timout_0():
             stime = time.time()
             inp = term.inkey(timeout=0)
             measured_time = (time.time() - stime) * 100
-            os.write(sys.__stdout__.fileno(), f'{inp.name} {measured_time:d}'.encode('ascii'))
+            os.write(sys.__stdout__.fileno(), f'{inp.name} {measured_time:.0f}'.encode('ascii'))
             sys.stdout.flush()
         if cov is not None:
             cov.stop()
@@ -532,7 +532,9 @@ def test_esc_delay_cbreak_nonprefix_sequence():
             esc = term.inkey(timeout=5)
             inp = term.inkey(timeout=5)
             measured_time = (time.time() - stime) * 100
-            os.write(sys.__stdout__.fileno(), f'{esc.name} {inp} {measured_time:d}'.encode('ascii'))
+            os.write(
+                sys.__stdout__.fileno(), f'{esc.name} {inp} {measured_time:.0f}'.encode('ascii')
+            )
             sys.stdout.flush()
         if cov is not None:
             cov.stop()
@@ -567,7 +569,9 @@ def test_esc_delay_cbreak_prefix_sequence():
             esc = term.inkey(timeout=5)
             inp = term.inkey(timeout=5)
             measured_time = (time.time() - stime) * 100
-            os.write(sys.__stdout__.fileno(), f'{esc.name} {inp} {measured_time:d}'.encode('ascii'))
+            os.write(
+                sys.__stdout__.fileno(), f'{esc.name} {inp} {measured_time:.0f}'.encode('ascii')
+            )
             sys.stdout.flush()
         if cov is not None:
             cov.stop()

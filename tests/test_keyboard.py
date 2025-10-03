@@ -93,7 +93,7 @@ def test_keystroke_default_args():
     assert ks.name == ks._name
     assert ks._code is None
     assert ks.code == ks._code
-    assert 'x' + ks == 'x'
+    assert f'x{ks}' == 'x'
     assert not ks.is_sequence
     assert repr(ks) == "''"
 
@@ -107,7 +107,7 @@ def test_a_keystroke():
     assert ks.name == ks._name
     assert ks._code == 1
     assert ks.code == ks._code
-    assert 'x' + ks == 'xx'
+    assert f'x{ks}' == 'xx'
     assert ks.is_sequence
     assert repr(ks) == "the X"
 

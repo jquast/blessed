@@ -195,7 +195,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
             if drop_whitespace and (cur_line and not Sequence(cur_line[-1], term).strip()):
                 del cur_line[-1]
             if cur_line:
-                lines.append(indent + ''.join(cur_line))
+                lines.append(f'{indent}{"".join(cur_line)}')
         return lines
 
     def _handle_long_word(self,  # type: ignore[no-untyped-def]
@@ -349,7 +349,7 @@ class Sequence(str):
             output += text
 
         # Return with remaining caps appended
-        return output + ''.join(text for text, cap in parsed_seq if cap)
+        return f'{output}{"".join(text for text, cap in parsed_seq if cap)}'
 
     def length(self) -> int:
         r"""

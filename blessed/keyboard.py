@@ -360,7 +360,7 @@ _CURSES_KEYCODE_ADDINS = (
 _LASTVAL = max(get_curses_keycodes().values())
 for keycode_name in _CURSES_KEYCODE_ADDINS:
     _LASTVAL += 1
-    globals()['KEY_' + keycode_name] = _LASTVAL
+    globals()[f'KEY_{keycode_name}'] = _LASTVAL
 
 #: In a perfect world, terminal emulators would always send exactly what
 #: the terminfo(5) capability database plans for them, accordingly by the

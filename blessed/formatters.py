@@ -32,14 +32,14 @@ def _make_colors() -> Set[str]:
     # background ('iCE colors' in my day).
     for cga_color in CGA_COLORS:
         colors.add(cga_color)
-        colors.add('on_' + cga_color)
-        colors.add('bright_' + cga_color)
-        colors.add('on_bright_' + cga_color)
+        colors.add(f'on_{cga_color}')
+        colors.add(f'bright_{cga_color}')
+        colors.add(f'on_bright_{cga_color}')
 
     # foreground and background VGA color
     for vga_color in X11_COLORNAMES_TO_RGB:
         colors.add(vga_color)
-        colors.add('on_' + vga_color)
+        colors.add(f'on_{vga_color}')
     return colors
 
 
@@ -171,8 +171,7 @@ class ParameterizingProxyString(str):
         :rtype: FormattingString
         :returns: Callable string for given parameters
         """
-        return FormattingString(self.format(*self._fmt_args(*args)),
-                                self._normal)
+        return FormattingString(self.format(*self._fmt_args(*args)), self._normal)
 
 
 class FormattingString(str):
@@ -227,12 +226,12 @@ class FormattingString(str):
         postfix = ''
         if self and self._normal:
             postfix = self._normal
-            _refresh = self._normal + self
+            _refresh = f'{self._normal}{self}'
             args_list = [_refresh.join(ucs_part.split(self._normal))
                          for ucs_part in args]
             args = tuple(args_list)
 
-        return self + ''.join(args) + postfix
+        return f'{self}{"".join(args)}{postfix}'
 
 
 class FormattingOtherString(str):
@@ -368,7 +367,7 @@ def split_compound(compound: str) -> List[str]:
     mergeable_prefixes = ['on', 'bright', 'on_bright']
     for segment in compound.split('_'):
         if merged_segs and merged_segs[-1] in mergeable_prefixes:
-            merged_segs[-1] += '_' + segment
+            merged_segs[-1] += f'_{segment}'
         else:
             merged_segs.append(segment)
     return merged_segs
@@ -439,10 +438,11 @@ def resolve_color(term: 'Terminal', color: str) -> Union[NullCallableString, For
     # foreground and background sequences are:
     # - ^[38;2;<r>;<g>;<b>m
     # - ^[48;2;<r>;<g>;<b>m
-    fgbg_seq = ('48' if 'on_' in color else '38')
     assert term.number_of_colors == 1 << 24
-    fmt_attr = '\x1b[' + fgbg_seq + ';2;{0};{1};{2}m'
-    return FormattingString(fmt_attr.format(*rgb), term.normal)
+    return FormattingString(
+        f'\x1b[{("48" if "on_" in color else "38")};2;{rgb.red};{rgb.green};{rgb.blue}m',
+        term.normal
+    )
 
 
 def resolve_attribute(term: 'Terminal', attr: str) -> Union[ParameterizingString, FormattingString]:

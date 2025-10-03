@@ -95,9 +95,7 @@ def test_multiline():
     def child():
         # build a test paragraph, along with a very colorful version
         term = TestTerminal()
-        given_string = ('\n' + (32 * 'A') + '\n' +
-                        (32 * 'B') + '\n' +
-                        (32 * 'C') + '\n\n')
+        given_string = f'\n{32 * "A"}\n{32 * "B"}\n{32 * "C"}\n\n'
         expected = [
             '',
             'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
