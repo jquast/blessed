@@ -207,8 +207,8 @@ class Keystroke(str):
         """
         Get name for modern/legacy CSI sequence with modifiers.
 
-        Returns name like 'KEY_CTRL_ALT_F1' or 'KEY_SHIFT_UP_RELEASED'.
-        Also handles release/repeat events for keys without modifiers.
+        Returns name like 'KEY_CTRL_ALT_F1' or 'KEY_SHIFT_UP_RELEASED'. Also handles release/repeat
+        events for keys without modifiers.
         """
         if not (self._mode is not None and self._mode < 0 and self._code is not None):
             return None

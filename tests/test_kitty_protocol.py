@@ -1025,12 +1025,12 @@ def test_kitty_digit_name_synthesis():
     """Test Kitty keyboard protocol digit name synthesis with modifiers."""
     # Test digit name synthesis for Kitty sequences
     digit_test_cases = [
-        ('\x1b[49;3u', 'ALT_1', 'Alt+1'),       # ASCII '1' = 49
-        ('\x1b[49;5u', 'CTRL_1', 'Ctrl+1'),
-        ('\x1b[49;4u', 'ALT_SHIFT_1', 'Alt+Shift+1'),  # Alt(2) + Shift(1) + base(1) = 4
-        ('\x1b[50;3u', 'ALT_2', 'Alt+2'),       # ASCII '2' = 50
-        ('\x1b[57;5u', 'CTRL_9', 'Ctrl+9'),     # ASCII '9' = 57
-        ('\x1b[48;7u', 'CTRL_ALT_0', 'Ctrl+Alt+0'),  # ASCII '0' = 48, modifiers=7 (1+2+4)
+        ('\x1b[49;3u', 'KEY_ALT_1', 'Alt+1'),       # ASCII '1' = 49
+        ('\x1b[49;5u', 'KEY_CTRL_1', 'Ctrl+1'),
+        ('\x1b[49;4u', 'KEY_ALT_SHIFT_1', 'Alt+Shift+1'),  # Alt(2) + Shift(1) + base(1) = 4
+        ('\x1b[50;3u', 'KEY_ALT_2', 'Alt+2'),       # ASCII '2' = 50
+        ('\x1b[57;5u', 'KEY_CTRL_9', 'Ctrl+9'),     # ASCII '9' = 57
+        ('\x1b[48;7u', 'KEY_CTRL_ALT_0', 'Ctrl+Alt+0'),  # ASCII '0' = 48, modifiers=7 (1+2+4)
     ]
 
     for sequence, expected_name, description in digit_test_cases:
@@ -1047,20 +1047,20 @@ def test_kitty_digit_name_synthesis():
     # Test that existing letter name synthesis still works
     ks_letter = _match_kitty_key('\x1b[97;3u')  # Alt+a
     assert ks_letter is not None
-    assert ks_letter.name == 'ALT_A'
+    assert ks_letter.name == 'KEY_ALT_A'
 
 
 def test_kitty_letter_name_synthesis_basic_modifiers():
     """Test Kitty protocol letter name synthesis for basic modifier combinations."""
     # Test basic modifier combinations for letter 'a' (unicode_key=97)
     test_cases = [
-        ('\x1b[97;5u', 'CTRL_A', 'Ctrl+a'),
-        ('\x1b[97;3u', 'ALT_A', 'Alt+a'),
-        ('\x1b[97;7u', 'CTRL_ALT_A', 'Ctrl+Alt+a'),
-        ('\x1b[97;2u', 'SHIFT_A', 'Shift+a'),
-        ('\x1b[97;6u', 'CTRL_SHIFT_A', 'Ctrl+Shift+a'),
-        ('\x1b[97;4u', 'ALT_SHIFT_A', 'Alt+Shift+a'),
-        ('\x1b[97;8u', 'CTRL_ALT_SHIFT_A', 'Ctrl+Alt+Shift+a'),
+        ('\x1b[97;5u', 'KEY_CTRL_A', 'Ctrl+a'),
+        ('\x1b[97;3u', 'KEY_ALT_A', 'Alt+a'),
+        ('\x1b[97;7u', 'KEY_CTRL_ALT_A', 'Ctrl+Alt+a'),
+        ('\x1b[97;2u', 'KEY_SHIFT_A', 'Shift+a'),
+        ('\x1b[97;6u', 'KEY_CTRL_SHIFT_A', 'Ctrl+Shift+a'),
+        ('\x1b[97;4u', 'KEY_ALT_SHIFT_A', 'Alt+Shift+a'),
+        ('\x1b[97;8u', 'KEY_CTRL_ALT_SHIFT_A', 'Ctrl+Alt+Shift+a'),
     ]
 
     for sequence, expected_name, description in test_cases:
@@ -1074,12 +1074,12 @@ def test_kitty_letter_name_synthesis_different_letters():
     """Test Kitty letter name synthesis works for different letters."""
     # Test various letters with Ctrl modifier
     letters_test_cases = [
-        ('\x1b[65;5u', 'CTRL_A', 'A'),  # uppercase A
-        ('\x1b[90;5u', 'CTRL_Z', 'Z'),  # uppercase Z
-        ('\x1b[97;5u', 'CTRL_A', 'a'),  # lowercase a
-        ('\x1b[122;5u', 'CTRL_Z', 'z'),  # lowercase z
-        ('\x1b[77;3u', 'ALT_M', 'M'),   # Alt+M
-        ('\x1b[109;3u', 'ALT_M', 'm'),  # Alt+m
+        ('\x1b[65;5u', 'KEY_CTRL_A', 'A'),  # uppercase A
+        ('\x1b[90;5u', 'KEY_CTRL_Z', 'Z'),  # uppercase Z
+        ('\x1b[97;5u', 'KEY_CTRL_A', 'a'),  # lowercase a
+        ('\x1b[122;5u', 'KEY_CTRL_Z', 'z'),  # lowercase z
+        ('\x1b[77;3u', 'KEY_ALT_M', 'M'),   # Alt+M
+        ('\x1b[109;3u', 'KEY_ALT_M', 'm'),  # Alt+m
     ]
 
     for sequence, expected_name, letter in letters_test_cases:
@@ -1091,15 +1091,15 @@ def test_kitty_letter_name_synthesis_different_letters():
 def test_kitty_letter_name_synthesis_base_key_preference():
     """Test that base_key is preferred over unicode_key for letter naming."""
     # Test Cyrillic 'С' (unicode_key=1089) with base_key='c' (99)
-    # Should synthesize name based on base_key 'c' -> 'CTRL_C'
+    # Should synthesize name based on base_key 'c' -> 'KEY_CTRL_C'
     ks = _match_kitty_key('\x1b[1089::99;5u')  # Ctrl+Cyrillic С with base_key c
     assert ks is not None
-    assert ks.name == 'CTRL_C'
+    assert ks.name == 'KEY_CTRL_C'
 
     # Test when base_key is not present, should fall back to unicode_key
     ks = _match_kitty_key('\x1b[97;5u')  # Ctrl+a, no base_key
     assert ks is not None
-    assert ks.name == 'CTRL_A'
+    assert ks.name == 'KEY_CTRL_A'
 
 
 def test_kitty_letter_name_synthesis_event_type_filtering():
@@ -1107,7 +1107,7 @@ def test_kitty_letter_name_synthesis_event_type_filtering():
     # Test keypress event (event_type=1) - should get name
     ks = _match_kitty_key('\x1b[97;5:1u')  # Ctrl+a keypress
     assert ks is not None
-    assert ks.name == 'CTRL_A'
+    assert ks.name == 'KEY_CTRL_A'
 
     # Test key release event (event_type=3) - should NOT get name
     ks = _match_kitty_key('\x1b[97;5:3u')  # Ctrl+a key release
@@ -1122,7 +1122,7 @@ def test_kitty_letter_name_synthesis_event_type_filtering():
     # Test default event_type (1) - should get name
     ks = _match_kitty_key('\x1b[97;5u')  # Ctrl+a (default event_type=1)
     assert ks is not None
-    assert ks.name == 'CTRL_A'
+    assert ks.name == 'KEY_CTRL_A'
 
 
 def test_kitty_letter_name_synthesis_non_letters_no_name():
@@ -1169,16 +1169,15 @@ def test_kitty_letter_name_synthesis_supports_advanced_modifiers():
     """Test that advanced modifiers (super/hyper/meta) are supported in letter naming."""
     # Test that super/hyper/meta DO appear in letter names (new behavior)
     advanced_modifier_cases = [
-        ('\x1b[97;9u', 'SUPER_A', 'Super+a'),       # super (1+8=9) - should get name
-        ('\x1b[97;17u', 'HYPER_A', 'Hyper+a'),      # hyper (1+16=17) - should get name
-        ('\x1b[97;33u', 'META_A', 'Meta+a'),        # meta (1+32=33) - should get name
-        ('\x1b[97;13u', 'CTRL_SUPER_A', 'Ctrl+Super+a'),  # ctrl+super (1+4+8=13) - should get both
-        ('\x1b[97;11u', 'ALT_SUPER_A', 'Alt+Super+a'),    # alt+super (1+2+8=11) - should get both
+        ('\x1b[97;9u', 'KEY_SUPER_A'),       # super (1+8=9) - should get name
+        ('\x1b[97;17u', 'KEY_HYPER_A'),      # hyper (1+16=17) - should get name
+        ('\x1b[97;33u', 'KEY_META_A'),        # meta (1+32=33) - should get name
+        ('\x1b[97;13u', 'KEY_CTRL_SUPER_A'),  # ctrl+super (1+4+8=13) - should get both
+        ('\x1b[97;11u', 'KEY_ALT_SUPER_A'),    # alt+super (1+2+8=11) - should get both
     ]
 
-    for sequence, expected_name, description in advanced_modifier_cases:
+    for sequence, expected_name in advanced_modifier_cases:
         ks = _match_kitty_key(sequence)
-        assert ks is not None
         assert ks.name == expected_name
 
 
@@ -1201,10 +1200,10 @@ def test_kitty_letter_name_synthesis_integration():
 
         # Test that Terminal.inkey() correctly synthesizes Kitty letter names
         test_sequences = [
-            ('\x1b[97;5u', 'CTRL_A'),
-            ('\x1b[122;3u', 'ALT_Z'),
-            ('\x1b[77;7u', 'CTRL_ALT_M'),
-            ('\x1b[98;6u', 'CTRL_SHIFT_B'),
+            ('\x1b[97;5u', 'KEY_CTRL_A'),
+            ('\x1b[122;3u', 'KEY_ALT_Z'),
+            ('\x1b[77;7u', 'KEY_CTRL_ALT_M'),
+            ('\x1b[98;6u', 'KEY_CTRL_SHIFT_B'),
         ]
 
         for sequence, expected_name in test_sequences:
@@ -1222,13 +1221,13 @@ def test_kitty_letter_name_synthesis_case_normalization():
     """Test that letter names are normalized to uppercase regardless of input case."""
     # Test both uppercase and lowercase unicode keys produce uppercase names
     case_test_cases = [
-        ('\x1b[97;5u', 'CTRL_A', 'lowercase a'),   # lowercase 'a' -> 'CTRL_A'
-        ('\x1b[65;5u', 'CTRL_A', 'uppercase A'),   # uppercase 'A' -> 'CTRL_A'
-        ('\x1b[122;3u', 'ALT_Z', 'lowercase z'),   # lowercase 'z' -> 'ALT_Z'
-        ('\x1b[90;3u', 'ALT_Z', 'uppercase Z'),    # uppercase 'Z' -> 'ALT_Z'
+        ('\x1b[97;5u', 'KEY_CTRL_A'),   # lowercase 'a' -> 'KEY_CTRL_A'
+        ('\x1b[65;5u', 'KEY_CTRL_A'),   # uppercase 'A' -> 'KEY_CTRL_A'
+        ('\x1b[122;3u', 'KEY_ALT_Z'),   # lowercase 'z' -> 'KEY_ALT_Z'
+        ('\x1b[90;3u', 'KEY_ALT_Z'),    # uppercase 'Z' -> 'KEY_ALT_Z'
     ]
 
-    for sequence, expected_name, description in case_test_cases:
+    for sequence, expected_name in case_test_cases:
         ks = _match_kitty_key(sequence)
         assert ks is not None
         assert ks.name == expected_name
@@ -1238,14 +1237,13 @@ def test_kitty_letter_name_synthesis_modifier_ordering():
     """Test that modifier ordering in names follows legacy pattern: CTRL_ALT_SHIFT."""
     # Test various combinations to ensure consistent ordering
     ordering_test_cases = [
-        ('\x1b[97;6u', 'CTRL_SHIFT_A', 'Ctrl+Shift'),     # ctrl+shift (1+4+1=6)
-        ('\x1b[97;4u', 'ALT_SHIFT_A', 'Alt+Shift'),       # alt+shift (1+2+1=4)
-        ('\x1b[97;8u', 'CTRL_ALT_SHIFT_A', 'Ctrl+Alt+Shift'),  # all three (1+4+2+1=8)
+        ('\x1b[97;6u', 'KEY_CTRL_SHIFT_A'),     # ctrl+shift (1+4+1=6)
+        ('\x1b[97;4u', 'KEY_ALT_SHIFT_A'),       # alt+shift (1+2+1=4)
+        ('\x1b[97;8u', 'KEY_CTRL_ALT_SHIFT_A'),  # all three (1+4+2+1=8)
     ]
 
-    for sequence, expected_name, description in ordering_test_cases:
+    for sequence, expected_name in ordering_test_cases:
         ks = _match_kitty_key(sequence)
-        assert ks is not None
         assert ks.name == expected_name
 
 
@@ -1327,19 +1325,17 @@ def test_kitty_letter_name_synthesis_boundary_conditions():
     """Test boundary conditions for letter detection."""
     # Test edge cases around ASCII letter ranges
     boundary_cases = [
-        ('\x1b[64;5u', None, '@'),     # ASCII 64, just before 'A' (65) - no name
-        ('\x1b[91;5u', 'CSI', '['),    # ASCII 91, just after 'Z' (90) - special case: CSI
-        ('\x1b[96;5u', None, '`'),     # ASCII 96, just before 'a' (97) - no name
-        ('\x1b[123;5u', None, '{'),    # ASCII 123, just after 'z' (122) - no name
-        ('\x1b[65;5u', 'CTRL_A', 'A'),  # ASCII 65, 'A' - should get name
-        ('\x1b[90;5u', 'CTRL_Z', 'Z'),  # ASCII 90, 'Z' - should get name
-        ('\x1b[97;5u', 'CTRL_A', 'a'),  # ASCII 97, 'a' - should get name
-        ('\x1b[122;5u', 'CTRL_Z', 'z'),  # ASCII 122, 'z' - should get name
+        ('\x1b[91;5u', 'CSI', '['),          # ASCII 91, just after 'Z' (90) - SPECIAL CASE
+        ('\x1b[64;5u', None, '@'),           # ASCII 64, just before 'A' (65)
+        ('\x1b[96;5u', None, '`'),           # ASCII 96, just before 'a' (97)
+        ('\x1b[123;5u', None, '{'),          # ASCII 123, just after 'z' (122)
+        ('\x1b[65;5u', 'KEY_CTRL_A', 'A'),   # ASCII 65, 'A'
+        ('\x1b[90;5u', 'KEY_CTRL_Z', 'Z'),   # ASCII 90, 'Z'
+        ('\x1b[97;5u', 'KEY_CTRL_A', 'a'),   # ASCII 97, 'a'
+        ('\x1b[122;5u', 'KEY_CTRL_Z', 'z'),  # ASCII 122, 'z
     ]
-
     for sequence, expected_name, description in boundary_cases:
         ks = _match_kitty_key(sequence)
-        assert ks is not None
         assert ks.name == expected_name
 
 
@@ -1416,16 +1412,16 @@ def test_kitty_advanced_modifiers(modifier, mod_value, char):
     assert getattr(ks, f'_{modifier}') is True
     assert ks._ctrl is False
     assert ks._alt is False
-    expected_name = f'{modifier.upper()}_{chr(char).upper()}'
+    expected_name = f'KEY_{modifier.upper()}_{chr(char).upper()}'
     assert ks.name == expected_name
 
 
 @pytest.mark.parametrize("sequence,expected_name", [
-    ('\x1b[97;13u', 'CTRL_SUPER_A'),
-    ('\x1b[122;11u', 'ALT_SUPER_Z'),
-    ('\x1b[97;21u', 'CTRL_HYPER_A'),
-    ('\x1b[97;37u', 'CTRL_META_A'),
-    ('\x1b[97;57u', 'SUPER_HYPER_META_A'),
+    ('\x1b[97;13u', 'KEY_CTRL_SUPER_A'),
+    ('\x1b[122;11u', 'KEY_ALT_SUPER_Z'),
+    ('\x1b[97;21u', 'KEY_CTRL_HYPER_A'),
+    ('\x1b[97;37u', 'KEY_CTRL_META_A'),
+    ('\x1b[97;57u', 'KEY_SUPER_HYPER_META_A'),
 ])
 def test_kitty_compound_advanced_modifiers(sequence, expected_name):
     """Test compound modifier combinations."""
