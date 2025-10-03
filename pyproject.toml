@@ -64,3 +64,53 @@ version = {attr = 'blessed.__version__'}
 
 [tool.setuptools.package-data]
 'blessed' = ['py.typed']
+
+[tool.pylint.main]
+load-plugins = [
+    'pylint.extensions.mccabe',
+    'pylint.extensions.check_elif',
+    'pylint.extensions.docparams',
+    'pylint.extensions.overlapping_exceptions',
+    'pylint.extensions.redefined_variable_type',
+]
+persistent = false
+jobs = 0
+
+[tool.pylint.'messages control']
+disable= [
+    'fixme',
+    'consider-using-f-string',  # Python 2
+    'super-with-arguments',  # Python 2
+    'useless-object-inheritance',  # Python 2
+    'raise-missing-from',  # Python 2
+]
+
+[tool.pylint.format]
+max-line-length = 100
+good-names = ['ks', 'fd', '_', 'x' ,'y']
+
+[tool.pylint.parameter_documentation]
+default-docstring-type= 'sphinx'
+accept-no-raise-doc = false
+accept-no-param-doc = true
+accept-no-return-doc = true
+
+[tool.pylint.design]
+max-args = 10
+max-attributes = 7
+max-branches = 12
+max-complexity = 11
+max-locals = 15
+max-module-lines = 1300
+max-parents = 7
+max-public-methods = 20
+max-returns = 6
+max-statements = 50
+
+[tool.pylint.similarities]
+ignore-imports = true
+min-similarity-lines = 8
+
+[tool.pylint.reports]
+reports = false
+msg-template = '{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'
