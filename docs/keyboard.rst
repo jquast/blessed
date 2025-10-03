@@ -21,61 +21,172 @@ function for all keyboard input, :meth:`~.Terminal.inkey`.
 inkey()
 -------
 
-Let's just dive right into a rich "event loop", that awaits a keypress for 3 seconds and tells us
-what key we pressed.
+The :meth:`~.Terminal.inkey` method checks the keyboard for any input, and
+returns it as a :class:`~.Keystroke` object. Combined with
+:meth:`~Terminal.cbreak`, single keystrokes can be immediately received with an
+optional timeout.
 
 .. code-block:: python
-   :emphasize-lines: 3,6
+   :emphasize-lines: 7,9
 
-   print(f"{term.home}{term.black_on_skyblue}{term.clear}")
-   print("press 'q' to quit.")
+   from blessed import Terminal
+
+   term = Terminal()
    with term.cbreak():
-       val = ''
-       while val.lower() != 'q':
-           val = term.inkey(timeout=3)
-           if not val:
+       print("press 'q' or F1 to quit.")
+       ks = None
+       while True:
+           ks = term.inkey(timeout=3)
+           if ks is None:
+              # timeout exceeded
               print("It sure is quiet in here ...")
-           elif val.is_sequence:
-              print("got sequence: {0}.".format((str(val), val.name, val.code)))
-           elif val:
-              print("got {0}.".format(val))
-       print(f'bye!{term.normal}')
+              continue
+           if ks.lower() == 'q' or ks.name == 'KEY_F1':
+               break
+           elif ks.name != None:
+              # application keys have "synthesized" names
+              print(f"ks.name={ks.name!r} ks={ks!r} value={ks.value!r}")
+           elif ks:
+              # standard input keys have their string values
+              print(f"ks={ks!r} same as value={ks.value!r}")
 
-.. image:: https://dxtz6bzwq9sxx.cloudfront.net/demo_cbreak_inkey.gif
-    :alt: A visual example of interacting with the Terminal.inkey() and cbreak() methods.
+   print(f'bye! Exited using ks={ks!r}, name={ks.name}')
 
-:meth:`~.Terminal.cbreak` enters a special mode_ that ensures :func:`os.read` on an input stream
-will return as soon as input is available, as explained in :linuxman:`cbreak(3)`. This mode is
-combined with :meth:`~.Terminal.inkey` to decode multibyte sequences, such as ``\0x1bOA``, into
-a unicode-derived :class:`~.Keystroke` instance.
 
-The :class:`~.Keystroke` returned by :meth:`~.Terminal.inkey` is unicode -- it may be printed,
-joined with, or compared to any other unicode strings.
-It also has these special attributes:
+:meth:`~.Terminal.cbreak` enters a special mode_ that ensures :func:`os.read` on
+an input stream will return as soon as input is available, as explained in
+:linuxman:`cbreak(3)`. This mode is combined with :meth:`~.Terminal.inkey` to
+decode multibyte sequences, such as ``\0x1bOA``, into a unicode-derived
+:class:`~.Keystroke` instance that has a *name* attribute of ``KEY_UP``, or, if
+you prefer by method call ``is_key_up()``.
 
-- :attr:`~.Keystroke.is_sequence` (bool): Whether it is an "application" key.
-- :attr:`~.Keystroke.code` (int): The keycode, for equality testing.
-- :attr:`~.Keystroke.name` (str): a human-readable name of any "application" key.
+Keystroke
+---------
+
+The :class:`~.Keystroke` object returned by `inkey()`_ may be printed, joined
+with, or compared to any other unicode strings. Be careful to print it directly,
+though, our example uses format string, ``f'{ks!r}'`` for ``repr()``, because
+the input may contain input that begins with the escape key, (``KEY_ESCAPE``)
+and are generally unprintable.
+
+The :class:`~.Keystroke` object returned by :meth:`~.Terminal.inkey` may
+also be ``None``, letting us know that the ``timeout`` value has elapsed
+without any input. Smaller values can be used to create "animations"
+while also periodically checking in for input.
+
+Modifiers
+---------
+
+Programs with GNU readline, like bash, support *Alt* modifiers, such as *ALT+u*
+to uppercase the word after cursor with input sequence ``'\x1bu``.  This
+sequence can be sent using configuration option altSendsEscape or
+`metaSendsEscape <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Alt-and-Meta-Keys>`_
+in xterm. Many other terminals send these sequences in their default
+configuration and modes.
+
+Use the :attr:`~.Keystroke.is_sequence` (bool) attribute to determine whether
+this is a special "application" key, and inspect its :attr:`~.Keystroke.name`
+(str) attribute to determine if it interesting. When it is not a sequence,
+the :attr:`~.Keystroke.value` can also be tested for its unmodified value::
+
+.. code-block:: python
+   :emphasize-lines: 9
+
+    import time, blessed
+
+    term = blessed.Terminal()
+    print()
+    print("Press X, CTRL-X, ALT-X, or CTRL-ALT-X to disarm!")
+    print()
+    print("time remaining: ", end='', flush=True)
+    TIME_TOTAL = 7
+    stime = time.time()
+    with term.cbreak():
+        while True:
+            # calculate and check time remaining,
+            n = (stime + TIME_TOTAL) - time.time()
+            if n < 0:
+                print()
+                print('You failed to disarm it in time!')
+                break
+
+            # display remaining time with 10Hz blinking '.' animation
+            xpos = len('time remaining: ') + int(TIME_TOTAL - n) * 2
+            maybe_dotted = '.' if int(n * 10) % 2 == 0 else ''
+            print(term.move_x(xpos), end='')
+            print(f'{int(n)}{maybe_dotted}', end='', flush=True)
+
+            # check for input and 'STOP' key
+            inp = term.inkey(timeout=0.1)
+            if inp is None:
+                continue  # timeout
+            if inp.value.lower() == 'x':
+                print(f'STOP with keystroke: {inp!r}({inp.name})')
+                break
+
+This program can be stopped with ctrl+x, alt+x, or even ctrl+alt+x.
+
+If you prefer, a dynamic :meth:`~.Keystroke:__getattr__` allows making compound
+tests of modifiers and application keys, such as ``ks.is_ctrl_alt_('x')``
+instead of testing for string equality ``ks.name == 'KEY_CTRL_ALT_X'``.
+
+Names
+-----
+
+:attr:`~.Keystroke.name` is all you really need to to match an "application"
+key.  All keystrokes begin with ``'KEY_'``, some examples:
+
+    - ``'KEY_UP'``
+    - ``'KEY_DOWN'``
+    - ``'KEY_LEFT'``
+    - ``'KEY_RIGHT'``
+    - ``'KEY_ENTER'``
+    - ``'KEY_BACKSPACE'`` and ``'KEY_DELETE'``
+    - ``'KEY_TAB'`` and ``'KEY_BTAB'``
+    - ``'KEY_F1'``, ``'KEY_F12'``
+
+Or, with modifiers,
+
+    - ``'KEY_ALT_a'``
+    - ``'KEY_ALT_SHIFT_A'``
+    - ``'KEY_ALT_LEFT'``
+    - ``'KEY_ALT_BACKSPACE'``
+    - ``'KEY_CTRL_ALT_SHIFT_F1'``
+    - ``'KEY_CTRL_ALT_DELETE'``
+    - ``'KEY_CTRL_C'``
+
+And, for Kitty_ modes, they may additionally have or ``_RELEASED``, ``_REPEATED`` suffix:
+
+    - ``'KEY_ALT_F4_PRESSED'``
+    - ``'KEY_ALT_F4_RELEASED'``
+    - ``'KEY_ALT_a_RELEASED'``
+    - ``'KEY_ALT_a_REPEATED'``
+    - ``'KEY_ALT_SHIFT_A_RELEASED'``
+    - ``'KEY_CTRL_ALT_SHIFT_F1_RELEASED'``
+    - ``'KEY_CTRL_ALT_DELETE_REPEATED'``
+
+The escape sequence, ``'\x1b['``, is always decoded as name ``CSI`` when it
+arrives without any known matching sequence. There is no ``KEY_ALT_[`` except
+when Kitty_ mode is active.
+
+Use the demonstration program, :ref:`keymatrix.py` to try them out.
 
 Keycodes
 --------
 
-.. note(jquast): a graphical chart of the keyboard, with KEY_CODE names on the labels, maybe?  at
-   least, just a table of all the keys would be better, we should auto-generate it though, like the
-   colors.
-
-When the :attr:`~.Keystroke.is_sequence` property tests *True*, the value of
-:attr:`~.Keystroke.code` represents a unique application key of the keyboard.
-
-:attr:`~.Keystroke.code` may then be compared with attributes of :class:`~.Terminal`,
-which are duplicated from those found in :linuxman:`curses(3)`, or those `constants
-<https://docs.python.org/3/library/curses.html#constants>`_ in :mod:`curses` beginning with phrase
-*KEY_*, as follows:
+For Legacy API of classic curses applications, :attr:`~.Keystroke.code` may be
+be compared with attributes of :class:`~.Terminal`, which are duplicated from
+those found in :linuxman:`curses(3)`, or those `constants
+<https://docs.python.org/3/library/curses.html#constants>`_ in :mod:`curses`
+beginning with phrase *KEY_*. These have numeric values that can be used for
+all basic application keys.
 
 .. include:: all_the_keys.txt
 
-All such keystrokes can be decoded by blessed, there is a demonstration program, :ref:`keymatrix.py`
-that tests how many of them you can find !
+However, this does not represent the full range of keys that can be detected
+with their modifiers, such as ``KEY_LEFT`` as ``KEY_CTRL_LEFT``,
+``KEY_CTRL_SHIFT_LEFT``, and ``KEY_CTRL_ALT_SHIFT_LEFT`` are only matchable
+by their names.
 
 delete
 ------
@@ -89,25 +200,5 @@ though its function in the operating system behaves just as backspace. Blessed u
 It is highly recommend to accept **both** ``KEY_DELETE`` and ``KEY_BACKSPACE`` as having the same
 meaning except when implementing full screen editors, and provide a choice to enable the delete mode
 by configuration.
-
-Alt/meta
---------
-
-Programs with GNU readline, like bash, have *Alt* combinators, such as *ALT+u* to uppercase the word
-after cursor.  This is achieved by the configuration option altSendsEscape or `metaSendsEscape
-<https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-Alt-and-Meta-Keys>`_ in xterm.
-
-The default for most terminals, however, is for this key to be bound by the operating system, or,
-used for inserting international keys, (where the combination *ALT+u, a* is used to insert the
-character ``ä``).
-
-It is therefore a recommendation to **avoid alt or meta keys entirely** in applications.
-
-And instead prefer the ctrl-key combinations, maybe along with :meth:`~.Terminal.raw`, to avoid
-instructing users to custom-configure their terminal emulators to communicate *Alt* sequences.
-
-If you still wish to optionally decode them, *ALT+z* becomes *Escape + z* (or, in raw form
-``\x1bz``). This is detected by blessings as two keystrokes, ``KEY_ESCAPE`` and ``'z'``.  Blessings
-currently provides no further assistance in detecting these key combinations.
 
 .. _mode: https://en.wikipedia.org/wiki/Terminal_mode
