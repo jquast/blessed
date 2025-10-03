@@ -1,0 +1,112 @@
+[build-system]
+requires = ['flit_core >=3.11,<4']
+build-backend = 'flit_core.buildapi'
+
+[project]
+name = 'blessed'
+description = """\
+    Easy, practical library for making terminal apps, by providing an elegant, \
+    well-documented interface to Colors, Keyboard input, and screen Positioning capabilities.\
+"""
+authors = [
+    {name = 'Jeff Quast, Erik Rose, Avram Lubkin', email = 'contact@jeffquast.com'},
+]
+
+classifiers = [
+    'Intended Audience :: Developers',
+    'Natural Language :: English',
+    'Development Status :: 5 - Production/Stable',
+    'Environment :: Console',
+    'Environment :: Console :: Curses',
+    'Operating System :: POSIX',
+    'Operating System :: Microsoft :: Windows',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Topic :: Software Development :: Libraries',
+    'Topic :: Software Development :: User Interfaces',
+    'Topic :: Terminals',
+    'Typing :: Typed',
+]
+dependencies = [
+    'wcwidth>=0.1.4',
+    'jinxed>=1.1.0; platform_system == "Windows"',
+]
+dynamic = ['version']
+license = 'MIT'
+license-files = ['LICENSE']
+keywords = ['terminal', 'sequences', 'tty', 'curses', 'ncurses', 'formatting',
+            'style', 'color', 'console', 'keyboard', 'ansi', 'xterm']
+readme = 'docs/intro.rst'
+requires-python = '>=3.7'
+
+[project.optional-dependencies]
+docs = [
+    'Pillow',
+    'Sphinx>3',
+    'sphinx-paramlinks',
+    'sphinx_rtd_theme',
+    'sphinxcontrib-manpage',
+]
+
+[project.urls]
+Homepage = 'https://github.com/jquast/blessed'
+Documentation = 'https://blessed.readthedocs.io'
+Repository = 'https://github.com/jquast/blessed'
+Issues = 'https://github.com/jquast/blessed/issues'
+Changelog = 'https://blessed.readthedocs.io/en/latest/history.html'
+
+[tool.pylint.main]
+load-plugins = [
+    'pylint.extensions.mccabe',
+    'pylint.extensions.check_elif',
+    'pylint.extensions.docparams',
+    'pylint.extensions.overlapping_exceptions',
+    'pylint.extensions.redefined_variable_type',
+]
+persistent = false
+jobs = 0
+
+[tool.pylint.'messages control']
+disable= [
+    'fixme',
+    'consider-using-f-string',  # Python 2
+    'super-with-arguments',  # Python 2
+    'useless-object-inheritance',  # Python 2
+    'raise-missing-from',  # Python 2
+]
+
+[tool.pylint.format]
+max-line-length = 100
+good-names = ['ks', 'fd', '_', 'x' ,'y']
+
+[tool.pylint.parameter_documentation]
+default-docstring-type= 'sphinx'
+accept-no-raise-doc = false
+accept-no-param-doc = true
+accept-no-return-doc = true
+
+[tool.pylint.design]
+max-args = 10
+max-attributes = 7
+max-branches = 12
+max-complexity = 11
+max-locals = 15
+max-module-lines = 1300
+max-parents = 7
+max-public-methods = 20
+max-returns = 6
+max-statements = 50
+
+[tool.pylint.similarities]
+ignore-imports = true
+min-similarity-lines = 8
+
+[tool.pylint.reports]
+reports = false
+msg-template = '{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'
