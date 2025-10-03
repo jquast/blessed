@@ -226,7 +226,7 @@ class Terminal(object):
         self.__init__capabilities()
         self.__init__keycodes()
 
-    def __init_set_styling(self, force_styling):
+    def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
         if os.getenv('NO_COLOR'):
             self.errors.append('NO_COLOR=' + repr(os.getenv('NO_COLOR')))
