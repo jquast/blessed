@@ -45,6 +45,15 @@ keywords = ['terminal', 'sequences', 'tty', 'curses', 'ncurses', 'formatting',
 readme = 'docs/intro.rst'
 requires-python = '>=3.7'
 
+[project.optional-dependencies]
+docs = [
+    'Pillow',
+    'Sphinx>3',
+    'sphinx-paramlinks',
+    'sphinx_rtd_theme',
+    'sphinxcontrib-manpage',
+]
+
 [project.urls]
 Homepage = 'https://github.com/jquast/blessed'
 Documentation = 'https://blessed.readthedocs.io'
