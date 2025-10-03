@@ -9,32 +9,27 @@ import math
 import time
 import platform
 import warnings
+import importlib
+from io import StringIO
 
 # 3rd party
 import pytest
 
 # local
-from blessed._compat import StringIO
-from .accessories import TestTerminal, unicode_cap, as_subprocess
 from .conftest import IS_WINDOWS
+from .accessories import TestTerminal, unicode_cap, as_subprocess
 
 try:
+    # std imports
     from unittest import mock
 except ImportError:
+    # 3rd party
     import mock
-
-
-# reload was a built-in in PY2, then moved to imp in PY3, then moved to importlib in PY34
-if sys.version_info[:2] >= (3, 4):
-    from importlib import reload as reload_module
-elif sys.version_info[0] >= 3:
-    from imp import reload as reload_module  # pylint: disable=deprecated-module
-else:
-    reload_module = reload  # pylint: disable=undefined-variable  # noqa: F821
 
 
 def test_export_only_Terminal():
     "Ensure only Terminal instance is exported for import * statements."
+    # local
     import blessed
     assert blessed.__all__ == ('Terminal',)
 
@@ -46,7 +41,7 @@ def test_null_location(all_terms):
         t = TestTerminal(stream=StringIO(), force_styling=True)
         with t.location():
             pass
-        expected_output = u''.join(
+        expected_output = ''.join(
             (unicode_cap('sc'), unicode_cap('rc')))
         assert (t.stream.getvalue() == expected_output)
 
@@ -74,7 +69,7 @@ def test_yield_keypad():
     def child(kind):
         # given,
         t = TestTerminal(stream=StringIO(), force_styling=True)
-        expected_output = u''.join((t.smkx, t.rmkx))
+        expected_output = ''.join((t.smkx, t.rmkx))
 
         # exercise,
         with t.keypad():
@@ -94,7 +89,7 @@ def test_null_fileno():
         out = StringIO()
         out.fileno = None
         t = TestTerminal(stream=out)
-        assert (t.save == u'')
+        assert (t.save == '')
 
     child()
 
@@ -320,26 +315,9 @@ def test_setupterm_invalid_has_no_styling():
     child()
 
 
-def test_python3_2_raises_exception(monkeypatch):
-    """Test python version 3.0 through 3.2 raises an exception."""
-    import blessed
-
-    monkeypatch.setattr('sys.version_info', (3, 2, 2, 'final', 0))
-
-    try:
-        reload_module(blessed)
-    except ImportError as err:
-        assert err.args[0] == (
-            'Blessed needs Python 3.2.3 or greater for Python 3 '
-            'support due to http://bugs.python.org/issue10570.')
-        monkeypatch.undo()
-        reload_module(blessed)
-    else:
-        assert False, 'Exception should have been raised'
-
-
 def test_without_dunder():
     """Ensure dunder does not remain in module (py2x InterruptedError test."""
+    # local
     import blessed.terminal
     assert '_' not in dir(blessed.terminal)
 
@@ -386,11 +364,11 @@ def test_yield_fullscreen(all_terms):
     @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), force_styling=True)
-        t.enter_fullscreen = u'BEGIN'
-        t.exit_fullscreen = u'END'
+        t.enter_fullscreen = 'BEGIN'
+        t.exit_fullscreen = 'END'
         with t.fullscreen():
             pass
-        expected_output = u''.join((t.enter_fullscreen, t.exit_fullscreen))
+        expected_output = ''.join((t.enter_fullscreen, t.exit_fullscreen))
         assert (t.stream.getvalue() == expected_output)
 
     child(all_terms)
@@ -401,11 +379,11 @@ def test_yield_hidden_cursor(all_terms):
     @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), force_styling=True)
-        t.hide_cursor = u'BEGIN'
-        t.normal_cursor = u'END'
+        t.hide_cursor = 'BEGIN'
+        t.normal_cursor = 'END'
         with t.hidden_cursor():
             pass
-        expected_output = u''.join((t.hide_cursor, t.normal_cursor))
+        expected_output = ''.join((t.hide_cursor, t.normal_cursor))
         assert (t.stream.getvalue() == expected_output)
 
     child(all_terms)
@@ -417,7 +395,7 @@ def test_no_preferredencoding_fallback():
     @as_subprocess
     def child():
         with mock.patch('locale.getpreferredencoding') as get_enc:
-            get_enc.return_value = u''
+            get_enc.return_value = ''
             t = TestTerminal()
             assert t._encoding == 'UTF-8'
 
@@ -469,14 +447,16 @@ def test_win32_missing_tty_modules(monkeypatch):
             else:
                 __builtins__['__import__'] = __import__
             try:
+                # local
                 import blessed.terminal
-                reload_module(blessed.terminal)
+                importlib.reload(blessed.terminal)
             except UserWarning as err:
                 assert err.args[0] == blessed.terminal._MSG_NOSUPPORT
 
             warnings.filterwarnings("ignore", category=UserWarning)
+            # local
             import blessed.terminal
-            reload_module(blessed.terminal)
+            importlib.reload(blessed.terminal)
             assert not blessed.terminal.HAS_TTY
             term = blessed.terminal.Terminal('ansi')
             # https://en.wikipedia.org/wiki/VGA-compatible_text_mode
@@ -490,14 +470,16 @@ def test_win32_missing_tty_modules(monkeypatch):
             else:
                 __builtins__['__import__'] = original_import
             warnings.resetwarnings()
+            # local
             import blessed.terminal
-            reload_module(blessed.terminal)
+            importlib.reload(blessed.terminal)
 
     child()
 
 
 def test_time_left():
     """test '_time_left' routine returns correct positive delta difference."""
+    # local
     from blessed.keyboard import _time_left
 
     # given stime =~ "10 seconds ago"
@@ -513,6 +495,7 @@ def test_time_left():
 
 def test_time_left_infinite_None():
     """keyboard '_time_left' routine returns None when given None."""
+    # local
     from blessed.keyboard import _time_left
     assert _time_left(stime=time.time(), timeout=None) is None
 
@@ -525,10 +508,11 @@ def test_termcap_repr():
     given_capname = 'cursor_up'
     expected = [r"<Termcap cursor_up:'\x1b\\[A'>",
                 r"<Termcap cursor_up:'\\\x1b\\[A'>",
-                r"<Termcap cursor_up:u'\\\x1b\\[A'>"]
+                r"<Termcap cursor_up:'\\\x1b\\[A'>"]
 
     @as_subprocess
     def child():
+        # local
         import blessed
         term = blessed.Terminal(given_ttype)
         given = repr(term.caps[given_capname])

@@ -3,18 +3,20 @@
 # std imports
 import sys
 import platform
+from io import StringIO
 
 # 3rd party
 import pytest
 
 # local
-from blessed._compat import StringIO
-from .accessories import TestTerminal, unicode_cap, unicode_parm, as_subprocess, MockTigetstr
 from .conftest import IS_WINDOWS
+from .accessories import MockTigetstr, TestTerminal, unicode_cap, unicode_parm, as_subprocess
 
 try:
+    # std imports
     from unittest import mock
 except ImportError:
+    # 3rd party
     import mock
 
 
@@ -37,8 +39,8 @@ def test_capability_without_tty():
     @as_subprocess
     def child():
         t = TestTerminal(stream=StringIO())
-        assert t.save == u''
-        assert t.red == u''
+        assert t.save == ''
+        assert t.red == ''
 
     child()
 
@@ -130,12 +132,12 @@ def test_location_with_styling(all_terms):
     def child_with_styling(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location(3, 4):
-            t.stream.write(u'hi')
-        expected_output = u''.join(
-            (unicode_cap('sc') or u'\x1b[s',
+            t.stream.write('hi')
+        expected_output = ''.join(
+            (unicode_cap('sc') or '\x1b[s',
              unicode_parm('cup', 4, 3),
-             u'hi',
-             unicode_cap('rc') or u'\x1b[u'))
+             'hi',
+             unicode_cap('rc') or '\x1b[u'))
         assert (t.stream.getvalue() == expected_output)
 
     child_with_styling(all_terms)
@@ -149,9 +151,9 @@ def test_location_without_styling():
         t = TestTerminal(stream=StringIO(), force_styling=None)
 
         with t.location(3, 4):
-            t.stream.write(u'hi')
+            t.stream.write('hi')
 
-        assert t.stream.getvalue() == u'hi'
+        assert t.stream.getvalue() == 'hi'
 
     child_without_styling()
 
@@ -166,11 +168,11 @@ def test_horizontal_location(all_terms):
         _hpa = unicode_parm('hpa', 5)
         if not _hpa and (kind.startswith('screen') or
                          kind.startswith('ansi')):
-            _hpa = u'\x1b[6G'
-        expected_output = u''.join(
-            (unicode_cap('sc') or u'\x1b[s',
+            _hpa = '\x1b[6G'
+        expected_output = ''.join(
+            (unicode_cap('sc') or '\x1b[s',
              _hpa,
-             unicode_cap('rc') or u'\x1b[u'))
+             unicode_cap('rc') or '\x1b[u'))
         assert (t.stream.getvalue() == expected_output), (
             repr(t.stream.getvalue()), repr(expected_output))
 
@@ -187,12 +189,12 @@ def test_vertical_location(all_terms):
         _vpa = unicode_parm('vpa', 5)
         if not _vpa and (kind.startswith('screen') or
                          kind.startswith('ansi')):
-            _vpa = u'\x1b[6d'
+            _vpa = '\x1b[6d'
 
-        expected_output = u''.join(
-            (unicode_cap('sc') or u'\x1b[s',
+        expected_output = ''.join(
+            (unicode_cap('sc') or '\x1b[s',
              _vpa,
-             unicode_cap('rc') or u'\x1b[u'))
+             unicode_cap('rc') or '\x1b[u'))
         assert (t.stream.getvalue() == expected_output)
 
     child(all_terms)
@@ -208,12 +210,12 @@ def test_inject_move_x():
         with mock.patch('curses.tigetstr', side_effect=MockTigetstr(hpa=None)):
             with t.location(x=COL):
                 pass
-        expected_output = u''.join(
-            (unicode_cap('sc') or u'\x1b[s',
-             u'\x1b[{0}G'.format(COL + 1),
-             unicode_cap('rc') or u'\x1b[u'))
+        expected_output = ''.join(
+            (unicode_cap('sc') or '\x1b[s',
+             '\x1b[{0}G'.format(COL + 1),
+             unicode_cap('rc') or '\x1b[u'))
         assert (t.stream.getvalue() == expected_output)
-        assert (t.move_x(COL) == u'\x1b[{0}G'.format(COL + 1))
+        assert (t.move_x(COL) == '\x1b[{0}G'.format(COL + 1))
 
     child('screen')
     child('screen-256color')
@@ -230,12 +232,12 @@ def test_inject_move_y():
         with mock.patch('curses.tigetstr', side_effect=MockTigetstr(vpa=None)):
             with t.location(y=ROW):
                 pass
-        expected_output = u''.join(
-            (unicode_cap('sc') or u'\x1b[s',
-             u'\x1b[{0}d'.format(ROW + 1),
-             unicode_cap('rc') or u'\x1b[u'))
+        expected_output = ''.join(
+            (unicode_cap('sc') or '\x1b[s',
+             '\x1b[{0}d'.format(ROW + 1),
+             unicode_cap('rc') or '\x1b[u'))
         assert (t.stream.getvalue() == expected_output)
-        assert (t.move_y(ROW) == u'\x1b[{0}d'.format(ROW + 1))
+        assert (t.move_y(ROW) == '\x1b[{0}d'.format(ROW + 1))
 
     child('screen')
     child('screen-256color')
@@ -250,7 +252,7 @@ def test_inject_civis_and_cnorm_for_ansi():
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.hidden_cursor():
             pass
-        expected_output = u'\x1b[?25l\x1b[?25h'
+        expected_output = '\x1b[?25l\x1b[?25h'
         assert (t.stream.getvalue() == expected_output)
 
     child('ansi')
@@ -264,7 +266,7 @@ def test_inject_sc_and_rc_for_ansi():
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location():
             pass
-        expected_output = u'\x1b[s\x1b[u'
+        expected_output = '\x1b[s\x1b[u'
         assert (t.stream.getvalue() == expected_output)
 
     child('ansi')
@@ -277,10 +279,10 @@ def test_zero_location(all_terms):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location(0, 0):
             pass
-        expected_output = u''.join(
-            (unicode_cap('sc') or u'\x1b[s',
+        expected_output = ''.join(
+            (unicode_cap('sc') or '\x1b[s',
              unicode_parm('cup', 0, 0),
-             unicode_cap('rc') or u'\x1b[u'))
+             unicode_cap('rc') or '\x1b[u'))
         assert (t.stream.getvalue() == expected_output)
 
     child(all_terms)
@@ -326,20 +328,20 @@ def test_callable_numeric_colors(all_terms):
         if t.on_magenta:
             assert t.on_color(5)('smoo') == t.on_magenta + 'smoo' + t.normal
         else:
-            assert t.color(5)(u'smoo') == 'smoo'
+            assert t.color(5)('smoo') == 'smoo'
 
         if t.color(4):
-            assert t.color(4)(u'smoo') == t.color(4) + u'smoo' + t.normal
+            assert t.color(4)('smoo') == t.color(4) + 'smoo' + t.normal
         else:
-            assert t.color(4)(u'smoo') == 'smoo'
+            assert t.color(4)('smoo') == 'smoo'
 
         if t.on_green:
-            assert t.on_color(2)('smoo') == t.on_green + u'smoo' + t.normal
+            assert t.on_color(2)('smoo') == t.on_green + 'smoo' + t.normal
         else:
             assert t.on_color(2)('smoo') == 'smoo'
 
         if t.on_color(6):
-            assert t.on_color(6)('smoo') == t.on_color(6) + u'smoo' + t.normal
+            assert t.on_color(6)('smoo') == t.on_color(6) + 'smoo' + t.normal
         else:
             assert t.on_color(6)('smoo') == 'smoo'
 
@@ -373,17 +375,17 @@ def test_formatting_functions(all_terms):
     def child(kind):
         t = TestTerminal(kind=kind)
         # test simple sugar,
-        expected_output = u''.join((t.bold, u'hi', t.normal)) if t.bold else u'hi'
-        assert t.bold(u'hi') == expected_output
+        expected_output = ''.join((t.bold, 'hi', t.normal)) if t.bold else 'hi'
+        assert t.bold('hi') == expected_output
         # Plain strs for Python 2.x
-        expected_output = u''.join((t.green, 'hi', t.normal)) if t.green else u'hi'
+        expected_output = ''.join((t.green, 'hi', t.normal)) if t.green else 'hi'
         assert t.green('hi') == expected_output
         # Test unicode
         if t.underline:
-            expected_output = u''.join((t.underline, u'boö', t.normal))
+            expected_output = ''.join((t.underline, 'boö', t.normal))
         else:
-            expected_output = u'boö'
-        assert (t.underline(u'boö') == expected_output)
+            expected_output = 'boö'
+        assert (t.underline('boö') == expected_output)
 
     child(all_terms)
 
@@ -394,17 +396,17 @@ def test_compound_formatting(all_terms):
     def child(kind):
         t = TestTerminal(kind=kind)
         if any((t.bold, t.green)):
-            expected_output = u''.join((t.bold, t.green, u'boö', t.normal))
+            expected_output = ''.join((t.bold, t.green, 'boö', t.normal))
         else:
-            expected_output = u'boö'
-        assert t.bold_green(u'boö') == expected_output
+            expected_output = 'boö'
+        assert t.bold_green('boö') == expected_output
 
         if any((t.on_bright_red, t.bold, t.bright_green, t.underline)):
-            expected_output = u''.join(
-                (t.on_bright_red, t.bold, t.bright_green, t.underline, u'meh',
+            expected_output = ''.join(
+                (t.on_bright_red, t.bold, t.bright_green, t.underline, 'meh',
                  t.normal))
         else:
-            expected_output = u'meh'
+            expected_output = 'meh'
         very_long_cap = t.on_bright_red_bold_bright_green_underline
         assert (very_long_cap('meh') == expected_output)
 
@@ -421,7 +423,7 @@ def test_nested_formatting(all_terms):
         given = t.green('-a-', t.bold('-b-', t.underline('-c-'),
                                       '-d-'),
                         '-e-')
-        expected = u''.join((
+        expected = ''.join((
             t.green, '-a-', t.bold, '-b-', t.underline, '-c-', t.normal,
             t.green, t.bold, '-d-',
             t.normal, t.green, '-e-', t.normal))
@@ -431,7 +433,7 @@ def test_nested_formatting(all_terms):
         given = t.green('off ', t.underline('ON'),
                         ' off ', t.underline('ON'),
                         ' off')
-        expected = u''.join((
+        expected = ''.join((
             t.green, 'off ', t.underline, 'ON',
             t.normal, t.green, ' off ', t.underline, 'ON',
             t.normal, t.green, ' off', t.normal))
@@ -443,26 +445,26 @@ def test_formatting_functions_without_tty(all_terms):
     @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=False)
-        assert (t.bold(u'hi') == u'hi')
-        assert (t.green('hi') == u'hi')
+        assert (t.bold('hi') == 'hi')
+        assert (t.green('hi') == 'hi')
         # Test non-ASCII chars, no longer really necessary:
-        assert (t.bold_green(u'boö') == u'boö')
-        assert (t.bold_underline_green_on_red('loo') == u'loo')
+        assert (t.bold_green('boö') == 'boö')
+        assert (t.bold_underline_green_on_red('loo') == 'loo')
 
         # Test deeply nested styles
         given = t.green('-a-', t.bold('-b-', t.underline('-c-'),
                                       '-d-'),
                         '-e-')
-        expected = u'-a--b--c--d--e-'
+        expected = '-a--b--c--d--e-'
         assert given == expected
 
         # Test off-and-on nested styles
         given = t.green('off ', t.underline('ON'),
                         ' off ', t.underline('ON'),
                         ' off')
-        expected = u'off ON off ON off'
+        expected = 'off ON off ON off'
         assert given == expected
-        assert (t.on_bright_red_bold_bright_green_underline('meh') == u'meh')
+        assert (t.on_bright_red_bold_bright_green_underline('meh') == 'meh')
 
     child(all_terms)
 
@@ -478,7 +480,7 @@ def test_nice_formatting_errors(all_terms):
         except TypeError as e:
             assert 'Unknown terminal capability,' in e.args[0]
         try:
-            t.bold_misspelled(u'hey')  # unicode
+            t.bold_misspelled('hey')  # unicode
             assert not t.is_a_tty, 'Should have thrown exception'
         except TypeError as e:
             assert 'Unknown terminal capability,' in e.args[0]
@@ -519,14 +521,15 @@ def test_padd():
     """Test Terminal.padd(seq)."""
     @as_subprocess
     def child(kind):
-        from blessed.sequences import Sequence
+        # local
         from blessed import Terminal
+        from blessed.sequences import Sequence
         term = Terminal(kind)
-        assert Sequence('xyz\b', term).padd() == u'xy'
-        assert Sequence('xyz\b-', term).padd() == u'xy-'
-        assert Sequence('xxxx\x1b[3Dzz', term).padd() == u'xzz'
-        assert Sequence('\x1b[3D', term).padd() == u''  # "Trim left"
-        assert Sequence(term.red('xxxx\x1b[3Dzz'), term).padd() == term.red(u'xzz')
+        assert Sequence('xyz\b', term).padd() == 'xy'
+        assert Sequence('xyz\b-', term).padd() == 'xy-'
+        assert Sequence('xxxx\x1b[3Dzz', term).padd() == 'xzz'
+        assert Sequence('\x1b[3D', term).padd() == ''  # "Trim left"
+        assert Sequence(term.red('xxxx\x1b[3Dzz'), term).padd() == term.red('xzz')
     kind = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
     child(kind)
 
@@ -535,6 +538,7 @@ def test_split_seqs(all_terms):
     """Test Terminal.split_seqs."""
     @as_subprocess
     def child(kind):
+        # local
         from blessed import Terminal
         term = Terminal(kind)
 
@@ -551,6 +555,7 @@ def test_split_seqs_maxsplit1(all_terms):
     """Test Terminal.split_seqs with maxsplit=1."""
     @as_subprocess
     def child(kind):
+        # local
         from blessed import Terminal
         term = Terminal(kind)
 
@@ -567,6 +572,7 @@ def test_split_seqs_term_right(all_terms):
     """Test Terminal.split_seqs with parameterized sequence"""
     @as_subprocess
     def child(kind):
+        # local
         from blessed import Terminal
         term = Terminal(kind)
 
@@ -583,6 +589,7 @@ def test_split_seqs_maxsplit3_and_term_right(all_terms):
     """Test Terminal.split_seqs with parameterized sequence."""
     @as_subprocess
     def child(kind):
+        # local
         from blessed import Terminal
         term = Terminal(kind)
 
@@ -628,6 +635,7 @@ def test_formatting_other_string(all_terms):
 
 def test_termcap_match_optional():
     """When match_optional is given, numeric matches are optional"""
+    # local
     from blessed.sequences import Termcap
 
     @as_subprocess
@@ -655,6 +663,7 @@ def test_truncate(all_terms):
     """Test terminal.truncate and make sure it agrees with terminal.length"""
     @as_subprocess
     def child(kind):
+        # local
         from blessed import Terminal
         term = Terminal(kind)
 
@@ -678,10 +687,11 @@ def test_truncate_wide_end(all_terms):
     """Ensure that terminal.truncate has the correct behaviour for wide characters."""
     @as_subprocess
     def child(kind):
+        # local
         from blessed import Terminal
         term = Terminal(kind)
-        test_string = u"AB\uff23"  # ABＣ
-        assert term.truncate(test_string, 3) == u"AB"
+        test_string = "AB\uff23"  # ABＣ
+        assert term.truncate(test_string, 3) == "AB"
 
     child(all_terms)
 
@@ -690,11 +700,12 @@ def test_truncate_wcwidth_clipping(all_terms):
     """Ensure that terminal.truncate has the correct behaviour for wide characters."""
     @as_subprocess
     def child(kind):
+        # local
         from blessed import Terminal
         term = Terminal(kind)
         assert term.truncate("", 4) == ""
-        test_string = term.blue(u"one\x01two")
-        assert term.truncate(test_string, 4) == term.blue(u"one\x01t")
+        test_string = term.blue("one\x01two")
+        assert term.truncate(test_string, 4) == term.blue("one\x01t")
 
     child(all_terms)
 
@@ -703,15 +714,16 @@ def test_truncate_padding(all_terms):
     """Ensure that terminal.truncate has the correct behaviour for wide characters."""
     @as_subprocess
     def child(kind):
+        # local
         from blessed import Terminal
         term = Terminal(kind)
 
         if term.move_right(5):
-            test_right_string = term.blue(u"one" + term.move_right(5) + u"two")
-            assert term.truncate(test_right_string, 9) == term.blue(u"one     t")
+            test_right_string = term.blue("one" + term.move_right(5) + "two")
+            assert term.truncate(test_right_string, 9) == term.blue("one     t")
 
-        test_bs_string = term.blue(u"one\b\b\btwo")
-        assert term.truncate(test_bs_string, 3) == term.blue(u"two")
+        test_bs_string = term.blue("one\b\b\btwo")
+        assert term.truncate(test_bs_string, 3) == term.blue("two")
 
     if all_terms != 'vtwin10':
         # padding doesn't work the same on windows !
@@ -722,6 +734,7 @@ def test_truncate_default(all_terms):
     """Ensure that terminal.truncate functions with the default argument."""
     @as_subprocess
     def child(kind):
+        # local
         from blessed import Terminal
         term = Terminal(kind)
         test = "Testing " + term.red("attention ") + term.blue("please.")
@@ -738,11 +751,13 @@ def test_supports_index(all_terms):
 
     @as_subprocess
     def child(kind):
-        from blessed.sequences import Sequence
+        # local
         from blessed.terminal import Terminal
+        from blessed.sequences import Sequence
 
         class Indexable:  # pylint: disable=too-few-public-methods
             """Custom class implementing __index__()"""
+
             def __index__(self):
                 return 100
 

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """Accessories for automated py.test runner."""
-from __future__ import print_function, with_statement
 
 # std imports
 import os
@@ -9,23 +8,20 @@ import codecs
 import functools
 import traceback
 import contextlib
+from typing import Callable
 
 # local
 from blessed import Terminal
-from blessed._compat import TextType
+# local
 from .conftest import IS_WINDOWS
 
-try:
-    from typing import Callable
-except ImportError:  # py2
-    pass
-
-
 if IS_WINDOWS:
+    # 3rd party
     import jinxed as curses
 else:
-    import curses
+    # std imports
     import pty
+    import curses
     import termios
 
 
@@ -38,6 +34,7 @@ RECV_SEMAPHORE = b'SEMAPHORE\r\n'
 def init_subproc_coverage(run_note):
     """Run coverage on subprocess"""
     try:
+        # 3rd party
         import coverage
     except ImportError:
         return None
@@ -103,7 +100,7 @@ class as_subprocess(object):  # pylint: disable=too-few-public-methods
                   .format(pid_testrunner, os.getpid()), file=sys.stderr)
             os._exit(1)
 
-        exc_output = TextType()
+        exc_output = str()
         decoder = codecs.getincrementaldecoder(self.encoding)()
         while True:
             try:
@@ -124,7 +121,7 @@ class as_subprocess(object):  # pylint: disable=too-few-public-methods
         # Display any output written by child process
         # (esp. any AssertionError exceptions written to stderr).
         exc_output_msg = 'Output in child process:\n%s\n%s\n%s' % (
-            u'=' * 40, exc_output, u'=' * 40,)
+            '=' * 40, exc_output, '=' * 40,)
         assert exc_output == '', exc_output_msg
 
         # Also test exit status is non-zero
@@ -143,7 +140,7 @@ def read_until_semaphore(fd, semaphore=RECV_SEMAPHORE, encoding='utf8'):
     # process will read xyz\\r\\n -- this is how pseudo terminals
     # behave; a virtual terminal requires both carriage return and
     # line feed, it is only for convenience that \\n does both.
-    outp = TextType()
+    outp = str()
     decoder = codecs.getincrementaldecoder(encoding)()
     semaphore = semaphore.decode('ascii')
     while not outp.startswith(semaphore):
@@ -167,7 +164,7 @@ def read_until_eof(fd, encoding='utf8'):
     Return decoded string.
     """
     decoder = codecs.getincrementaldecoder(encoding)()
-    outp = TextType()
+    outp = str()
     while True:
         try:
             _exc = os.read(fd, 100)
@@ -203,7 +200,7 @@ def unicode_cap(cap):
     except curses.error:
         val = None
 
-    return val.decode('latin1') if val else u''
+    return val.decode('latin1') if val else ''
 
 
 def unicode_parm(cap, *parms):
@@ -219,7 +216,7 @@ def unicode_parm(cap, *parms):
             val = None
         if val:
             return val.decode('latin1')
-    return u''
+    return ''
 
 
 class MockTigetstr(object):  # pylint: disable=too-few-public-methods
