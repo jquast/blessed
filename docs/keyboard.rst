@@ -1,7 +1,8 @@
 Keyboard
 ========
 
-The built-in function :func:`input` (or :func:`raw_input`) is pretty good for a basic game:
+Although the built-in function :func:`input` (or :func:`raw_input`) is pretty
+good for reading a *line* of input:
 
 .. code-block:: python
 
@@ -11,9 +12,9 @@ The built-in function :func:`input` (or :func:`raw_input`) is pretty good for a 
     else:
         print(f"How interesting, {name} you say?")
 
-But it has drawbacks -- it's no good for interactive apps!  This function **will not return until
+It has drawbacks -- it's no good for interactive apps!  This function **will not return until
 the return key is pressed**, so we can't do any exciting animations, and we can't understand or
-detect arrow keys and others required to make awesome, interactive apps and games!
+detect arrow keys.
 
 *Blessed* fixes this issue with a context manager, :meth:`~Terminal.cbreak`, and a single
 function for all keyboard input, :meth:`~.Terminal.inkey`.
@@ -27,38 +28,43 @@ returns it as a :class:`~.Keystroke` object. Combined with
 optional timeout.
 
 .. code-block:: python
-   :emphasize-lines: 7,9
+   :emphasize-lines: 4,7
 
    from blessed import Terminal
 
    term = Terminal()
    with term.cbreak():
-       print("press 'q' or F1 to quit.")
-       ks = None
+       print("press the 'Q' or F1 key to stop this loop!")
        while True:
            ks = term.inkey(timeout=3)
-           if ks is None:
-              # timeout exceeded
+
+           if ks is None:  # timeout exceeded
               print("It sure is quiet in here ...")
               continue
+
            if ks.lower() == 'q' or ks.name == 'KEY_F1':
                break
-           elif ks.name != None:
+
+           elif ks.is_sequence:
               # application keys have "synthesized" names
-              print(f"ks.name={ks.name!r} ks={ks!r} value={ks.value!r}")
-           elif ks:
-              # standard input keys have their string values
-              print(f"ks={ks!r} same as value={ks.value!r}")
+              print(f"ks.name={ks.name!r} ks={ks!r}")
 
-   print(f'bye! Exited using ks={ks!r}, name={ks.name}')
+           else:
+              # standard input keys have string values
+              print(f"ks={ks!r}")
+
+   print(f'bye! Exited using ks={ks!r} (name={ks.name})')
 
 
-:meth:`~.Terminal.cbreak` enters a special mode_ that ensures :func:`os.read` on
+:meth:`~.Terminal.cbreak` enters a special mode that ensures :func:`os.read` on
 an input stream will return as soon as input is available, as explained in
-:linuxman:`cbreak(3)`. This mode is combined with :meth:`~.Terminal.inkey` to
-decode multibyte sequences, such as ``\0x1bOA``, into a unicode-derived
-:class:`~.Keystroke` instance that has a *name* attribute of ``KEY_UP``, or, if
-you prefer by method call ``is_key_up()``.
+:linuxman:`cbreak(3)`.
+
+This mode is combined with :meth:`~.Terminal.inkey` to decode multibyte
+sequences, such as ``\0x1bOA``, into a unicode-derived :class:`~.Keystroke`
+instance that is given *name* attribute of ``KEY_UP``. 
+
+Or, if you prefer by method call ``is_key_up()``.
 
 Keystroke
 ---------
@@ -85,49 +91,34 @@ in xterm. Many other terminals send these sequences in their default
 configuration and modes.
 
 Use the :attr:`~.Keystroke.is_sequence` (bool) attribute to determine whether
-this is a special "application" key, and inspect its :attr:`~.Keystroke.name`
-(str) attribute to determine if it interesting. When it is not a sequence,
-the :attr:`~.Keystroke.value` can also be tested for its unmodified value::
+this key should be evaluated by its :attr:`~.name`, which should be non-None.
 
-.. code-block:: python
-   :emphasize-lines: 9
+The :attr:`~.Keystroke.value` displays its value without modifiers or sequences.
+For example, Ctrl+A has a value of ``'a'``. Application keys like ``KEY_LEFT``
+have an empty value.
 
-    import time, blessed
+Methods
+-------
 
-    term = blessed.Terminal()
-    print()
-    print("Press X, CTRL-X, ALT-X, or CTRL-ALT-X to disarm!")
-    print()
-    print("time remaining: ", end='', flush=True)
-    TIME_TOTAL = 7
-    stime = time.time()
-    with term.cbreak():
-        while True:
-            # calculate and check time remaining,
-            n = (stime + TIME_TOTAL) - time.time()
-            if n < 0:
-                print()
-                print('You failed to disarm it in time!')
-                break
+If you prefer, a dynamic :meth:`~.Keystroke:__getattr__` allows for more
+advanced compound tests of modifiers and application keys, given a return **ks**
+:class:`~.Keystroke` value from :meth:`~.Terminal.inkey`.
 
-            # display remaining time with 10Hz blinking '.' animation
-            xpos = len('time remaining: ') + int(TIME_TOTAL - n) * 2
-            maybe_dotted = '.' if int(n * 10) % 2 == 0 else ''
-            print(term.move_x(xpos), end='')
-            print(f'{int(n)}{maybe_dotted}', end='', flush=True)
+Methods begin with ``is_``, contain any number of modifiers ``ctrl``, ``alt``,
+``shift``, conditionally ending with a lowercase application key name, such as
+``f1``, or ``left``:
 
-            # check for input and 'STOP' key
-            inp = term.inkey(timeout=0.1)
-            if inp is None:
-                continue  # timeout
-            if inp.value.lower() == 'x':
-                print(f'STOP with keystroke: {inp!r}({inp.name})')
-                break
+- ``ks.is_ctrl('x')``
+- ``ks.is_f1()``
+- ``ks.is_left()``
+- ``ks.is_ctrl_alt('x')``
+- ``ks.is_shift_left()``
+- ``ks.is_ctrl_shift_alt('x')``
 
-This program can be stopped with ctrl+x, alt+x, or even ctrl+alt+x.
+These "magic methods" of :meth:`~.Keystroke:__getattr__` take optional arguments
+``ignore_case`` (bool), defaults to *True*
 
-If you prefer, a dynamic :meth:`~.Keystroke:__getattr__` allows making compound
-tests of modifiers and application keys, such as ``ks.is_ctrl_alt_('x')``
+
 instead of testing for string equality ``ks.name == 'KEY_CTRL_ALT_X'``.
 
 Names

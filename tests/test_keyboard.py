@@ -1254,6 +1254,100 @@ def test_alt_uppercase_sets_shift_modifier_and_name():
         assert ks.name == expected_name
 
 
+def test_ctrl_alt_value_extraction():
+    """Test that Ctrl+Alt sequences correctly extract the base character value."""
+    from blessed.keyboard import Keystroke
+
+    # Basic Ctrl+Alt letter tests
+    test_cases = [
+        ('\x1b\x01', 'a', 'KEY_CTRL_ALT_A', 7),  # Ctrl+Alt+A
+        ('\x1b\x06', 'f', 'KEY_CTRL_ALT_F', 7),  # Ctrl+Alt+F
+        ('\x1b\x18', 'x', 'KEY_CTRL_ALT_X', 7),  # Ctrl+Alt+X
+        ('\x1b\x1a', 'z', 'KEY_CTRL_ALT_Z', 7),  # Ctrl+Alt+Z
+    ]
+
+    for sequence, expected_value, expected_name, expected_modifiers in test_cases:
+        ks = Keystroke(sequence)
+        assert ks.value == expected_value, \
+            f"Expected value '{expected_value}' for {sequence!r}, got '{ks.value}'"
+        assert ks.name == expected_name, \
+            f"Expected name {expected_name} for {sequence!r}, got {ks.name}"
+        assert ks.modifiers == expected_modifiers, \
+            f"Expected modifiers {expected_modifiers} for {sequence!r}, got {ks.modifiers}"
+        assert ks._ctrl is True
+        assert ks._alt is True
+        assert ks._shift is False
+
+
+def test_ctrl_alt_symbol_value_extraction():
+    """Test that Ctrl+Alt+symbol sequences correctly extract the symbol value."""
+    from blessed.keyboard import Keystroke
+
+    # Ctrl+Alt symbol tests
+    symbol_test_cases = [
+        ('\x1b\x00', '@', 'KEY_CTRL_ALT_@'),    # Ctrl+Alt+@
+        ('\x1b\x1c', '\\', 'KEY_CTRL_ALT_\\'),  # Ctrl+Alt+\
+        ('\x1b\x1d', ']', 'KEY_CTRL_ALT_]'),    # Ctrl+Alt+]
+        ('\x1b\x1e', '^', 'KEY_CTRL_ALT_^'),    # Ctrl+Alt+^
+        ('\x1b\x1f', '_', 'KEY_CTRL_ALT__'),    # Ctrl+Alt+_
+    ]
+
+    for sequence, expected_value, expected_name in symbol_test_cases:
+        ks = Keystroke(sequence)
+        assert ks.value == expected_value, \
+            f"Expected value '{expected_value}' for {sequence!r}, got '{ks.value}'"
+        assert ks.name == expected_name, \
+            f"Expected name {expected_name} for {sequence!r}, got {ks.name}"
+    
+    # Alt+Escape is a special Alt-only case (not Ctrl+Alt), control chars have no text value
+    ks_alt_esc = Keystroke('\x1b\x1b')
+    assert ks_alt_esc.name == 'KEY_ALT_ESCAPE'
+    assert ks_alt_esc.value == '', f"Alt+Escape should have empty value, got {ks_alt_esc.value!r}"
+    assert ks_alt_esc.modifiers == 3  # Alt-only
+
+
+def test_ctrl_alt_doesnt_break_existing_behavior():
+    """Test that Ctrl+Alt fix doesn't break Alt-only or Ctrl-only sequences."""
+    from blessed.keyboard import Keystroke
+
+    # Alt-only should still work
+    ks_alt = Keystroke('\x1ba')  # Alt+a
+    assert ks_alt.value == 'a'
+    assert ks_alt.name == 'KEY_ALT_A'
+    assert ks_alt.modifiers == 3  # Alt-only
+    assert ks_alt._ctrl is False
+    assert ks_alt._alt is True
+
+    # Ctrl-only should still work
+    ks_ctrl = Keystroke('\x01')  # Ctrl+A
+    assert ks_ctrl.value == 'a'
+    assert ks_ctrl.name == 'KEY_CTRL_A'
+    assert ks_ctrl.modifiers == 5  # Ctrl-only
+    assert ks_ctrl._ctrl is True
+    assert ks_ctrl._alt is False
+
+    # Alt-only special controls (should remain Alt-only, not become Ctrl+Alt)
+    # These are all control characters, so they have empty value
+    alt_special_cases = [
+        ('\x1b\x1b', 'KEY_ALT_ESCAPE', 3),      # Alt+Escape
+        ('\x1b\x7f', 'KEY_ALT_BACKSPACE', 3),   # Alt+Backspace
+        ('\x1b\x0d', 'KEY_ALT_ENTER', 3),       # Alt+Enter
+        ('\x1b\x09', 'KEY_ALT_TAB', 3),         # Alt+Tab
+    ]
+
+    for sequence, expected_name, expected_modifiers in alt_special_cases:
+        ks = Keystroke(sequence)
+        # All these are control character combinations, so value should be empty
+        assert ks.value == '', \
+            f"Expected empty value for {expected_name}, got {ks.value!r}"
+        assert ks.name == expected_name, \
+            f"Expected name {expected_name} for {sequence!r}, got {ks.name}"
+        assert ks.modifiers == expected_modifiers, \
+            f"Expected modifiers {expected_modifiers} for {expected_name}, got {ks.modifiers}"
+        assert ks._alt is True
+        assert ks._ctrl is False
+
+
 def test_compatibility_with_existing_behavior():
     """Test that existing keyboard behavior remains unchanged."""
     from blessed.keyboard import Keystroke

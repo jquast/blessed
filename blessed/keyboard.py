@@ -479,8 +479,30 @@ class Keystroke(str):
         Returns the printable character from Alt sequences.
         """
         if (len(self) == 2 and self[0] == '\x1b' and
-                self._alt and not self._ctrl):
+                self._alt and not self._ctrl and self[1].isprintable()):
             return self[1]  # Return as-is (preserves case and supports Unicode)
+        return None
+
+    def _get_ctrl_alt_sequence_value(self) -> Optional[str]:
+        """
+        Get value for Ctrl+Alt sequences (ESC + control char).
+
+        Returns the base character from Ctrl+Alt combinations.
+        """
+        if not (len(self) == 2 and self[0] == '\x1b' and
+                self._ctrl and self._alt):
+            return None
+
+        char_code = ord(self[1])
+
+        # Ctrl+A through Ctrl+Z (codes 1-26)
+        if 1 <= char_code <= 26:
+            return chr(char_code + ord('a') - 1)  # lowercase
+
+        # Ctrl+symbol mappings
+        if char_code in CTRL_CODE_SYMBOLS_MAP:
+            return CTRL_CODE_SYMBOLS_MAP[char_code]
+
         return None
 
     def _get_ctrl_sequence_value(self) -> Optional[str]:
@@ -566,6 +588,7 @@ class Keystroke(str):
 
         return (self._get_plain_char_value()
                 or self._get_alt_sequence_value()
+                or self._get_ctrl_alt_sequence_value()
                 or self._get_ctrl_sequence_value()
                 or self._get_protocol_value()
                 or self._get_ascii_value()

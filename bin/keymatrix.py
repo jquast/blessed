@@ -251,8 +251,6 @@ def render_keymatrix(term: Terminal, n_header_rows: int, raw_sequences: deque,
 
     echo = functools.partial(print, end=term.clear_eol + '\r\n', flush=False)
     echo(term.move_yx(bar_y, (term.width // 3) - 3) + bar_content)
-    echo()
-    echo()
 
     # Calculate available space for formatted events table
     max_event_rows = min(10, max(2, term.height - bar_y))
@@ -260,6 +258,9 @@ def render_keymatrix(term: Terminal, n_header_rows: int, raw_sequences: deque,
     # Render formatted events table
     events_to_display = list(formatted_events)[-max_event_rows:]
 
+    echo()
+    echo(f"{'value':<6} {'repr':<20} {'Name':<25} extra:")
+    echo()
     for event_line in events_to_display:
         echo(event_line)
     echo('', end=term.clear_eos, flush=True)
