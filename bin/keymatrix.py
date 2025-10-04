@@ -30,8 +30,7 @@ class DecModeManager:
 
     def probe(self, timeout: float = 1.0) -> List[str]:
         """Probe terminal for DEC mode support and return log messages."""
-        messages = []
-        messages.append("Checking DEC Private Mode status:")
+        messages = ["Checking DEC Private Mode status:"]
 
         for mode in self.test_modes:
             mode = DecPrivateMode(mode)
@@ -48,6 +47,9 @@ class DecModeManager:
 
             messages.append(f'{mode}: {status}')
             self.available_modes[mode] = response.is_enabled()
+
+        if not self.available_modes:
+            messages.append(f"All DEC Private Modes fail support")
 
         return messages
 
@@ -116,12 +118,9 @@ class KittyKeyboardManager:
         self.kitty_flags = self.term.get_kitty_keyboard_state(timeout=timeout)
 
         if self.kitty_flags is None:
-            return False, "Kitty Keyboard Protocol not supported!", None
+            return ["Kitty Keyboard Protocol not supported!"]
 
-        header = (f"Kitty Keyboard Protocol: {self.kitty_flags!r} "
-                  + self.term.reverse("[Shift + F1 ... F5]") + " to toggle")
-        initial_log = f'{self.kitty_flags!r}'
-        return True, header, initial_log
+        return [f'Kitty Keyboard Protocol is {self.kitty_flags!r}']
 
     def toggle_by_index(self, shift_f_idx: int) -> str:
         """Toggle kitty flag by Shift+F index and return log message."""
@@ -145,6 +144,9 @@ class KittyKeyboardManager:
                 return 'Kitty: disabled'
         except Exception as e:
             return f'Kitty error: {e}'
+
+    def header_msg(self) -> str:
+        return f"{self.repr_flags()} [Shift+F1..F5] to toggle"
 
     def repr_flags(self) -> str:
         """Return string representation of current flags."""
@@ -185,15 +187,16 @@ def get_test_modes() -> Tuple[DecPrivateMode, ...]:
     )
 
 
-def render_header(term: Terminal, header: List[str], dec_manager: DecModeManager) -> int:
+def render_header(term: Terminal, dec_manager: DecModeManager, kitty_manager:
+                  KittyKeyboardManager) -> int:
     """
     Render the header section.
 
     Returns number of rows used.
     """
-    row_count = 0
-    echo = functools.partial(print, end=term.clear_eol + '\r\n', flush=False)
-    echo(term.home, end='')
+    header = ["Press ^C to quit."]
+    if kitty_manager.kitty_flags is not None:
+        header.append(f"{kitty_manager.repr_flags()} [Shift+F1..F5] to toggle")
 
     # Display DEC modes table
     if dec_manager.entries():
@@ -202,20 +205,22 @@ def render_header(term: Terminal, header: List[str], dec_manager: DecModeManager
             idx = dec_manager.test_modes.index(mode)
             status = "  IS  " if enabled else "IS NOT"
             f_key = f"F{idx + 1}"
-            echo(f"{repr(mode):<{maxlen}} "
-                 f"{term.reverse(status)} Enabled, "
-                 f"[{term.reverse(f_key)}] toggles: {mode.long_description}")
-            row_count += 1
+            mode_description = (
+                    f"{repr(mode):<{maxlen}} "
+                    f"{term.reverse(status)} Enabled, "
+                    f"[{term.reverse(f_key)}] toggles")
+            header.append(mode_description)
 
-    # Separator and header
+    # Display, Separators, headers, return row count
+    echo = functools.partial(print, end=term.clear_eol + '\r\n', flush=False)
+    echo(term.home, end='')
     echo('-' * term.width)
-    row_count += 1
+    row_count = 1
     for line in header:
         echo(line)
         row_count += 1
-    echo('-' * term.width)
+    echo('-' * term.width, flush=True)
     row_count += 1
-
     return row_count
 
 
@@ -250,10 +255,14 @@ def render_keymatrix(term: Terminal, n_header_rows: int, raw_sequences: deque,
         raw_sequences.popleft()
 
     echo = functools.partial(print, end=term.clear_eol + '\r\n', flush=False)
-    echo(term.move_yx(bar_y, (term.width // 3) - 3) + bar_content)
+    bar_line = ' ' * ((term.width // 3) - 3) + f'[ {bar_content} ]'
+    echo(term.move_yx(bar_y-3, 0))
+    echo()
+    echo(bar_line)
+    echo()
 
     # Calculate available space for formatted events table
-    max_event_rows = min(10, max(2, term.height - bar_y))
+    max_event_rows = term.height - bar_y - 5
 
     # Render formatted events table
     events_to_display = list(formatted_events)[-max_event_rows:]
@@ -288,25 +297,17 @@ def main():
     test_modes = get_test_modes()
 
     # Initialize managers
-    dec_manager = DecModeManager(term, test_modes)
-    kitty_manager = KittyKeyboardManager(term)
-
-    # State
-    header = ["Press ^C to quit."]
-    do_exit = False
-
-    # Probe terminal capabilities
-    dec_manager.probe(timeout=1.0)
-    if not dec_manager.available_modes:
-        header.append(f"All DEC Private Modes {term.bold_red('fail support')}")
-
-    supported, kitty_header, kitty_log = kitty_manager.probe(timeout=1.0)
-    if kitty_header:
-        header.append(kitty_header)
 
     # Key event storage
     raw_sequences = deque(maxlen=100)  # Store raw sequences
     formatted_events = deque(maxlen=50)  # Store formatted event lines
+
+    # Probe terminal capabilities
+    dec_manager = DecModeManager(term, test_modes)
+    formatted_events.extend(dec_manager.probe(timeout=1.0))
+
+    kitty_manager = KittyKeyboardManager(term)
+    formatted_events.extend(kitty_manager.probe(timeout=1.0))
 
     # Ensure clean input state
     inp = term.flushinp(0.1)
@@ -314,22 +315,19 @@ def main():
 
     # Main interaction loop
     input_mode = term.cbreak if '--cbreak' in sys.argv else term.raw
+    oldsize = (term.height, term.width)
     with input_mode(), term.fullscreen():
         message = None
         n_header_rows = 0
 
         # Initial full render
-        n_header_rows = render_header(term, header, dec_manager)
+        n_header_rows = render_header(term, dec_manager, kitty_manager)
         render_keymatrix(term, n_header_rows, raw_sequences, formatted_events)
 
-        while True:
-            if do_exit:
-                dec_manager.cleanup()
-                kitty_manager.cleanup()
-                exit(0)
-
+        do_exit = False
+        while not do_exit:
             # Handle user input
-            inp = term.inkey()
+            inp = term.inkey(0.1)
             for mgr in (dec_manager, kitty_manager):
                 if inp.name in mgr.toggle_keynames():
                     index = mgr.get_index_by_key(inp.name)
@@ -339,17 +337,27 @@ def main():
             if inp.name == 'KEY_CTRL_C':
                 do_exit = True
 
-            raw_sequences.append(inp)
-            formatted_events.append(format_key_event(term, inp))
+            if inp:
+                raw_sequences.append(inp)
+                formatted_events.append(format_key_event(term, inp))
 
-            # If mode was toggled, re-render header and flush input
-            if message:
-                formatted_events.append(f">> {message}")
-                n_header_rows = render_header(term, header, dec_manager)
-                message = None
+            # If mode was toggled, screen was resized, or CTRL^L pressed,
+            # re-render header
+            if (message
+                    or oldsize != (term.height, term.width)
+                    or inp.name == 'KEY_CTRL_L'):
+                if message:
+                    message = None
+                    formatted_events.append(f">> {message}")
+                n_header_rows = render_header(term, dec_manager, kitty_manager)
+                oldsize = (term.height, term.width)
 
             # Always render key matrix (efficient, only updates changed area)
             render_keymatrix(term, n_header_rows, raw_sequences, formatted_events)
+
+        dec_manager.cleanup()
+        kitty_manager.cleanup()
+
 
 
 if __name__ == '__main__':

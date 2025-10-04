@@ -251,3 +251,36 @@ Focus tracking reports when the terminal window gains or loses focus:
                 print(f"Focus {status}")
             elif ks == 'q':
                 break
+
+
+Focus Events
+------------
+
+As a bonus, blessed also supports focus tracking! Enable :attr:`DecPrivateMode.FOCUS_IN_OUT_EVENTS` to receive events when the terminal window gains or loses focus:
+
+.. code-block:: python
+
+    from blessed import Terminal, DecPrivateMode
+
+    term = Terminal()
+    
+    with term.cbreak(), term.dec_modes_enabled(DecPrivateMode.FOCUS_IN_OUT_EVENTS):
+        print("Switch to another window and back...")
+        
+        while True:
+            event = term.inkey()
+            
+            if event.mode == DecPrivateMode.FOCUS_IN_OUT_EVENTS:
+                focus = event.mode_values()
+                if focus.gained:
+                    print("Window gained focus!")
+                else:
+                    print("Window lost focus!")
+                break
+
+This can be useful for pausing animations or updating status when the user switches away from your application.
+
+Summary
+-------
+
+

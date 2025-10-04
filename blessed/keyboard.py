@@ -27,11 +27,33 @@ else:
 
 # DEC event namedtuples
 BracketedPasteEvent = namedtuple('BracketedPasteEvent', 'text')
-MouseSGREvent = namedtuple(
-    'MouseSGREvent',
-    'button x y is_release shift meta ctrl is_drag is_wheel')
-MouseLegacyEvent = namedtuple('MouseLegacyEvent',
-                              'button x y is_release shift meta ctrl is_motion is_drag is_wheel')
+
+
+class MouseEvent(namedtuple('_MouseEvent',
+                            'button x y is_release shift meta ctrl is_motion is_wheel')):
+    """
+    Mouse event with button, coordinates, and modifier information.
+
+    A unified mouse event structure that supports both legacy and SGR mouse protocols.
+    Provides a custom __repr__ that only displays active (non-default) attributes for clarity.
+    """
+
+    def __repr__(self) -> str:
+        """Return succinct representation showing only active attributes."""
+        # Always show button, x, y
+        parts = [f'button={self.button}', f'x={self.x}', f'y={self.y}']
+        
+        # Only show boolean flags when True
+        for bool_name in ('is_release', 'shift', 'meta', 'ctrl', 'is_motion', 'is_wheel'):
+            if getattr(self, bool_name):
+                parts.append(f'{bool_name}=True')
+        return f"MouseEvent({', '.join(parts)})"
+
+
+# Backwards compatibility aliases
+MouseSGREvent = MouseEvent
+MouseLegacyEvent = MouseEvent
+
 FocusEvent = namedtuple('FocusEvent', 'gained')
 SyncEvent = namedtuple('SyncEvent', 'begin')
 
@@ -711,11 +733,13 @@ class Keystroke(str):
         This method should only be called when :attr:`Keystroke.mode` is
         non-None and greater than 0.
 
-        Returns a namedtuple with parsed event data for supported DEC modes:
+        Returns a namedtuple with parsed event data for supported
+        :class:`~.DecPrivateMode` modes:
 
         - ``BRACKETED_PASTE``: :class:`BracketedPasteEvent` with ``text`` field
-        - ``MOUSE_TRACK_SGR``: :class:`MouseSGREvent` with button, coordinates, and modifier flags
-        - ``MOUSE_REPORT_*``: :class:`MouseLegacyEvent` with button, coordinates, and modifier flags
+        - ``MOUSE_EXTENDED_SGR``, ``MOUSE_ALL_MOTION``,  ``MOUSE_REPORT_DRAG``,
+          and ``MOUSE_REPORT_CLICK`` events: :class:`MouseEvent` with button,
+          coordinates, and modifier flags
         - ``FOCUS_EVENT_REPORTING``: :class:`FocusEvent` with ``gained`` boolean field
 
         :rtype: namedtuple
@@ -765,7 +789,6 @@ class Keystroke(str):
 
         # Extract motion/drag flags
         is_motion = bool(cb & 32)
-        is_drag = is_motion and not is_release
 
         # Wheel events
         is_wheel = cb >= 64
@@ -781,7 +804,6 @@ class Keystroke(str):
             meta=meta,
             ctrl=ctrl,
             is_motion=is_motion,
-            is_drag=is_drag,
             is_wheel=is_wheel
         )
 
@@ -812,8 +834,8 @@ class Keystroke(str):
         meta = bool(b & 8)
         ctrl = bool(b & 16)
 
-        # Extract event type flags
-        is_drag = bool(b & 32)
+        # Extract motion/drag flags
+        is_motion = bool(b & 32)
         is_wheel = b in (64, 65)  # wheel up/down
 
         # Get base button (0-2 for left/middle/right, or 64-65 for wheel)
@@ -827,7 +849,7 @@ class Keystroke(str):
             shift=shift,
             meta=meta,
             ctrl=ctrl,
-            is_drag=is_drag,
+            is_motion=is_motion,
             is_wheel=is_wheel
         )
 
@@ -1948,7 +1970,7 @@ class KittyKeyboardProtocol:
 
 __all__ = ('Keystroke', 'get_keyboard_codes', 'get_keyboard_sequences',
            '_match_dec_event', '_match_kitty_key', '_match_modify_other_keys',
-           '_match_legacy_csi_modifiers', 'BracketedPasteEvent', 'MouseSGREvent',
-           'MouseLegacyEvent', 'FocusEvent', 'SyncEvent', 'KittyKeyEvent',
+           '_match_legacy_csi_modifiers', 'BracketedPasteEvent', 'MouseEvent',
+           'MouseSGREvent', 'MouseLegacyEvent', 'FocusEvent', 'SyncEvent', 'KittyKeyEvent',
            'ModifyOtherKeysEvent', 'LegacyCSIKeyEvent', 'KittyKeyboardProtocol',
            'DeviceAttribute')

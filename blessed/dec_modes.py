@@ -380,7 +380,9 @@ class DecPrivateMode:
         SpecialInternalModifyOtherKeys: "Non-DEC Mode used internally by Keystroke",
         SpecialInternalKitty: "Non_DEC Mode used internally by Keystroke",
 
-        # DEC standard modes (1-117)
+        # DEC standard modes (1-117). The "classical" names are used instead of
+        # more friendly mnemonics, that's because most of these are legacy and
+        # unused and it makes it easier to find out about them.
         DECCKM: "Cursor Keys Mode",
         DECANM: "ANSI/VT52 Mode",
         DECCOLM: "Column Mode",

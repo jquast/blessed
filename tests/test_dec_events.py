@@ -12,6 +12,7 @@ from blessed.keyboard import (
     Keystroke,
     _match_dec_event,
     BracketedPasteEvent,
+    MouseEvent,
     MouseSGREvent,
     MouseLegacyEvent,
     FocusEvent,
@@ -279,3 +280,103 @@ def test_resolve_sequence():
     assert isinstance(event_value, BracketedPasteEvent)
     assert event_value.text == 'test'
     assert ks_dec.mode == DecPrivateMode.BRACKETED_PASTE
+
+
+def test_mouse_event_is_motion_field():
+    """Test that is_motion field is present and correct for both SGR and legacy events."""
+    # Test SGR mouse event with motion (drag)
+    ks_drag = _match_dec_event('\x1b[<32;10;20M')  # bit 32 set = motion
+    values = ks_drag.mode_values()
+    assert isinstance(values, MouseEvent)
+    assert values.is_motion is True
+    assert values.is_drag is True  # is_drag = is_motion and not is_release
+    assert not values.is_release
+
+    # Test SGR mouse press without motion
+    ks_press = _match_dec_event('\x1b[<0;10;20M')
+    values = ks_press.mode_values()
+    assert values.is_motion is False
+    assert values.is_drag is False
+
+    # Test SGR mouse release with motion bit set
+    ks_release = _match_dec_event('\x1b[<32;10;20m')  # lowercase 'm' = release
+    values = ks_release.mode_values()
+    assert values.is_motion is True
+    assert values.is_drag is False  # not a drag because is_release is True
+    assert values.is_release is True
+
+    # Test legacy mouse event with motion
+    # cb byte: 32 (motion bit) + offset 32 = 64 = '@'
+    ks_legacy_motion = _match_dec_event('\x1b[M@  ')
+    values = ks_legacy_motion.mode_values()
+    assert isinstance(values, MouseEvent)
+    assert values.is_motion is True
+    assert values.is_drag is True
+
+    # Test legacy mouse event without motion
+    ks_legacy_press = _match_dec_event('\x1b[M   ')  # cb=32, button=0, no motion
+    values = ks_legacy_press.mode_values()
+    assert values.is_motion is False
+    assert values.is_drag is False
+
+
+def test_mouse_event_repr():
+    """Test that MouseEvent __repr__ only shows active attributes."""
+    # Test simple press event - should only show button, x, y
+    ks_press = _match_dec_event('\x1b[<0;10;20M')
+    values = ks_press.mode_values()
+    repr_str = repr(values)
+    assert repr_str == "MouseEvent(button=0, x=10, y=20)"
+    assert 'is_release' not in repr_str
+    assert 'shift' not in repr_str
+
+    # Test release event - should show is_release
+    ks_release = _match_dec_event('\x1b[<0;10;20m')
+    values = ks_release.mode_values()
+    repr_str = repr(values)
+    assert 'is_release=True' in repr_str
+    assert repr_str == "MouseEvent(button=0, x=10, y=20, is_release=True)"
+
+    # Test drag event - should show is_motion and is_drag
+    ks_drag = _match_dec_event('\x1b[<32;5;5M')
+    values = ks_drag.mode_values()
+    repr_str = repr(values)
+    assert 'is_motion=True' in repr_str
+    assert 'is_drag=True' in repr_str
+    assert repr_str == "MouseEvent(button=0, x=5, y=5, is_motion=True, is_drag=True)"
+
+    # Test with modifiers - should show shift, meta, ctrl
+    ks_mod = _match_dec_event('\x1b[<28;5;5M')  # 28 = 4 (shift) + 8 (meta) + 16 (ctrl)
+    values = ks_mod.mode_values()
+    repr_str = repr(values)
+    assert 'shift=True' in repr_str
+    assert 'meta=True' in repr_str
+    assert 'ctrl=True' in repr_str
+    assert repr_str == "MouseEvent(button=0, x=5, y=5, shift=True, meta=True, ctrl=True)"
+
+    # Test wheel event - should show is_wheel
+    ks_wheel = _match_dec_event('\x1b[<64;10;10M')
+    values = ks_wheel.mode_values()
+    repr_str = repr(values)
+    assert 'is_wheel=True' in repr_str
+    assert repr_str == "MouseEvent(button=64, x=10, y=10, is_wheel=True)"
+
+
+def test_mouse_event_backwards_compatibility():
+    """Test that MouseSGREvent and MouseLegacyEvent still work as aliases."""
+    # Verify they are the same class
+    assert MouseSGREvent is MouseEvent
+    assert MouseLegacyEvent is MouseEvent
+
+    # Verify isinstance checks work with old names
+    ks_sgr = _match_dec_event('\x1b[<0;10;20M')
+    values = ks_sgr.mode_values()
+    assert isinstance(values, MouseSGREvent)
+    assert isinstance(values, MouseLegacyEvent)
+    assert isinstance(values, MouseEvent)
+
+    ks_legacy = _match_dec_event('\x1b[M   ')
+    values = ks_legacy.mode_values()
+    assert isinstance(values, MouseSGREvent)
+    assert isinstance(values, MouseLegacyEvent)
+    assert isinstance(values, MouseEvent)
