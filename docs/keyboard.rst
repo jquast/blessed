@@ -11,6 +11,11 @@ keystrokes as :class:`~.Keystroke` objects. Combined with
 :meth:`~.Terminal.cbreak` mode, you can build responsive, interactive terminal
 applications that can respond "key at a time".
 
+The :meth:`~.Terminal.cbreak` context manager enables immediate key detection.
+
+The :meth:`~.Terminal.inkey` method returns a :class:`~.Keystroke` object
+representing the key that was immediately pressed.
+
 Getting Started
 ---------------
 
@@ -25,29 +30,47 @@ Here's a simple example that reads a single keystroke:
         key = term.inkey()
         print(f"You pressed: {key!r}")
 
-The :meth:`~.Terminal.cbreak` context manager enables immediate key detection.
+The :meth:`~.Terminal.inkey` method also accepts a ``timeout`` parameter (in
+seconds). When timeout is exceeded without input, an empty :class:`~.Keystroke`
+is returned, ``''``
 
-Inside this context, :meth:`~.Terminal.inkey` returns a :class:`~.Keystroke`
-object representing the key that was immediately pressed.
+.. code-block:: python
+
+    from blessed import Terminal
+    import time
+
+    term = Terminal()
+    print("Cross animation, press any key to stop: ", end="", flush=True)
+    with term.cbreak(), term.hidden_cursor():
+        cross = '|'
+        
+        while True:
+            key = term.inkey(timeout=0.1)
+            if key:
+                print(f'STOP by {key!r}')
+                break
+
+            cross = {'|':'-', '-':'|'}[cross]
+            print(f'{cross}\b', end='', flush=True)
+
 
 Keystroke
 ---------
 
 The :class:`~.Keystroke` class makes it easy to work with keyboard input. It
-inherits from :class:`str`, so you can compare it directly to characters, but it
-also provides special properties for detecting modifier keys and special
+inherits from :class:`str`, so you can compare it directly to other strings, but
+it also provides special properties for detecting modifier keys and special
 sequences.
 
-* Use :meth:`~.Terminal.inkey` with ``timeout`` for non-blocking input
 * Use :attr:`~.Keystroke.is_sequence` to detect special keys
-* Use :attr:`~.Keystroke.name` to identify keys by name (e.g., ``KEY_F1``, ``KEY_CTRL_Q``)
-* Or, by magic methods like ``keystroke.is_f1()`` or ``keystroke.is_key_ctrl('q')``.
+* Use :attr:`~.Keystroke.name` to identify special keys by name (e.g., ``KEY_F1``, ``KEY_CTRL_Q``)
+* Or, by using magic methods like ``keystroke.is_f1()`` or ``keystroke.is_key_ctrl('q')``.
 
 Special Keys
 ~~~~~~~~~~~~
 
 The :attr:`~.Keystroke.is_sequence` property returns ``True`` for arrow keys,
-function keys, and any key combination with modifiers (Ctrl, Alt, Shift):
+function keys, and any character key combined with modifiers (Ctrl, Alt, Shift).
 
 .. code-block:: python
 
@@ -62,8 +85,7 @@ function keys, and any key combination with modifiers (Ctrl, Alt, Shift):
         else:
             print(f"Regular character: {key}")
 
-name: Identifying Keys
-~~~~~~~~~~~~~~~~~~~~~~
+Use the demonstration program, :ref:`keymatrix.py` to experiment further.
 
 The :attr:`~.Keystroke.name` property provides a readable name for special keys,
 and can be used for basic equality tests like in this "paint by arrow key" example:
@@ -93,9 +115,9 @@ and can be used for basic equality tests like in this "paint by arrow key" examp
             elif key.name == 'KEY_LEFT':
                 position[1] = max(0, position[1] - 1)
             elif key.name == 'KEY_DOWN':
-                position[0] = max(term.height, position[0] + 1)
+                position[0] = min(term.height, position[0] + 1)
             elif key.name == 'KEY_RIGHT':
-                position[1] = max(term.width, position[1] + 1)
+                position[1] = min(term.width, position[1] + 1)
 
 Common key names include:
 
@@ -111,51 +133,37 @@ Common key names include:
 For regular characters without modifiers, :attr:`~.Keystroke.name` returns ``None``.
 
 Modifiers
----------
-
-Blessed detects modifier keys (Ctrl, Alt, Shift) combined with regular keys or
-special keys. The :attr:`~.Keystroke.name` property represents these
-combinations:
-
-.. code-block:: python
-
-    from blessed import Terminal
-
-    term = Terminal()
-    with term.cbreak():
-        print("Try Ctrl+Q or Alt+X:")
-        while True:
-            key = term.inkey()
-            
-            if key.name == 'KEY_CTRL_Q':
-                print("Quitting with Ctrl+Q")
-                break
-            elif key.name == 'KEY_ALT_X':
-                print("You pressed Alt+X")
-            elif key.name == 'KEY_CTRL_ALT_S':
-                print("Ctrl+Alt+S detected, nice!")
+~~~~~~~~~
 
 Standard keys with modifiers follow the pattern:
 
-* ``KEY_CTRL_<char>`` - Control + character (e.g., ``KEY_CTRL_C``)
-* ``KEY_ALT_<char>`` - Alt + character (e.g., ``KEY_ALT_F``)
-* ``KEY_SHIFT_<char>`` - Shift + letter (e.g., ``KEY_ALT_SHIFT_A``)
-* ``KEY_CTRL_ALT_<char>`` - Ctrl + Alt + character
+* ``KEY_CTRL_A``
+* ``KEY_ALT_Q``
+* ``KEY_SHIFT_X``
+* ``KEY_CTRL_ALT_Y``
+* ``KEY_ALT_SHIFT_Z``
+* ``KEY_CTRL_ALT_SHIFT_L``
 
 And application keys:
 
-* ``KEY_SHIFT_LEFT`` - Shift + Left Arrow
-* ``KEY_CTRL_BACKSPACE`` - Ctrl + Backspace
-* ``KEY_ALT_DELETE`` - Alt + Delete
-* ``KEY_CTRL_SHIFT_F3`` - Ctrl + Shift + F3
-* ``KEY_CTRL_ALT_SHIFT_F9`` - Ctrl + Alt + Shift + F9
+* ``KEY_SHIFT_LEFT``
+* ``KEY_CTRL_BACKSPACE``
+* ``KEY_ALT_DELETE``
+* ``KEY_CTRL_SHIFT_F3``
+* ``KEY_CTRL_ALT_SHIFT_F9``
 
-When multiple modifiers are specified, they are always in the order of ``CTRL``,
-``ALT``, and then ``SHIFT``.
+When multiple modifiers are specified, they always in the following order
 
+- ``CTRL``
+- ``ALT``
+- ``SHIFT``
+
+The escape sequence, ``'\x1b['``, is always decoded as name ``CSI`` when it                                               
+arrives without any known matching sequence. There is no ``KEY_ALT_[`` except                                             
+when Kitty_ modes disambiguate, are active.
 
 Magic Methods
--------------
+~~~~~~~~~~~~~
 
 The :class:`~.Keystroke` class provides convenient "magic methods" for checking
 keys with modifiers. These methods all start with ``is_``:
@@ -182,84 +190,39 @@ keys with modifiers. These methods all start with ``is_``:
         if key.is_shift_left():
             print("Shift+Left arrow pressed")
 
+Some examples, given *key* object of :class:`~.Keystroke`:
 
-Some examples:
-
-.. code-block:: python
-
-    key.is_ctrl('x')
-    key.is_alt('q')
-    key.is_ctrl_alt('s')
-    key.is_ctrl_shift_alt('a')
-    key.is_f1()
-    key.is_up()
-    key.is_enter()
-    key.is_backspace()
-    key.is_ctrl_left()
-    key.is_alt_backspace()
-    key.is_shift_f5()
+- ``key.is_ctrl('x')``
+- ``key.is_alt('q')``
+- ``key.is_ctrl_alt('s')``
+- ``key.is_ctrl_shift_alt('a')``
+- ``key.is_f1()``
+- ``key.is_up()``
+- ``key.is_enter()``
+- ``key.is_backspace()``
+- ``key.is_ctrl_left()``
+- ``key.is_alt_backspace()``
+- ``key.is_shift_f5()``
 
 By default, character matching is case-insensitive. You can change this with the
-``ignore_case`` parameter:
+``ignore_case`` parameter. For example, "Alt" with capital letter ``U`` matches
+both methods:
 
-.. code-block:: python
+- ``key.is_alt('u')``
+- ``key.is_alt_shift('u')``
 
-    from blessed import Terminal
-    term = Terminal()
-    term.ungetch('\x1bU')
+To match only To explicitly match "Alt + u" (lowercase 'U'), set ``ignore_case``
+argument to False:
 
-    assert key.is_alt('u')
-    assert key.is_alt_shift('u')
-    assert not key.is_alt('u', ignore_case=False)
-
-Timeouts
---------
-
-The :meth:`~.Terminal.inkey` method accepts a ``timeout`` parameter (in seconds)
-for non-blocking input:
-
-.. code-block:: python
-
-    from blessed import Terminal
-
-    term = Terminal()
-    with term.cbreak():
-        print("Press any key (waiting 3 seconds)...")
-        key = term.inkey(timeout=3)
-        
-        if key:
-            print(f"You pressed: {key!r}")
-        else:
-            print("No key pressed (timeout)")
-
-A timeout of ``0`` checks for immediately available input:
-
-.. code-block:: python
-
-    from blessed import Terminal
-    import time
-
-    term = Terminal()
-    print("Very fast cross animation, press any key to stop: ", end="", flush=True)
-    with term.cbreak(), term.hidden_cursor():
-        cross = '|'
-        
-        while True:
-            key = term.inkey(timeout=0)
-            if key:
-                break
-
-            cross = {'|':'-', '-':'|'}[cross]
-            print(f'{cross}\b', end='', flush=True)
-
+- ``key.is_alt('u', ignore_case=False)``
 
 Character Value
 ~~~~~~~~~~~~~~~
 
 The :attr:`~.Keystroke.value` property returns the text character for keys that
 produce text, stripping away modifier information. Special keys like ``KEY_UP``
-or ``KEY_F1``, have an empty :attr:`~.Keystroke.value` string.
-
+or ``KEY_F1``, have an empty :attr:`~.Keystroke.value` string. In this example,
+you can type ``mango`` while holding down the Alt key:
 
 .. code-block:: python
 
@@ -267,9 +230,8 @@ or ``KEY_F1``, have an empty :attr:`~.Keystroke.value` string.
 
     def prompt(question, max_length=15):
         print(f'{question} ', end='', flush=True)
-        text = ""
-
         term = Terminal()
+        text = ""
         with term.cbreak():
             while True:
                 key = term.inkey()
@@ -287,20 +249,27 @@ or ``KEY_F1``, have an empty :attr:`~.Keystroke.value` string.
         
     fruit = prompt("What is your favorite fruit?")
 
-    flavor = 'sweet' if sum(map(ord,fruit)) % 2 == 0 else 'sour'
+    print(f"{fruit}? Sounds tasty!")
 
-    yn = prompt(f"Never heard of {fruit}, is it {flavor}?")
-    if yn.lower().startswith('y'):
-        print("I thought so!")
-    else:
-        print("Sounds tasty!")
+Note that both ``KEY_BACKSPACE`` and ``KEY_DELETE`` are given the same meaning
+in this example, a significant number of systems send ``KEY_DELETE`` when the
+backspace key is pressed.
 
+Printing
+~~~~~~~~
+
+Although the :class:`~.Keystroke` object returned by `inkey()`_ may be used as a
+string, caution must be exercised to print them.
+
+Our examples use format string, ``f'{ks!r}'`` for ``repr()``. This is because
+input sequences may contain control characters and are generally considered
+unprintable.
 
 Flushing Input
 ~~~~~~~~~~~~~~
 
-Sometimes you need to clear any pending keyboard input, such as when switching
-screens or to "debounce" input after a long processing delay. Use
+Sometimes you need to clear the keyboard input buffer, such as when switching
+screens, or to "debounce" input after a long processing delay. Use
 :meth:`~.Terminal.flushinp` to discard buffered input:
 
 .. code-block:: python
@@ -324,7 +293,7 @@ screens or to "debounce" input after a long processing delay. Use
 Key Codes
 ~~~~~~~~~
 
-For compatibility with Legacy curses applications, :attr:`~.Keystroke.code` may
+For compatibility with legacy curses applications, :attr:`~.Keystroke.code` may
 be be compared with attributes of :class:`~.Terminal`, which are duplicated from
 those found in :linuxman:`curses(3)`, or those `constants
 <https://docs.python.org/3/library/curses.html#constants>`_ in :mod:`curses`
@@ -334,6 +303,4 @@ basic application keys.
 .. include:: all_the_keys.txt
 
 However, these keys do not represent the full range of keys that can be detected
-with their modifiers, such as ``KEY_LEFT`` as ``KEY_CTRL_LEFT``,
-``KEY_CTRL_SHIFT_LEFT``, and ``KEY_CTRL_ALT_SHIFT_LEFT`` are only matchable
-by their names.
+with their modifiers, such as ``KEY_CTRL_LEFT`` is not matched by any code.
