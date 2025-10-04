@@ -119,7 +119,7 @@ class KittyKeyboardManager:
             return False, "Kitty Keyboard Protocol not supported!", None
 
         header = (f"Kitty Keyboard Protocol: {self.kitty_flags!r} "
-                  + self.term.reverse(f"[Shift+F1..F5]" + " to toggle"))
+                  + self.term.reverse("[Shift + F1 ... F5]") + " to toggle")
         initial_log = f'{self.kitty_flags!r}'
         return True, header, initial_log
 

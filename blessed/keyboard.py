@@ -550,9 +550,7 @@ class Keystroke(str):
         return None
 
     def _get_ascii_value(self) -> Optional[str]:
-        """
-        Get value for keys matched by curses-imitated keycodes.
-        """
+        """Get value for keys matched by curses-imitated keycodes."""
         return {
             curses.KEY_ENTER: '\n',
             KEY_TAB: '\t',
@@ -574,7 +572,7 @@ class Keystroke(str):
         Some Examples,
 
         - Plain text: 'a', 'A', '1', ';', ' ', 'Ω', emoji with ZWJ sequences
-        - Alt+printable: Alt+a → 'a', Alt+A → 'A'
+        - Alt+printable: Alt+a _get_ctrl_alt_sequence_value 'a', Alt+A → 'A'
         - Ctrl+letter: Ctrl+A → 'a', Ctrl+Z → 'z'
         - Ctrl+symbol: Ctrl+@ → '@', Ctrl+? → '?', Ctrl+[ → '['
         - Control chars: '\t', '\n', '\x08', '\x1b' (for Enter/Tab/Backspace/Escape keycodes)
@@ -854,15 +852,20 @@ class Keystroke(str):
             return True
         return False
 
-    def _build_event_predicate(self, event_type: str, expected_name: str,
-                               expected_name_without_event: str) -> typing.Callable[[], bool]:
+    def _build_event_predicate(self,
+                               event_type: str,
+                               expected_name: str,
+                               expected_name_without_event: str) -> typing.Callable[[Optional[str],
+                                                                                     bool],
+                                                                                    bool]:
         """
         Build a predicate function for event-type checking.
 
         Returns a callable that checks if keystroke matches the expected event type.
         """
-        def event_predicate() -> bool:
+        def event_predicate(char: Optional[str] = None, ignore_case: bool = True) -> bool:
             """Check if keystroke matches the expected event type."""
+            # Parameters are accepted but not used for event predicates
             if not self._check_name_match(expected_name, expected_name_without_event):
                 return False
 
@@ -873,32 +876,42 @@ class Keystroke(str):
         return event_predicate
 
     def _build_modifier_predicate(
-            self, tokens: typing.List[str]) -> typing.Callable[[Optional[str], bool, bool], bool]:
+            self, tokens: typing.List[str]) -> typing.Callable[[Optional[str], bool], bool]:
         """
         Build a predicate function for modifier checking.
 
         Returns a callable that checks if keystroke has the specified modifiers.
         """
-        def modifier_predicate(char: Optional[str] = None, ignore_case: bool = True,
-                               exact: bool = True) -> bool:
+        def modifier_predicate(char: Optional[str] = None, ignore_case: bool = True) -> bool:
             # Build expected modifier bits from tokens
             expected_bits = 0
             for token in tokens:
                 expected_bits |= getattr(KittyModifierBits, token)
 
-            # Get effective modifier bits for exact matching
-            if exact:
-                # even with 'exact', Strip lock bits to ignore caps_lock and num_lock
-                effective_bits = self.modifiers_bits & ~(
-                    KittyModifierBits.caps_lock | KittyModifierBits.num_lock)
+            # Strip lock bits to ignore caps_lock and num_lock
+            effective_bits = self.modifiers_bits & ~(
+                KittyModifierBits.caps_lock | KittyModifierBits.num_lock)
+
+            # When matching with a character and it's alphabetic, be lenient about Shift
+            # because shift is implicit in the case of the letter
+            if char and len(char) == 1 and char.isalpha():
+                # Strip shift from both sides for letter matching
+                effective_bits_no_shift = effective_bits & ~KittyModifierBits.shift
+                expected_bits_no_shift = expected_bits & ~KittyModifierBits.shift
+                if effective_bits_no_shift != expected_bits_no_shift:
+                    return False
+            else:
+                # Exact matching (no char, or non-alpha char)
                 if effective_bits != expected_bits:
                     return False
-            # Subset check - all expected bits must be present
-            elif (self.modifiers_bits & expected_bits) != expected_bits:
-                return False
 
-            # If no character specified, just check modifiers
+            # If no character specified
             if char is None:
+                # Text keys (with printable character values) require char argument
+                keystroke_char = self.value
+                if keystroke_char and len(keystroke_char) == 1 and keystroke_char.isprintable():
+                    return False
+                # Non-text keys can match on modifiers alone
                 return True
 
             # Check character match using same logic as value property
@@ -916,23 +929,61 @@ class Keystroke(str):
 
         return modifier_predicate
 
-    def __getattr__(self, attr: str) -> typing.Callable[..., bool]:
+    def _build_keycode_predicate(
+            self, modifier_tokens: typing.List[str],
+            key_name: str) -> typing.Callable[[Optional[str], bool], bool]:
         """
-        Dynamic compound modifier predicates via __getattr__.
+        Build a predicate function for application key checking.
+
+        Returns a callable that checks if keystroke matches the expected keycode and modifiers.
+        """
+        def keycode_predicate(char: Optional[str] = None, ignore_case: bool = True) -> bool:
+            # ignore_case parameter is accepted but not used for application keys
+            # Application keys don't match when a character is provided
+            if char is not None:
+                return False
+
+            # Get expected keycode from key name
+            keycodes = get_keyboard_codes()
+            expected_key_constant = f'KEY_{key_name.upper()}'
+
+            # Find the keycode value
+            expected_code = None
+            for code, name in keycodes.items():
+                if name == expected_key_constant:
+                    expected_code = code
+                    break
+
+            if expected_code is None or self._code != expected_code:
+                return False
+
+            # Build expected modifier bits (same as _build_modifier_predicate)
+            expected_bits = 0
+            for token in modifier_tokens:
+                expected_bits |= getattr(KittyModifierBits, token)
+
+            # Check modifiers - exact match only
+            effective_bits = self.modifiers_bits & ~(
+                KittyModifierBits.caps_lock | KittyModifierBits.num_lock)
+            return effective_bits == expected_bits
+
+        return keycode_predicate
+
+    def __getattr__(self, attr: str) -> typing.Callable[[Optional[str], bool], bool]:
+        """
+        Dynamic compound modifier and application key predicates via __getattr__.
 
         Recognizes attributes starting with "is_" and parses underscore-separated
-        modifier tokens to create dynamic predicate functions.
+        tokens to create dynamic predicate functions.
 
         :arg str attr: Attribute name being accessed
         :rtype: callable or raises AttributeError
-        :returns: Callable predicate function for modifier combinations
+        :returns: Callable predicate function with signature ``Callable[[Optional[str], bool], bool]``.
+            All predicates accept the same parameters:
+            - ``char`` (Optional[str]): Character to match against keystroke value
+            - ``ignore_case`` (bool): Whether to ignore case when matching characters
 
-        Examples::
-
-             ks.is_alt('a')                 # - Alt-only with character 'a'
-             ks.is_ctrl_shift()             # - exactly Ctrl+Shift, no other modifiers
-             ks.is_key_shift_f2_released()  # - Shift+F2 release event
-             ks.is_ctrl_a_repeated()        # - Ctrl+a repeat event
+            For event predicates and application key predicates, these parameters are accepted but not used.
         """
         if not attr.startswith('is_'):
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}'")
@@ -964,15 +1015,38 @@ class Keystroke(str):
             return self._build_event_predicate(event_type, expected_name,
                                                expected_name_without_event)
 
-        # Parse modifier tokens
+        # Parse tokens to separate modifiers from potential key name
         tokens = tokens_str.split('_')
 
-        # Validate tokens - only allow known modifier names
+        # Separate modifiers from potential key name
+        modifiers = []
+        key_name_tokens = []
+
+        for i, token in enumerate(tokens):
+            if token in KittyModifierBits.names_modifiers_only:
+                modifiers.append(token)
+            else:
+                # Remaining tokens could be a key name
+                key_name_tokens = tokens[i:]
+                break
+
+        # If we have key name tokens, check if they form a valid application key
+        if key_name_tokens:
+            key_name = '_'.join(key_name_tokens)
+            keycodes = get_keyboard_codes()
+            expected_key_constant = f'KEY_{key_name.upper()}'
+
+            # Check if this is a valid application key
+            if expected_key_constant in keycodes.values():
+                return self._build_keycode_predicate(modifiers, key_name)
+
+        # No valid key name found - validate as modifier-only predicate
         invalid_tokens = [token for token in tokens
                           if token not in KittyModifierBits.names_modifiers_only]
         if invalid_tokens:
-            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute "
-                                 f"'{attr}' (invalid modifier tokens: {invalid_tokens})")
+            raise AttributeError(
+                f"'{self.__class__.__name__}' object has no attribute '{attr}' "
+                f"(invalid modifier tokens: {invalid_tokens})")
 
         # Return modifier predicate
         return self._build_modifier_predicate(tokens)
@@ -1253,7 +1327,7 @@ def resolve_sequence(  # pylint: disable=too-many-positional-arguments
     # when the sequence so far is not a 'known prefix', or, when
     # final is True, we return the ambigously matched KEY_ALT_[...]
     if (ks is not None and ks.code == curses.KEY_EXIT and len(text) > 1
-        ) and ((final or text[1] == '\x7f' or text[:2] not in prefixes)):
+            ) and ((final or text[1] == '\x7f' or text[:2] not in prefixes)):
         ks = Keystroke(ucs=text[:2])
     # final match is just simple resolution of the first codepoint of text,
     if ks is None:
