@@ -448,12 +448,7 @@ class Sequence(str):
                 outp += data[last_end:match.start()]
 
             last_end = match.end()
-
             text = match.group(match.lastgroup)
-            if match.lastgroup is None:
-                outp += text
-                continue
-
             value = self._term.caps[match.lastgroup].horizontal_distance(text)
 
             if value > 0:
