@@ -514,7 +514,7 @@ class Terminal():
             return WINSZ(*struct.unpack(WINSZ._FMT, data))
         return WINSZ(ws_row=25, ws_col=80, ws_xpixel=0, ws_ypixel=0)
 
-    def _height_and_width(self):  # type: ignore[no-untyped-def]
+    def _height_and_width(self):    # type: ignore[no-untyped-def]
         """
         Return a tuple of (terminal height, terminal width).
 

@@ -188,13 +188,11 @@ def get_keyboard_sequences(term: 'Terminal') -> typing.OrderedDict[str, int]:
     # of a kermit or avatar terminal, for example, remains unchanged
     # in its byte sequence values even when represented by unicode.
     #
-    sequence_map = dict((
-        (seq.decode('latin1'), val)
-        for (seq, val) in (
-            (curses.tigetstr(cap), val)
-            for (val, cap) in capability_names.items()
+    sequence_map = {
+        seq.decode('latin1'): val for seq, val in (
+            (curses.tigetstr(cap), val) for (val, cap) in capability_names.items()
         ) if seq
-    ) if term.does_styling else ())
+    } if term.does_styling else {}
 
     sequence_map.update(_alternative_left_right(term))
     sequence_map.update(DEFAULT_SEQUENCE_MIXIN)
