@@ -1423,8 +1423,8 @@ def _match_dec_event(text: str, mode_1016_active: Optional[bool] = None) -> Opti
         match = pattern.match(text)
         if match:
             if mode == DecPrivateMode.MOUSE_EXTENDED_SGR and mode_1016_active:
-                # recase mode 1006 match as 1016 when that mode is active
-                mode = DecPrivateMode.MOUSE_EXTENDED_SGR
+                # recast mode 1006 as mode 1016 if that mode is known to be active
+                mode = DecPrivateMode.MOUSE_SGR_PIXELS
             return Keystroke(ucs=match.group(0), mode=mode, match=match)
     return None
 
