@@ -63,8 +63,7 @@ def test_basic_url():
         t = TestTerminal(stream=StringIO(), force_styling=True)
         given_url = 'https://blessed.readthedocs.org'
         given_text = 'documentation'
-        expected_output = ('\x1b]8;;{0}\x1b\\{1}\x1b]8;;\x1b\\'
-                           .format(given_url, given_text))
+        expected_output = f'\x1b]8;;{given_url}\x1b\\{given_text}\x1b]8;;\x1b\\'
 
         # exercise
         result = t.link(given_url, 'documentation')
@@ -84,8 +83,7 @@ def test_url_with_id():
         given_url = 'https://blessed.readthedocs.org'
         given_text = 'documentation'
         given_url_id = '123'
-        expected_output = ('\x1b]8;id={0};{1}\x1b\\{2}\x1b]8;;\x1b\\'
-                           .format(given_url_id, given_url, given_text))
+        expected_output = f'\x1b]8;id={given_url_id};{given_url}\x1b\\{given_text}\x1b]8;;\x1b\\'
 
         # exercise
         result = t.link(given_url, 'documentation', given_url_id)
@@ -138,7 +136,7 @@ def test_location_with_styling(all_terms):
              unicode_parm('cup', 4, 3),
              'hi',
              unicode_cap('rc') or '\x1b[u'))
-        assert (t.stream.getvalue() == expected_output)
+        assert t.stream.getvalue() == expected_output
 
     child_with_styling(all_terms)
 
@@ -195,7 +193,7 @@ def test_vertical_location(all_terms):
             (unicode_cap('sc') or '\x1b[s',
              _vpa,
              unicode_cap('rc') or '\x1b[u'))
-        assert (t.stream.getvalue() == expected_output)
+        assert t.stream.getvalue() == expected_output
 
     child(all_terms)
 
@@ -211,11 +209,10 @@ def test_inject_move_x():
             with t.location(x=COL):
                 pass
         expected_output = ''.join(
-            (unicode_cap('sc') or '\x1b[s',
-             '\x1b[{0}G'.format(COL + 1),
-             unicode_cap('rc') or '\x1b[u'))
-        assert (t.stream.getvalue() == expected_output)
-        assert (t.move_x(COL) == '\x1b[{0}G'.format(COL + 1))
+            (unicode_cap('sc') or '\x1b[s', f'\x1b[{COL + 1}G', unicode_cap('rc') or '\x1b[u'),
+        )
+        assert t.stream.getvalue() == expected_output
+        assert t.move_x(COL) == f'\x1b[{COL + 1}G'
 
     child('screen')
     child('screen-256color')
@@ -233,11 +230,10 @@ def test_inject_move_y():
             with t.location(y=ROW):
                 pass
         expected_output = ''.join(
-            (unicode_cap('sc') or '\x1b[s',
-             '\x1b[{0}d'.format(ROW + 1),
-             unicode_cap('rc') or '\x1b[u'))
-        assert (t.stream.getvalue() == expected_output)
-        assert (t.move_y(ROW) == '\x1b[{0}d'.format(ROW + 1))
+            (unicode_cap('sc') or '\x1b[s', f'\x1b[{ROW + 1}d', unicode_cap('rc') or '\x1b[u')
+        )
+        assert t.stream.getvalue() == expected_output
+        assert t.move_y(ROW) == f'\x1b[{ROW + 1}d'
 
     child('screen')
     child('screen-256color')
@@ -253,7 +249,7 @@ def test_inject_civis_and_cnorm_for_ansi():
         with t.hidden_cursor():
             pass
         expected_output = '\x1b[?25l\x1b[?25h'
-        assert (t.stream.getvalue() == expected_output)
+        assert t.stream.getvalue() == expected_output
 
     child('ansi')
 
@@ -267,7 +263,7 @@ def test_inject_sc_and_rc_for_ansi():
         with t.location():
             pass
         expected_output = '\x1b[s\x1b[u'
-        assert (t.stream.getvalue() == expected_output)
+        assert t.stream.getvalue() == expected_output
 
     child('ansi')
 
@@ -283,14 +279,13 @@ def test_zero_location(all_terms):
             (unicode_cap('sc') or '\x1b[s',
              unicode_parm('cup', 0, 0),
              unicode_cap('rc') or '\x1b[u'))
-        assert (t.stream.getvalue() == expected_output)
+        assert t.stream.getvalue() == expected_output
 
     child(all_terms)
 
 
 def test_mnemonic_colors(all_terms):
     """Make sure color shortcuts work."""
-    # pylint:  disable=consider-using-ternary
 
     @as_subprocess
     def child(kind):
@@ -303,14 +298,14 @@ def test_mnemonic_colors(all_terms):
         # Avoid testing red, blue, yellow, and cyan, since they might someday
         # change depending on terminal type.
         t = TestTerminal(kind=kind)
-        assert (t.white == color(t, 7))
-        assert (t.green == color(t, 2))  # Make sure it's different than white.
-        assert (t.on_black == on_color(t, 0))
-        assert (t.on_green == on_color(t, 2))
-        assert (t.bright_black == color(t, 8))
-        assert (t.bright_green == color(t, 10))
-        assert (t.on_bright_black == on_color(t, 8))
-        assert (t.on_bright_green == on_color(t, 10))
+        assert t.white == color(t, 7)
+        assert t.green == color(t, 2)  # Make sure it's different than white.
+        assert t.on_black == on_color(t, 0)
+        assert t.on_green == on_color(t, 2)
+        assert t.bright_black == color(t, 8)
+        assert t.bright_green == color(t, 10)
+        assert t.on_bright_black == on_color(t, 8)
+        assert t.on_bright_green == on_color(t, 10)
 
     child(all_terms)
 
@@ -321,27 +316,27 @@ def test_callable_numeric_colors(all_terms):
     def child(kind):
         t = TestTerminal(kind=kind)
         if t.magenta:
-            assert t.color(5)('smoo') == t.magenta + 'smoo' + t.normal
+            assert t.color(5)('smoo') == f'{t.magenta}smoo{t.normal}'
         else:
             assert t.color(5)('smoo') == 'smoo'
 
         if t.on_magenta:
-            assert t.on_color(5)('smoo') == t.on_magenta + 'smoo' + t.normal
+            assert t.on_color(5)('smoo') == f'{t.on_magenta}smoo{t.normal}'
         else:
             assert t.color(5)('smoo') == 'smoo'
 
         if t.color(4):
-            assert t.color(4)('smoo') == t.color(4) + 'smoo' + t.normal
+            assert t.color(4)('smoo') == f'{t.color(4)}smoo{t.normal}'
         else:
             assert t.color(4)('smoo') == 'smoo'
 
         if t.on_green:
-            assert t.on_color(2)('smoo') == t.on_green + 'smoo' + t.normal
+            assert t.on_color(2)('smoo') == f'{t.on_green}smoo{t.normal}'
         else:
             assert t.on_color(2)('smoo') == 'smoo'
 
         if t.on_color(6):
-            assert t.on_color(6)('smoo') == t.on_color(6) + 'smoo' + t.normal
+            assert t.on_color(6)('smoo') == f'{t.on_color(6)}smoo{t.normal}'
         else:
             assert t.on_color(6)('smoo') == 'smoo'
 
@@ -353,8 +348,8 @@ def test_null_callable_numeric_colors(all_terms):
     @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), kind=kind)
-        assert (t.color(5)('smoo') == 'smoo')
-        assert (t.on_color(6)('smoo') == 'smoo')
+        assert t.color(5)('smoo') == 'smoo'
+        assert t.on_color(6)('smoo') == 'smoo'
 
     child(all_terms)
 
@@ -364,7 +359,7 @@ def test_naked_color_cap(all_terms):
     @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind)
-        assert (t.color + '' == t.setaf + '')
+        assert f'{t.color}' == f'{t.setaf}'
 
     child(all_terms)
 
@@ -377,15 +372,11 @@ def test_formatting_functions(all_terms):
         # test simple sugar,
         expected_output = ''.join((t.bold, 'hi', t.normal)) if t.bold else 'hi'
         assert t.bold('hi') == expected_output
-        # Plain strs for Python 2.x
         expected_output = ''.join((t.green, 'hi', t.normal)) if t.green else 'hi'
         assert t.green('hi') == expected_output
         # Test unicode
-        if t.underline:
-            expected_output = ''.join((t.underline, 'boö', t.normal))
-        else:
-            expected_output = 'boö'
-        assert (t.underline('boö') == expected_output)
+        expected_output = ''.join((t.underline, 'boö', t.normal)) if t.underline else 'boö'
+        assert t.underline('boö') == expected_output
 
     child(all_terms)
 
@@ -395,20 +386,17 @@ def test_compound_formatting(all_terms):
     @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind)
-        if any((t.bold, t.green)):
-            expected_output = ''.join((t.bold, t.green, 'boö', t.normal))
-        else:
-            expected_output = 'boö'
+        expected_output = (
+            ''.join((t.bold, t.green, 'boö', t.normal)) if any((t.bold, t.green)) else 'boö'
+        )
         assert t.bold_green('boö') == expected_output
 
-        if any((t.on_bright_red, t.bold, t.bright_green, t.underline)):
-            expected_output = ''.join(
-                (t.on_bright_red, t.bold, t.bright_green, t.underline, 'meh',
-                 t.normal))
-        else:
-            expected_output = 'meh'
-        very_long_cap = t.on_bright_red_bold_bright_green_underline
-        assert (very_long_cap('meh') == expected_output)
+        expected_output = (
+            ''.join((t.on_bright_red, t.bold, t.bright_green, t.underline, 'meh', t.normal))
+            if any((t.on_bright_red, t.bold, t.bright_green, t.underline))
+            else 'meh'
+        )
+        assert t.on_bright_red_bold_bright_green_underline('meh') == expected_output
 
     child(all_terms)
 
@@ -445,11 +433,11 @@ def test_formatting_functions_without_tty(all_terms):
     @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=False)
-        assert (t.bold('hi') == 'hi')
-        assert (t.green('hi') == 'hi')
+        assert t.bold('hi') == 'hi'
+        assert t.green('hi') == 'hi'
         # Test non-ASCII chars, no longer really necessary:
-        assert (t.bold_green('boö') == 'boö')
-        assert (t.bold_underline_green_on_red('loo') == 'loo')
+        assert t.bold_green('boö') == 'boö'
+        assert t.bold_underline_green_on_red('loo') == 'loo'
 
         # Test deeply nested styles
         given = t.green('-a-', t.bold('-b-', t.underline('-c-'),
@@ -464,7 +452,7 @@ def test_formatting_functions_without_tty(all_terms):
                         ' off')
         expected = 'off ON off ON off'
         assert given == expected
-        assert (t.on_bright_red_bold_bright_green_underline('meh') == 'meh')
+        assert t.on_bright_red_bold_bright_green_underline('meh') == 'meh'
 
     child(all_terms)
 
@@ -507,12 +495,12 @@ def test_null_callable_string(all_terms):
     @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), kind=kind)
-        assert (t.clear == '')
-        assert (t.move(False) == '')
-        assert (t.move_x(1) == '')
-        assert (t.bold() == '')
-        assert (t.bold('', 'x', 'huh?') == 'xhuh?')
-        assert (t.clear('x') == 'x')
+        assert t.clear == ''
+        assert t.move(False) == ''
+        assert t.move_x(1) == ''
+        assert t.bold() == ''
+        assert t.bold('', 'x', 'huh?') == 'xhuh?'
+        assert t.clear('x') == 'x'
 
     child(all_terms)
 
@@ -543,7 +531,7 @@ def test_split_seqs(all_terms):
         term = Terminal(kind)
 
         if term.sc and term.rc:
-            given_text = term.sc + 'AB' + term.rc + 'CD'
+            given_text = f'{term.sc}AB{term.rc}CD'
             expected = [term.sc, 'A', 'B', term.rc, 'C', 'D']
             result = list(term.split_seqs(given_text))
             assert result == expected
@@ -560,7 +548,7 @@ def test_split_seqs_maxsplit1(all_terms):
         term = Terminal(kind)
 
         if term.bold:
-            given_text = term.bold + 'bbq'
+            given_text = f'{term.bold}bbq'
             expected = [term.bold, 'bbq']
             result = list(term.split_seqs(given_text, 1))
             assert result == expected
@@ -577,7 +565,7 @@ def test_split_seqs_term_right(all_terms):
         term = Terminal(kind)
 
         if term.move_up:
-            given_text = 'XY' + term.move_right + 'VK'
+            given_text = f'XY{term.move_right}VK'
             expected = ['X', 'Y', term.move_right, 'V', 'K']
             result = list(term.split_seqs(given_text))
             assert result == expected
@@ -594,13 +582,13 @@ def test_split_seqs_maxsplit3_and_term_right(all_terms):
         term = Terminal(kind)
 
         if term.move_right(32):
-            given_text = 'PQ' + term.move_right(32) + 'RS'
+            given_text = f'PQ{term.move_right(32)}RS'
             expected = ['P', 'Q', term.move_right(32), 'RS']
             result = list(term.split_seqs(given_text, 3))
             assert result == expected
 
         if term.move_up(45):
-            given_text = 'XY' + term.move_up(45) + 'VK'
+            given_text = f'XY{term.move_up(45)}VK'
             expected = ['X', 'Y', term.move_up(45), 'V', 'K']
             result = list(term.split_seqs(given_text))
             assert result == expected
@@ -614,21 +602,21 @@ def test_formatting_other_string(all_terms):
     def child(kind):
         t = TestTerminal(stream=StringIO(), kind=kind, force_styling=True)
 
-        assert (t.move_left == t.cub1)
-        assert (t.move_left() == t.cub1)
-        assert (t.move_left(2) == t.cub(2))
+        assert t.move_left == t.cub1
+        assert t.move_left() == t.cub1
+        assert t.move_left(2) == t.cub(2)
 
-        assert (t.move_right == t.cuf1)
-        assert (t.move_right() == t.cuf1)
-        assert (t.move_right(2) == t.cuf(2))
+        assert t.move_right == t.cuf1
+        assert t.move_right() == t.cuf1
+        assert t.move_right(2) == t.cuf(2)
 
-        assert (t.move_up == t.cuu1)
-        assert (t.move_up() == t.cuu1)
-        assert (t.move_up(2) == t.cuu(2))
+        assert t.move_up == t.cuu1
+        assert t.move_up() == t.cuu1
+        assert t.move_up(2) == t.cuu(2)
 
-        assert (t.move_down == t.cud1)
-        assert (t.move_down() == t.cud1)
-        assert (t.move_down(2) == t.cud(2))
+        assert t.move_down == t.cud1
+        assert t.move_down() == t.cud1
+        assert t.move_down(2) == t.cud(2)
 
     child(all_terms)
 
@@ -667,16 +655,19 @@ def test_truncate(all_terms):
         from blessed import Terminal
         term = Terminal(kind)
 
-        test_string = term.red("Testing ") + term.yellow("makes ") +\
-            term.green("me ") + term.blue("feel ") +\
-            term.indigo("good") + term.normal
+        test_string = (
+            f'{term.red("Testing")} {term.yellow("makes")} {term.green("me")} '
+            f'{term.blue("feel")} {term.indigo("good")}{term.normal}'
+        )
         stripped_string = term.strip_seqs(test_string)
         for i in range(len(stripped_string)):
             test_l = term.length(term.truncate(test_string, i))
             assert test_l == len(stripped_string[:i])
-        test_nogood = term.red("Testing ") + term.yellow("makes ") +\
-            term.green("me ") + term.blue("feel ") +\
-            term.indigo("") + term.normal
+
+        test_nogood = (
+            f'{term.red("Testing")} {term.yellow("makes")} {term.green("me")} '
+            f'{term.blue("feel")} {term.indigo("")}{term.normal}'
+        )
         trunc = term.truncate(test_string, term.length(test_string) - len("good"))
         assert trunc == test_nogood
 
@@ -719,7 +710,7 @@ def test_truncate_padding(all_terms):
         term = Terminal(kind)
 
         if term.move_right(5):
-            test_right_string = term.blue("one" + term.move_right(5) + "two")
+            test_right_string = term.blue(f"one{term.move_right(5)}two")
             assert term.truncate(test_right_string, 9) == term.blue("one     t")
 
         test_bs_string = term.blue("one\b\b\btwo")
@@ -737,7 +728,7 @@ def test_truncate_default(all_terms):
         # local
         from blessed import Terminal
         term = Terminal(kind)
-        test = "Testing " + term.red("attention ") + term.blue("please.")
+        test = f'Testing {term.red("attention ")}{term.blue("please.")}'
         trunc = term.truncate(test)
         assert term.length(trunc) <= term.width
         assert term.truncate(term.red('x' * 1000)) == term.red('x' * term.width)

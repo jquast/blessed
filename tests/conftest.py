@@ -29,7 +29,7 @@ def envvar_enabled(envvar):
     if value is False:
         return value
 
-    if value.lower() in ('no', 'false'):
+    if value.lower() in {'no', 'false'}:
         return False
 
     try:

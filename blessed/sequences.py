@@ -31,9 +31,7 @@ _T = TypeVar("_T")
 __all__ = ('Sequence', 'SequenceTextWrapper', 'iter_parse', 'measure_length')
 
 
-# pylint: disable=unused-argument,missing-function-docstring
-
-class Termcap(object):
+class Termcap():
     """Terminal capability of given variable name and pattern."""
 
     def __init__(self, name: str, pattern: str, attribute: str, nparams: int = 0) -> None:
@@ -53,14 +51,12 @@ class Termcap(object):
         self._re_compiled: Optional[Pattern[str]] = None
 
     def __repr__(self) -> str:
-        # pylint: disable=redundant-keyword-arg
-        return '<Termcap {self.name}:{self.pattern!r}>'.format(self=self)
+        return f'<Termcap {self.name}:{self.pattern!r}>'
 
     @property
     def named_pattern(self) -> str:
         """Regular expression pattern for capability with named group."""
-        # pylint: disable=redundant-keyword-arg
-        return '(?P<{self.name}>{self.pattern})'.format(self=self)
+        return f'(?P<{self.name}>{self.pattern})'
 
     @property
     def re_compiled(self) -> Pattern[str]:
@@ -142,11 +138,8 @@ class Termcap(object):
                     pattern = _outp.replace(str(num), _numeric_regex)
                     return cls(name, pattern, attribute, nparams)
 
-        if match_grouped:
-            pattern = re.sub(r'(\d+)', lambda x: _numeric_regex, _outp)
-        else:
-            pattern = re.sub(r'\d+', lambda x: _numeric_regex, _outp)
-        return cls(name, pattern, attribute, nparams)
+        pattern = r'(\d+)' if match_grouped else r'\d+'
+        return cls(name, re.sub(pattern, lambda x: _numeric_regex, _outp), attribute, nparams)
 
 
 class SequenceTextWrapper(textwrap.TextWrapper):
@@ -177,8 +170,8 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         lines: list[str] = []
         if self.width <= 0 or not isinstance(self.width, int):
             raise ValueError(
-                "invalid width {0!r}({1!r}) (must be integer > 0)"
-                .format(self.width, type(self.width)))
+                f"invalid width {self.width!r}({type(self.width)!r}) (must be integer > 0)"
+            )
 
         term = self.term
         drop_whitespace = not hasattr(self, 'drop_whitespace'
@@ -189,8 +182,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
             cur_len = 0
             indent = self.subsequent_indent if lines else self.initial_indent
             width = self.width - len(indent)
-            if drop_whitespace and (
-                    Sequence(chunks[-1], term).strip() == '' and lines):
+            if drop_whitespace and lines and not Sequence(chunks[-1], term).strip():
                 del chunks[-1]
             while chunks:
                 chunk_len = Sequence(chunks[-1], term).length()
@@ -200,11 +192,10 @@ class SequenceTextWrapper(textwrap.TextWrapper):
                     break
                 cur_line.append(chunks.pop())
                 cur_len += chunk_len
-            if drop_whitespace and (
-                    cur_line and Sequence(cur_line[-1], term).strip() == ''):
+            if drop_whitespace and (cur_line and not Sequence(cur_line[-1], term).strip()):
                 del cur_line[-1]
             if cur_line:
-                lines.append(indent + ''.join(cur_line))
+                lines.append(f'{indent}{"".join(cur_line)}')
         return lines
 
     def _handle_long_word(self,  # type: ignore[no-untyped-def]
@@ -276,7 +267,6 @@ class Sequence(str):
     """
 
     def __new__(cls: Type[_T], sequence_text: str, term: 'Terminal') -> _T:
-        # pylint: disable = missing-return-doc, missing-return-type-doc
         """
         Class constructor.
 
@@ -359,7 +349,7 @@ class Sequence(str):
             output += text
 
         # Return with remaining caps appended
-        return output + ''.join(text for text, cap in parsed_seq if cap)
+        return f'{output}{"".join(text for text, cap in parsed_seq if cap)}'
 
     def length(self) -> int:
         r"""
@@ -458,12 +448,8 @@ class Sequence(str):
                 outp += data[last_end:match.start()]
 
             last_end = match.end()
-
             text = match.group(match.lastgroup)
-            if match.lastgroup is not None:
-                value = self._term.caps[match.lastgroup].horizontal_distance(text)
-            else:
-                value = 0
+            value = self._term.caps[match.lastgroup].horizontal_distance(text)
 
             if value > 0:
                 outp += ' ' * value

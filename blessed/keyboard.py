@@ -188,13 +188,11 @@ def get_keyboard_sequences(term: 'Terminal') -> typing.OrderedDict[str, int]:
     # of a kermit or avatar terminal, for example, remains unchanged
     # in its byte sequence values even when represented by unicode.
     #
-    sequence_map = dict((
-        (seq.decode('latin1'), val)
-        for (seq, val) in (
-            (curses.tigetstr(cap), val)
-            for (val, cap) in capability_names.items()
+    sequence_map = {
+        seq.decode('latin1'): val for seq, val in (
+            (curses.tigetstr(cap), val) for (val, cap) in capability_names.items()
         ) if seq
-    ) if term.does_styling else ())
+    } if term.does_styling else {}
 
     sequence_map.update(_alternative_left_right(term))
     sequence_map.update(DEFAULT_SEQUENCE_MIXIN)
@@ -360,7 +358,7 @@ _CURSES_KEYCODE_ADDINS = (
 _LASTVAL = max(get_curses_keycodes().values())
 for keycode_name in _CURSES_KEYCODE_ADDINS:
     _LASTVAL += 1
-    globals()['KEY_' + keycode_name] = _LASTVAL
+    globals()[f'KEY_{keycode_name}'] = _LASTVAL
 
 #: In a perfect world, terminal emulators would always send exactly what
 #: the terminfo(5) capability database plans for them, accordingly by the
@@ -477,7 +475,7 @@ DEFAULT_ESCDELAY = 0.35
 
 
 def _reinit_escdelay() -> None:
-    # pylint: disable=W0603
+    # pylint: disable=global-statement
     # Using the global statement: this is necessary to
     # allow test coverage without complex module reload
     global DEFAULT_ESCDELAY
