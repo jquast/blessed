@@ -77,7 +77,7 @@ Exemplary 3rd-party examples which use *blessed*,
 Requirements
 ------------
 
-*Blessed* works with Windows, Mac, Linux, and BSD's, on Python 2.7, 3.5+.
+*Blessed* works with Windows, Mac, Linux, and BSD's, on Python 3.7+.
 
 Brief Overview
 --------------
@@ -155,8 +155,7 @@ print some underlined text at the bottom of the screen:
         # Move cursor to bottom.
         print(tparm(cup, height - 1, 0))
 
-    print('This is {under}underlined{normal}!'
-          .format(under=underline, normal=normal))
+    print(f'This is {underline}underlined{normal}!')
 
     # Restore cursor position.
     print(rc)

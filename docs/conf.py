@@ -39,7 +39,7 @@ def no_op_wraps(func):
         return functools.orig_wraps(func)
 
     def wrapper(decorator):
-        sys.stderr.write('patched for function signature: {0!r}\n'.format(func))
+        sys.stderr.write(f'patched for function signature: {func!r}\n')
         return func
     return wrapper
 

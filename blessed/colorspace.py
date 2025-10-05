@@ -30,7 +30,7 @@ class RGBColor(collections.namedtuple("RGBColor", ["red", "green", "blue"])):
     """Named tuple for an RGB color definition."""
 
     def __str__(self) -> str:
-        return '#{0:02x}{1:02x}{2:02x}'.format(*self)
+        return f'#{self.red:02x}{self.green:02x}{self.blue:02x}'
 
 
 #: X11 Color names to (XTerm-defined) RGB values from xorg-rgb/rgb.txt

@@ -43,7 +43,7 @@ def test_null_location(all_terms):
             pass
         expected_output = ''.join(
             (unicode_cap('sc'), unicode_cap('rc')))
-        assert (t.stream.getvalue() == expected_output)
+        assert t.stream.getvalue() == expected_output
 
     child(all_terms)
 
@@ -76,7 +76,7 @@ def test_yield_keypad():
             pass
 
         # verify.
-        assert (t.stream.getvalue() == expected_output)
+        assert t.stream.getvalue() == expected_output
 
     child(kind='xterm')
 
@@ -89,7 +89,7 @@ def test_null_fileno():
         out = StringIO()
         out.fileno = None
         t = TestTerminal(stream=out)
-        assert (t.save == '')
+        assert t.save == ''
 
     child()
 
@@ -103,12 +103,12 @@ def test_number_of_colors_without_tty():
     @as_subprocess
     def child_256_nostyle():
         t = TestTerminal(stream=StringIO())
-        assert (t.number_of_colors == 0)
+        assert t.number_of_colors == 0
 
     @as_subprocess
     def child_256_forcestyle():
         t = TestTerminal(stream=StringIO(), force_styling=True)
-        assert (t.number_of_colors == 256)
+        assert t.number_of_colors == 256
 
     @as_subprocess
     def child_8_forcestyle():
@@ -116,20 +116,20 @@ def test_number_of_colors_without_tty():
         kind = 'cons25' if platform.system().lower() == 'freebsd' else 'ansi'
         t = TestTerminal(kind=kind, stream=StringIO(),
                          force_styling=True)
-        assert (t.number_of_colors == 8)
+        assert t.number_of_colors == 8
 
     @as_subprocess
     def child_0_forcestyle():
         t = TestTerminal(kind='vt220', stream=StringIO(),
                          force_styling=True)
-        assert (t.number_of_colors == 0)
+        assert t.number_of_colors == 0
 
     @as_subprocess
     def child_24bit_forcestyle_with_colorterm():
         os.environ['COLORTERM'] = 'truecolor'
         t = TestTerminal(kind='vt220', stream=StringIO(),
                          force_styling=True)
-        assert (t.number_of_colors == 1 << 24)
+        assert t.number_of_colors == 1 << 24
 
     child_0_forcestyle()
     child_8_forcestyle()
@@ -143,19 +143,19 @@ def test_number_of_colors_with_tty():
     @as_subprocess
     def child_256():
         t = TestTerminal()
-        assert (t.number_of_colors == 256)
+        assert t.number_of_colors == 256
 
     @as_subprocess
     def child_8():
         # 'ansi' on freebsd returns 0 colors. We use 'cons25', compatible with its kernel tty.c
         kind = 'cons25' if platform.system().lower() == 'freebsd' else 'ansi'
         t = TestTerminal(kind=kind)
-        assert (t.number_of_colors == 8)
+        assert t.number_of_colors == 8
 
     @as_subprocess
     def child_0():
         t = TestTerminal(kind='vt220')
-        assert (t.number_of_colors == 0)
+        assert t.number_of_colors == 0
 
     child_0()
     child_8()
@@ -168,8 +168,8 @@ def test_init_descriptor_always_initted(all_terms):
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO())
         assert t._init_descriptor == sys.__stdout__.fileno()
-        assert (isinstance(t.height, int))
-        assert (isinstance(t.width, int))
+        assert isinstance(t.height, int)
+        assert isinstance(t.width, int)
         assert t.height == t._height_and_width()[0]
         assert t.width == t._height_and_width()[1]
 
@@ -255,10 +255,11 @@ def test_setupterm_singleton_issue_33():
             term = TestTerminal(kind=next_kind, force_styling=True)
         except UserWarning as err:
             assert (err.args[0].startswith(
-                    'A terminal of kind "' + next_kind + '" has been requested')
-                    ), err.args[0]
-            assert ('a terminal of kind "' + first_kind + '" will '
-                    'continue to be returned' in err.args[0]), err.args[0]
+                f'A terminal of kind "{next_kind}" has been requested')
+            ), err.args[0]
+            assert (
+                f'a terminal of kind "{first_kind}" will continue to be returned' in err.args[0]
+            ), err.args[0]
         else:
             # unless term is not a tty and setupterm() is not called
             assert not term.is_a_tty, 'Should have thrown exception'
@@ -281,12 +282,12 @@ def test_setupterm_invalid_issue39():
         try:
             term = TestTerminal(kind='unknown', force_styling=True)
         except UserWarning as err:
-            assert err.args[0] in (
+            assert err.args[0] in {
                 "Failed to setupterm(kind='unknown'): "
                 "setupterm: could not find terminal",
                 "Failed to setupterm(kind='unknown'): "
                 "Could not find terminal unknown",
-            )
+            }
         else:
             if platform.system().lower() != 'freebsd':
                 assert not term.is_a_tty and not term.does_styling, (
@@ -369,7 +370,7 @@ def test_yield_fullscreen(all_terms):
         with t.fullscreen():
             pass
         expected_output = ''.join((t.enter_fullscreen, t.exit_fullscreen))
-        assert (t.stream.getvalue() == expected_output)
+        assert t.stream.getvalue() == expected_output
 
     child(all_terms)
 
@@ -384,7 +385,7 @@ def test_yield_hidden_cursor(all_terms):
         with t.hidden_cursor():
             pass
         expected_output = ''.join((t.hide_cursor, t.normal_cursor))
-        assert (t.stream.getvalue() == expected_output)
+        assert t.stream.getvalue() == expected_output
 
     child(all_terms)
 
@@ -483,7 +484,7 @@ def test_time_left():
     from blessed.keyboard import _time_left
 
     # given stime =~ "10 seconds ago"
-    stime = (time.time() - 10)
+    stime = time.time() - 10
 
     # timeleft(now, 15s) = 5s remaining
     timeout = 15

@@ -23,7 +23,7 @@ if platform.system() != 'Windows':
     import curses
 else:
     # 3rd party
-    import jinxed as curses
+    import jinxed as curses  # pylint: disable=import-error
 
 
 def fn_tparm(*args):
@@ -111,12 +111,10 @@ def test_parameterizing_string_type_error(monkeypatch):
         pstr('XYZ')
         assert False, "previous call should have raised TypeError"
     except TypeError as err:
-        assert err.args[0] in ((
+        assert err.args[0] == (
             "Unknown terminal capability, 'cap-name', or, TypeError "
-            "for arguments ('XYZ',): custom_err"  # py3x
-        ), (
-            "Unknown terminal capability, 'cap-name', or, TypeError "
-            "for arguments ('XYZ',): custom_err"))  # py2
+            "for arguments ('XYZ',): custom_err"
+        )
 
     # ensure TypeError when given an integer raises its natural exception
     try:
@@ -164,19 +162,16 @@ def test_nested_formattingstring_type_error(monkeypatch):
 
     # given,
     pstr = FormattingString('a-', 'n-')
-    expected_msgs = ((
-        "TypeError for FormattingString argument, 291, at position 1: "
-        "expected type str, got int"  # py3x
-    ), ("TypeError for FormattingString argument, 291, at position 1: "
-        "expected type basestring, got int"
-        ))  # py2
 
     # exercise,
     with pytest.raises(TypeError) as err:
         pstr('text', 0x123, '...')
 
     # verify,
-    assert str(err.value) in expected_msgs
+    assert str(err.value) == (
+        "TypeError for FormattingString argument, 291, at position 1: "
+        "expected type str, got int"
+    )
 
 
 def test_nullcallablestring(monkeypatch):
@@ -215,7 +210,8 @@ def test_resolve_capability(monkeypatch):
 
     # given, always returns a b'seq'
     def tigetstr(attr):
-        return ('seq-%s' % (attr,)).encode('latin1')
+        return f'seq-{attr}'.encode('latin1')
+
     monkeypatch.setattr(curses, 'tigetstr', tigetstr)
     term = mock.Mock()
     term._sugar = {'mnemonic': 'xyz'}
@@ -227,6 +223,7 @@ def test_resolve_capability(monkeypatch):
     # given, where tigetstr returns None
     def tigetstr_none(attr):
         return None
+
     monkeypatch.setattr(curses, 'tigetstr', tigetstr_none)
 
     # exercise,
@@ -235,6 +232,7 @@ def test_resolve_capability(monkeypatch):
     # given, where does_styling is False
     def raises_exception(*args):
         assert False, "Should not be called"
+
     term.does_styling = False
     monkeypatch.setattr(curses, 'tigetstr', raises_exception)
 
@@ -248,7 +246,8 @@ def test_resolve_color(monkeypatch):
     from blessed.formatters import FormattingString, NullCallableString, resolve_color
 
     def color_cap(digit):
-        return 'seq-%s' % (digit,)
+        return f'seq-{digit}'
+
     monkeypatch.setattr(curses, 'COLOR_RED', 1984)
 
     # given, terminal with color capabilities
@@ -293,7 +292,8 @@ def test_resolve_attribute_as_color(monkeypatch):
     from blessed.formatters import resolve_attribute
 
     def resolve_color(term, digit):
-        return 'seq-%s' % (digit,)
+        return f'seq-{digit}'
+
     COLORS = {'COLORX', 'COLORY'}
     COMPOUNDABLES = {'JOINT', 'COMPOUND'}
     monkeypatch.setattr(blessed.formatters, 'resolve_color', resolve_color)
@@ -310,7 +310,8 @@ def test_resolve_attribute_as_compoundable(monkeypatch):
     from blessed.formatters import FormattingString, resolve_attribute
 
     def resolve_cap(term, digit):
-        return 'seq-%s' % (digit,)
+        return f'seq-{digit}'
+
     COMPOUNDABLES = {'JOINT', 'COMPOUND'}
     monkeypatch.setattr(blessed.formatters,
                         'resolve_capability',
@@ -335,7 +336,7 @@ def test_resolve_attribute_non_compoundables(monkeypatch):
         return ['split', 'compound']
 
     def resolve_cap(term, digit):
-        return 'seq-%s' % (digit,)
+        return f'seq-{digit}'
 
     monkeypatch.setattr(blessed.formatters,
                         'split_compound',
@@ -366,7 +367,8 @@ def test_resolve_attribute_recursive_compoundables(monkeypatch):
 
     # patch,
     def resolve_cap(term, digit):
-        return 'seq-%s' % (digit,)
+        return f'seq-{digit}'
+
     monkeypatch.setattr(blessed.formatters,
                         'resolve_capability',
                         resolve_cap)
@@ -375,7 +377,8 @@ def test_resolve_attribute_recursive_compoundables(monkeypatch):
     monkeypatch.setattr(curses, 'COLOR_BLUE', 6800)
 
     def color_cap(digit):
-        return 'seq-%s' % (digit,)
+        return f'seq-{digit}'
+
     term = mock.Mock()
     term._background_color = color_cap
     term._foreground_color = color_cap
