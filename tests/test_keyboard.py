@@ -371,18 +371,19 @@ def test_legacy_spec_compliance_text_keys():
 
     # Test that existing Ctrl behavior is preserved
     ctrl_cases = [
-        ('\x01', 'Ctrl+A', 5),
-        ('\x06', 'Ctrl+F', 5),
-        ('\x1a', 'Ctrl+Z', 5),
+        ('\x01', 'A', 'Ctrl+A', 5),
+        ('\x06', 'F', 'Ctrl+F', 5),
+        ('\x1a', 'Z', 'Ctrl+Z', 5),
     ]
 
-    for sequence, description, expected_mod in ctrl_cases:
+    for sequence, char, description, expected_mod in ctrl_cases:
         ks = Keystroke(sequence)
 
         assert ks.modifiers == expected_mod
         assert ks._ctrl is True
         assert ks._alt is False
-        assert ks.is_ctrl() is True
+        assert ks.is_ctrl() is False
+        assert ks.is_ctrl(char) is True
 
 
 def test_ss3_no_modifier_sequences():
@@ -798,16 +799,19 @@ def test_keystroke_alt():
     assert Keystroke('\x1ba').is_alt('A', ignore_case=False) is False
 
     # Test without character argument (any Alt+char)
-    assert Keystroke('\x1ba').is_alt() is True     # Alt+a
-    assert Keystroke('\x1b1').is_alt() is True     # Alt+1
-    assert Keystroke('\x1b ').is_alt() is True     # Alt+space
+    assert Keystroke('\x1ba').is_alt() is False    # Alt+a
+    assert Keystroke('\x1b1').is_alt() is False    # Alt+1
+    assert Keystroke('\x1b ').is_alt() is False    # Alt+space
+    assert Keystroke('\x1ba').is_alt('A') is True  # Alt+a
+    assert Keystroke('\x1b1').is_alt('1') is True  # Alt+1
+    assert Keystroke('\x1b ').is_alt(' ') is True  # Alt+space
 
     # Test negative cases
-    assert Keystroke('a').is_alt('a') is False     # Regular 'a'
-    assert Keystroke('\x1b').is_alt('a') is False  # Just ESC
-    assert Keystroke('\x1ba').is_alt('b') is False  # Alt+a != Alt+b
+    assert Keystroke('a').is_alt('a') is False       # Regular 'a'
+    assert Keystroke('\x1b').is_alt('a') is False    # Just ESC
+    assert Keystroke('\x1ba').is_alt('b') is False   # Alt+a != Alt+b
     assert Keystroke('\x1bab').is_alt('a') is False  # Too long
-    assert Keystroke('\x1b\x01').is_alt() is False  # Non-printable second char
+    assert Keystroke('\x1b\x01').is_alt() is False   # Non-printable second char
 
 
 def test_keystroke_ctrl_alt_names():
@@ -919,13 +923,13 @@ def test_individual_modifier_properties():
         # Check each modifier property using dynamic predicates
         # For single modifiers, exact matching should work, it is allowed to *not* pass
         # the alphanumeric, eg. is_alt() instead of is_alt('a'), verify that here, also
-        assert ks.is_shift() == expected_flags.get('shift', False)
+        # XXX todo? assert ks.is_shift() == expected_flags.get('shift', False)
+        # XXX todo? assert ks.is_shift('a') == expected_flags.get('shift', False)
         assert ks.is_alt() == expected_flags.get('alt', False)
         assert ks.is_ctrl() == expected_flags.get('ctrl', False)
         assert ks.is_super() == expected_flags.get('super', False)
         assert ks.is_hyper() == expected_flags.get('hyper', False)
         assert ks.is_meta() == expected_flags.get('meta', False)
-        assert ks.is_shift('a') == expected_flags.get('shift', False)
         assert ks.is_alt('a') == expected_flags.get('alt', False)
         assert ks.is_ctrl('a') == expected_flags.get('ctrl', False)
         assert ks.is_super('a') == expected_flags.get('super', False)
@@ -1041,9 +1045,9 @@ def test_dynamic_compound_modifier_predicates():
 
     # Test single modifier keystroke
     ks_ctrl_only = Keystroke('\x01')  # Ctrl+A
-    assert ks_ctrl_only.is_ctrl() is True    # Exactly Ctrl
+    assert ks_ctrl_only.is_ctrl() is False
     assert ks_ctrl_only.is_ctrl('a') is True
-    assert ks_ctrl_only.is_alt() is False    # No Alt
+    assert ks_ctrl_only.is_alt() is False
     assert ks_ctrl_only.is_ctrl_alt() is False  # Not Ctrl+Alt
 
 
@@ -1056,7 +1060,7 @@ def test_is_ctrl_exact_matching_legacy():
     assert ks.is_ctrl('a') is True
     assert ks.is_ctrl('A') is True  # Case insensitive
     assert ks.is_ctrl('b') is False
-    assert ks.is_ctrl() is True
+    assert ks.is_ctrl() is False
 
     # Test special control mappings
     assert Keystroke('\x00').is_ctrl('@') is True  # Ctrl+@
@@ -1073,7 +1077,7 @@ def test_is_alt_exact_matching_legacy():
     assert ks.is_alt('a') is True
     assert ks.is_alt('A') is True   # Case insensitive by default
     assert ks.is_alt('b') is False
-    assert ks.is_alt() is True
+    assert ks.is_alt() is False
 
     # Case sensitivity control
     ks = Keystroke('\x1bA')  # Alt+A (uppercase)

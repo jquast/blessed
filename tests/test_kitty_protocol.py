@@ -339,7 +339,7 @@ def test_kitty_protocol_is_ctrl_is_alt():
     assert ks.is_ctrl('a') is True
     assert ks.is_ctrl('A') is True  # Case insensitive
     assert ks.is_ctrl('b') is False
-    assert ks.is_ctrl() is True  # Any ctrl
+    assert ks.is_ctrl() is False
 
     # Exactly Alt+a
     ks = _match_kitty_key('\x1b[97;3u')  # Alt+a
