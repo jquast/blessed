@@ -15,7 +15,6 @@ else:
         xoff = len(quit_msg) + 3
         print(term.home + term.reverse(term.ljust(quit_msg)) + term.clear_eos)
 
-        button_held = False
         while True:
             inp = term.inkey(timeout=1)
 
