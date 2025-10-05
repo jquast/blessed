@@ -176,59 +176,10 @@ def test_keystroke_cbreak_noinput(use_stream, timeout, expected_cs_range):
         term = TestTerminal(stream=stream)
         with term.cbreak():
             stime = time.time()
-<<<<<<< HEAD
             inp = term.inkey(timeout=timeout)
             assert inp == ''
             assert_elapsed_range(stime, *expected_cs_range)
     child(use_stream, timeout, expected_cs_range)
-=======
-            inp = term.inkey(timeout=0)
-            assert inp == ''
-            assert math.floor(time.time() - stime) == 0.0
-    child()
-
-
-def test_keystroke_0s_cbreak_noinput_nokb():
-    """0-second keystroke without data in input stream and no keyboard/tty."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO())
-        with term.cbreak():
-            stime = time.time()
-            inp = term.inkey(timeout=0)
-            assert inp == ''
-            assert math.floor(time.time() - stime) == 0.0
-    child()
-
-
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
-def test_keystroke_1s_cbreak_noinput():
-    """1-second keystroke without input; '' should be returned after ~1 second."""
-    @as_subprocess
-    def child():
-        term = TestTerminal()
-        with term.cbreak():
-            stime = time.time()
-            inp = term.inkey(timeout=1)
-            assert inp == ''
-            assert math.floor(time.time() - stime) == 1.0
-    child()
-
-
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
-def test_keystroke_1s_cbreak_noinput_nokb():
-    """1-second keystroke without input or keyboard."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO())
-        with term.cbreak():
-            stime = time.time()
-            inp = term.inkey(timeout=1)
-            assert inp == ''
-            assert math.floor(time.time() - stime) == 1.0
-    child()
-
->>>>>>> origin/master
 
 def test_keystroke_0s_cbreak_with_input():
     """0-second keystroke with input; Keypress should be immediately returned."""
@@ -438,13 +389,8 @@ def test_esc_delay_cbreak_035():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-<<<<<<< HEAD
             inp = term.inkey(timeout=1, esc_delay=0.15)
             measured_time = (time.time() - stime) * 100
-=======
-            inp = term.inkey(timeout=5)
-            measured_time = int((time.time() - stime) * 100)
->>>>>>> origin/master
             os.write(sys.__stdout__.fileno(), f'{inp.name} {measured_time}'.encode('ascii'))
             sys.stdout.flush()
         if cov is not None:
