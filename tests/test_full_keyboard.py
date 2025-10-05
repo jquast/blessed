@@ -489,7 +489,7 @@ def test_esc_delay_cbreak_nonprefix_sequence():
             keystroke = term.inkey(timeout=5)
             measured_time = (time.time() - stime) * 100
             os.write(
-                sys.__stdout__.fileno(), f'{esc.name} {measured_time:.0f}'.encode('ascii')
+                sys.__stdout__.fileno(), f'{keystroke.name} {measured_time:.0f}'.encode('ascii')
             )
             sys.stdout.flush()
         if cov is not None:
@@ -524,7 +524,7 @@ def test_esc_delay_cbreak_with_csi_only():
             esc = term.inkey(timeout=5, esc_delay=given_esc_delay)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
-                sys.__stdout__.fileno(), f'{esc.name} {inp!r} {measured_time:.0f}'.encode('ascii'))
+                sys.__stdout__.fileno(), f'{esc.name} {esc!r} {measured_time:.0f}'.encode('ascii'))
             )
             sys.stdout.flush()
         if cov is not None:
