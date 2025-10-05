@@ -206,9 +206,9 @@ def render_header(term: Terminal, dec_manager: DecModeManager, kitty_manager:
             status = "  IS  " if enabled else "IS NOT"
             f_key = f"F{idx + 1}"
             mode_description = (
-                    f"{repr(mode):<{maxlen}} "
-                    f"{term.reverse(status)} Enabled, "
-                    f"[{term.reverse(f_key)}] toggles")
+                f"{repr(mode):<{maxlen}} "
+                f"{term.reverse(status)} Enabled, "
+                f"[{term.reverse(f_key)}] toggles")
             header.append(mode_description)
 
     # Display, Separators, headers, return row count
@@ -256,7 +256,7 @@ def render_keymatrix(term: Terminal, n_header_rows: int, raw_sequences: deque,
 
     echo = functools.partial(print, end=term.clear_eol + '\r\n', flush=False)
     bar_line = ' ' * ((term.width // 3) - 3) + f'[ {bar_content} ]'
-    echo(term.move_yx(bar_y-3, 0))
+    echo(term.move_yx(bar_y - 3, 0))
     echo()
     echo(bar_line)
     echo()
@@ -357,7 +357,6 @@ def main():
 
         dec_manager.cleanup()
         kitty_manager.cleanup()
-
 
 
 if __name__ == '__main__':

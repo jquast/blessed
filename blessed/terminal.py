@@ -86,6 +86,7 @@ _RE_GET_FGCOLOR_RESPONSE = re.compile(
 _RE_GET_BGCOLOR_RESPONSE = re.compile(
     '\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
 
+
 class WINSZ(collections.namedtuple('WINSZ', (
         'ws_row', 'ws_col', 'ws_xpixel', 'ws_ypixel'))):
     """

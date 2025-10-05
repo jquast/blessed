@@ -160,14 +160,14 @@ def test_kbhit_no_tty():
 
 
 @pytest.mark.parametrize(
-        'use_stream,timeout,expected_cs_range', [
-            (False, 0, (0, 5)),
-            (True, 0, (0, 5)),
-            pytest.param(False, 0.3, (25, 80), marks=pytest.mark.skipif(
-                TEST_QUICK, reason="TEST_QUICK specified")),
-            pytest.param(True, 0.3, (25, 80), marks=pytest.mark.skipif(
-                TEST_QUICK, reason="TEST_QUICK specified")),
-            ])
+    'use_stream,timeout,expected_cs_range', [
+        (False, 0, (0, 5)),
+        (True, 0, (0, 5)),
+        pytest.param(False, 0.3, (25, 80), marks=pytest.mark.skipif(
+            TEST_QUICK, reason="TEST_QUICK specified")),
+        pytest.param(True, 0.3, (25, 80), marks=pytest.mark.skipif(
+            TEST_QUICK, reason="TEST_QUICK specified")),
+    ])
 def test_keystroke_cbreak_noinput(use_stream, timeout, expected_cs_range):
     """Test keystroke without input with various timeout/stream combinations."""
     @as_subprocess
@@ -180,6 +180,7 @@ def test_keystroke_cbreak_noinput(use_stream, timeout, expected_cs_range):
             assert inp == ''
             assert_elapsed_range(stime, *expected_cs_range)
     child(use_stream, timeout, expected_cs_range)
+
 
 def test_keystroke_0s_cbreak_with_input():
     """0-second keystroke with input; Keypress should be immediately returned."""

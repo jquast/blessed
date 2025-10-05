@@ -42,7 +42,7 @@ class MouseEvent(namedtuple('_MouseEvent',
         """Return succinct representation showing only active attributes."""
         # Always show button, x, y
         parts = [f'button={self.button}', f'x={self.x}', f'y={self.y}']
-        
+
         # Only show boolean flags when True
         for bool_name in ('is_release', 'shift', 'meta', 'ctrl', 'is_motion', 'is_wheel'):
             if getattr(self, bool_name):
