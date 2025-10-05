@@ -86,6 +86,32 @@ _RE_GET_FGCOLOR_RESPONSE = re.compile(
 _RE_GET_BGCOLOR_RESPONSE = re.compile(
     '\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
 
+class WINSZ(collections.namedtuple('WINSZ', (
+        'ws_row', 'ws_col', 'ws_xpixel', 'ws_ypixel'))):
+    """
+    Structure represents return value of :const:`termios.TIOCGWINSZ`.
+
+    .. py:attribute:: ws_row
+
+        rows, in characters
+
+    .. py:attribute:: ws_col
+
+        columns, in characters
+
+    .. py:attribute:: ws_xpixel
+
+        horizontal size, pixels
+
+    .. py:attribute:: ws_ypixel
+
+        vertical size, pixels
+    """
+    #: format of termios structure
+    _FMT = 'hhhh'
+    #: buffer of termios structure appropriate for ioctl argument
+    _BUF = '\x00' * struct.calcsize(_FMT)
+
 
 class Terminal():
     """
