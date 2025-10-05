@@ -9,6 +9,7 @@ Welcome to Blessed documentation!
    terminal
    colors
    keyboard
+   mouse
    location
    measuring
    examples
