@@ -1360,9 +1360,10 @@ def resolve_sequence(  # pylint: disable=too-many-positional-arguments
 
     # Resolve for alt+backspace and metaSendsEscape, KEY_ALT_[..],
     # when the sequence so far is not a 'known prefix', or, when
-    # final is True, we return the ambigously matched KEY_ALT_[...]
-    if (ks is not None and ks.code == curses.KEY_EXIT and len(text) > 1
-            ) and ((final or text[1] == '\x7f' or text[:2] not in prefixes)):
+    # final is True, we return the ambiguously matched KEY_ALT_[...]
+    maybe_alt = (ks is not None and ks.code == curses.KEY_EXIT and len(text) > 1)
+    final_or_not_keystroke = (final or text[1] == '\x7f' or text[:2] not in prefixes)
+    if (maybe_alt and final_or_not_keystroke):
         ks = Keystroke(ucs=text[:2])
     # final match is just simple resolution of the first codepoint of text,
     if ks is None:
