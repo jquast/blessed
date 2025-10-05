@@ -523,7 +523,7 @@ def test_esc_delay_cbreak_with_csi_only():
             esc = term.inkey(timeout=5, esc_delay=given_esc_delay)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
-                sys.__stdout__.fileno(), f'{esc.name} {inp!r} {measured_time:.0f}'.encode('ascii')
+                sys.__stdout__.fileno(), f'{esc.name} {inp!r} {measured_time:.0f}'.encode('ascii'))
             )
             sys.stdout.flush()
         if cov is not None:
