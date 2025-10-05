@@ -1262,13 +1262,22 @@ def get_keyboard_sequences(term: typing.Any) -> 'OrderedDict[str, int]':
     The return value is an OrderedDict instance, with their keys
     sorted longest-first.
     """
-    sequence_map = dict((
-        (seq.decode('latin1'), val)
-        for (seq, val) in (
-            (curses.tigetstr(cap), val)
-            for (val, cap) in capability_names.items()
+    # A small gem from curses.has_key that makes this all possible,
+    # _capability_names: a lookup table of terminal capability names for
+    # keyboard sequences (fe. kcub1, key_left), keyed by the values of
+    # constants found beginning with KEY_ in the main curses module
+    # (such as KEY_LEFT).
+    #
+    # latin1 encoding is used so that bytes in 8-bit range of 127-255
+    # have equivalent chr() and unichr() values, so that the sequence
+    # of a kermit or avatar terminal, for example, remains unchanged
+    # in its byte sequence values even when represented by unicode.
+    #
+    sequence_map = {
+        seq.decode('latin1'): val for seq, val in (
+            (curses.tigetstr(cap), val) for (val, cap) in capability_names.items()
         ) if seq
-    ) if term.does_styling else ())
+    } if term.does_styling else {}
 
     sequence_map.update(_alternative_left_right(term))
     sequence_map.update(DEFAULT_SEQUENCE_MIXIN)
@@ -1831,7 +1840,7 @@ DEFAULT_ESCDELAY = 0.35
 
 
 def _reinit_escdelay() -> None:
-    # pylint: disable=W0603
+    # pylint: disable=global-statement
     # Using the global statement: this is necessary to
     # allow test coverage without complex module reload
     global DEFAULT_ESCDELAY

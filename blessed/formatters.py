@@ -32,14 +32,14 @@ def _make_colors() -> Set[str]:
     # background ('iCE colors' in my day).
     for cga_color in CGA_COLORS:
         colors.add(cga_color)
-        colors.add('on_' + cga_color)
-        colors.add('bright_' + cga_color)
-        colors.add('on_bright_' + cga_color)
+        colors.add(f'on_{cga_color}')
+        colors.add(f'bright_{cga_color}')
+        colors.add(f'on_bright_{cga_color}')
 
     # foreground and background VGA color
     for vga_color in X11_COLORNAMES_TO_RGB:
         colors.add(vga_color)
-        colors.add('on_' + vga_color)
+        colors.add(f'on_{vga_color}')
     return colors
 
 
@@ -66,7 +66,6 @@ class ParameterizingString(str):
     """
 
     def __new__(cls: Type[_T], cap: str, normal: str = '', name: str = '<not specified>') -> _T:
-        # pylint: disable = missing-return-doc, missing-return-type-doc
         """
         Class constructor accepting 3 positional arguments.
 
@@ -103,8 +102,8 @@ class ParameterizingString(str):
             # something intelligent:
             if args and isinstance(args[0], str):
                 raise TypeError(
-                    "Unknown terminal capability, %r, or, TypeError "
-                    "for arguments %r: %s" % (self._name, args, err))
+                    f"Unknown terminal capability, {self._name!r}, or, TypeError "
+                    f"for arguments {args!r}: {err}") from err
             # Somebody passed a non-string; I don't feel confident
             # guessing what they were trying to do.
             raise
@@ -143,7 +142,6 @@ class ParameterizingProxyString(str):
 
     def __new__(cls: Type[_T], fmt_pair: Tuple[str, Callable[..., Tuple[object, ...]]],
                 normal: str = '', name: str = '<not specified>') -> _T:
-        # pylint: disable = missing-return-doc, missing-return-type-doc
         """
         Class constructor accepting 4 positional arguments.
 
@@ -173,8 +171,7 @@ class ParameterizingProxyString(str):
         :rtype: FormattingString
         :returns: Callable string for given parameters
         """
-        return FormattingString(self.format(*self._fmt_args(*args)),
-                                self._normal)
+        return FormattingString(self.format(*self._fmt_args(*args)), self._normal)
 
 
 class FormattingString(str):
@@ -197,7 +194,6 @@ class FormattingString(str):
     """
 
     def __new__(cls: Type[_T], sequence: str, normal: str = '') -> _T:
-        # pylint: disable = missing-return-doc, missing-return-type-doc
         """
         Class constructor accepting 2 positional arguments.
 
@@ -224,18 +220,18 @@ class FormattingString(str):
         for idx, ucs_part in enumerate(args):
             if not isinstance(ucs_part, str):
                 raise TypeError(
-                    "TypeError for FormattingString argument, %r, at position %s: expected type "
-                    "%s, got %s" % (ucs_part, idx, str.__name__, type(ucs_part).__name__)
+                    f"TypeError for FormattingString argument, {ucs_part!r}, at position {idx}: "
+                    f"expected type {str.__name__}, got {type(ucs_part).__name__}"
                 )
         postfix = ''
         if self and self._normal:
             postfix = self._normal
-            _refresh = self._normal + self
+            _refresh = f'{self._normal}{self}'
             args_list = [_refresh.join(ucs_part.split(self._normal))
                          for ucs_part in args]
             args = tuple(args_list)
 
-        return self + ''.join(args) + postfix
+        return f'{self}{"".join(args)}{postfix}'
 
 
 class FormattingOtherString(str):
@@ -257,7 +253,6 @@ class FormattingOtherString(str):
     """
 
     def __new__(cls: Type[_T], direct: ParameterizingString, target: ParameterizingString) -> _T:
-        # pylint: disable = missing-return-doc, missing-return-type-doc
         """
         Class constructor accepting 2 positional arguments.
 
@@ -372,7 +367,7 @@ def split_compound(compound: str) -> List[str]:
     mergeable_prefixes = ['on', 'bright', 'on_bright']
     for segment in compound.split('_'):
         if merged_segs and merged_segs[-1] in mergeable_prefixes:
-            merged_segs[-1] += '_' + segment
+            merged_segs[-1] += f'_{segment}'
         else:
             merged_segs.append(segment)
     return merged_segs
@@ -427,8 +422,7 @@ def resolve_color(term: 'Terminal', color: str) -> Union[NullCallableString, For
         # bright colors at 8-15:
         offset = 8 if 'bright_' in color else 0
         base_color = color.rsplit('_', 1)[-1]
-        attr = 'COLOR_%s' % (base_color.upper(),)
-        fmt_attr = vga_color_cap(getattr(curses, attr) + offset)
+        fmt_attr = vga_color_cap(getattr(curses, f'COLOR_{base_color.upper()}') + offset)
         return FormattingString(fmt_attr, term.normal)
 
     assert base_color in X11_COLORNAMES_TO_RGB, (
@@ -444,10 +438,11 @@ def resolve_color(term: 'Terminal', color: str) -> Union[NullCallableString, For
     # foreground and background sequences are:
     # - ^[38;2;<r>;<g>;<b>m
     # - ^[48;2;<r>;<g>;<b>m
-    fgbg_seq = ('48' if 'on_' in color else '38')
     assert term.number_of_colors == 1 << 24
-    fmt_attr = '\x1b[' + fgbg_seq + ';2;{0};{1};{2}m'
-    return FormattingString(fmt_attr.format(*rgb), term.normal)
+    return FormattingString(
+        f'\x1b[{("48" if "on_" in color else "38")};2;{rgb.red};{rgb.green};{rgb.blue}m',
+        term.normal
+    )
 
 
 def resolve_attribute(term: 'Terminal', attr: str) -> Union[ParameterizingString, FormattingString]:

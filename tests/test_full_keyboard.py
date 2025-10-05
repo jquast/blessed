@@ -160,12 +160,14 @@ def test_kbhit_no_tty():
 
 
 @pytest.mark.parametrize(
-    'use_stream,timeout,expected_cs_range', [
-        (False, 0, (0, 5)), (True, 0, (0, 5)), pytest.param(
-            False, 0.3, (25, 80), marks=pytest.mark.skipif(
-                TEST_QUICK, reason="TEST_QUICK specified")), pytest.param(
-                    True, 0.3, (25, 80), marks=pytest.mark.skipif(
-                        TEST_QUICK, reason="TEST_QUICK specified")), ])
+        'use_stream,timeout,expected_cs_range', [
+            (False, 0, (0, 5)),
+            (True, 0, (0, 5)),
+            pytest.param(False, 0.3, (25, 80), marks=pytest.mark.skipif(
+                TEST_QUICK, reason="TEST_QUICK specified")),
+            pytest.param(True, 0.3, (25, 80), marks=pytest.mark.skipif(
+                TEST_QUICK, reason="TEST_QUICK specified")),
+            ])
 def test_keystroke_cbreak_noinput(use_stream, timeout, expected_cs_range):
     """Test keystroke without input with various timeout/stream combinations."""
     @as_subprocess
@@ -175,10 +177,9 @@ def test_keystroke_cbreak_noinput(use_stream, timeout, expected_cs_range):
         with term.cbreak():
             stime = time.time()
             inp = term.inkey(timeout=timeout)
-            assert inp == u''
+            assert inp == ''
             assert_elapsed_range(stime, *expected_cs_range)
     child(use_stream, timeout, expected_cs_range)
-
 
 def test_keystroke_0s_cbreak_with_input():
     """0-second keystroke with input; Keypress should be immediately returned."""
@@ -390,8 +391,7 @@ def test_esc_delay_cbreak_035():
             stime = time.time()
             inp = term.inkey(timeout=1, esc_delay=0.15)
             measured_time = (time.time() - stime) * 100
-            os.write(sys.__stdout__.fileno(), (
-                '%s %i' % (inp.name, measured_time,)).encode('ascii'))
+            os.write(sys.__stdout__.fileno(), f'{inp.name} {measured_time}'.encode('ascii'))
             sys.stdout.flush()
         if cov is not None:
             cov.stop()
@@ -424,8 +424,7 @@ def test_esc_delay_cbreak_135():
             stime = time.time()
             inp = term.inkey(timeout=1, esc_delay=0.25)
             measured_time = (time.time() - stime) * 100
-            os.write(sys.__stdout__.fileno(), (
-                '%s %i' % (inp.name, measured_time,)).encode('ascii'))
+            os.write(sys.__stdout__.fileno(), f'{inp.name} {measured_time:.0f}'.encode('ascii'))
             sys.stdout.flush()
         if cov is not None:
             cov.stop()
@@ -456,8 +455,7 @@ def test_esc_delay_cbreak_timout_0():
             stime = time.time()
             inp = term.inkey(timeout=0, esc_delay=0.15)
             measured_time = (time.time() - stime) * 100
-            os.write(sys.__stdout__.fileno(), (
-                '%s %i' % (inp.name, measured_time,)).encode('ascii'))
+            os.write(sys.__stdout__.fileno(), f'{inp.name} {measured_time:.0f}'.encode('ascii'))
             sys.stdout.flush()
         if cov is not None:
             cov.stop()
@@ -489,8 +487,9 @@ def test_esc_delay_cbreak_nonprefix_sequence():
             stime = time.time()
             keystroke = term.inkey(timeout=5)
             measured_time = (time.time() - stime) * 100
-            os.write(sys.__stdout__.fileno(), (
-                '%s %i' % (keystroke.name, measured_time,)).encode('ascii'))
+            os.write(
+                sys.__stdout__.fileno(), f'{esc.name} {measured_time:.0f}'.encode('ascii')
+            )
             sys.stdout.flush()
         if cov is not None:
             cov.stop()
@@ -524,7 +523,8 @@ def test_esc_delay_cbreak_with_csi_only():
             esc = term.inkey(timeout=5, esc_delay=given_esc_delay)
             measured_time = (time.time() - stime) * 100
             os.write(sys.__stdout__.fileno(), (
-                '%s %s %i' % (esc.name, repr(esc), measured_time,)).encode('ascii'))
+                sys.__stdout__.fileno(), f'{esc.name} {inp!r} {measured_time:.0f}'.encode('ascii')
+            )
             sys.stdout.flush()
         if cov is not None:
             cov.stop()
@@ -594,7 +594,7 @@ def test_get_location_0s():
         term = TestTerminal(stream=io.StringIO())
         stime = time.time()
         y, x = term.get_location(timeout=0)
-        assert (math.floor(time.time() - stime) == 0.0)
+        assert math.floor(time.time() - stime) == 0.0
         assert (y, x) == (-1, -1)
     child()
 
@@ -613,7 +613,7 @@ def test_get_location_0s_under_raw():
         with term.raw():
             stime = time.time()
             y, x = term.get_location(timeout=0)
-            assert (math.floor(time.time() - stime) == 0.0)
+            assert math.floor(time.time() - stime) == 0.0
             assert (y, x) == (-1, -1)
 
         if cov is not None:
@@ -641,7 +641,7 @@ def test_get_location_0s_reply_via_ungetch_under_raw():
             term.ungetch(u'\x1b[10;10R')
 
             y, x = term.get_location(timeout=0.01)
-            assert (math.floor(time.time() - stime) == 0.0)
+            assert math.floor(time.time() - stime) == 0.0
             assert (y, x) == (9, 9)
 
         if cov is not None:
@@ -665,7 +665,7 @@ def test_get_location_0s_reply_via_ungetch():
         term.ungetch(u'\x1b[10;10R')
 
         y, x = term.get_location(timeout=0.01)
-        assert (math.floor(time.time() - stime) == 0.0)
+        assert math.floor(time.time() - stime) == 0.0
         assert (y, x) == (9, 9)
     child()
 
@@ -685,7 +685,7 @@ def test_get_location_0s_nonstandard_u6():
         with mock.patch.object(term, 'u6') as mock_u6:
             mock_u6.return_value = ParameterizingString(u'\x1b[%d;%dR', term.normal, 'u6')
             y, x = term.get_location(timeout=0.01)
-        assert (math.floor(time.time() - stime) == 0.0)
+        assert math.floor(time.time() - stime) == 0.0
         assert (y, x) == (10, 10)
     child()
 
@@ -716,7 +716,7 @@ def test_get_location_timeout():
         term.ungetch(u'\x1b[0n')
 
         y, x = term.get_location(timeout=0.2)
-        assert (math.floor(time.time() - stime) == 0.0)
+        assert math.floor(time.time() - stime) == 0.0
         assert (y, x) == (-1, -1)
     child()
 

@@ -5,5 +5,5 @@ include LICENSE
 include version.json
 include *.txt
 include tox.ini
-recursive-include blessed *.pyi py.typed
+recursive-include blessed py.typed
 recursive-include tests *.py *.ans

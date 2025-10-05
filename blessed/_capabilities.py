@@ -87,64 +87,59 @@ CAPABILITY_DATABASE: \
         ('set3_des_seq', ('s3ds', {})),
         # this 'color' is deceiving, but often matching, and a better match
         # than set_a_attributes1 or set_a_foreground.
-        ('color', ('_foreground_color', {'nparams': 1, 'match_any': True,
-                                         'numeric': 1})),
-        ('set_a_foreground', ('color', {'nparams': 1, 'match_any': True,
-                                        'numeric': 1})),
-        ('set_a_background', ('on_color', {'nparams': 1, 'match_any': True,
-                                           'numeric': 1})),
+        ('color', ('_foreground_color', {'nparams': 1, 'match_any': True, 'numeric': 1})),
+        ('set_a_foreground', ('color', {'nparams': 1, 'match_any': True, 'numeric': 1})),
+        ('set_a_background', ('on_color', {'nparams': 1, 'match_any': True, 'numeric': 1})),
         ('set_tab', ('hts', {})),
         ('tab', ('ht', {})),
         ('italic', ('sitm', {})),
         ('no_italic', ('sitm', {})),
     ))
 
+_ESC = re.escape('\x1b')
+_CSI = rf'{_ESC}\['
+_ANY_NOTESC = rf'[^{_ESC}]*'
+
 CAPABILITIES_RAW_MIXIN: typing.Dict[str, str] = {
     'bell': re.escape('\a'),
     'carriage_return': re.escape('\r'),
     'cursor_left': re.escape('\b'),
-    'cursor_report': re.escape('\x1b') + r'\[(\d+)\;(\d+)R',
-    'cursor_right': re.escape('\x1b') + r'\[C',
-    'exit_attribute_mode': re.escape('\x1b') + r'\[m',
-    'parm_left_cursor': re.escape('\x1b') + r'\[(\d+)D',
-    'parm_right_cursor': re.escape('\x1b') + r'\[(\d+)C',
-    'restore_cursor': re.escape(r'\x1b\[u'),
-    'save_cursor': re.escape(r'\x1b\[s'),
+    'cursor_report': rf'{_CSI}(\d+)\;(\d+)R',
+    'cursor_right': rf'{_CSI}C',
+    'exit_attribute_mode': rf'{_CSI}m',
+    'parm_left_cursor': rf'{_CSI}(\d+)D',
+    'parm_right_cursor': rf'{_CSI}(\d+)C',
+    'restore_cursor': rf'{_CSI}u',
+    'save_cursor': rf'{_CSI}s',
     'scroll_forward': re.escape('\n'),
     'set0_des_seq': re.escape('\x1b(B'),
     'tab': re.escape('\t'),
 }
-_ANY_NOTESC = '[^' + re.escape('\x1b') + ']*'
+
 
 CAPABILITIES_ADDITIVES: typing.Dict[
     str, typing.Union[typing.Tuple[str, str, int], typing.Tuple[str, str]]] = {
-    'link': (
-        re.escape('\x1b') + r'\]8;' + _ANY_NOTESC + ';' + _ANY_NOTESC + re.escape('\x1b') + '\\\\',
-        'link', 1),
-    'color256': (re.escape('\x1b') + r'\[38;5;\d+m', 'color', 1),
-    'on_color256': (re.escape('\x1b') + r'\[48;5;\d+m', 'on_color', 1),
-    'color_rgb': (re.escape('\x1b') + r'\[38;2;\d+;\d+;\d+m', 'color_rgb', 3),
-    'on_color_rgb': (re.escape('\x1b') + r'\[48;2;\d+;\d+;\d+m', 'on_color_rgb', 3),
+    'link': (rf'{_ESC}\]8;{_ANY_NOTESC};{_ANY_NOTESC}{_ESC}\\', 'link', 1),
+    'color256': (rf'{_CSI}38;5;\d+m', 'color', 1),
+    'on_color256': (rf'{_CSI}48;5;\d+m', 'on_color', 1),
+    'color_rgb': (rf'{_CSI}38;2;\d+;\d+;\d+m', 'color_rgb', 3),
+    'on_color_rgb': (rf'{_CSI}48;2;\d+;\d+;\d+m', 'on_color_rgb', 3),
     'shift_in': (re.escape('\x0f'), ''),
     'shift_out': (re.escape('\x0e'), ''),
     # sgr(...) outputs strangely, use the basic ANSI/EMCA-48 codes here.
-    'set_a_attributes1': (
-        re.escape('\x1b') + r'\[\d+m', 'sgr', 1),
-    'set_a_attributes2': (
-        re.escape('\x1b') + r'\[\d+\;\d+m', 'sgr', 2),
-    'set_a_attributes3': (
-        re.escape('\x1b') + r'\[\d+\;\d+\;\d+m', 'sgr', 3),
-    'set_a_attributes4': (
-        re.escape('\x1b') + r'\[\d+\;\d+\;\d+\;\d+m', 'sgr', 4),
+    'set_a_attributes1': (rf'{_CSI}\d+m', 'sgr', 1),
+    'set_a_attributes2': (rf'{_CSI}\d+\;\d+m', 'sgr', 2),
+    'set_a_attributes3': (rf'{_CSI}\d+\;\d+\;\d+m', 'sgr', 3),
+    'set_a_attributes4': (rf'{_CSI}\d+\;\d+\;\d+\;\d+m', 'sgr', 4),
     # this helps where xterm's sgr0 includes set0_des_seq, we'd
     # rather like to also match this immediate substring.
-    'sgr0': (re.escape('\x1b') + r'\[m', 'sgr0'),
+    'sgr0': (rf'{_CSI}m', 'sgr0'),
     'backspace': (re.escape('\b'), ''),
-    'ascii_tab': (re.escape('\t'), ''),
-    'clr_eol': (re.escape('\x1b[K'), ''),
-    'clr_eol0': (re.escape('\x1b[0K'), ''),
-    'clr_bol': (re.escape('\x1b[1K'), ''),
-    'clr_eosK': (re.escape('\x1b[2K'), ''),
+    'ascii_tab': (CAPABILITIES_RAW_MIXIN['tab'], ''),
+    'clr_eol': (rf'{_CSI}K', ''),
+    'clr_eol0': (rf'{_CSI}0K', ''),
+    'clr_bol': (rf'{_CSI}1K', ''),
+    'clr_eosK': (rf'{_CSI}2K', ''),
 }
 
 CAPABILITIES_HORIZONTAL_DISTANCE: typing.Dict[str, int] = {

@@ -225,80 +225,52 @@ or ``KEY_F1``, have an empty :attr:`~.Keystroke.value` string. In this example,
 you can type ``mango`` while holding down the Alt key:
 
 .. code-block:: python
+   :emphasize-lines: 3,6
 
-    from blessed import Terminal
+   print(f"{term.home}{term.black_on_skyblue}{term.clear}")
+   print("press 'q' to quit.")
+   with term.cbreak():
+       val = ''
+       while val.lower() != 'q':
+           val = term.inkey(timeout=3)
+           if not val:
+              print("It sure is quiet in here ...")
+           elif val.is_sequence:
+              print(f"got sequence: {val}, {val.name}, {val.code}")
+           elif val:
+              print(f"got {val}.")
+       print(f'bye!{term.normal}')
 
-    def prompt(question, max_length=15):
-        print(f'{question} ', end='', flush=True)
-        term = Terminal()
-        text = ""
-        with term.cbreak():
-            while True:
-                key = term.inkey()
-                
-                if key.name == 'KEY_ENTER':
-                    print()
-                    return text
-                if key.name in ('KEY_BACKSPACE', 'KEY_DELETE'):
-                    if text:
-                        text = text[:-1]
-                        print(f"\b \b", end='', flush=True)
-                elif key.value and len(text) < max_length:
-                    text += key.value
-                    print(key.value, end='', flush=True)
-        
-    fruit = prompt("What is your favorite fruit?")
+.. image:: https://dxtz6bzwq9sxx.cloudfront.net/demo_cbreak_inkey.gif
+    :alt: A visual example of interacting with the Terminal.inkey() and cbreak() methods.
 
-    print(f"{fruit}? Sounds tasty!")
+:meth:`~.Terminal.cbreak` enters a special mode_ that ensures :func:`os.read` on an input stream
+will return as soon as input is available, as explained in :linuxman:`cbreak(3)`. This mode is
+combined with :meth:`~.Terminal.inkey` to decode multibyte sequences, such as ``\0x1bOA``, into
+a unicode-derived :class:`~.Keystroke` instance.
 
-Note that both ``KEY_BACKSPACE`` and ``KEY_DELETE`` are given the same meaning
-in this example, a significant number of systems send ``KEY_DELETE`` when the
-backspace key is pressed.
+The :class:`~.Keystroke` returned by :meth:`~.Terminal.inkey` is unicode -- it may be printed,
+joined with, or compared to any other unicode strings.
+It also has these special attributes:
 
-Printing
-~~~~~~~~
+- :attr:`~.Keystroke.is_sequence` (bool): Whether it is an "application" key.
+- :attr:`~.Keystroke.code` (int): The keycode, for equality testing.
+- :attr:`~.Keystroke.name` (str): a human-readable name of any "application" key.
 
-Although the :class:`~.Keystroke` object returned by `inkey()`_ may be used as a
-string, caution must be exercised to print them.
+Keycodes
+--------
 
-Our examples use format string, ``f'{ks!r}'`` for ``repr()``. This is because
-input sequences may contain control characters and are generally considered
-unprintable.
+.. note(jquast): a graphical chart of the keyboard, with KEY_CODE names on the labels, maybe?  at
+   least, just a table of all the keys would be better, we should auto-generate it though, like the
+   colors.
 
-Flushing Input
-~~~~~~~~~~~~~~
+When the :attr:`~.Keystroke.is_sequence` property tests *True*, the value of
+:attr:`~.Keystroke.code` represents a unique application key of the keyboard.
 
-Sometimes you need to clear the keyboard input buffer, such as when switching
-screens, or to "debounce" input after a long processing delay. Use
-:meth:`~.Terminal.flushinp` to discard buffered input:
-
-.. code-block:: python
-
-    from blessed import Terminal
-    import time
-
-    term = Terminal()
-    
-    with term.cbreak():
-        print("Processing... (please wait)")
-        time.sleep(2)
-        
-        # Discard any keys pressed during the delay
-        term.flushinp()
-        
-        print("Ready! Press any key:")
-        key = term.inkey()
-
-
-Key Codes
-~~~~~~~~~
-
-For compatibility with legacy curses applications, :attr:`~.Keystroke.code` may
-be be compared with attributes of :class:`~.Terminal`, which are duplicated from
-those found in :linuxman:`curses(3)`, or those `constants
-<https://docs.python.org/3/library/curses.html#constants>`_ in :mod:`curses`
-beginning with phrase *KEY_*. These have numeric values that can be used for all
-basic application keys.
+:attr:`~.Keystroke.code` may then be compared with attributes of :class:`~.Terminal`,
+which are duplicated from those found in :linuxman:`curses(3)`, or those `constants
+<https://docs.python.org/3/library/curses.html#constants>`_ in :mod:`curses` beginning with phrase
+*KEY_*, as follows:
 
 .. include:: all_the_keys.txt
 

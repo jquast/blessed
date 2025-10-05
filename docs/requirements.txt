@@ -1,5 +1,0 @@
-Pillow
-Sphinx>3
-sphinx-paramlinks
-sphinx_rtd_theme
-sphinxcontrib-manpage

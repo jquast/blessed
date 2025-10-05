@@ -73,11 +73,10 @@ else:
         _TTY_METHODS = ('setraw', 'cbreak', 'kbhit', 'height', 'width')
         _MSG_NOSUPPORT = (
             "One or more of the modules: 'termios', 'fcntl', and 'tty' "
-            "are not found on your platform '{platform}'. "
+            f"are not found on your platform '{platform.system()}'. "
             "The following methods of Terminal are dummy/no-op "
-            "unless a deriving class overrides them: {tty_methods}."
-            .format(platform=platform.system(),
-                    tty_methods=', '.join(_TTY_METHODS)))
+            f"unless a deriving class overrides them: {', '.join(_TTY_METHODS)}."
+        )
         warnings.warn(_MSG_NOSUPPORT)
         HAS_TTY = False
 
@@ -86,37 +85,9 @@ _RE_GET_FGCOLOR_RESPONSE = re.compile(
     '\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
 _RE_GET_BGCOLOR_RESPONSE = re.compile(
     '\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
-_RE_GET_DEVICE_ATTR_RESPONSE = re.compile('\x1b\\[\\?([0-9]+)((?:;[0-9]+)*)c')
 
 
-class WINSZ(collections.namedtuple('WINSZ', (
-        'ws_row', 'ws_col', 'ws_xpixel', 'ws_ypixel'))):
-    """
-    Structure represents return value of :const:`termios.TIOCGWINSZ`.
-
-    .. py:attribute:: ws_row
-
-        rows, in characters
-
-    .. py:attribute:: ws_col
-
-        columns, in characters
-
-    .. py:attribute:: ws_xpixel
-
-        horizontal size, pixels
-
-    .. py:attribute:: ws_ypixel
-
-        vertical size, pixels
-    """
-    #: format of termios structure
-    _FMT = 'hhhh'
-    #: buffer of termios structure appropriate for ioctl argument
-    _BUF = '\x00' * struct.calcsize(_FMT)
-
-
-class Terminal(object):
+class Terminal():
     """
     An abstraction for color, style, positioning, and input in the terminal.
 
@@ -192,11 +163,25 @@ class Terminal(object):
             This comes in handy if users are trying to pipe your output through
             something like ``less -r`` or build systems which support decoding
             of terminal sequences.
+
+            When the OS Environment variable FORCE_COLOR_ or CLICOLOR_FORCE_ is
+            *non-empty*, styling is used no matter the value specified by
+            ``force_styling``.
+
+            Conversely, When OS Environment variable NO_COLOR_ is *non-empty*,
+            styling is **not** used no matter the value specified by
+            ``force_styling`` and has precedence over FORCE_COLOR_ and
+            CLICOLOR_FORCE_.
+
+            .. _FORCE_COLOR: https://force-color.org/
+            .. _CLICOLOR_FORCE: https://bixense.com/clicolors/
+            .. _NO_COLOR: https://no-color.org/
         """
-        # pylint: disable=global-statement,too-many-branches
+        # pylint: disable=global-statement
         global _CUR_TERM
-        self.errors = ['parameters: kind=%r, stream=%r, force_styling=%r' %
-                       (kind, stream, force_styling)]
+        self.errors = [
+            f'parameters: kind={kind!r}, stream={stream!r}, force_styling={force_styling!r}',
+        ]
         self._normal = None  # cache normal attr, preventing recursive lookups
         # we assume our input stream to be line-buffered until either the
         # cbreak of raw context manager methods are entered with an attached tty.
@@ -213,18 +198,13 @@ class Terminal(object):
         else:
             self._kind = kind or os.environ.get('TERM', 'dumb') or 'dumb'
 
-        self._does_styling = False
-        if force_styling is None and self.is_a_tty:
-            self.errors.append('force_styling is None')
-        elif force_styling or self.is_a_tty:
-            self._does_styling = True
-
+        self.__init_set_styling(force_styling)
         if self.does_styling:
             # Initialize curses (call setupterm), so things like tigetstr() work.
             try:
                 curses.setupterm(self._kind, self._init_descriptor)
             except curses.error as err:
-                msg = 'Failed to setupterm(kind={0!r}): {1}'.format(self._kind, err)
+                msg = f'Failed to setupterm(kind={self._kind!r}): {err}'
                 warnings.warn(msg)
                 self.errors.append(msg)
                 self._kind = None
@@ -239,11 +219,11 @@ class Terminal(object):
                     # are a downstream developer and you need this
                     # functionality, consider sub-processing, instead.
                     warnings.warn(
-                        'A terminal of kind "%s" has been requested; due to an'
+                        f'A terminal of kind "{kind}" has been requested; due to an'
                         ' internal python curses bug, terminal capabilities'
-                        ' for a terminal of kind "%s" will continue to be'
-                        ' returned for the remainder of this process.' % (
-                            self._kind, _CUR_TERM,))
+                        f' for a terminal of kind "{_CUR_TERM}" will continue to be'
+                        ' returned for the remainder of this process.'
+                    )
 
         self.__init__color_capabilities()
         self.__init__capabilities()
@@ -266,6 +246,21 @@ class Terminal(object):
         # pylint: disable=attribute-defined-outside-init
         self._device_attributes_cache: Optional[DeviceAttribute] = None
 
+    def __init_set_styling(self, force_styling: bool) -> None:
+        self._does_styling = False
+        if os.getenv('NO_COLOR'):
+            self.errors.append(f'NO_COLOR={os.getenv("NO_COLOR")!r}')
+        elif os.getenv('FORCE_COLOR'):
+            self.errors.append(f'FORCE_COLOR={os.getenv("FORCE_COLOR")!r}')
+            self._does_styling = True
+        elif os.getenv('CLICOLOR_FORCE'):
+            self.errors.append(f'CLICOLOR_FORCE={os.getenv("CLICOLOR_FORCE")!r}')
+            self._does_styling = True
+        elif force_styling is None and self.is_a_tty:
+            self.errors.append('force_styling is None')
+        elif force_styling or self.is_a_tty:
+            self._does_styling = True
+
     def __init__streams(self) -> None:
         # pylint: disable=too-complex,too-many-branches
         #         Agree to disagree !
@@ -285,7 +280,7 @@ class Terminal(object):
             except ValueError as err:
                 # The stream is not a file, such as the case of StringIO, or, when it has been
                 # "detached", such as might be the case of stdout in some test scenarios.
-                self.errors.append('Unable to determine output stream file descriptor: %s' % err)
+                self.errors.append(f'Unable to determine output stream file descriptor: {err}')
             else:
                 self._is_a_tty = os.isatty(stream_fd)
                 if not self._is_a_tty:
@@ -297,7 +292,7 @@ class Terminal(object):
                 if sys.__stdin__ is not None:
                     self._keyboard_fd = sys.__stdin__.fileno()
             except (AttributeError, ValueError) as err:
-                self.errors.append('Unable to determine input stream file descriptor: %s' % err)
+                self.errors.append(f'Unable to determine input stream file descriptor: {err}')
             else:
                 # _keyboard_fd only non-None if both stdin and stdout is a tty.
                 if not self.is_a_tty:
@@ -315,13 +310,13 @@ class Terminal(object):
             try:
                 self._init_descriptor = sys.__stdout__.fileno()  # type: ignore
             except ValueError as err:
-                self.errors.append('Unable to determine __stdout__ file descriptor: %s' % err)
+                self.errors.append(f'Unable to determine __stdout__ file descriptor: {err}')
 
     def __init__color_capabilities(self) -> None:
         self._color_distance_algorithm = 'cie2000'
         if not self.does_styling:
             self.number_of_colors = 0
-        elif IS_WINDOWS or os.environ.get('COLORTERM') in ('truecolor', '24bit'):
+        elif IS_WINDOWS or os.environ.get('COLORTERM') in {'truecolor', '24bit'}:
             self.number_of_colors = 1 << 24
         else:
             self.number_of_colors = max(0, curses.tigetnum('colors') or -1)
@@ -368,12 +363,12 @@ class Terminal(object):
         )
         # for tokenizer, the '.lastgroup' is the primary lookup key for
         # 'self.caps', unless 'MISMATCH'; then it is an unmatched character.
-        self._caps_compiled_any = re.compile('|'.join(
-            cap.named_pattern for cap in self.caps.values()
-        ) + '|(?P<MISMATCH>.)')
-        self._caps_unnamed_any = re.compile('|'.join(
-            '({0})'.format(cap.pattern) for cap in self.caps.values()
-        ) + '|(.)')
+        self._caps_compiled_any = re.compile(
+            f'{"|".join(cap.named_pattern for cap in self.caps.values())}|(?P<MISMATCH>.)'
+        )
+        self._caps_unnamed_any = re.compile(
+            f'{"|".join(f"({cap.pattern})" for cap in self.caps.values())}|(.)'
+        )
 
     def __init__keycodes(self) -> None:
         # Initialize keyboard data determined by capability.
@@ -408,7 +403,7 @@ class Terminal(object):
                 self._keyboard_decoder = codecs.getincrementaldecoder(self._encoding)()
             except LookupError as err:
                 # encoding is illegal or unsupported, use 'UTF-8'
-                warnings.warn('LookupError: {0}, defaulting to UTF-8 for keyboard.'.format(err))
+                warnings.warn(f'LookupError: {err}, defaulting to UTF-8 for keyboard.')
                 self._encoding = 'UTF-8'
                 self._keyboard_decoder = codecs.getincrementaldecoder(self._encoding)()
 
@@ -602,7 +597,7 @@ class Terminal(object):
         try:
             if self._line_buffered:
                 ctx = self.cbreak()
-                ctx.__enter__()  # pylint: disable=no-member
+                ctx.__enter__()
 
             # Emit the query sequence,
             self.stream.write(query_str)
@@ -622,7 +617,7 @@ class Terminal(object):
 
         finally:
             if ctx is not None:
-                ctx.__exit__(None, None, None)  # pylint: disable=no-member
+                ctx.__exit__(None, None, None)
 
         return match
 
@@ -661,9 +656,6 @@ class Terminal(object):
             of :meth:`get_location`, or argument order *(y, x)* of :meth:`move`. This is
             for API Compatibility with the blessings library, sorry for the trouble!
         """
-        # pylint: disable=invalid-name
-        #         Invalid argument name "x"
-
         # Save position and move to the requested column, row, or both:
         self.stream.write(self.save)
         if x is not None and y is not None:
@@ -1384,7 +1376,7 @@ class Terminal(object):
         """
         if self.number_of_colors == 1 << 24:
             # "truecolor" 24-bit
-            fmt_attr = '\x1b[38;2;{0};{1};{2}m'.format(red, green, blue)
+            fmt_attr = f'\x1b[38;2;{red};{green};{blue}m'
             return FormattingString(fmt_attr, self.normal)
 
         # color by approximation to 256 or 16-color terminals
@@ -1417,7 +1409,7 @@ class Terminal(object):
         color will be determined using :py:attr:`color_distance_algorithm`.
         """
         if self.number_of_colors == 1 << 24:
-            fmt_attr = '\x1b[48;2;{0};{1};{2}m'.format(red, green, blue)
+            fmt_attr = f'\x1b[48;2;{red};{green};{blue}m'
             return FormattingString(fmt_attr, self.normal)
 
         color_idx = self.rgb_downconvert(red, green, blue)
@@ -1438,7 +1430,6 @@ class Terminal(object):
         inadvertently returning another terminal capability.
         """
         formatters = split_compound(value)
-        # Pylint sometimes thinks formatters isn't a list  # pylint: disable=not-an-iterable
         if all((fmt in COLORS or fmt in COMPOUNDABLES) for fmt in formatters):
             return getattr(self, value)
 
@@ -1521,13 +1512,12 @@ class Terminal(object):
         assert len(url) < 2000, (len(url), url)
         if url_id:
             assert len(str(url_id)) < 250, (len(str(url_id)), url_id)
-            params = 'id={0}'.format(url_id)
+            params = f'id={url_id}'
         else:
             params = ''
         if not self.does_styling:
             return text
-        return ('\x1b]8;{0};{1}\x1b\\{2}'
-                '\x1b]8;;\x1b\\'.format(params, url, text))
+        return f'\x1b]8;{params};{url}\x1b\\{text}\x1b]8;;\x1b\\'
 
     @property
     def stream(self) -> IO[str]:

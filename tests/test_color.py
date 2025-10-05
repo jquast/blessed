@@ -49,15 +49,15 @@ def test_color_rgb():
     @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
-        color_patterns = r'%s|%s' % (t.caps['color'].pattern, t.caps['color256'].pattern)
+        color_patterns = rf"{t.caps['color'].pattern}|{t.caps['color256'].pattern}"
         t.number_of_colors = 1 << 24
-        assert t.color_rgb(0, 0, 0)('smoo') == '\x1b[38;2;0;0;0msmoo' + t.normal
-        assert t.color_rgb(84, 192, 233)('smoo') == '\x1b[38;2;84;192;233msmoo' + t.normal
+        assert t.color_rgb(0, 0, 0)('smoo') == f'\x1b[38;2;0;0;0msmoo{t.normal}'
+        assert t.color_rgb(84, 192, 233)('smoo') == f'\x1b[38;2;84;192;233msmoo{t.normal}'
 
         t.number_of_colors = 256
         # In 256-color mode, (0,0,0) maps to cube index 16, not ANSI black (0)
         # This avoids user theme customizations of ANSI colors 0-15
-        assert t.color_rgb(0, 0, 0)('smoo') == t.color(16) + 'smoo' + t.normal
+        assert t.color_rgb(0, 0, 0)('smoo') == f'{t.color(16)}smoo{t.normal}'
         assert re.match(color_patterns, t.color_rgb(84, 192, 233))
 
     child()
@@ -68,13 +68,13 @@ def test_on_color_rgb():
     @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
-        color_patterns = r'%s|%s' % (t.caps['color'].pattern, t.caps['on_color256'].pattern)
+        color_patterns = rf"{t.caps['color'].pattern}|{t.caps['on_color256'].pattern}"
         t.number_of_colors = 1 << 24
-        assert t.on_color_rgb(0, 0, 0)('smoo') == '\x1b[48;2;0;0;0msmoo' + t.normal
-        assert t.on_color_rgb(84, 192, 233)('smoo') == '\x1b[48;2;84;192;233msmoo' + t.normal
+        assert t.on_color_rgb(0, 0, 0)('smoo') == f'\x1b[48;2;0;0;0msmoo{t.normal}'
+        assert t.on_color_rgb(84, 192, 233)('smoo') == f'\x1b[48;2;84;192;233msmoo{t.normal}'
 
         t.number_of_colors = 256
-        assert t.on_color_rgb(0, 0, 0)('smoo') == t.on_color(16) + 'smoo' + t.normal
+        assert t.on_color_rgb(0, 0, 0)('smoo') == f'{t.on_color(16)}smoo{t.normal}'
         assert re.match(color_patterns, t.on_color_rgb(84, 192, 233))
 
     child()
@@ -204,7 +204,7 @@ def test_rgb_to_xterm_gray_index():
         assert t.rgb_downconvert(8, 8, 8) == 232  # First gray (8+10*0)
         assert t.rgb_downconvert(18, 18, 18) == 233  # Second gray (8+10*1)
         # Mid gray, should be around (128-8)/10 ≈ 12
-        assert t.rgb_downconvert(128, 128, 128) in [244, 245]
+        assert t.rgb_downconvert(128, 128, 128) in {244, 245}
         assert t.rgb_downconvert(238, 238, 238) == 255  # Last gray (8+10*23)
 
         # Test pure grayscale inputs

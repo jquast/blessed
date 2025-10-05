@@ -24,7 +24,8 @@ if platform.system() != 'Windows':
     import curses
     import tty  # pylint: disable=unused-import  # NOQA
 else:
-    import jinxed as curses
+    # 3rd party
+    import jinxed as curses  # pylint: disable=import-error
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="?")
@@ -480,7 +481,7 @@ def test_keystroke_default_args():
     assert ks.name == ks._name
     assert ks._code is None
     assert ks.code == ks._code
-    assert 'x' + ks == 'x'
+    assert f'x{ks}' == 'x'
     assert not ks.is_sequence
     assert repr(ks) in {"u''",  # py26, 27
                         "''"}  # py33
@@ -494,7 +495,7 @@ def test_a_keystroke():
     assert ks.name == ks._name
     assert ks._code == 1
     assert ks.code == ks._code
-    assert 'x' + ks == 'xx'
+    assert f'x{ks}' == 'xx'
     assert ks.is_sequence
     assert repr(ks) == "the X"
 

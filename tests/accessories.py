@@ -17,7 +17,7 @@ from .conftest import IS_WINDOWS
 
 if IS_WINDOWS:
     # 3rd party
-    import jinxed as curses
+    import jinxed as curses  # pylint: disable=import-error
 else:
     # std imports
     import pty
@@ -46,7 +46,7 @@ def init_subproc_coverage(run_note):
     return cov
 
 
-class as_subprocess(object):  # pylint: disable=too-few-public-methods
+class as_subprocess():  # pylint: disable=too-few-public-methods
     """This helper executes test cases in a child process, avoiding a python-internal bug of
     _curses: setupterm() may not be called more than once per process."""
     _CHILD_PID = 0
@@ -68,9 +68,8 @@ class as_subprocess(object):  # pylint: disable=too-few-public-methods
             # protected _exit() function of ``os``; to prevent the
             # 'SystemExit' exception from being thrown.
             cov = init_subproc_coverage(
-                "@as_subprocess-{pid};{func_name}(*{args}, **{kwargs})"
-                .format(pid=os.getpid(), func_name=self.func,
-                        args=args, kwargs=kwargs))
+                f"@as_subprocess-{os.getpid()};{self.func}(*{args}, **{kwargs})"
+            )
             try:
                 self.func(*args, **kwargs)
             except Exception:  # pylint: disable=broad-except
@@ -96,8 +95,7 @@ class as_subprocess(object):  # pylint: disable=too-few-public-methods
 
         # detect rare fork in test runner, when bad bugs happen
         if pid_testrunner != os.getpid():
-            print('TEST RUNNER HAS FORKED, {0}=>{1}: EXIT'
-                  .format(pid_testrunner, os.getpid()), file=sys.stderr)
+            print(f'TEST RUNNER HAS FORKED, {pid_testrunner}=>{os.getpid()}: EXIT', file=sys.stderr)
             os._exit(1)
 
         exc_output = str()
@@ -120,8 +118,7 @@ class as_subprocess(object):  # pylint: disable=too-few-public-methods
 
         # Display any output written by child process
         # (esp. any AssertionError exceptions written to stderr).
-        exc_output_msg = 'Output in child process:\n%s\n%s\n%s' % (
-            '=' * 40, exc_output, '=' * 40,)
+        exc_output_msg = f'Output in child process:\n{"=" * 40}\n{exc_output}\n{"=" * 40}'
         assert exc_output == '', exc_output_msg
 
         # Also test exit status is non-zero
@@ -152,8 +149,8 @@ def read_until_semaphore(fd, semaphore=RECV_SEMAPHORE, encoding='utf8'):
             break
         outp += decoder.decode(_exc, final=False)
     assert outp.startswith(semaphore), (
-        'Semaphore not recv before EOF '
-        '(expected: %r, got: %r)' % (semaphore, outp,))
+        f'Semaphore not recv before EOF (expected: {semaphore!r}, got: {outp!r})'
+    )
     return outp[len(semaphore):]
 
 
@@ -219,7 +216,7 @@ def unicode_parm(cap, *parms):
     return ''
 
 
-class MockTigetstr(object):  # pylint: disable=too-few-public-methods
+class MockTigetstr():  # pylint: disable=too-few-public-methods
     """
     Wraps curses.tigetstr() to override specific capnames
 

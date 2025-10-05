@@ -167,7 +167,7 @@ def dist_cie94(rgb1: _RGB, rgb2: _RGB) -> float:
     s_c = 1 + k_1 * c_1
     s_h = 1 + k_2 * c_1
 
-    return ((delta_l / (k_l * s_l)) ** 2 +  # pylint: disable=superfluous-parens
+    return ((delta_l / (k_l * s_l)) ** 2 +
             (delta_c / (k_c * s_c)) ** 2 +
             (delta_h / (k_h * s_h)) ** 2)
 
