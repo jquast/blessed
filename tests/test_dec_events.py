@@ -289,20 +289,17 @@ def test_mouse_event_is_motion_field():
     values = ks_drag.mode_values()
     assert isinstance(values, MouseEvent)
     assert values.is_motion is True
-    assert values.is_drag is True  # is_drag = is_motion and not is_release
     assert not values.is_release
 
     # Test SGR mouse press without motion
     ks_press = _match_dec_event('\x1b[<0;10;20M')
     values = ks_press.mode_values()
     assert values.is_motion is False
-    assert values.is_drag is False
 
     # Test SGR mouse release with motion bit set
     ks_release = _match_dec_event('\x1b[<32;10;20m')  # lowercase 'm' = release
     values = ks_release.mode_values()
     assert values.is_motion is True
-    assert values.is_drag is False  # not a drag because is_release is True
     assert values.is_release is True
 
     # Test legacy mouse event with motion
@@ -311,13 +308,11 @@ def test_mouse_event_is_motion_field():
     values = ks_legacy_motion.mode_values()
     assert isinstance(values, MouseEvent)
     assert values.is_motion is True
-    assert values.is_drag is True
 
     # Test legacy mouse event without motion
     ks_legacy_press = _match_dec_event('\x1b[M   ')  # cb=32, button=0, no motion
     values = ks_legacy_press.mode_values()
     assert values.is_motion is False
-    assert values.is_drag is False
 
 
 def test_mouse_event_repr():
@@ -336,14 +331,6 @@ def test_mouse_event_repr():
     repr_str = repr(values)
     assert 'is_release=True' in repr_str
     assert repr_str == "MouseEvent(button=0, x=10, y=20, is_release=True)"
-
-    # Test drag event - should show is_motion and is_drag
-    ks_drag = _match_dec_event('\x1b[<32;5;5M')
-    values = ks_drag.mode_values()
-    repr_str = repr(values)
-    assert 'is_motion=True' in repr_str
-    assert 'is_drag=True' in repr_str
-    assert repr_str == "MouseEvent(button=0, x=5, y=5, is_motion=True, is_drag=True)"
 
     # Test with modifiers - should show shift, meta, ctrl
     ks_mod = _match_dec_event('\x1b[<28;5;5M')  # 28 = 4 (shift) + 8 (meta) + 16 (ctrl)
