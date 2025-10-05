@@ -1000,12 +1000,16 @@ class Keystroke(str):
 
         :arg str attr: Attribute name being accessed
         :rtype: callable or raises AttributeError
-        :returns: Callable predicate function with signature ``Callable[[Optional[str], bool], bool]``.
+        :returns: Callable predicate function with signature
+            ``Callable[[Optional[str], bool], bool]``.
+
             All predicates accept the same parameters:
+
             - ``char`` (Optional[str]): Character to match against keystroke value
             - ``ignore_case`` (bool): Whether to ignore case when matching characters
 
-            For event predicates and application key predicates, these parameters are accepted but not used.
+            For event predicates and application key predicates, these
+            parameters are accepted but not used.
         """
         if not attr.startswith('is_'):
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}'")

@@ -49,7 +49,7 @@ class DecModeManager:
             self.available_modes[mode] = response.is_enabled()
 
         if not self.available_modes:
-            messages.append(f"All DEC Private Modes fail support")
+            messages.append("All DEC Private Modes fail support")
 
         return messages
 
