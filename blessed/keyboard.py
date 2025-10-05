@@ -9,7 +9,7 @@ import platform
 from typing import TYPE_CHECKING, Match, TypeVar
 from collections import OrderedDict
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     # local
     from blessed.terminal import Terminal
 

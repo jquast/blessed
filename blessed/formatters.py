@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Set, List, Type, Tuple, Union, TypeVar, Callab
 # local
 from blessed.colorspace import CGA_COLORS, X11_COLORNAMES_TO_RGB
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     # local
     from blessed.terminal import Terminal
 

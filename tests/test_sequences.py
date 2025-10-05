@@ -178,7 +178,7 @@ def test_horizontal_location(all_terms):
 
 
 def test_vertical_location(all_terms):
-    """Make sure we can move the cursor horizontally without changing rows."""
+    """Make sure we can move the cursor vertically without changing columns."""
     @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
@@ -553,6 +553,9 @@ def test_split_seqs_maxsplit1(all_terms):
             result = list(term.split_seqs(given_text, 1))
             assert result == expected
 
+            # Another case where split matches exactly
+            assert list(term.split_seqs(f'{term.bold}b', 1)) == [term.bold, 'b']
+
     child(all_terms)
 
 
@@ -592,6 +595,18 @@ def test_split_seqs_maxsplit3_and_term_right(all_terms):
             expected = ['X', 'Y', term.move_up(45), 'V', 'K']
             result = list(term.split_seqs(given_text))
             assert result == expected
+
+    child(all_terms)
+
+
+def test_invalid_params_for_horizontal_distance(all_terms):
+    """Raise error if text parametrized horizontal distance is invalid"""
+    @as_subprocess
+    def child(kind):
+        term = TestTerminal(stream=StringIO(), kind=kind, force_styling=True)
+        with pytest.raises(ValueError) as e:
+            term.caps['parm_left_cursor'].horizontal_distance('\x1b[C')
+            assert e.value == "Invalid parameters for termccap parm_left_cursor: '\x1b[C'"
 
     child(all_terms)
 
