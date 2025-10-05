@@ -450,7 +450,7 @@ class Keystroke(str):
 
     @property
     def code(self) -> Optional[int]:
-        """Integer keycode value of multibyte sequence (int)."""
+        """Legacy curses-alike keycode value (int)."""
         return self._code
 
     @property
@@ -1377,7 +1377,7 @@ def _time_left(stime: float, timeout: Optional[float]) -> Optional[float]:
 def _read_until(term: typing.Any, pattern: str,
                 timeout: Optional[float]) -> Tuple[Optional[Match[str]], str]:
     """
-    Convenience read-until-pattern function, supporting :meth:`~.get_location`.
+    Convenience read-until-pattern function, supporting :meth:`~._query_response`.
 
     :arg blessed.Terminal term: :class:`~.Terminal` instance.
     :arg float timeout: timeout period, may be set to None to indicate no
@@ -1404,8 +1404,9 @@ def _read_until(term: typing.Any, pattern: str,
 
     # first, buffer all pending data. pexpect library provides a
     # 'searchwindowsize' attribute that limits this memory region.  We're not
-    # concerned about OOM conditions: only (human) keyboard input and terminal
-    # response sequences are expected.
+    # concerned about OOM conditions: only (human) keyboard and mouse input
+    # and terminal response sequences are expected, the application developer
+    # should keep up.
 
     while True:  # pragma: no branch
         # block as long as necessary to ensure at least one character is
