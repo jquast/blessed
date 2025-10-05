@@ -34,8 +34,8 @@ class MouseEvent(namedtuple('_MouseEvent',
     """
     Mouse event with button, coordinates, and modifier information.
 
-    A unified mouse event structure that supports both legacy and SGR mouse protocols.
-    Provides a custom __repr__ that only displays active (non-default) attributes for clarity.
+    A unified mouse event structure that supports both legacy and SGR mouse protocols. Provides a
+    custom __repr__ that only displays active (non-default) attributes for clarity.
     """
 
     def __repr__(self) -> str:
