@@ -1254,14 +1254,11 @@ class Terminal():
         >>> term.split_seqs(term.underline('xyz'), 1)
         ['\x1b[4m', r'xyz\x1b(B\x1b[m']
         """
-        pattern = self._caps_unnamed_any
         result = []
-        for idx, match in enumerate(re.finditer(pattern, text)):
+        for idx, match in enumerate(re.finditer(self._caps_unnamed_any, text)):
             result.append(match.group())
             if maxsplit and idx == maxsplit:
-                remaining = text[match.end():]
-                if remaining:
-                    result[-1] += remaining
+                result[-1] += text[match.end():]
                 break
         return result
 

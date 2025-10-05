@@ -343,6 +343,22 @@ def test_IOUnsupportedOperation():
     child()
 
 
+def test_stream_no_fileno():
+    """Handle custom stream objects gracefully"""
+    @as_subprocess
+    def child():
+        stream = object()
+        term = TestTerminal(stream=stream)
+        assert term._stream is stream
+        assert 'stream has no fileno method' in term.errors
+        assert 'Output stream is not a default stream' in term.errors
+        assert term._init_descriptor is sys.__stdout__.fileno()
+        assert term._keyboard_fd is None
+        assert term.is_a_tty is False
+
+    child()
+
+
 @pytest.mark.skipif(IS_WINDOWS, reason="has process-wide side-effects")
 def test_winsize_IOError_returns_environ():
     """When _winsize raises IOError, defaults from os.environ given."""
