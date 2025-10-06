@@ -920,31 +920,22 @@ def test_individual_modifier_properties():
                                     modifiers=modifiers_value, event_type=1, int_codepoints=[])
         ks = Keystroke(f'\x1b[{ord(test_letter)};{modifiers_value}u', mode=-1, match=kitty_event)
 
-        # Check each modifier property using dynamic predicates
-        # For single modifiers, exact matching should work, it is allowed to *not* pass
-        # the alphanumeric, eg. is_alt() instead of is_alt('a'), verify that here, also
-        # XXX todo? assert ks.is_shift() == expected_flags.get('shift', False)
-        # XXX todo? assert ks.is_shift('a') == expected_flags.get('shift', False)
-        assert ks.is_alt() == expected_flags.get('alt', False)
-        assert ks.is_ctrl() == expected_flags.get('ctrl', False)
-        assert ks.is_super() == expected_flags.get('super', False)
-        assert ks.is_hyper() == expected_flags.get('hyper', False)
-        assert ks.is_meta() == expected_flags.get('meta', False)
-        assert ks.is_alt('a') == expected_flags.get('alt', False)
-        assert ks.is_ctrl('a') == expected_flags.get('ctrl', False)
-        assert ks.is_super('a') == expected_flags.get('super', False)
-        assert ks.is_hyper('a') == expected_flags.get('hyper', False)
-        assert ks.is_meta('a') == expected_flags.get('meta', False)
+        assert ks.is_alt(test_letter) == expected_flags.get('alt', False)
+        assert ks.is_ctrl(test_letter) == expected_flags.get('ctrl', False)
+        assert ks.is_hyper(test_letter) == expected_flags.get('hyper', False)
+        assert ks.is_meta(test_letter) == expected_flags.get('meta', False)
+        # assert ks.is_shift(test_letter) == expected_flags.get('shift', False)
+        assert ks.is_super(test_letter) == expected_flags.get('super', False)
 
         # Test private properties are accessible internally
-        assert ks._shift == expected_flags.get('shift', False)
         assert ks._alt == expected_flags.get('alt', False)
+        assert ks._caps_lock == expected_flags.get('caps_lock', False)
         assert ks._ctrl == expected_flags.get('ctrl', False)
-        assert ks._super == expected_flags.get('super', False)
         assert ks._hyper == expected_flags.get('hyper', False)
         assert ks._meta == expected_flags.get('meta', False)
-        assert ks._caps_lock == expected_flags.get('caps_lock', False)
         assert ks._num_lock == expected_flags.get('num_lock', False)
+        # assert ks._shift == expected_flags.get('shift', False)
+        assert ks._super == expected_flags.get('super', False)
 
     # Test multi-modifier case: Shift+Alt+Ctrl
     kitty_event = KittyKeyEvent(unicode_key=ord(test_letter), shifted_key=None, base_key=None,

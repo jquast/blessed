@@ -1362,12 +1362,13 @@ def resolve_sequence(  # pylint: disable=too-many-positional-arguments
     # when the sequence so far is not a 'known prefix', or, when
     # final is True, we return the ambiguously matched KEY_ALT_[...]
     maybe_alt = (ks is not None and ks.code == curses.KEY_EXIT and len(text) > 1)
-    final_or_not_keystroke = (final or text[1] == '\x7f' or text[:2] not in prefixes)
+    final_or_not_keystroke = (
+            final or (len(text) > 1 and text[1] == '\x7f') or text[:2] not in prefixes)
     if (maybe_alt and final_or_not_keystroke):
         ks = Keystroke(ucs=text[:2])
     # final match is just simple resolution of the first codepoint of text,
     if ks is None:
-        ks = Keystroke(ucs=text and text[0] or u'')
+        ks = Keystroke(ucs=text and text[0] or '')
     return ks
 
 
@@ -1388,7 +1389,8 @@ def _time_left(stime: float, timeout: Optional[float]) -> Optional[float]:
     return max(0, timeout - (time.time() - stime)) if timeout else timeout
 
 
-def _read_until(term: typing.Any, pattern: str,
+def _read_until(term: 'Terminal',
+                pattern: str,
                 timeout: Optional[float]) -> Tuple[Optional[Match[str]], str]:
     """
     Convenience read-until-pattern function, supporting :meth:`~._query_response`.
@@ -1414,7 +1416,7 @@ def _read_until(term: typing.Any, pattern: str,
     term.inkey() without delay.
     """
     stime = time.time()
-    match, buf = None, u''
+    match, buf = None, ''
 
     # first, buffer all pending data. pexpect library provides a
     # 'searchwindowsize' attribute that limits this memory region.  We're not
