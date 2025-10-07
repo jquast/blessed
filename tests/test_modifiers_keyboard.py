@@ -1,0 +1,1786 @@
+# -*- coding: utf-8 -*-
+"""Tests for keyboard support."""
+# std imports
+import os
+import platform
+
+# 3rd party
+import pytest
+
+# local
+from .accessories import TestTerminal, as_subprocess
+
+try:
+    from unittest import mock
+except ImportError:
+    import mock
+
+if platform.system() != 'Windows':
+    import tty  # pylint: disable=unused-import  # NOQA
+    import curses
+else:
+    import jinxed as curses  # pylint: disable=import-error
+
+
+def test_legacy_ctrl_alt_modifiers():
+    """Infer modifiers from legacy Ctrl+Alt."""
+    from blessed.keyboard import Keystroke
+
+    ks = Keystroke('\x1b\x06')
+    assert ks.modifiers == 7
+    assert ks.modifiers_bits == 6
+    assert ks._ctrl is True
+    assert ks._alt is True
+    assert ks._shift is False
+
+    ks = Keystroke('\x1b\x1a')
+    assert ks.modifiers == 7
+    assert ks.modifiers_bits == 6
+    assert ks._ctrl is True
+    assert ks._alt is True
+    assert ks._shift is False
+
+
+def test_legacy_ctrl_alt_exact_matching():
+    """Ctrl+Alt sequences don't match exact is_ctrl/is_alt."""
+    from blessed.keyboard import Keystroke
+
+    ks = Keystroke('\x1b\x06')
+    assert ks.is_ctrl('f') is False
+    assert ks.is_ctrl('F') is False
+    assert ks.is_ctrl() is False
+    assert ks.is_alt('f') is False
+    assert ks.is_alt('F') is False
+    assert ks.is_alt() is False
+
+    ks = Keystroke('\x1b\x1a')
+    assert ks.is_ctrl('z') is False
+    assert ks.is_ctrl('Z') is False
+    assert ks.is_ctrl() is False
+    assert ks.is_alt('z') is False
+    assert ks.is_alt('Z') is False
+    assert ks.is_alt() is False
+
+
+def test_legacy_ctrl_alt_edge_cases():
+    """Edge cases for legacy Ctrl+Alt sequences."""
+    from blessed.keyboard import Keystroke
+
+    ctrl_alt_cases = [
+        ('\x1b\x01', 'ctrl+alt+a'),
+        ('\x1b\x06', 'ctrl+alt+f'),
+        ('\x1b\x1a', 'ctrl+alt+z'),
+        ('\x1b\x00', 'ctrl+alt+@'),
+        ('\x1b\x08', 'ctrl+alt+backspace'),
+    ]
+
+    for sequence, description in ctrl_alt_cases:
+        ks = Keystroke(sequence)
+        assert ks.modifiers == 7
+        assert ks._ctrl is True
+        assert ks._alt is True
+        assert ks._shift is False
+        assert len(ks) == 2
+        assert ks[0] == '\x1b'
+
+    alt_only_cases = [
+        ('\x1b\x1b', 'alt+escape', 'KEY_ALT_ESCAPE'),
+        ('\x1b\x7f', 'alt+backspace', 'KEY_ALT_BACKSPACE'),
+        ('\x1b\x0d', 'alt+enter', 'KEY_ALT_ENTER'),
+        ('\x1b\x09', 'alt+tab', 'KEY_ALT_TAB'),
+    ]
+
+    for sequence, description, expected_name in alt_only_cases:
+        ks = Keystroke(sequence)
+        assert ks.modifiers == 3
+        assert ks._ctrl is False
+        assert ks._alt is True
+        assert ks._shift is False
+        assert ks.name == expected_name
+        assert len(ks) == 2
+        assert ks[0] == '\x1b'
+
+
+def test_terminal_inkey_legacy_ctrl_alt_integration():
+    """Terminal.inkey() handles legacy Ctrl+Alt sequences."""
+    from blessed import Terminal
+
+    @as_subprocess
+    def child():
+        term = Terminal(force_styling=True)
+
+        ctrl_alt_f = '\x1b\x06'
+        term.ungetch(ctrl_alt_f)
+        ks = term.inkey(timeout=0)
+        assert ks == ctrl_alt_f
+        assert ks.modifiers == 7
+        assert ks._ctrl is True
+        assert ks._alt is True
+        assert ks._shift is False
+
+        ctrl_alt_z = '\x1b\x1a'
+        term.ungetch(ctrl_alt_z)
+        ks = term.inkey(timeout=0)
+        assert ks == ctrl_alt_z
+        assert ks.modifiers == 7
+        assert ks._ctrl is True
+        assert ks._alt is True
+        assert ks._shift is False
+
+    child()
+
+
+def test_legacy_ctrl_alt_doesnt_affect_other_sequences():
+    """Test that legacy Ctrl+Alt detection doesn't interfere with existing sequences."""
+    from blessed.keyboard import Keystroke
+
+    # Regular Alt sequences should still work (ESC + printable)
+    ks_alt_a = Keystroke('\x1ba')  # Alt+a
+    assert ks_alt_a.modifiers == 3  # 1 + 2 (alt only)
+    assert ks_alt_a._ctrl is False
+    assert ks_alt_a._alt is True
+    assert ks_alt_a.name == 'KEY_ALT_A'
+
+    # Regular Ctrl sequences should still work (single control char)
+    ks_ctrl_a = Keystroke('\x01')  # Ctrl+a
+    assert ks_ctrl_a.modifiers == 5  # 1 + 4 (ctrl only)
+    assert ks_ctrl_a._ctrl is True
+    assert ks_ctrl_a._alt is False
+    assert ks_ctrl_a.name == 'KEY_CTRL_A'
+
+    # Regular printable characters should have no modifiers
+    ks_regular = Keystroke('a')
+    assert ks_regular.modifiers == 1  # No modifiers
+    assert ks_regular._ctrl is False
+    assert ks_regular._alt is False
+
+
+def test_keystroke_legacy_ctrl_alt_name_generation():
+    """Test name generation for legacy Ctrl+Alt (metaSendsEscape + control char)."""
+    from blessed.keyboard import Keystroke
+
+    # Test basic letter mappings
+    test_cases = [
+        ('\x1b\x17', 'KEY_CTRL_ALT_W'),  # ESC + Ctrl+W (0x17 = 23, W = 23rd letter)
+        ('\x1b\x01', 'KEY_CTRL_ALT_A'),  # ESC + Ctrl+A
+        ('\x1b\x02', 'KEY_CTRL_ALT_B'),  # ESC + Ctrl+B
+        ('\x1b\x1a', 'KEY_CTRL_ALT_Z'),  # ESC + Ctrl+Z
+    ]
+
+    for sequence, expected_name in test_cases:
+        ks = Keystroke(sequence)
+        assert ks.name == expected_name
+        # Verify it has the correct modifiers
+        assert ks.modifiers == 7  # 1 + 2 (alt) + 4 (ctrl)
+        assert ks._ctrl is True
+        assert ks._alt is True
+        assert ks._shift is False
+
+    # Test special symbol mappings for Ctrl+Alt (not C0 exceptions)
+    symbol_test_cases = [
+        ('\x1b\x00', 'KEY_CTRL_ALT_@'),   # ESC + Ctrl+@ (NUL) - Ctrl+Alt
+        ('\x1b\x1c', 'KEY_CTRL_ALT_\\'),  # ESC + Ctrl+\ (FS) - Ctrl+Alt
+        ('\x1b\x1d', 'KEY_CTRL_ALT_]'),   # ESC + Ctrl+] (GS) - Ctrl+Alt
+        ('\x1b\x1e', 'KEY_CTRL_ALT_^'),   # ESC + Ctrl+^ (RS) - Ctrl+Alt
+        ('\x1b\x1f', 'KEY_CTRL_ALT__'),   # ESC + Ctrl+_ (US) - Ctrl+Alt
+        ('\x1b\x08', 'KEY_CTRL_ALT_H'),   # ESC + Ctrl+H (BS) - Ctrl+Alt Backspace
+    ]
+
+    for sequence, expected_name in symbol_test_cases:
+        ks = Keystroke(sequence)
+        assert ks.name == expected_name
+        # Verify it has the correct modifiers
+        assert ks.modifiers == 7  # 1 + 2 (alt) + 4 (ctrl)
+        assert ks._ctrl is True
+        assert ks._alt is True
+        assert ks._shift is False
+
+    # Test C0 exceptions that should be Alt-only
+    alt_only_symbol_cases = [
+        ('\x1b\x1b', 'KEY_ALT_ESCAPE'),   # ESC + ESC - Alt+Escape per legacy spec
+        ('\x1b\x7f', 'KEY_ALT_BACKSPACE'),  # ESC + DEL - Alt+Backspace per legacy spec
+    ]
+
+    for sequence, expected_name in alt_only_symbol_cases:
+        ks = Keystroke(sequence)
+        assert ks.name == expected_name
+        # Verify it has the correct modifiers (Alt-only)
+        assert ks.modifiers == 3  # 1 + 2 (alt only)
+        assert ks._ctrl is False
+        assert ks._alt is True
+        assert ks._shift is False
+
+    # Test that existing naming is unchanged
+    # Regular Alt sequences (ESC + printable)
+    assert Keystroke('\x1ba').name == 'KEY_ALT_A'  # Alt+a
+    assert Keystroke('\x1bz').name == 'KEY_ALT_Z'  # Alt+z
+    assert Keystroke('\x1b1').name == 'KEY_ALT_1'  # Alt+1
+
+    # Test new ALT_SHIFT naming for uppercase letters
+    assert Keystroke('\x1bA').name == 'KEY_ALT_SHIFT_A'  # Alt+A (uppercase)
+    assert Keystroke('\x1bZ').name == 'KEY_ALT_SHIFT_Z'  # Alt+Z (uppercase)
+
+    # Regular Ctrl sequences (single control char)
+    assert Keystroke('\x01').name == 'KEY_CTRL_A'  # Ctrl+a
+    assert Keystroke('\x1a').name == 'KEY_CTRL_Z'  # Ctrl+z
+    assert Keystroke('\x00').name == 'KEY_CTRL_@'  # Ctrl+@
+    assert Keystroke('\x7f').name == 'KEY_CTRL_?'  # Ctrl+?
+
+    # Test that explicit names are preserved
+    ks_with_name = Keystroke('\x1b\x17', name='CUSTOM_NAME')
+    assert ks_with_name.name == 'CUSTOM_NAME'
+
+    # Test edge cases - unmapped control characters should not generate names
+    # (though in practice, all control chars 0-31 and 127 should be mapped)
+    # We don't expect any unmapped ones in the current implementation
+
+
+def test_legacy_spec_compliance_menu_key():
+    """Test that MENU key (CSI 29~) works according to legacy spec."""
+    from blessed.keyboard import _match_legacy_csi_modifiers, LegacyCSIKeyEvent, KEY_MENU
+
+    # Test basic MENU key without modifiers
+    # Note: this would typically be CSI 29~ but our matcher only handles with modifiers
+    # The basic form would be handled by traditional keymap
+
+    # Test MENU key with modifiers
+    test_cases = [
+        ('\x1b[29;2~', 'Shift+Menu', 2, {'shift': True}),
+        ('\x1b[29;3~', 'Alt+Menu', 3, {'alt': True}),
+        ('\x1b[29;5~', 'Ctrl+Menu', 5, {'ctrl': True}),
+        ('\x1b[29;7~', 'Ctrl+Alt+Menu', 7, {'ctrl': True, 'alt': True}),
+    ]
+
+    for sequence, description, expected_mod, expected_flags in test_cases:
+        ks = _match_legacy_csi_modifiers(sequence)
+        assert ks is not None, f"Failed to match {description} sequence={sequence!r}"
+        assert ks._mode == -3  # Legacy CSI mode
+        assert isinstance(ks._match, LegacyCSIKeyEvent)
+
+        event = ks._match
+        assert event.kind == 'tilde'
+        assert event.key_id == 29  # MENU tilde number
+        assert event.modifiers == expected_mod
+
+        # Check that it maps to the correct keycode
+        assert ks._code == KEY_MENU
+
+        # Check modifier flags
+        assert ks.modifiers == expected_mod
+        assert ks._shift == expected_flags.get('shift', False), f"shift failed for {description}"
+        assert ks._ctrl == expected_flags.get('ctrl', False), f"ctrl failed for {description}"
+        assert ks._alt == expected_flags.get('alt', False), f"alt failed for {description}"
+
+        # Check dynamic name generation includes MENU
+        assert 'MENU' in ks.name, f"name should contain MENU for {description}, got {ks.name!r}"
+
+
+def test_legacy_spec_compliance_c0_controls():
+    """Test C0 control modifier inference per legacy spec."""
+    from blessed.keyboard import Keystroke
+
+    # Test Alt-only C0 controls per legacy spec table
+    alt_only_cases = [
+        ('\x1b\x0d', 'Alt+Enter', 3, 'Enter'),      # ESC + CR
+        ('\x1b\x1b', 'Alt+Escape', 3, 'Escape'),    # ESC + ESC
+        ('\x1b\x7f', 'Alt+Backspace', 3, 'DEL'),    # ESC + DEL
+        ('\x1b\x09', 'Alt+Tab', 3, 'Tab'),          # ESC + TAB
+    ]
+
+    for sequence, description, expected_mod, key_name in alt_only_cases:
+        ks = Keystroke(sequence)
+
+        assert ks.modifiers == expected_mod
+        assert ks._alt is True
+        assert ks._ctrl is False
+        assert ks._shift is False
+
+        # These should match exact alt checks
+        assert ks.is_alt() is True
+        assert ks.is_ctrl() is False
+
+    # Test Ctrl+Alt combinations that still use ESC + control char
+    ctrl_alt_cases = [
+        ('\x1b\x01', 'Ctrl+Alt+A', 7),        # ESC + Ctrl+A
+        ('\x1b\x06', 'Ctrl+Alt+F', 7),        # ESC + Ctrl+F
+        ('\x1b\x1a', 'Ctrl+Alt+Z', 7),        # ESC + Ctrl+Z
+        ('\x1b\x00', 'Ctrl+Alt+Space', 7),    # ESC + NUL (Ctrl+Space)
+        ('\x1b\x08', 'Ctrl+Alt+Backspace', 7),  # ESC + BS (Ctrl+Backspace)
+    ]
+
+    for sequence, description, expected_mod in ctrl_alt_cases:
+        ks = Keystroke(sequence)
+
+        assert ks.modifiers == expected_mod
+        assert ks._ctrl is True
+        assert ks._alt is True
+        assert ks._shift is False
+
+        # These should NOT match exact checks since both modifiers are present
+        assert ks.is_ctrl() is False
+        assert ks.is_alt() is False
+
+
+def test_legacy_spec_compliance_text_keys():
+    """Test text key modifier inference per legacy spec algorithm."""
+    from blessed.keyboard import Keystroke
+
+    # Test that existing Alt + printable behavior is preserved
+    printable_alt_cases = [
+        ('\x1ba', 'Alt+a', 3),
+        ('\x1b1', 'Alt+1', 3),
+        ('\x1b;', 'Alt+;', 3),
+        ('\x1bZ', 'Alt+Shift+Z', 4),
+    ]
+
+    for sequence, description, expected_mod in printable_alt_cases:
+        ks = Keystroke(sequence)
+
+        assert ks.modifiers == expected_mod
+        assert ks._alt is True
+        assert ks._ctrl is False
+
+        if sequence == '\x1bZ':
+            # test with 'shift' combined,
+            assert ks.modifiers == expected_mod
+            assert ks.is_alt() is False
+            assert ks.is_alt_shift() is False
+            assert ks.is_alt_shift('Z') is True
+            assert ks.is_alt_shift('z') is True
+            assert ks.is_alt_shift('z', ignore_case=True) is True
+
+    # Test that existing Ctrl behavior is preserved
+    ctrl_cases = [
+        ('\x01', 'A', 'Ctrl+A', 5),
+        ('\x06', 'F', 'Ctrl+F', 5),
+        ('\x1a', 'Z', 'Ctrl+Z', 5),
+    ]
+
+    for sequence, char, description, expected_mod in ctrl_cases:
+        ks = Keystroke(sequence)
+
+        assert ks.modifiers == expected_mod
+        assert ks._ctrl is True
+        assert ks._alt is False
+        assert ks.is_ctrl() is False
+        assert ks.is_ctrl(char) is True
+
+
+def test_ss3_no_modifier_sequences():
+    """Test SS3 sequences (no modifiers) per legacy spec."""
+    from blessed.keyboard import resolve_sequence, get_keyboard_sequences, get_keyboard_codes
+    from .accessories import TestTerminal
+
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        keymap = get_keyboard_sequences(term)
+        codes = get_keyboard_codes()
+        prefixes = set()
+
+        def resolve(seq):
+            return resolve_sequence(seq, keymap, codes, prefixes, final=True)
+
+        # Test SS3 sequences from DEFAULT_SEQUENCE_MIXIN
+        ss3_cases = [
+            ('\x1bOA', 'Up', curses.KEY_UP),        # SS3 A
+            ('\x1bOB', 'Down', curses.KEY_DOWN),    # SS3 B
+            ('\x1bOC', 'Right', curses.KEY_RIGHT),  # SS3 C
+            ('\x1bOD', 'Left', curses.KEY_LEFT),    # SS3 D
+            ('\x1bOF', 'End', curses.KEY_END),      # SS3 F
+            ('\x1bOH', 'Home', curses.KEY_HOME),    # SS3 H
+            ('\x1bOP', 'F1', curses.KEY_F1),        # SS3 P
+            ('\x1bOQ', 'F2', curses.KEY_F2),        # SS3 Q
+            ('\x1bOR', 'F3', curses.KEY_F3),        # SS3 R
+            ('\x1bOS', 'F4', curses.KEY_F4),        # SS3 S
+        ]
+
+        for sequence, description, expected_code in ss3_cases:
+            ks = resolve(sequence)
+
+            # Should be recognized and have correct keycode
+            assert ks == sequence
+            assert ks.code == expected_code
+            assert ks.name is not None
+            assert ks.name.startswith('KEY_')
+
+            # Should have no modifiers (base value 1)
+            assert ks.modifiers == 1
+            assert ks._ctrl is False
+            assert ks._alt is False
+            assert ks._shift is False
+
+    child()
+
+
+@pytest.mark.parametrize('sequence,char,expected', [
+    # Positive cases - basic control characters
+    ('\x01', 'a', True), ('\x01', 'A', True),  # Ctrl+A
+    ('\x1a', 'z', True), ('\x1a', 'Z', True),  # Ctrl+Z
+    # Special control mappings
+    ('\x00', '@', True),   # Ctrl+@
+    ('\x1b', '[', True),   # Ctrl+[
+    ('\x1c', '\\', True),  # Ctrl+\
+    ('\x1d', ']', True),   # Ctrl+]
+    ('\x1e', '^', True),   # Ctrl+^
+    ('\x1f', '_', True),   # Ctrl+_
+    ('\x7f', '?', True),   # Ctrl+?
+    # Negative cases
+    ('a', 'a', False),      # Regular 'a'
+    ('\x01', 'b', False),   # Ctrl+A != Ctrl+B
+    ('\x1ba', 'a', False),  # Alt+a, not Ctrl+a
+])
+def test_keystroke_ctrl(sequence, char, expected):
+    """Test Keystroke.is_ctrl() method for control character detection."""
+    from blessed.keyboard import Keystroke
+    assert Keystroke(sequence).is_ctrl(char) is expected
+
+
+def test_keystroke_alt():
+    """Test Keystroke.is_alt() method for Alt+character detection."""
+    from blessed.keyboard import Keystroke
+
+    # Test basic Alt combinations
+    assert Keystroke('\x1ba').is_alt('a') is True  # Alt+a
+    assert Keystroke('\x1ba').is_alt('A') is True  # Case insensitive by default
+    assert Keystroke('\x1bz').is_alt('z') is True  # Alt+z
+    assert Keystroke('\x1bZ').is_alt('Z') is True  # Alt+Z (now has Shift too)
+
+    # Test case sensitivity control
+    assert Keystroke('\x1ba').is_alt('A', ignore_case=True) is True
+    assert Keystroke('\x1ba').is_alt('A', ignore_case=False) is False
+
+    # Test without character argument (any Alt+char)
+    assert Keystroke('\x1ba').is_alt() is False    # Alt+a
+    assert Keystroke('\x1b1').is_alt() is False    # Alt+1
+    assert Keystroke('\x1b ').is_alt() is False    # Alt+space
+    assert Keystroke('\x1ba').is_alt('A') is True  # Alt+a
+    assert Keystroke('\x1b1').is_alt('1') is True  # Alt+1
+    assert Keystroke('\x1b ').is_alt(' ') is True  # Alt+space
+
+    # Test negative cases
+    assert Keystroke('a').is_alt('a') is False       # Regular 'a'
+    assert Keystroke('\x1b').is_alt('a') is False    # Just ESC
+    assert Keystroke('\x1ba').is_alt('b') is False   # Alt+a != Alt+b
+    assert Keystroke('\x1bab').is_alt('a') is False  # Too long
+    assert Keystroke('\x1b\x01').is_alt() is False   # Non-printable second char
+
+
+def test_keystroke_ctrl_alt_names():
+    """Test that Keystroke names are synthesized correctly for CTRL and ALT."""
+    from blessed.keyboard import Keystroke
+
+    # Test CTRL names
+    assert Keystroke('\x01').name == 'KEY_CTRL_A'
+    assert Keystroke('\x1a').name == 'KEY_CTRL_Z'
+    assert Keystroke('\x00').name == 'KEY_CTRL_@'
+    assert Keystroke('\x1b').name == 'KEY_CTRL_['
+    assert Keystroke('\x1c').name == 'KEY_CTRL_\\'
+    assert Keystroke('\x1d').name == 'KEY_CTRL_]'
+    assert Keystroke('\x1e').name == 'KEY_CTRL_^'
+    assert Keystroke('\x1f').name == 'KEY_CTRL__'
+    assert Keystroke('\x7f').name == 'KEY_CTRL_?'
+
+    # Test ALT names
+    assert Keystroke('\x1ba').name == 'KEY_ALT_A'
+    assert Keystroke('\x1bz').name == 'KEY_ALT_Z'
+    assert Keystroke('\x1bA').name == 'KEY_ALT_SHIFT_A'
+    assert Keystroke('\x1b1').name == 'KEY_ALT_1'
+    assert Keystroke('\x1b!').name == 'KEY_ALT_!'
+
+    # Test that existing names are preserved
+    ks_with_name = Keystroke('\x01', name='EXISTING_NAME')
+    assert ks_with_name.name == 'EXISTING_NAME'
+
+
+def test_keystroke_is_sequence_enhanced():
+    """Test that is_sequence includes multi-char sequences like Alt combinations."""
+    from blessed.keyboard import Keystroke
+
+    # Test original behavior
+    assert Keystroke('a').is_sequence is False
+    assert Keystroke('\x01', code=1).is_sequence is True
+    assert Keystroke('\x01', mode=123).is_sequence is True
+
+    # Test new behavior for multi-char sequences
+    assert Keystroke('\x1ba').is_sequence is True   # Alt+a (len > 1)
+    assert Keystroke('ab').is_sequence is True      # Any multi-char
+    assert Keystroke('\x1b[A').is_sequence is True  # Escape sequence (len > 1)
+
+
+def test_modifiers_inference_legacy_ctrl():
+    """Test modifier inference from legacy control characters."""
+    from blessed.keyboard import Keystroke
+
+    # Ctrl+a as legacy control character
+    ks = Keystroke('\x01')  # Ctrl+A
+
+    assert ks.modifiers == 5  # 1 + 4 (ctrl)
+    assert ks.modifiers_bits == 4
+    assert ks._ctrl is True
+    assert ks._alt is False
+    assert ks._shift is False
+
+
+def test_modifiers_inference_legacy_alt():
+    """Test modifier inference from legacy Alt (meta sends escape)."""
+    from blessed.keyboard import Keystroke
+
+    # Alt+a as ESC+a
+    ks = Keystroke('\x1ba')
+
+    assert ks.modifiers == 3  # 1 + 2 (alt)
+    assert ks.modifiers_bits == 2
+    assert ks._ctrl is False
+    assert ks._alt is True
+    assert ks._shift is False
+
+
+def test_modifiers_inference_no_modifiers():
+    """Test that regular characters have no modifiers."""
+    from blessed.keyboard import Keystroke
+
+    ks = Keystroke('a')
+
+    assert ks.modifiers == 1  # No modifiers
+    assert ks.modifiers_bits == 0
+    assert ks._ctrl is False
+    assert ks._alt is False
+    assert ks._shift is False
+
+
+def test_individual_modifier_properties():
+    """Test individual modifier flag properties using new dynamic API."""
+    from blessed.keyboard import Keystroke, KittyKeyEvent
+
+    test_letter = 'a'
+    single_modifier_cases = [
+        (1, {}),  # No modifiers
+        (2, {'shift': True}),  # 1 + 1
+        (3, {'alt': True}),    # 1 + 2
+        (5, {'ctrl': True}),   # 1 + 4
+        (9, {'super': True}),  # 1 + 8
+        (17, {'hyper': True}),  # 1 + 16
+        (33, {'meta': True}),  # 1 + 32
+        (65, {'caps_lock': True}),  # 1 + 64
+        (129, {'num_lock': True}),  # 1 + 128
+    ]
+
+    for modifiers_value, expected_flags in single_modifier_cases:
+        # Create a Kitty keystroke with the modifier value
+        kitty_event = KittyKeyEvent(unicode_key=ord(test_letter), shifted_key=None, base_key=None,
+                                    modifiers=modifiers_value, event_type=1, int_codepoints=[])
+        ks = Keystroke(f'\x1b[{ord(test_letter)};{modifiers_value}u', mode=-1, match=kitty_event)
+
+        assert ks.is_alt(test_letter) == expected_flags.get('alt', False)
+        assert ks.is_ctrl(test_letter) == expected_flags.get('ctrl', False)
+        assert ks.is_hyper(test_letter) == expected_flags.get('hyper', False)
+        assert ks.is_meta(test_letter) == expected_flags.get('meta', False)
+        # assert ks.is_shift(test_letter) == expected_flags.get('shift', False)
+        assert ks.is_super(test_letter) == expected_flags.get('super', False)
+
+        # Test private properties are accessible internally
+        assert ks._alt == expected_flags.get('alt', False)
+        assert ks._caps_lock == expected_flags.get('caps_lock', False)
+        assert ks._ctrl == expected_flags.get('ctrl', False)
+        assert ks._hyper == expected_flags.get('hyper', False)
+        assert ks._meta == expected_flags.get('meta', False)
+        assert ks._num_lock == expected_flags.get('num_lock', False)
+        # assert ks._shift == expected_flags.get('shift', False)
+        assert ks._super == expected_flags.get('super', False)
+
+    # Test multi-modifier case: Shift+Alt+Ctrl
+    kitty_event = KittyKeyEvent(unicode_key=ord(test_letter), shifted_key=None, base_key=None,
+                                modifiers=8, event_type=1, int_codepoints=[])  # 1 + (1+2+4) = 8
+    ks = Keystroke('\x1b[{ord(test_letter)};8u', mode=-1, match=kitty_event)
+
+    # Individual modifiers should return False since multiple are present
+    assert ks.is_shift(test_letter) is False
+    assert ks.is_alt(test_letter) is False
+    assert ks.is_ctrl(test_letter) is False
+
+    # But private properties should reflect the actual bits
+    assert ks._shift is True
+    assert ks._alt is True
+    assert ks._ctrl is True
+    assert ks._super is False
+
+    # and final compound is fine, even in strange orders,
+    assert ks.is_ctrl_shift_alt('a')
+    assert ks.is_alt_shift_ctrl('a')
+    assert ks.is_shift_ctrl_alt('a')
+    assert ks.is_shift_alt_ctrl('a')
+
+
+def test_keystroke_value_property():
+    """Test the new value property for text character extraction."""
+    from blessed.keyboard import Keystroke
+
+    # Plain printable characters
+    assert Keystroke('a').value == 'a'
+    assert Keystroke('A').value == 'A'
+    assert Keystroke('1').value == '1'
+    assert Keystroke(';').value == ';'
+    assert Keystroke(' ').value == ' '
+
+    # Alt+printable (ESC + char) - return the printable part
+    assert Keystroke('\x1ba').value == 'a'  # Alt+a -> 'a'
+    assert Keystroke('\x1bA').value == 'A'  # Alt+A -> 'A'
+    assert Keystroke('\x1b1').value == '1'  # Alt+1 -> '1'
+
+    # Ctrl+letter - return lowercase letter
+    assert Keystroke('\x01').value == 'a'   # Ctrl+A -> 'a'
+    assert Keystroke('\x1a').value == 'z'   # Ctrl+Z -> 'z'
+
+    # Ctrl+symbol - return symbol
+    assert Keystroke('\x00').value == '@'   # Ctrl+@ -> '@'
+    assert Keystroke('\x1b').value == '['   # Ctrl+[ -> '['
+    assert Keystroke('\x7f').value == '?'   # Ctrl+? -> '?'
+
+    # Application keys - return empty string
+    arrow_key = Keystroke('\x1b[A', code=1, name='KEY_UP')
+    assert arrow_key.value == ''  # Application keys return empty string
+
+
+def test_value_property_unicode_and_complex():
+    """Test value property with Unicode characters and complex sequences."""
+    from blessed.keyboard import Keystroke, KittyKeyEvent
+    import curses
+
+    # Unicode characters (non-ASCII)
+    omega_kitty = KittyKeyEvent(unicode_key=937, shifted_key=None, base_key=None,
+                                modifiers=1, event_type=1, int_codepoints=[])
+    omega_ks = Keystroke('\x1b[937u', mode=-1, match=omega_kitty)
+    assert omega_ks.value == 'Ω'  # Unicode Omega
+
+    # Emoji with ZWJ sequence via int_codepoints
+    emoji_kitty = KittyKeyEvent(unicode_key=0, shifted_key=None, base_key=None,
+                                modifiers=1, event_type=1, int_codepoints=[128104, 8205, 128187])
+    emoji_ks = Keystroke('\x1b[0;;1;128104:8205:128187u', mode=-1, match=emoji_kitty)
+    assert emoji_ks.value == '👨‍💻'  # Man technologist emoji with ZWJ
+
+    # Function keys return empty string
+    f10_ks = Keystroke('\x1b[21~', code=curses.KEY_F10, name='KEY_F10')
+    assert f10_ks.value == ''  # F10 -> empty string
+
+    # DEC events return empty string
+    paste_ks = Keystroke('\x1b[200~hello\x1b[201~', mode=2004, match=None)
+    assert paste_ks.value == ''  # Bracketed paste -> empty string
+
+
+def test_dynamic_compound_modifier_predicates():
+    """Test the new dynamic compound modifier predicates."""
+    from blessed.keyboard import Keystroke, KittyKeyEvent
+
+    # Create a Keystroke with Ctrl+Alt+A
+    kitty_event = KittyKeyEvent(unicode_key=97, shifted_key=None, base_key=None,
+                                modifiers=7, event_type=1, int_codepoints=[])  # 1 + 2 + 4 = 7
+    ks = Keystroke('\x1b[97;7u', mode=-1, match=kitty_event)
+
+    # Test with character matching
+    assert ks.is_ctrl_alt('a') is True
+    assert ks.is_ctrl_alt('A') is True  # Case insensitive by default
+    assert ks.is_ctrl_alt('b') is False  # Wrong character
+
+    # single-modifier test should fail when other modifiers present
+    assert ks.is_ctrl() is False      # Not exactly Ctrl (Alt also present)
+    assert ks.is_alt() is False       # Not exactly Alt (Ctrl also present)
+
+    # Test single modifier keystroke
+    ks_ctrl_only = Keystroke('\x01')  # Ctrl+A
+    assert ks_ctrl_only.is_ctrl() is False
+    assert ks_ctrl_only.is_ctrl('a') is True
+    assert ks_ctrl_only.is_alt() is False
+    assert ks_ctrl_only.is_ctrl_alt() is False  # Not Ctrl+Alt
+
+
+def test_is_ctrl_exact_matching_legacy():
+    """Test exact matching for is_ctrl with legacy control characters."""
+    from blessed.keyboard import Keystroke
+
+    # Legacy Ctrl+a
+    ks = Keystroke('\x01')
+    assert ks.is_ctrl('a') is True
+    assert ks.is_ctrl('A') is True  # Case insensitive
+    assert ks.is_ctrl('b') is False
+    assert ks.is_ctrl() is False
+
+    # Test special control mappings
+    assert Keystroke('\x00').is_ctrl('@') is True  # Ctrl+@
+    assert Keystroke('\x1b').is_ctrl('[') is True  # Ctrl+[ (ESC)
+    assert Keystroke('\x7f').is_ctrl('?') is True  # Ctrl+?
+
+
+def test_is_alt_exact_matching_legacy():
+    """Test exact matching for is_alt with legacy Alt combinations."""
+    from blessed.keyboard import Keystroke
+
+    # Legacy Alt+a
+    ks = Keystroke('\x1ba')
+    assert ks.is_alt('a') is True
+    assert ks.is_alt('A') is True   # Case insensitive by default
+    assert ks.is_alt('b') is False
+    assert ks.is_alt() is False
+
+    # Case sensitivity control
+    ks = Keystroke('\x1bA')  # Alt+A (uppercase)
+    # Now has Shift too
+    assert ks.is_alt('a', ignore_case=True) is True
+    assert ks.is_alt('a', ignore_case=False) is False
+    assert ks.is_alt('A', ignore_case=False) is True
+
+
+def test_lock_keys_ignored_in_exact_matching():
+    """Test that caps_lock and num_lock are ignored in exact matching."""
+    from blessed.keyboard import Keystroke, KittyKeyEvent
+
+    # Ctrl+a with caps_lock on should still match is_ctrl('a')
+    kitty_event = KittyKeyEvent(unicode_key=97, shifted_key=None, base_key=None,
+                                modifiers=69, event_type=1, int_codepoints=[])  # 1 + 4 + 64
+    ks = Keystroke('\x1b[97;69u', mode=-1, match=kitty_event)
+    assert ks._caps_lock is True
+    assert ks._ctrl is True
+    assert ks.is_ctrl('a') is True  # Should still match despite caps_lock
+
+    # Alt+a with num_lock on should still match is_alt('a')
+    kitty_event = KittyKeyEvent(unicode_key=97, shifted_key=None, base_key=None,
+                                modifiers=131, event_type=1, int_codepoints=[])  # 1 + 2 + 128
+    ks = Keystroke('\x1b[97;131u', mode=-1, match=kitty_event)
+    assert ks._num_lock is True
+    assert ks._alt is True
+    assert ks.is_alt('a') is True  # Should still match despite num_lock
+
+
+def test_modifiers_bits_edge_cases():
+    """Test edge cases for modifiers_bits property."""
+    from blessed.keyboard import Keystroke
+
+    # Ensure modifiers_bits never goes negative
+    ks = Keystroke('a')  # modifiers = 1
+    assert ks.modifiers_bits == 0  # max(0, 1 - 1) = 0
+
+    # Test with constructed keystroke with modifiers = 0 (shouldn't happen normally)
+    ks = Keystroke('a')
+    ks._modifiers = 0  # Force set to 0
+    assert ks.modifiers_bits == 0  # max(0, 0 - 1) = 0
+
+
+def test_comprehensive_modifier_combinations():
+    """Test comprehensive modifier combinations work correctly."""
+    from blessed.keyboard import Keystroke, KittyKeyEvent
+
+    # Test a complex modifier combination: Ctrl+Shift+Alt+Super
+    expected_bits = 0b1 | 0b10 | 0b100 | 0b1000  # shift + alt + ctrl + super = 15
+    expected_modifiers = 1 + expected_bits  # 16
+
+    kitty_event = KittyKeyEvent(unicode_key=97, shifted_key=None, base_key=None,
+                                modifiers=expected_modifiers, event_type=1, int_codepoints=[])
+    ks = Keystroke(f'\x1b[97;{expected_modifiers}u', mode=-1, match=kitty_event)
+
+    assert ks.modifiers == expected_modifiers
+    assert ks.modifiers_bits == expected_bits
+    assert ks._shift is True
+    assert ks._alt is True
+    assert ks._ctrl is True
+    assert ks._super is True
+    assert ks._hyper is False
+    assert ks._meta is False
+
+    # This should NOT match exact ctrl or alt since other modifiers are present
+    assert ks.is_ctrl('a') is False
+    assert ks.is_alt('a') is False
+    assert ks.is_ctrl() is False
+    assert ks.is_alt() is False
+
+
+def test_ghostty_f3_tilde_form_variants():
+    """Test F3 tilde-form sequences for ghostty terminal compatibility."""
+    from blessed.keyboard import _match_legacy_csi_modifiers, LegacyCSIKeyEvent
+
+    # Test all F3 modifier combinations in tilde form (ghostty peculiarity)
+    f3_test_cases = [
+        ('\x1b[13;2~', 2, 'Shift+F3', {'shift': True}),
+        ('\x1b[13;3~', 3, 'Alt+F3', {'alt': True}),
+        ('\x1b[13;5~', 5, 'Ctrl+F3', {'ctrl': True}),
+        ('\x1b[13;6~', 6, 'Ctrl+Shift+F3', {'ctrl': True, 'shift': True}),
+        ('\x1b[13;7~', 7, 'Ctrl+Alt+F3', {'ctrl': True, 'alt': True}),
+        ('\x1b[13;8~', 8, 'Ctrl+Alt+Shift+F3', {'ctrl': True, 'alt': True, 'shift': True}),
+    ]
+
+    for sequence, expected_mod, description, expected_flags in f3_test_cases:
+        ks = _match_legacy_csi_modifiers(sequence)
+        assert ks is not None, f"Failed to match {description} sequence={sequence!r}"
+        assert ks._mode == -3  # Legacy CSI mode
+        assert isinstance(ks._match, LegacyCSIKeyEvent)
+
+        event = ks._match
+        assert event.kind == 'tilde'
+        assert event.key_id == 13  # F3 tilde number
+        assert event.modifiers == expected_mod
+
+        # Check modifiers are properly detected
+        assert ks.modifiers == expected_mod
+        assert ks._code == curses.KEY_F3  # Should map to F3 keycode
+
+        # Check individual modifier flags
+        assert ks._shift == expected_flags.get('shift', False), f"shift failed for {description}"
+        assert ks._alt == expected_flags.get('alt', False), f"alt failed for {description}"
+        assert ks._ctrl == expected_flags.get('ctrl', False), f"ctrl failed for {description}"
+
+        # Check dynamic name generation
+        expected_name_parts = ['KEY']
+        if ks._ctrl:
+            expected_name_parts.append('CTRL')
+        if ks._alt:
+            expected_name_parts.append('ALT')
+        if ks._shift:
+            expected_name_parts.append('SHIFT')
+        expected_name_parts.append('F3')
+        expected_name = '_'.join(expected_name_parts)
+
+        assert ks.name == expected_name
+
+
+def test_alt_uppercase_sets_shift_modifier_and_name():
+    """Test that Alt+uppercase letters correctly set both Alt and Shift modifiers."""
+    from blessed.keyboard import Keystroke
+
+    # Test lowercase Alt+j - should be Alt-only
+    ks_lower = Keystroke('\x1bj')  # Alt+j
+    assert ks_lower.modifiers == 3  # 1 + 2 (alt only)
+    assert ks_lower._alt is True
+    assert ks_lower._shift is False
+    assert ks_lower.name == 'KEY_ALT_J'
+
+    # Test uppercase Alt+J - should be Alt+Shift
+    ks_upper = Keystroke('\x1bJ')  # Alt+Shift+J
+    assert ks_upper.modifiers == 4  # 1 + 2 (alt) + 1 (shift) = 4
+    assert ks_upper._alt is True
+    assert ks_upper._shift is True
+    assert ks_upper.name == 'KEY_ALT_SHIFT_J'
+
+    # Test various uppercase letters
+    test_cases = [
+        ('\x1bA', 'KEY_ALT_SHIFT_A'),
+        ('\x1bZ', 'KEY_ALT_SHIFT_Z'),
+        ('\x1bM', 'KEY_ALT_SHIFT_M'),
+    ]
+
+    for sequence, expected_name in test_cases:
+        ks = Keystroke(sequence)
+        assert ks.modifiers == 4
+        assert ks._alt is True
+        assert ks._shift is True
+        assert ks.name == expected_name
+
+    # Test that non-alphabetic printable characters remain Alt-only
+    non_alpha_cases = [
+        ('\x1b1', 'KEY_ALT_1', 3),  # Alt+1
+        ('\x1b!', 'KEY_ALT_!', 3),  # Alt+!
+        ('\x1b;', 'KEY_ALT_;', 3),  # Alt+;
+        ('\x1b ', 'KEY_ALT_ ', 3),  # Alt+space (though space might not have a name)
+    ]
+
+    for sequence, expected_name, expected_modifiers in non_alpha_cases:
+        ks = Keystroke(sequence)
+        assert ks.modifiers == expected_modifiers
+        assert ks._alt is True
+        assert ks._shift is False
+        if expected_name.endswith(' '):  # Space might not have a name
+            continue
+        assert ks.name == expected_name
+
+
+def test_ctrl_alt_value_extraction():
+    """Test that Ctrl+Alt sequences correctly extract the base character value."""
+    from blessed.keyboard import Keystroke
+
+    # Basic Ctrl+Alt letter tests
+    test_cases = [
+        ('\x1b\x01', 'a', 'KEY_CTRL_ALT_A', 7),  # Ctrl+Alt+A
+        ('\x1b\x06', 'f', 'KEY_CTRL_ALT_F', 7),  # Ctrl+Alt+F
+        ('\x1b\x18', 'x', 'KEY_CTRL_ALT_X', 7),  # Ctrl+Alt+X
+        ('\x1b\x1a', 'z', 'KEY_CTRL_ALT_Z', 7),  # Ctrl+Alt+Z
+    ]
+
+    for sequence, expected_value, expected_name, expected_modifiers in test_cases:
+        ks = Keystroke(sequence)
+        assert ks.value == expected_value, \
+            f"Expected value '{expected_value}' for {sequence!r}, got '{ks.value}'"
+        assert ks.name == expected_name, \
+            f"Expected name {expected_name} for {sequence!r}, got {ks.name}"
+        assert ks.modifiers == expected_modifiers, \
+            f"Expected modifiers {expected_modifiers} for {sequence!r}, got {ks.modifiers}"
+        assert ks._ctrl is True
+        assert ks._alt is True
+        assert ks._shift is False
+
+
+def test_ctrl_alt_symbol_value_extraction():
+    """Test that Ctrl+Alt+symbol sequences correctly extract the symbol value."""
+    from blessed.keyboard import Keystroke
+
+    # Ctrl+Alt symbol tests
+    symbol_test_cases = [
+        ('\x1b\x00', '@', 'KEY_CTRL_ALT_@'),    # Ctrl+Alt+@
+        ('\x1b\x1c', '\\', 'KEY_CTRL_ALT_\\'),  # Ctrl+Alt+\
+        ('\x1b\x1d', ']', 'KEY_CTRL_ALT_]'),    # Ctrl+Alt+]
+        ('\x1b\x1e', '^', 'KEY_CTRL_ALT_^'),    # Ctrl+Alt+^
+        ('\x1b\x1f', '_', 'KEY_CTRL_ALT__'),    # Ctrl+Alt+_
+    ]
+
+    for sequence, expected_value, expected_name in symbol_test_cases:
+        ks = Keystroke(sequence)
+        assert ks.value == expected_value, \
+            f"Expected value '{expected_value}' for {sequence!r}, got '{ks.value}'"
+        assert ks.name == expected_name, \
+            f"Expected name {expected_name} for {sequence!r}, got {ks.name}"
+
+    # Alt+Escape is a special Alt-only case (not Ctrl+Alt), control chars have no text value
+    ks_alt_esc = Keystroke('\x1b\x1b')
+    assert ks_alt_esc.name == 'KEY_ALT_ESCAPE'
+    assert ks_alt_esc.value == '', f"Alt+Escape should have empty value, got {ks_alt_esc.value!r}"
+    assert ks_alt_esc.modifiers == 3  # Alt-only
+
+
+def test_ctrl_alt_doesnt_break_existing_behavior():
+    """Test that Ctrl+Alt fix doesn't break Alt-only or Ctrl-only sequences."""
+    from blessed.keyboard import Keystroke
+
+    # Alt-only should still work
+    ks_alt = Keystroke('\x1ba')  # Alt+a
+    assert ks_alt.value == 'a'
+    assert ks_alt.name == 'KEY_ALT_A'
+    assert ks_alt.modifiers == 3  # Alt-only
+    assert ks_alt._ctrl is False
+    assert ks_alt._alt is True
+
+    # Ctrl-only should still work
+    ks_ctrl = Keystroke('\x01')  # Ctrl+A
+    assert ks_ctrl.value == 'a'
+    assert ks_ctrl.name == 'KEY_CTRL_A'
+    assert ks_ctrl.modifiers == 5  # Ctrl-only
+    assert ks_ctrl._ctrl is True
+    assert ks_ctrl._alt is False
+
+    # Alt-only special controls (should remain Alt-only, not become Ctrl+Alt)
+    # These are all control characters, so they have empty value
+    alt_special_cases = [
+        ('\x1b\x1b', 'KEY_ALT_ESCAPE', 3),      # Alt+Escape
+        ('\x1b\x7f', 'KEY_ALT_BACKSPACE', 3),   # Alt+Backspace
+        ('\x1b\x0d', 'KEY_ALT_ENTER', 3),       # Alt+Enter
+        ('\x1b\x09', 'KEY_ALT_TAB', 3),         # Alt+Tab
+    ]
+
+    for sequence, expected_name, expected_modifiers in alt_special_cases:
+        ks = Keystroke(sequence)
+        # All these are control character combinations, so value should be empty
+        assert ks.value == '', \
+            f"Expected empty value for {expected_name}, got {ks.value!r}"
+        assert ks.name == expected_name, \
+            f"Expected name {expected_name} for {sequence!r}, got {ks.name}"
+        assert ks.modifiers == expected_modifiers, \
+            f"Expected modifiers {expected_modifiers} for {expected_name}, got {ks.modifiers}"
+        assert ks._alt is True
+        assert ks._ctrl is False
+
+
+def test_compatibility_with_existing_behavior():
+    """Test that existing keyboard behavior remains unchanged."""
+    from blessed.keyboard import Keystroke
+
+    # Regular keys should work as before
+    ks = Keystroke('a')
+    assert str(ks) == 'a'
+    assert ks.is_sequence is False
+
+    # Multi-character sequences
+    ks = Keystroke('\x1b[A', code=1, name='KEY_UP')
+    assert ks.name == 'KEY_UP'
+    assert ks.code == 1
+    assert ks.is_sequence is True
+
+    # Legacy control and alt names should still work
+    assert Keystroke('\x01').name == 'KEY_CTRL_A'
+    assert Keystroke('\x1ba').name == 'KEY_ALT_A'
+
+
+@pytest.mark.parametrize('sequence,expected_key,expected_modifiers,description', [
+    # Basic with tilde
+    ('\x1b[27;5;44~', 44, 5, 'Ctrl+, (comma)'),
+    # Without tilde
+    ('\x1b[27;5;46', 46, 5, 'Ctrl+. (period)'),
+    # Various modifier combinations
+    ('\x1b[27;3;97~', 97, 3, 'Alt+a'),
+    ('\x1b[27;7;98~', 98, 7, 'Ctrl+Alt+b'),
+])
+def test_match_modify_other_keys(sequence, expected_key, expected_modifiers, description):
+    """Test xterm ModifyOtherKeys sequences with various combinations."""
+    from blessed.keyboard import _match_modify_other_keys, ModifyOtherKeysEvent
+
+    ks = _match_modify_other_keys(sequence)
+    assert ks is not None
+    assert ks._mode == -2  # ModifyOtherKeys mode indicator
+    assert isinstance(ks._match, ModifyOtherKeysEvent)
+
+    event = ks._match
+    assert event.key == expected_key
+    assert event.modifiers == expected_modifiers
+
+
+def test_match_modify_other_keys_non_matching():
+    """Test that non-ModifyOtherKeys sequences don't match."""
+    from blessed.keyboard import _match_modify_other_keys
+
+    assert _match_modify_other_keys('a') is None
+    assert _match_modify_other_keys('\x1b[A') is None  # Regular arrow key
+    assert _match_modify_other_keys('\x1b[27;5') is None  # Incomplete
+    assert _match_modify_other_keys('\x1b[28;5;44~') is None  # Wrong prefix
+    assert _match_modify_other_keys('\x1b]27;5;44~') is None  # Wrong CSI
+
+
+def test_match_legacy_csi_modifiers_letter_form():
+    """Test legacy CSI modifier sequences in letter form."""
+    from blessed.keyboard import _match_legacy_csi_modifiers, LegacyCSIKeyEvent
+
+    # ESC [ 1 ; modifiers [ABCDEFHPQS]
+    test_cases = [
+        ('\x1b[1;3A', 'A', 3, 'KEY_UP'),        # Alt+Up
+        ('\x1b[1;5B', 'B', 5, 'KEY_DOWN'),      # Ctrl+Down
+        ('\x1b[1;2C', 'C', 2, 'KEY_RIGHT'),     # Shift+Right
+        ('\x1b[1;6D', 'D', 6, 'KEY_LEFT'),      # Ctrl+Shift+Left
+        ('\x1b[1;3F', 'F', 3, 'KEY_END'),       # Alt+End
+        ('\x1b[1;5H', 'H', 5, 'KEY_HOME'),      # Ctrl+Home
+        ('\x1b[1;2P', 'P', 2, 'KEY_F1'),        # Shift+F1
+        ('\x1b[1;3Q', 'Q', 3, 'KEY_F2'),        # Alt+F2
+        ('\x1b[1;5R', 'R', 5, 'KEY_F3'),        # Ctrl+F3
+        ('\x1b[1;6S', 'S', 6, 'KEY_F4'),        # Ctrl+Shift+F4
+    ]
+
+    for sequence, final_char, expected_mod, expected_key_name in test_cases:
+        ks = _match_legacy_csi_modifiers(sequence)
+        assert ks is not None
+        assert ks._mode == -3  # Legacy CSI mode
+        assert isinstance(ks._match, LegacyCSIKeyEvent)
+
+        event = ks._match
+        assert event.kind == 'letter'
+        assert event.key_id == final_char
+        assert event.modifiers == expected_mod
+
+        # Check modifiers are properly detected
+        assert ks.modifiers == expected_mod
+
+        # Check that the base keycode is set correctly
+        assert ks._code is not None
+
+
+def test_match_legacy_csi_modifiers_tilde_form():
+    """Test legacy CSI modifier sequences in tilde form."""
+    from blessed.keyboard import _match_legacy_csi_modifiers, LegacyCSIKeyEvent
+
+    # ESC [ number ; modifiers ~
+    test_cases = [
+        ('\x1b[2;2~', 2, 2, 'KEY_INSERT'),     # Shift+Insert
+        ('\x1b[3;5~', 3, 5, 'KEY_DELETE'),     # Ctrl+Delete
+        ('\x1b[5;3~', 5, 3, 'KEY_PGUP'),       # Alt+PageUp
+        ('\x1b[6;6~', 6, 6, 'KEY_PGDOWN'),     # Ctrl+Shift+PageDown
+        ('\x1b[15;2~', 15, 2, 'KEY_F5'),       # Shift+F5
+        ('\x1b[17;5~', 17, 5, 'KEY_F6'),       # Ctrl+F6
+        ('\x1b[23;3~', 23, 3, 'KEY_F11'),      # Alt+F11
+        ('\x1b[24;7~', 24, 7, 'KEY_F12'),      # Ctrl+Alt+F12
+    ]
+
+    for sequence, key_num, expected_mod, expected_key_name in test_cases:
+        ks = _match_legacy_csi_modifiers(sequence)
+        assert ks is not None
+        assert ks._mode == -3  # Legacy CSI mode
+        assert isinstance(ks._match, LegacyCSIKeyEvent)
+
+        event = ks._match
+        assert event.kind == 'tilde'
+        assert event.key_id == key_num
+        assert event.modifiers == expected_mod
+
+        # Check modifiers are properly detected
+        assert ks.modifiers == expected_mod
+
+        # Check that the base keycode is set correctly
+        assert ks._code is not None
+
+
+def test_match_legacy_csi_modifiers_non_matching():
+    """Test that non-legacy-CSI sequences don't match."""
+    from blessed.keyboard import _match_legacy_csi_modifiers
+
+    # Should not match
+    assert _match_legacy_csi_modifiers('a') is None
+    assert _match_legacy_csi_modifiers('\x1b[A') is None  # No modifiers
+    assert _match_legacy_csi_modifiers('\x1b[2~') is None  # No modifiers
+    assert _match_legacy_csi_modifiers('\x1b[1;3') is None  # Incomplete
+    assert _match_legacy_csi_modifiers('\x1b[1;3Z') is None  # Unknown final char
+    assert _match_legacy_csi_modifiers('\x1b[99;5~') is None  # Unknown tilde number
+
+
+def test_legacy_csi_modifier_properties():
+    """Test that legacy CSI modifier keystrokes have correct modifier properties."""
+    from blessed.keyboard import _match_legacy_csi_modifiers
+
+    # Test Ctrl+Alt+Right (1 + 2 + 4 = 7)
+    ks = _match_legacy_csi_modifiers('\x1b[1;7C')
+    assert ks._ctrl is True
+    assert ks._alt is True
+    assert ks._shift is False
+    assert ks._super is False
+
+    # Test Shift+PageUp (1 + 1 = 2)
+    ks = _match_legacy_csi_modifiers('\x1b[5;2~')
+    assert ks._shift is True
+    assert ks._ctrl is False
+    assert ks._alt is False
+
+
+def test_terminal_inkey_modify_other_keys():
+    """Test that Terminal.inkey() properly handles xterm ModifyOtherKeys sequences."""
+    from blessed import Terminal
+    from blessed.keyboard import ModifyOtherKeysEvent
+
+    @as_subprocess
+    def child():
+        term = Terminal(force_styling=True)
+
+        # Simulate ModifyOtherKeys input by adding to keyboard buffer
+        # Ctrl+, (comma)
+        modify_sequence = '\x1b[27;5;44~'
+        term.ungetch(modify_sequence)
+
+        ks = term.inkey(timeout=0)
+
+        # Should have been parsed as a ModifyOtherKeys sequence
+        assert ks is not None
+        assert ks == modify_sequence
+        assert ks._mode == -2  # ModifyOtherKeys mode indicator
+        assert isinstance(ks._match, ModifyOtherKeysEvent)
+
+        # Verify the parsed event data
+        event = ks._match
+        assert event.key == 44         # comma
+        assert event.modifiers == 5    # Ctrl modifier
+    child()
+
+
+def test_terminal_inkey_legacy_csi_modifiers():
+    """Test that Terminal.inkey() properly handles legacy CSI modifier sequences."""
+    from blessed import Terminal
+    from blessed.keyboard import LegacyCSIKeyEvent
+
+    @as_subprocess
+    def child():
+        term = Terminal(force_styling=True)
+
+        # Simulate legacy CSI modifier input
+        # Alt+Up arrow
+        legacy_sequence = '\x1b[1;3A'
+        term.ungetch(legacy_sequence)
+
+        ks = term.inkey(timeout=0)
+
+        # Should have been parsed as a legacy CSI modifier sequence
+        assert ks is not None
+        assert ks == legacy_sequence
+        assert ks._mode == -3  # Legacy CSI mode indicator
+        assert isinstance(ks._match, LegacyCSIKeyEvent)
+
+        # Verify the parsed event data
+        event = ks._match
+        assert event.kind == 'letter'
+        assert event.key_id == 'A'     # Up arrow
+        assert event.modifiers == 3    # Alt modifier
+
+        # Check modifier properties work
+        assert ks._alt is True
+        assert ks._ctrl is False
+        assert ks._shift is False
+
+        # Check that base keycode is correct
+        assert ks._code == curses.KEY_UP
+    child()
+
+
+def test_terminal_inkey_fallback_to_legacy():
+    """Test that legacy sequences still work when new protocols don't match."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+
+        # Regular arrow key sequence (legacy)
+        legacy_sequence = '\x1b[A'
+        term.ungetch(legacy_sequence)
+
+        ks = term.inkey(timeout=0)
+
+        assert ks == legacy_sequence
+        assert ks._code is not None
+        assert ks._mode is None or ks._mode >= 0
+    child()
+
+
+def test_terminal_inkey_f3_high_strangeness():
+    """Test Terminal.inkey integration with 'F3' modifiers."""
+    # "F3" has its issues,
+    #
+    # a long sordid history, starting with that the vt220 didn't have F1-F4,
+    # Xenix and SCO had more than F12,
+    # that xterm (curses?) has definitions for up to 64 function keys
+    # https://unix.stackexchange.com/questions/479192/why-does-xterm-support-63-function-keys
+    # but are just aliases for modifiers of the first 12 or 24,
+    # and that xterm simulates Shift+F3 as though it is F15,
+    #
+    # and well, for whatever reason modifiers on F3 have an entirely different
+    # structure than F1,F2, and F4 on many terminals!
+    #
+    # F1 Function Key
+    # ===============
+    # F1: '\x1bOP'
+    # Shift+F1: '\x1b[1;2P'
+    # Alt+F1: '\x1b[1;3P'
+    # Ctrl+Alt+Shift+F1: '\x1b[1;8P'
+    #
+    # F2 Function Key
+    # ===============
+    # F2: '\x1bOQ'
+    # Shift+F2: '\x1b[1;2Q'
+    # Ctrl+Alt+Shift+F2: '\x1b[1;6P'
+
+    # F3 Function Key ?!
+    # ==================
+    # F3: '\x1bOR'
+    # Shift+F3: '\x1b[13;2~'
+    # Alt+F3: '\x1b[13;2~'
+    # Shift+F3: '\x1b[13;2~'
+    # Ctrl+Alt+Shift+F3: '\x1b[13;8~'
+    #
+    from blessed.keyboard import LegacyCSIKeyEvent
+
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+
+        # Test a couple of F3 tilde-form variants via Terminal.inkey()
+        test_cases = [
+            ('\x1b[13;2~', 'Shift+F3', 2, {'shift': True}),
+            ('\x1b[13;3~', 'Alt+F3', 3, {'alt': True}),
+            ('\x1b[13;6~', 'Ctrl+Shift+F3', 6, {'ctrl': True, 'shift': True}),
+            ('\x1b[13;7~', 'Ctrl+Alt+F3', 7, {'ctrl': True, 'alt': True}),
+            ('\x1b[13;8~', 'Ctrl+Alt+Shift+F3', 8, {'ctrl': True, 'alt': True, 'shift': True}),
+        ]
+
+        for sequence, description, expected_mod, expected_flags in test_cases:
+            # Use ungetch to simulate input from ghostty terminal
+            term.ungetch(sequence)
+
+            ks = term.inkey(timeout=0)
+
+            # Should have been parsed correctly
+            assert ks is not None
+            assert ks == sequence
+            assert ks._mode == -3  # Legacy CSI mode
+            assert isinstance(ks._match, LegacyCSIKeyEvent)
+
+            # Verify the parsed event data
+            event = ks._match
+            assert event.kind == 'tilde'
+            assert event.key_id == 13  # F3 tilde number
+            assert event.modifiers == expected_mod
+
+            # Check that it maps to the correct base keycode
+            assert ks._code == curses.KEY_F3
+
+            # Check modifier flags
+            assert ks.modifiers == expected_mod
+            assert ks._shift == expected_flags.get('shift', False)
+            assert ks._ctrl == expected_flags.get('ctrl', False)
+            assert ks._alt == expected_flags.get('alt', False)
+
+            # Check that dynamic name generation works
+            assert ks.name.startswith('KEY_')
+            assert ks.name.endswith('_F3')
+    child()
+
+
+def test_is_known_input_prefix_dec_events():
+    """Test _is_known_input_prefix correctly identifies DEC event sequences."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+
+        # Test sequences that SHOULD be treated as keyboard prefixes
+        keyboard_sequences = [
+            '\x1b[200~',           # Bracketed paste start
+            '\x1b[200~{test}',     # Partial bracketed paste
+            '\x1b[I',              # Focus gained
+            '\x1b[O',              # Focus lost
+            '\x1b[M',              # Legacy mouse
+            '\x1b[<',              # SGR mouse start
+            '\x1b[<0;10;20',       # Partial SGR mouse
+        ]
+
+        # Test sequences that should NOT be treated as keyboard prefixes (terminal responses)
+        terminal_response_sequences = [
+            '\x1b[?1$y',           # DEC mode query response (DECCKM disabled)
+            '\x1b[?1;1$y',         # DEC mode query response (DECCKM enabled)
+            '\x1b[?2004;2$y',      # Bracketed paste mode response (disabled)
+            '\x1b[?64;1;2;4;7c',   # Device Attributes response
+            '\x1b]10;rgb:ffff/ffff/ffff\x07',  # Foreground color response
+            '\x1b[42;10R',         # Cursor position report
+            '\x1b[?u',             # Kitty keyboard protocol response start
+            '\x1b[?0u',            # Kitty keyboard protocol response
+        ]
+
+        # Test keyboard sequences (should return True)
+        for seq in keyboard_sequences:
+            is_prefix = term._is_known_input_prefix(seq)
+            assert is_prefix is True
+
+        # Test terminal response sequences (should return False)
+        for seq in terminal_response_sequences:
+            is_prefix = term._is_known_input_prefix(seq)
+            assert is_prefix is False
+
+    child()
+
+
+def test_is_known_input_prefix_traditional_sequences():
+    """Test _is_known_input_prefix works with traditional keyboard sequences."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+
+        # Test traditional sequences that should be recognized from keymap
+        traditional_sequences = [
+            '\x1b[A',      # Up arrow
+            '\x1b[B',      # Down arrow
+            '\x1b[C',      # Right arrow
+            '\x1b[D',      # Left arrow
+            '\x1b[H',      # Home
+            '\x1b[F',      # End
+            '\x1b[1~',     # Find
+            '\x1b[2~',     # Insert
+            '\x1b',        # Just CSI prefix
+            '\x1b[',       # CSI sequence start
+        ]
+
+        for seq in traditional_sequences:
+            is_prefix = term._is_known_input_prefix(seq)
+            assert is_prefix is True
+
+    child()
+
+
+def test_bracketed_paste():
+    """Test that bracketed paste works through immediate inkey()."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+
+        # Test complete bracketed paste sequence
+        paste_sequence = '\x1b[200~{test}\x1b[201~'
+        term.ungetch(paste_sequence)
+
+        ks = term.inkey(timeout=0)
+
+        # Should be recognized as bracketed paste event
+        assert ks == paste_sequence
+        assert ks._mode == 2004  # BRACKETED_PASTE mode
+
+        # Should be able to extract the pasted text
+        event_values = ks.mode_values()
+        assert event_values.text == '{test}'
+
+    child()
+
+
+@pytest.mark.parametrize('sequence,fkey_char,expected_mod,mod_name,expected_flags', [
+    ('\x1bO2P', 'P', 2, 'shift', {'shift': True}),
+    ('\x1bO3P', 'P', 3, 'alt', {'alt': True}),
+    ('\x1bO4P', 'P', 4, 'alt+shift', {'alt': True, 'shift': True}),
+    ('\x1bO5P', 'P', 5, 'ctrl', {'ctrl': True}),
+    ('\x1bO6P', 'P', 6, 'ctrl+shift', {'ctrl': True, 'shift': True}),
+    ('\x1bO7P', 'P', 7, 'ctrl+alt', {'ctrl': True, 'alt': True}),
+    ('\x1bO8P', 'P', 8, 'ctrl+alt+shift', {'ctrl': True, 'alt': True, 'shift': True}),
+    ('\x1bO2Q', 'Q', 2, 'shift', {'shift': True}),
+    ('\x1bO2R', 'R', 2, 'shift', {'shift': True}),
+    ('\x1bO2S', 'S', 2, 'shift', {'shift': True}),
+])
+def test_ss3_fkey_modifier_sequences(sequence, fkey_char, expected_mod, mod_name, expected_flags):
+    """Test SS3 F-key modifier sequences for F1-F4."""
+    from blessed.keyboard import _match_legacy_csi_modifiers
+
+    ks = _match_legacy_csi_modifiers(sequence)
+    assert ks is not None
+
+    # Map F-key chars to codes
+    fkey_codes = {'P': curses.KEY_F1, 'Q': curses.KEY_F2, 'R': curses.KEY_F3, 'S': curses.KEY_F4}
+    assert ks.code == fkey_codes[fkey_char]
+    assert ks.modifiers == expected_mod
+
+    # Check modifier flags
+    assert ks._shift == expected_flags.get('shift', False)
+    assert ks._alt == expected_flags.get('alt', False)
+    assert ks._ctrl == expected_flags.get('ctrl', False)
+
+
+def test_ss3_fkey_match_properties():
+    """Test SS3 match object properties."""
+    from blessed.keyboard import _match_legacy_csi_modifiers
+
+    ks = _match_legacy_csi_modifiers('\x1bO6P')
+    assert ks is not None
+    assert ks._mode == -3  # Legacy CSI modifier mode
+    assert ks._match is not None
+    assert ks._match.kind == 'ss3-fkey'
+    assert ks._match.key_id == 'P'
+    assert ks._match.modifiers == 6
+
+
+@pytest.mark.parametrize('sequence', [
+    '\x1bOZ',      # Invalid final character
+    '\x1bO2',      # Missing final character
+    '\x1bO20P',    # Invalid modifier (too many digits)
+    '\x1bO0P',     # Invalid modifier (0)
+    '\x1b[2P',     # Wrong escape sequence (CSI instead of SS3)
+])
+def test_ss3_fkey_invalid_sequences_no_match(sequence):
+    """Test that invalid SS3 sequences don't match."""
+    from blessed.keyboard import _match_legacy_csi_modifiers
+
+    ks = _match_legacy_csi_modifiers(sequence)
+    # Should either return None or not match this specific pattern
+    if ks is not None:
+        # If it matches, it should be a different pattern (CSI letter form)
+        if hasattr(ks._match, 'kind'):
+            assert ks._match.kind != 'ss3-fkey'
+
+
+@pytest.mark.parametrize('sequence,expected_code', [
+    ('\x1bOP', curses.KEY_F1),
+    ('\x1bOQ', curses.KEY_F2),
+    ('\x1bOR', curses.KEY_F3),
+    ('\x1bOS', curses.KEY_F4),
+])
+def test_ss3_fkey_unmodified_backward_compatibility(sequence, expected_code):
+    """Test that unmodified F1-F4 sequences are handled by DEFAULT_SEQUENCE_MIXIN."""
+    from blessed.keyboard import _match_legacy_csi_modifiers
+
+    # The legacy CSI modifier parser should NOT match these
+    ks = _match_legacy_csi_modifiers(sequence)
+    assert ks is None  # Should be handled by DEFAULT_SEQUENCE_MIXIN instead
+
+
+@pytest.mark.parametrize('sequence,expected_code,expected_name', [
+    ('\x1b[1;2P', curses.KEY_F1, 'KEY_SHIFT_F1'),
+    ('\x1b[1;3Q', curses.KEY_F2, 'KEY_ALT_F2'),
+    ('\x1b[1;5R', curses.KEY_F3, 'KEY_CTRL_F3'),
+    ('\x1b[1;6S', curses.KEY_F4, 'KEY_CTRL_SHIFT_F4'),
+])
+def test_ss3_csi_letter_form_compatibility(sequence, expected_code, expected_name):
+    """Test that CSI letter form F1-F4 sequences still work alongside SS3."""
+    from blessed.keyboard import _match_legacy_csi_modifiers
+
+    ks = _match_legacy_csi_modifiers(sequence)
+    assert ks is not None
+    assert ks.code == expected_code
+    assert ks.name == expected_name
+    assert ks._match.kind == 'letter'  # Should be letter form, not ss3-fkey
+
+
+def test_ss3_sequence_matching_order():
+    """Test that SS3 F-key parsing doesn't interfere with other patterns."""
+    from blessed.keyboard import _match_legacy_csi_modifiers
+
+    # This should match the tilde form, not SS3 form
+    ks = _match_legacy_csi_modifiers('\x1b[15;2~')  # Shift+F5
+    assert ks is not None
+    assert ks.code == curses.KEY_F5
+    assert ks._match.kind == 'tilde'
+
+    # This should match the SS3 form
+    ks = _match_legacy_csi_modifiers('\x1bO2P')  # Shift+F1
+    assert ks is not None
+    assert ks.code == curses.KEY_F1
+    assert ks._match.kind == 'ss3-fkey'
+
+
+def test_legacy_csi_modifiers_with_event_type_letter_form():
+    """Test legacy CSI modifier sequences with event_type in letter form."""
+    from blessed.keyboard import _match_legacy_csi_modifiers, LegacyCSIKeyEvent
+
+    # Test letter form with event_type: Shift+F2 key release
+    ks = _match_legacy_csi_modifiers('\x1b[1;2:3Q')  # Shift+F2 (Q), release (3)
+    assert ks is not None
+    assert ks._mode == -3  # Legacy CSI mode
+    assert isinstance(ks._match, LegacyCSIKeyEvent)
+
+    event = ks._match
+    assert event.kind == 'letter'
+    assert event.key_id == 'Q'  # F2 letter
+    assert event.modifiers == 2  # Shift modifier
+    assert event.event_type == 3  # Release event
+    assert ks.code == curses.KEY_F2
+
+    # Test letter form without event_type (should default to 1)
+    ks = _match_legacy_csi_modifiers('\x1b[1;5Q')  # Ctrl+F2, no event_type
+    assert ks is not None
+    event = ks._match
+    assert event.event_type == 1  # Default to press event
+
+
+def test_legacy_csi_modifiers_with_event_type_tilde_form():
+    """Test legacy CSI modifier sequences with event_type in tilde form."""
+    from blessed.keyboard import _match_legacy_csi_modifiers, LegacyCSIKeyEvent
+
+    # Test tilde form with event_type: F12 key release
+    # F12 (24), no extra modifiers (1), release (3)
+    ks = _match_legacy_csi_modifiers('\x1b[24;1:3~')
+    assert ks is not None
+    assert ks._mode == -3  # Legacy CSI mode
+    assert isinstance(ks._match, LegacyCSIKeyEvent)
+
+    event = ks._match
+    assert event.kind == 'tilde'
+    assert event.key_id == 24  # F12 tilde number
+    assert event.modifiers == 1  # No extra modifiers
+    assert event.event_type == 3  # Release event
+    assert ks.code == curses.KEY_F12
+
+    # Test tilde form without event_type (should default to 1)
+    ks = _match_legacy_csi_modifiers('\x1b[24;2~')  # Shift+F12, no event_type
+    assert ks is not None
+    event = ks._match
+    assert event.event_type == 1  # Default to press event
+
+
+def test_terminal_inkey_legacy_csi_with_event_type():
+    """Test that Terminal.inkey() properly handles legacy CSI sequences with event_type."""
+    @as_subprocess
+    def child():
+        from blessed import Terminal
+        term = Terminal(force_styling=True)
+
+        # Test letter form with event type
+        letter_sequence = '\x1b[1;2:3Q'  # Shift+F2 release
+        term.ungetch(letter_sequence)
+        ks = term.inkey(timeout=0)
+        assert ks == letter_sequence
+        assert ks._mode == -3  # Legacy CSI mode
+        assert ks._match.event_type == 3  # Release event
+        assert ks.code == curses.KEY_F2
+
+        # Test tilde form with event type
+        tilde_sequence = '\x1b[24;1:3~'  # F12 release
+        term.ungetch(tilde_sequence)
+        ks = term.inkey(timeout=0)
+        assert ks == tilde_sequence
+        assert ks._mode == -3  # Legacy CSI mode
+        assert ks._match.event_type == 3  # Release event
+        assert ks.code == curses.KEY_F12
+
+    child()
+
+
+def test_legacy_csi_modifiers_event_type_edge_cases():
+    """Test edge cases for legacy CSI modifier event_type parsing."""
+    from blessed.keyboard import _match_legacy_csi_modifiers
+
+    # Test various event types
+    event_type_cases = [
+        ('\x1b[1;2:1Q', 1, 'press'),    # Explicit press
+        ('\x1b[1;2:2Q', 2, 'repeat'),   # Repeat
+        ('\x1b[1;2:3Q', 3, 'release'),  # Release
+    ]
+
+    for sequence, expected_type, description in event_type_cases:
+        ks = _match_legacy_csi_modifiers(sequence)
+        assert ks is not None, f"Should match {description} event"
+        assert ks._match.event_type == expected_type, f"Wrong event type for {description}"
+
+    # Test that invalid sequences don't match
+    invalid_cases = [
+        '\x1b[1;2:Q',      # Missing event type number
+        '\x1b[1;2:abc~',   # Non-numeric event type
+        '\x1b[24;2:~',     # Missing event type in tilde form
+    ]
+
+    for invalid_seq in invalid_cases:
+        ks = _match_legacy_csi_modifiers(invalid_seq)
+        assert ks is None, f"Should not match invalid sequence {invalid_seq!r}"
+
+
+@pytest.mark.parametrize('sequence,code,predicate', [
+    ('\x1b[A', curses.KEY_UP, 'is_up'),
+    ('\x1b[B', curses.KEY_DOWN, 'is_down'),
+    ('\x1b[C', curses.KEY_RIGHT, 'is_right'),
+    ('\x1b[D', curses.KEY_LEFT, 'is_left'),
+    ('\x1b[H', curses.KEY_HOME, 'is_home'),
+    ('\x1b[F', curses.KEY_END, 'is_end'),
+    ('\x1b[5~', curses.KEY_PPAGE, 'is_pgup'),
+    ('\x1b[6~', curses.KEY_NPAGE, 'is_pgdown'),
+    ('\x1b[2~', curses.KEY_IC, 'is_insert'),
+    ('\x1b[3~', curses.KEY_DC, 'is_delete'),
+])
+def test_application_key_predicates_basic(sequence, code, predicate):
+    """Test basic application key predicates without modifiers."""
+    from blessed.keyboard import Keystroke
+
+    ks = Keystroke(sequence, code=code)
+    assert getattr(ks, predicate)() is True
+
+
+def test_application_key_predicates_with_modifiers():
+    """Test application key predicates with modifiers."""
+    from blessed.keyboard import Keystroke, LegacyCSIKeyEvent
+
+    # Ctrl+Left
+    legacy_event = LegacyCSIKeyEvent(kind='letter', key_id='D', modifiers=5, event_type=1)
+    ks_ctrl_left = Keystroke('\x1b[1;5D', code=curses.KEY_LEFT, mode=-3, match=legacy_event)
+
+    assert ks_ctrl_left.is_ctrl_left() is True
+    assert ks_ctrl_left.is_left() is False  # Has modifiers
+    assert ks_ctrl_left.is_ctrl_right() is False
+
+    # Alt+Delete
+    legacy_event = LegacyCSIKeyEvent(kind='tilde', key_id=3, modifiers=3, event_type=1)
+    ks_alt_delete = Keystroke('\x1b[3;3~', code=curses.KEY_DC, mode=-3, match=legacy_event)
+
+    assert ks_alt_delete.is_alt_delete() is True
+    assert ks_alt_delete.is_delete() is False
+
+
+def test_application_key_predicates_char_arg_returns_false():
+    """Test that application key predicates with character args return False."""
+    from blessed.keyboard import Keystroke, LegacyCSIKeyEvent
+
+    legacy_event = LegacyCSIKeyEvent(kind='letter', key_id='D', modifiers=5, event_type=1)
+    ks_ctrl_left = Keystroke('\x1b[1;5D', code=curses.KEY_LEFT, mode=-3, match=legacy_event)
+
+    # Application keys don't match when character is provided
+    assert ks_ctrl_left.is_ctrl_left('a') is False
+    assert ks_ctrl_left.is_ctrl_left('x') is False
+
+
+def test_application_key_predicates_with_event_types():
+    """Test application key predicates recognize event types via name."""
+    from blessed.keyboard import Keystroke, LegacyCSIKeyEvent
+
+    # Left release has name KEY_LEFT_RELEASED
+    legacy_event = LegacyCSIKeyEvent(kind='letter', key_id='D', modifiers=1, event_type=3)
+    ks = Keystroke('\x1b[1;1:3D', code=curses.KEY_LEFT, mode=-3, match=legacy_event)
+
+    assert ks.released is True
+    assert ks.name == 'KEY_LEFT_RELEASED'
+
+    # Ctrl+F1 repeated has name KEY_CTRL_F1_REPEATED
+    legacy_event = LegacyCSIKeyEvent(kind='letter', key_id='P', modifiers=5, event_type=2)
+    ks = Keystroke('\x1b[1;5:2P', code=curses.KEY_F1, mode=-3, match=legacy_event)
+
+    assert ks.repeated is True
+    assert ks.name == 'KEY_CTRL_F1_REPEATED'
+
+
+def test_application_key_predicates_compound_modifiers():
+    """Test application key predicates with compound modifiers."""
+    from blessed.keyboard import Keystroke, LegacyCSIKeyEvent
+
+    # Ctrl+Alt+Shift+Delete
+    legacy_event = LegacyCSIKeyEvent(kind='tilde', key_id=3, modifiers=8, event_type=1)
+    ks = Keystroke('\x1b[3;8~', code=curses.KEY_DC, mode=-3, match=legacy_event)
+
+    assert ks.is_ctrl_alt_shift_delete() is True
+    assert ks.is_ctrl_delete() is False  # Not exact match
+
+
+def test_application_key_predicates_invalid_key_name():
+    """Test that invalid application key names raise AttributeError."""
+    from blessed.keyboard import Keystroke
+
+    ks = Keystroke('\x1b[D', code=curses.KEY_LEFT, name='KEY_LEFT')
+
+    with pytest.raises(AttributeError) as exc_info:
+        ks.is_nonexistent_key()
+    assert 'invalid modifier tokens' in str(exc_info.value)
+
+
+@pytest.mark.parametrize('sequence,code,predicate', [
+    ('\x1bOP', curses.KEY_F1, 'is_f1'),
+    ('\x1bOQ', curses.KEY_F2, 'is_f2'),
+    ('\x1bOR', curses.KEY_F3, 'is_f3'),
+    ('\x1bOS', curses.KEY_F4, 'is_f4'),
+    ('\x1b[15~', curses.KEY_F5, 'is_f5'),
+    ('\x1b[17~', curses.KEY_F6, 'is_f6'),
+    ('\x1b[18~', curses.KEY_F7, 'is_f7'),
+    ('\x1b[19~', curses.KEY_F8, 'is_f8'),
+    ('\x1b[20~', curses.KEY_F9, 'is_f9'),
+    ('\x1b[21~', curses.KEY_F10, 'is_f10'),
+    ('\x1b[23~', curses.KEY_F11, 'is_f11'),
+    ('\x1b[24~', curses.KEY_F12, 'is_f12'),
+])
+def test_application_key_predicates_function_keys(sequence, code, predicate):
+    """Test application key predicates for function keys."""
+    from blessed.keyboard import Keystroke
+
+    ks = Keystroke(sequence, code=code)
+    assert getattr(ks, predicate)() is True
+
+
+def test_application_key_predicates_exact_parameter():
+    """Test exact parameter behavior for application key predicates."""
+    from blessed.keyboard import Keystroke, LegacyCSIKeyEvent
+
+    # Ctrl+Alt+Left
+    legacy_event = LegacyCSIKeyEvent(kind='letter', key_id='D', modifiers=7, event_type=1)
+    ks = Keystroke('\x1b[1;7D', code=curses.KEY_LEFT, mode=-3, match=legacy_event)
+
+    # Exact matching (default)
+    assert ks.is_ctrl_alt_left() is True
+    assert ks.is_ctrl_left() is False  # Has Alt too
+    assert ks.is_alt_left() is False   # Has Ctrl too
+
+
+def test_application_vs_modifier_only_predicates():
+    """Test that application key and modifier-only predicates are distinct."""
+    from blessed.keyboard import Keystroke, LegacyCSIKeyEvent
+
+    # Ctrl+a (modifier-only)
+    ks_ctrl_a = Keystroke('\x01')
+    assert ks_ctrl_a.is_ctrl('a') is True
+    assert ks_ctrl_a.value == 'a'
+
+    # Ctrl+Left (application key)
+    legacy_event = LegacyCSIKeyEvent(kind='letter', key_id='D', modifiers=5, event_type=1)
+    ks_ctrl_left = Keystroke('\x1b[1;5D', code=curses.KEY_LEFT, mode=-3, match=legacy_event)
+    assert ks_ctrl_left.is_ctrl_left() is True
+    assert ks_ctrl_left.value == ''
+
+    # Should not cross-match
+    assert ks_ctrl_a.is_ctrl_left() is False
+    assert ks_ctrl_left.is_ctrl('a') is False
+
+
+def test_application_key_predicates_with_underscores():
+    """Test application keys with underscores in names."""
+    from blessed.keyboard import Keystroke, KEY_KP_0, KEY_KP_MULTIPLY
+
+    assert Keystroke('\x1bOp', code=KEY_KP_0).is_kp_0() is True
+    assert Keystroke('\x1bOj', code=KEY_KP_MULTIPLY).is_kp_multiply() is True
+
+
+def test_application_key_predicates_caps_num_lock_ignored():
+    """Test that caps_lock and num_lock are ignored in exact matching."""
+    from blessed.keyboard import Keystroke, LegacyCSIKeyEvent
+
+    # Ctrl+Left with caps_lock (5 + 64 = 69)
+    legacy_event = LegacyCSIKeyEvent(kind='letter', key_id='D', modifiers=69, event_type=1)
+    ks = Keystroke('\x1b[1;69D', code=curses.KEY_LEFT, mode=-3, match=legacy_event)
+
+    assert ks.is_ctrl_left() is True
+    assert ks._caps_lock is True

@@ -7,7 +7,7 @@ import time
 import typing
 import platform
 import functools
-from typing import Set, Dict, Match, Tuple, TypeVar, Optional
+from typing import Set, Dict, Match, Tuple, TypeVar, Optional, TYPE_CHECKING
 from collections import OrderedDict, namedtuple
 
 # local
@@ -15,7 +15,12 @@ from blessed.dec_modes import DecPrivateMode
 
 _T = TypeVar('_T', bound='Keystroke')
 
+
 # isort: off
+if TYPE_CHECKING:
+    # local
+    from blessed.terminal import Terminal
+
 # curses
 if platform.system() == 'Windows':
     # pylint: disable=import-error
@@ -1222,7 +1227,7 @@ def get_keyboard_codes() -> Dict[int, str]:
     return dict(zip(keycodes.values(), keycodes.keys()))
 
 
-def _alternative_left_right(term: typing.Any) -> Dict[str, int]:
+def _alternative_left_right(term: 'Terminal') -> Dict[str, int]:
     r"""
     Determine and return mapping of left and right arrow keys sequences.
 
@@ -1247,7 +1252,7 @@ def _alternative_left_right(term: typing.Any) -> Dict[str, int]:
     return keymap
 
 
-def get_keyboard_sequences(term: typing.Any) -> 'OrderedDict[str, int]':
+def get_keyboard_sequences(term: 'Terminal') -> 'OrderedDict[str, int]':
     r"""
     Return mapping of keyboard sequences paired by keycodes.
 

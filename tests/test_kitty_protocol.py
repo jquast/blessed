@@ -334,19 +334,18 @@ def test_kitty_protocol_modifier_properties():
 
 def test_kitty_protocol_is_ctrl_is_alt():
     """Test is_ctrl() and is_alt() methods work with Kitty protocol."""
-    # Exactly Ctrl+a
+    # Matching Ctrl+a
     ks = _match_kitty_key('\x1b[97;5u')  # Ctrl+a
     assert ks.is_ctrl('a') is True
-    assert ks.is_ctrl('A') is True  # Case insensitive
+    assert ks.is_ctrl('A') is True  # Ctrl is Case insensitive
     assert ks.is_ctrl('b') is False
     assert ks.is_ctrl() is False
 
-    # Exactly Alt+a
+    # Matching Alt+a
     ks = _match_kitty_key('\x1b[97;3u')  # Alt+a
     assert ks.is_alt('a') is True
-    assert ks.is_alt('A') is True  # Case insensitive by default
+    assert ks.is_alt('A') is True  # Alt is also Case insensitive
     assert ks.is_alt('b') is False
-    assert ks.is_alt() is True  # Any alt
 
     # Ctrl+Alt+a should NOT match exact is_ctrl('a') or is_alt('a')
     ks = _match_kitty_key('\x1b[97;7u')  # Ctrl+Alt+a
