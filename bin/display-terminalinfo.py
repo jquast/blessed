@@ -108,8 +108,8 @@ def display_bitmask(kind, bitmap, value):
                      col1_width=col1_width,
                      col2_width=col2_width))
     print('{} {}   {}'.format('-' * col1_width,
-                                 '-' * col2_width,
-                                 '-' * max(map(len, bitmap.values()))))
+                              '-' * col2_width,
+                              '-' * max(map(len, bitmap.values()))))
     for flag_name, description in bitmap.items():
         try:
             bitmask = getattr(termios, flag_name)
@@ -138,8 +138,8 @@ def display_ctl_chars(index, ctlc):
                      col1_width=col1_width,
                      col2_width=col2_width))
     print('{}   {} {}'.format('-' * col1_width,
-                                 '-' * col2_width,
-                                 '-' * 10))
+                              '-' * col2_width,
+                              '-' * 10))
     for index_name, name in index.items():
         try:
             index = getattr(termios, index_name)

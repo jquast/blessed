@@ -21,7 +21,7 @@ def rgb_at_xy(term, x, y, t):
         + math.sin(y / 32.0)
         + math.sin(math.sqrt(
             (x - w / 2.0) * (x - w / 2.0) +
-             (y - h / 2.0) * (y - h / 2.0)
+            (y - h / 2.0) * (y - h / 2.0)
         ) / 8.0 + t * 3)
     ) + math.sin(math.sqrt(x * x + y * y) / 8.0)
     saturation = y / h
