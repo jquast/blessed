@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Core blessed Terminal() tests."""
 
 # std imports
@@ -365,7 +364,7 @@ def test_winsize_IOError_returns_environ():
     @as_subprocess
     def child():
         def side_effect(fd):
-            raise IOError
+            raise OSError
 
         term = TestTerminal()
         term._winsize = side_effect

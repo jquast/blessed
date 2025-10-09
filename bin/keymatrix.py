@@ -5,7 +5,6 @@ A simple "game": hit all application keys to win.
 Display all known key capabilities that may match the terminal. As each key is pressed on input, it
 is lit up and points are scored.
 """
-from __future__ import division, print_function
 
 # std imports
 import sys
@@ -16,7 +15,7 @@ from blessed import Terminal
 
 def echo(text):
     """Display ``text`` and flush output."""
-    sys.stdout.write(u'{}'.format(text))
+    sys.stdout.write(f'{text}')
     sys.stdout.flush()
 
 
@@ -28,14 +27,14 @@ def refresh(term, board, level, score, inps):
         level_color = 4
     bottom = 0
     for keycode, attr in board.items():
-        echo(u''.join((
+        echo(''.join((
             term.move_yx(attr['row'], attr['column']),
             term.color(level_color),
             (term.reverse if attr['hit'] else term.bold),
             keycode,
             term.normal)))
         bottom = max(bottom, attr['row'])
-    echo(term.move_yx(term.height, 0) + 'level: %s score: %s' % (level, score,))
+    echo(term.move_yx(term.height, 0) + 'level: {} score: {}'.format(level, score))
     if bottom >= (term.height - 5):
         sys.stderr.write(
             ('\n' * (term.height // 2)) +
@@ -48,7 +47,7 @@ def refresh(term, board, level, score, inps):
     echo('Press ^C to exit.')
     for row, inp in enumerate(inps[(term.height - (bottom + 3)) * -1:], 1):
         echo(term.move_yx(bottom + row + 1, 0))
-        echo('{0!r}, {1}, {2}'.format(
+        echo('{!r}, {}, {}'.format(
             inp.__str__() if inp.is_sequence else inp,
              inp.code,
              inp.name))
@@ -120,14 +119,14 @@ def main():
     with term.cbreak():
         echo(term.move_y(term.height))
         echo(
-            u'{term.clear_eol}Your final score was {score} '
-            u'at level {level}{term.clear_eol}\n'
-            u'{term.clear_eol}\n'
-            u'{term.clear_eol}You hit {hit_highbit} '
-            u' 8-bit characters\n{term.clear_eol}\n'
-            u'{term.clear_eol}You hit {hit_unicode} '
-            u' unicode characters.\n{term.clear_eol}\n'
-            u'{term.clear_eol}press any key\n'.format(
+            '{term.clear_eol}Your final score was {score} '
+            'at level {level}{term.clear_eol}\n'
+            '{term.clear_eol}\n'
+            '{term.clear_eol}You hit {hit_highbit} '
+            ' 8-bit characters\n{term.clear_eol}\n'
+            '{term.clear_eol}You hit {hit_unicode} '
+            ' unicode characters.\n{term.clear_eol}\n'
+            '{term.clear_eol}press any key\n'.format(
                 term=term,
                 score=score, level=level,
                 hit_highbit=hit_highbit,

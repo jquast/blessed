@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Module providing 'sequence awareness'."""
 # std imports
 import re

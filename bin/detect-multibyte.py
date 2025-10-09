@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 Determines whether the attached terminal supports multibyte encodings.
 
@@ -32,7 +31,6 @@ by the following diagram:
 
 # pylint: disable=invalid-name
 #         Invalid module name "detect-multibyte"
-from __future__ import print_function
 
 # std imports
 import sys
@@ -70,7 +68,7 @@ def main():
         pos0 = get_pos(term)
 
         # display multibyte character
-        print(u'⦰', end='')
+        print('⦰', end='')
 
         # store second position
         pos1 = get_pos(term)
@@ -84,13 +82,13 @@ def main():
 
     # returned to our original starting position,
     if not multibyte_capable:
-        print('multibyte encoding failed, horizontal distance is {0}, '
+        print('multibyte encoding failed, horizontal distance is {}, '
               'expected 1 for unicode point https://codepoints.net/U+29B0'
               .format(horizontal_distance), file=sys.stderr)
         exit(1)
 
     print('{checkbox} multibyte encoding supported!'
-          .format(checkbox=term.bold_green(u'✓')))
+          .format(checkbox=term.bold_green('✓')))
 
 
 if __name__ == '__main__':

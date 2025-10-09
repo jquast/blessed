@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests for capturing keyboard input"""
 
 # std imports
@@ -235,7 +234,7 @@ def test_keystroke_0s_cbreak_with_input():
 
     with echo_off(master_fd):
         os.write(master_fd, SEND_SEMAPHORE)
-        os.write(master_fd, 'x'.encode('ascii'))
+        os.write(master_fd, b'x')
         read_until_semaphore(master_fd)
         stime = time.time()
         output = read_until_eof(master_fd)
@@ -270,13 +269,13 @@ def test_keystroke_cbreak_with_input_slowly():
 
     with echo_off(master_fd):
         os.write(master_fd, SEND_SEMAPHORE)
-        os.write(master_fd, 'a'.encode('ascii'))
+        os.write(master_fd, b'a')
         time.sleep(0.1)
-        os.write(master_fd, 'b'.encode('ascii'))
+        os.write(master_fd, b'b')
         time.sleep(0.1)
-        os.write(master_fd, 'cdefgh'.encode('ascii'))
+        os.write(master_fd, b'cdefgh')
         time.sleep(0.1)
-        os.write(master_fd, 'X'.encode('ascii'))
+        os.write(master_fd, b'X')
         read_until_semaphore(master_fd)
         stime = time.time()
         output = read_until_eof(master_fd)
@@ -308,7 +307,7 @@ def test_keystroke_0s_cbreak_multibyte_utf8():
 
     with echo_off(master_fd):
         os.write(master_fd, SEND_SEMAPHORE)
-        os.write(master_fd, '\u01b1'.encode('utf-8'))
+        os.write(master_fd, '\u01b1'.encode())
         read_until_semaphore(master_fd)
         stime = time.time()
         output = read_until_eof(master_fd)
@@ -346,7 +345,7 @@ def test_keystroke_0s_raw_input_ctrl_c():
         # ensure child is in raw mode before sending ^C,
         read_until_semaphore(master_fd)
         time.sleep(0.05)
-        os.write(master_fd, '\x03'.encode('latin1'))
+        os.write(master_fd, b'\x03')
         stime = time.time()
         output = read_until_eof(master_fd)
     pid, status = os.waitpid(pid, 0)

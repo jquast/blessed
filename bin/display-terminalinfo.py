@@ -2,7 +2,6 @@
 """Display known information about our terminal."""
 # pylint: disable=invalid-name
 #         Invalid module name "display-terminalinfo"
-from __future__ import print_function
 
 # std imports
 import os
@@ -108,7 +107,7 @@ def display_bitmask(kind, bitmap, value):
                      description='Description',
                      col1_width=col1_width,
                      col2_width=col2_width))
-    print('{0} {1}   {2}'.format('-' * col1_width,
+    print('{} {}   {}'.format('-' * col1_width,
                                  '-' * col2_width,
                                  '-' * max(map(len, bitmap.values()))))
     for flag_name, description in bitmap.items():
@@ -138,7 +137,7 @@ def display_ctl_chars(index, ctlc):
                      value='Value',
                      col1_width=col1_width,
                      col2_width=col2_width))
-    print('{0}   {1} {2}'.format('-' * col1_width,
+    print('{}   {} {}'.format('-' * col1_width,
                                  '-' * col2_width,
                                  '-' * 10))
     for index_name, name in index.items():
@@ -162,12 +161,12 @@ def display_pathconf(names, getter):
     fmt = '{name:>{col1_width}}  {value}'
     print(fmt.format(name='pathconf'.ljust(col1_width), value='value',
                      col1_width=col1_width))
-    print('{0}  {1}'.format('-' * col1_width, '-' * 27))
+    print('{}  {}'.format('-' * col1_width, '-' * 27))
     for name in names:
         try:
             value = getter(name)
         except OSError as err:
-            value = 'OSErrno {err.errno}'.format(err=err)
+            value = f'OSErrno {err.errno}'
         print(fmt.format(name=name, value=value, col1_width=col1_width))
     print()
 
@@ -183,8 +182,8 @@ def main():
     locale.setlocale(locale.LC_ALL, '')
     encoding = locale.getpreferredencoding()
 
-    print('os.isatty({0}) => {1}'.format(fd, os.isatty(fd)))
-    print('locale.getpreferredencoding() => {0}'.format(encoding))
+    print(f'os.isatty({fd}) => {os.isatty(fd)}')
+    print(f'locale.getpreferredencoding() => {encoding}')
 
     display_pathconf(names=os.pathconf_names,
                      getter=lambda name: os.fpathconf(fd, name))
@@ -194,7 +193,7 @@ def main():
          _, _,  # input / output speed (bps macros)
          ctlc) = termios.tcgetattr(fd)
     except termios.error as err:
-        print('stdin is not a typewriter: {0}'.format(err))
+        print(f'stdin is not a typewriter: {err}')
     else:
         display_bitmask(kind='  Input Mode',
                         bitmap=BITMAP_IFLAG,
@@ -210,8 +209,8 @@ def main():
                         value=lflag)
         display_ctl_chars(index=CTLCHAR_INDEX,
                           ctlc=ctlc)
-        print('os.ttyname({0}) => {1}'.format(fd, os.ttyname(fd)))
-        print('os.ctermid() => {0}'.format(os.ttyname(fd)))
+        print(f'os.ttyname({fd}) => {os.ttyname(fd)}')
+        print(f'os.ctermid() => {os.ttyname(fd)}')
 
 
 if __name__ == '__main__':

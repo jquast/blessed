@@ -2,7 +2,6 @@
 """Displays os.fpathconf values related to terminals."""
 # pylint: disable=invalid-name
 #         Invalid module name "display-sighandlers"
-from __future__ import print_function
 
 # std imports
 import os
@@ -48,9 +47,9 @@ def display_fpathconf():
             try:
                 value = os.fpathconf(fd, name)
                 if name == 'PC_VDISABLE':
-                    value = r'\x{0:02x}'.format(value)
+                    value = fr'\x{value:02x}'
             except OSError as err:
-                value = 'OSErrno {0.errno}'.format(err)
+                value = f'OSErrno {err.errno}'
 
         print(fmt.format(name=name, value=value, description=description))
     print()
