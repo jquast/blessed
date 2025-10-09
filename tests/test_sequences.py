@@ -1,5 +1,4 @@
 """Tests for Terminal() sequences and sequence-awareness."""
-# -*- coding: utf-8 -*-
 # std imports
 import sys
 import platform

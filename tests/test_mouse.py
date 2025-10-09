@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests for mouse event handling."""
 # std imports
 import io

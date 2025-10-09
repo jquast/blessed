@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests color algorithms."""
 
 # std imports

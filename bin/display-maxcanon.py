@@ -19,7 +19,6 @@ this systems integrated test: the given system definitions are misleading on som
 """
 # pylint: disable=invalid-name
 #         Invalid module name "display-sighandlers"
-from __future__ import print_function
 
 # std imports
 import os
@@ -37,27 +36,27 @@ def detect_maxcanon():
                           echo=True, encoding='utf8',
                           timeout=3)
 
-    child.sendline(u'echo -n READY_; echo GO')
-    child.expect_exact(u'READY_GO')
+    child.sendline('echo -n READY_; echo GO')
+    child.expect_exact('READY_GO')
 
-    child.sendline(u'stty icanon imaxbel erase ^H; echo -n retval: $?')
-    child.expect_exact(u'retval: 0')
+    child.sendline('stty icanon imaxbel erase ^H; echo -n retval: $?')
+    child.expect_exact('retval: 0')
 
-    child.sendline(u'echo -n GO_; echo AGAIN')
-    child.expect_exact(u'GO_AGAIN')
-    child.sendline(u'cat')
+    child.sendline('echo -n GO_; echo AGAIN')
+    child.expect_exact('GO_AGAIN')
+    child.sendline('cat')
 
     child.delaybeforesend = 0
 
     column, blocksize = 0, 64
-    ch_marker = u'_'
+    ch_marker = '_'
 
     print('auto-detecting MAX_CANON: ', end='')
     sys.stdout.flush()
 
     while True:
         child.send(ch_marker * blocksize)
-        result = child.expect([ch_marker * blocksize, u'\a', pexpect.TIMEOUT])
+        result = child.expect([ch_marker * blocksize, '\a', pexpect.TIMEOUT])
         if result == 0:
             # entire block fit without emitting bel
             column += blocksize

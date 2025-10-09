@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Sub-module providing color functions.
 
