@@ -615,7 +615,7 @@ class Terminal():
             try:
                 if fd is not None:
                     return self._winsize(fd)
-            except (OSError, ValueError, TypeError):  # pylint: disable=overlapping-except
+            except (OSError, ValueError, TypeError):
                 pass
 
         return WINSZ(ws_row=int(os.getenv('LINES', '25')),
