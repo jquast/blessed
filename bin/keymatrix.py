@@ -34,7 +34,7 @@ def refresh(term, board, level, score, inps):
             keycode,
             term.normal)))
         bottom = max(bottom, attr['row'])
-    echo(term.move_yx(term.height, 0) + 'level: {} score: {}'.format(level, score))
+    echo(term.move_yx(term.height, 0) + f'level: {level} score: {score}')
     if bottom >= (term.height - 5):
         sys.stderr.write(
             ('\n' * (term.height // 2)) +
@@ -47,10 +47,7 @@ def refresh(term, board, level, score, inps):
     echo('Press ^C to exit.')
     for row, inp in enumerate(inps[(term.height - (bottom + 3)) * -1:], 1):
         echo(term.move_yx(bottom + row + 1, 0))
-        echo('{!r}, {}, {}'.format(
-            inp.__str__() if inp.is_sequence else inp,
-             inp.code,
-             inp.name))
+        echo(f'{inp.__str__() if inp.is_sequence else inp!r}, {inp.code}, {inp.name}')
         echo(term.clear_eol)
 
 
@@ -119,18 +116,14 @@ def main():
     with term.cbreak():
         echo(term.move_y(term.height))
         echo(
-            '{term.clear_eol}Your final score was {score} '
-            'at level {level}{term.clear_eol}\n'
-            '{term.clear_eol}\n'
-            '{term.clear_eol}You hit {hit_highbit} '
-            ' 8-bit characters\n{term.clear_eol}\n'
-            '{term.clear_eol}You hit {hit_unicode} '
-            ' unicode characters.\n{term.clear_eol}\n'
-            '{term.clear_eol}press any key\n'.format(
-                term=term,
-                score=score, level=level,
-                hit_highbit=hit_highbit,
-                hit_unicode=hit_unicode)
+            f'{term.clear_eol}Your final score was {score} '
+            f'at level {level}{term.clear_eol}\n'
+            f'{term.clear_eol}\n'
+            f'{term.clear_eol}You hit {hit_highbit} '
+            f' 8-bit characters\n{term.clear_eol}\n'
+            f'{term.clear_eol}You hit {hit_unicode} '
+            f' unicode characters.\n{term.clear_eol}\n'
+            f'{term.clear_eol}press any key\n'
         )
         term.inkey()
 

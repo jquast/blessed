@@ -107,9 +107,8 @@ def display_bitmask(kind, bitmap, value):
                      description='Description',
                      col1_width=col1_width,
                      col2_width=col2_width))
-    print('{} {}   {}'.format('-' * col1_width,
-                              '-' * col2_width,
-                              '-' * max(map(len, bitmap.values()))))
+    print(f"{'-' * col1_width} {'-' * col2_width}   "
+          f"{'-' * max(map(len, bitmap.values()))}")
     for flag_name, description in bitmap.items():
         try:
             bitmask = getattr(termios, flag_name)
@@ -137,9 +136,7 @@ def display_ctl_chars(index, ctlc):
                      value='Value',
                      col1_width=col1_width,
                      col2_width=col2_width))
-    print('{}   {} {}'.format('-' * col1_width,
-                              '-' * col2_width,
-                              '-' * 10))
+    print(f"{'-' * col1_width}   {'-' * col2_width} {'-' * 10}")
     for index_name, name in index.items():
         try:
             index = getattr(termios, index_name)
@@ -161,7 +158,7 @@ def display_pathconf(names, getter):
     fmt = '{name:>{col1_width}}  {value}'
     print(fmt.format(name='pathconf'.ljust(col1_width), value='value',
                      col1_width=col1_width))
-    print('{}  {}'.format('-' * col1_width, '-' * 27))
+    print(f"{'-' * col1_width}  {'-' * 27}")
     for name in names:
         try:
             value = getter(name)

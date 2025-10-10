@@ -82,13 +82,12 @@ def main():
 
     # returned to our original starting position,
     if not multibyte_capable:
-        print('multibyte encoding failed, horizontal distance is {}, '
-              'expected 1 for unicode point https://codepoints.net/U+29B0'
-              .format(horizontal_distance), file=sys.stderr)
+        print(f'multibyte encoding failed, horizontal distance is {horizontal_distance}, '
+              'expected 1 for unicode point https://codepoints.net/U+29B0',
+              file=sys.stderr)
         exit(1)
 
-    print('{checkbox} multibyte encoding supported!'
-          .format(checkbox=term.bold_green('✓')))
+    print(f"{term.bold_green('✓')} multibyte encoding supported!")
 
 
 if __name__ == '__main__':

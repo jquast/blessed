@@ -29,7 +29,7 @@ def main():
         # In most programs, you'll want to set some kind of 'dirty' flag,
         # perhaps by a Semaphore like threading.Event or (thanks to the GIL)
         # a simple global variable will suffice.
-        print('height={t.height}, width={t.width}\r'.format(t=term))
+        print(f'height={term.height}, width={term.width}\r')
 
     signal.signal(signal.SIGWINCH, on_resize)
 
