@@ -77,8 +77,8 @@ def main():
             # existing environment values if it has to.
             lines, columns = term.height, term.width
 
-    print("COLUMNS={columns};\nLINES={lines};\nexport COLUMNS LINES;"
-          .format(columns=columns, lines=lines))
+    print(f"COLUMNS={columns};\nLINES={lines};\nexport COLUMNS LINES;"
+          )
 
 
 if __name__ == '__main__':
