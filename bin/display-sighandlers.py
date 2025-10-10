@@ -2,7 +2,6 @@
 """Displays all signals, their values, and their handlers to stdout."""
 # pylint: disable=invalid-name
 #         Invalid module name "display-sighandlers"
-from __future__ import print_function
 
 # std imports
 import signal

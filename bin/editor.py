@@ -19,7 +19,6 @@ any serious editor would make liberal use of special modes.
 ``Ctrl - S``
   save
 """
-from __future__ import division, print_function
 
 # std imports
 import functools
@@ -34,14 +33,14 @@ try:
     # pylint: disable=invalid-name
     #         Invalid constant name "echo"
     echo = functools.partial(print, end='', flush=True)
-    echo(u'')
+    echo('')
 except TypeError:
     # TypeError: 'flush' is an invalid keyword argument for this function
     import sys
 
     def echo(text):
         """Display ``text`` and flush output."""
-        sys.stdout.write(u'{}'.format(text))
+        sys.stdout.write(f'{text}')
         sys.stdout.flush()
 
 
@@ -55,7 +54,7 @@ def input_filter(keystroke):
     if keystroke.is_sequence:
         # Namely, deny multi-byte sequences (such as '\x1b[A'),
         return False
-    if ord(keystroke) < ord(u' '):
+    if ord(keystroke) < ord(' '):
         # or control characters (such as ^L),
         return False
     return True
@@ -71,7 +70,7 @@ Cursor = collections.namedtuple('Cursor', ('y', 'x', 'term'))
 
 def readline(term, width=20):
     """A rudimentary readline implementation."""
-    text = u''
+    text = ''
     while True:
         inp = term.inkey()
         if inp.code == term.KEY_ENTER:
@@ -89,7 +88,7 @@ def readline(term, width=20):
             # "When you hit backspace, the kernel tty line discipline rubs out
             # your previous character by printing (in the simple case)
             # Ctrl-H, a space, and then another Ctrl-H."
-            echo(u'\b \b')
+            echo('\b \b')
     return text
 
 
@@ -104,13 +103,13 @@ def save(screen, fname):
             while row != cur_row:
                 cur_row += 1
                 cur_col = 0
-                fout.write(u'\n')
+                fout.write('\n')
             while col > cur_col:
                 cur_col += 1
-                fout.write(u' ')
+                fout.write(' ')
             fout.write(char)
             cur_col += 1
-        fout.write(u'\n')
+        fout.write('\n')
 
 
 def redraw(term, screen, start=None, end=None):
@@ -230,7 +229,7 @@ def main():
             term.keypad():
         inp = None
         while True:
-            echo_yx(csr, term.reverse(screen.get((csr.y, csr.x), u' ')))
+            echo_yx(csr, term.reverse(screen.get((csr.y, csr.x), ' ')))
             inp = term.inkey()
 
             if inp == chr(3):
@@ -240,8 +239,8 @@ def main():
             elif inp == chr(19):
                 # ^s saves
                 echo_yx(home(bottom(csr)),
-                        term.ljust(term.bold_white(u'Filename: ')))
-                echo_yx(right_of(home(bottom(csr)), len(u'Filename: ')), u'')
+                        term.ljust(term.bold_white('Filename: ')))
+                echo_yx(right_of(home(bottom(csr)), len('Filename: ')), '')
                 save(screen, readline(term))
                 echo_yx(home(bottom(csr)), term.clear_eol)
                 redraw(term=term, screen=screen,
@@ -258,7 +257,7 @@ def main():
 
             if n_csr != csr:
                 # erase old cursor,
-                echo_yx(csr, screen.get((csr.y, csr.x), u' '))
+                echo_yx(csr, screen.get((csr.y, csr.x), ' '))
                 csr = n_csr
 
             elif input_filter(inp):
