@@ -1508,3 +1508,242 @@ def test_plain_keystroke_defaults_to_pressed():
     assert ks.pressed is True
     assert ks.repeated is False
     assert ks.released is False
+
+
+# Keypad Keys Tests
+
+
+def test_kitty_keypad_end():
+    """Test Kitty protocol KP_END key (the original issue case)."""
+    ks = _match_kitty_key('\x1b[57424u')
+    assert ks is not None
+    assert ks._mode == DecPrivateMode.SpecialInternalKitty
+    assert ks._match.unicode_key == 57424
+    assert ks.code == 57424
+    assert ks.name == 'KEY_KP_END_PUA'
+    assert ks.value == ''
+
+
+@pytest.mark.parametrize("sequence,expected_code,expected_name", [
+    ('\x1b[57399u', 57399, 'KEY_KP_0_PUA'),
+    ('\x1b[57400u', 57400, 'KEY_KP_1_PUA'),
+    ('\x1b[57401u', 57401, 'KEY_KP_2_PUA'),
+    ('\x1b[57402u', 57402, 'KEY_KP_3_PUA'),
+    ('\x1b[57403u', 57403, 'KEY_KP_4_PUA'),
+    ('\x1b[57404u', 57404, 'KEY_KP_5_PUA'),
+    ('\x1b[57405u', 57405, 'KEY_KP_6_PUA'),
+    ('\x1b[57406u', 57406, 'KEY_KP_7_PUA'),
+    ('\x1b[57407u', 57407, 'KEY_KP_8_PUA'),
+    ('\x1b[57408u', 57408, 'KEY_KP_9_PUA'),
+    ('\x1b[57409u', 57409, 'KEY_KP_DECIMAL_PUA'),
+    ('\x1b[57410u', 57410, 'KEY_KP_DIVIDE_PUA'),
+    ('\x1b[57411u', 57411, 'KEY_KP_MULTIPLY_PUA'),
+    ('\x1b[57412u', 57412, 'KEY_KP_SUBTRACT_PUA'),
+    ('\x1b[57413u', 57413, 'KEY_KP_ADD_PUA'),
+    ('\x1b[57414u', 57414, 'KEY_KP_ENTER_PUA'),
+    ('\x1b[57415u', 57415, 'KEY_KP_EQUAL_PUA'),
+    ('\x1b[57416u', 57416, 'KEY_KP_SEPARATOR_PUA'),
+    ('\x1b[57417u', 57417, 'KEY_KP_LEFT_PUA'),
+    ('\x1b[57418u', 57418, 'KEY_KP_RIGHT_PUA'),
+    ('\x1b[57419u', 57419, 'KEY_KP_UP_PUA'),
+    ('\x1b[57420u', 57420, 'KEY_KP_DOWN_PUA'),
+    ('\x1b[57421u', 57421, 'KEY_KP_PAGE_UP_PUA'),
+    ('\x1b[57422u', 57422, 'KEY_KP_PAGE_DOWN_PUA'),
+    ('\x1b[57423u', 57423, 'KEY_KP_HOME_PUA'),
+    ('\x1b[57424u', 57424, 'KEY_KP_END_PUA'),
+    ('\x1b[57425u', 57425, 'KEY_KP_INSERT_PUA'),
+    ('\x1b[57426u', 57426, 'KEY_KP_DELETE_PUA'),
+    ('\x1b[57427u', 57427, 'KEY_KP_BEGIN_PUA'),
+])
+def test_kitty_all_keypad_keys(sequence, expected_code, expected_name):
+    """Test all Kitty protocol keypad keys."""
+    ks = _match_kitty_key(sequence)
+    assert ks is not None
+    assert ks._mode == DecPrivateMode.SpecialInternalKitty
+    assert ks._match.unicode_key == expected_code
+    assert ks.code == expected_code
+    assert ks.name == expected_name
+    assert ks.value == ''
+
+
+@pytest.mark.parametrize("sequence,expected_code,modifier", [
+    ('\x1b[57424;5u', 57424, 5),    # Ctrl+KP_END
+    ('\x1b[57424;3u', 57424, 3),    # Alt+KP_END
+    ('\x1b[57424;7u', 57424, 7),    # Ctrl+Alt+KP_END
+    ('\x1b[57399;6u', 57399, 6),    # Ctrl+Shift+KP_0
+])
+def test_kitty_keypad_with_modifiers(sequence, expected_code, modifier):
+    """Test keypad keys with modifiers."""
+    ks = _match_kitty_key(sequence)
+    assert ks is not None
+    assert ks._mode == DecPrivateMode.SpecialInternalKitty
+    assert ks._match.unicode_key == expected_code
+    assert ks._match.modifiers == modifier
+    assert ks.code == expected_code
+
+
+@pytest.mark.parametrize("sequence,event_type", [
+    ('\x1b[57424u', 1),           # press (default)
+    ('\x1b[57424;1:1u', 1),       # press (explicit)
+    ('\x1b[57424;1:2u', 2),       # repeat
+    ('\x1b[57424;1:3u', 3),       # release
+])
+def test_kitty_keypad_event_types(sequence, event_type):
+    """Test keypad keys with different event types."""
+    ks = _match_kitty_key(sequence)
+    assert ks is not None
+    assert ks._match.event_type == event_type
+    assert ks.pressed == (event_type == 1)
+    assert ks.repeated == (event_type == 2)
+    assert ks.released == (event_type == 3)
+
+
+def test_kitty_keypad_integration_inkey():
+    """Test keypad keys integration with Terminal.inkey()."""
+    @as_subprocess
+    def child():
+        term = Terminal(stream=io.StringIO(), force_styling=True)
+
+        # Test KP_END
+        term.ungetch('\x1b[57424u')
+        ks = term.inkey(timeout=0)
+        assert ks == '\x1b[57424u'
+        assert ks.name == 'KEY_KP_END_PUA'
+        assert ks.code == 57424
+
+        # Test KP_0
+        term.ungetch('\x1b[57399u')
+        ks = term.inkey(timeout=0)
+        assert ks == '\x1b[57399u'
+        assert ks.name == 'KEY_KP_0_PUA'
+        assert ks.code == 57399
+
+        # Test KP_ENTER
+        term.ungetch('\x1b[57414u')
+        ks = term.inkey(timeout=0)
+        assert ks == '\x1b[57414u'
+        assert ks.name == 'KEY_KP_ENTER_PUA'
+        assert ks.code == 57414
+
+    child()
+
+
+def test_kitty_keypad_with_ctrl_modifier():
+    """Test Ctrl+keypad combinations."""
+    @as_subprocess
+    def child():
+        term = Terminal(stream=io.StringIO(), force_styling=True)
+
+        # Ctrl+KP_END
+        term.ungetch('\x1b[57424;5u')
+        ks = term.inkey(timeout=0)
+        assert ks._ctrl is True
+        assert ks._alt is False
+        assert ks.name == 'KEY_CTRL_KP_END_PUA'
+
+    child()
+
+
+def test_kitty_keypad_with_multiple_modifiers():
+    """Test keypad keys with multiple modifiers."""
+    @as_subprocess
+    def child():
+        term = Terminal(stream=io.StringIO(), force_styling=True)
+
+        # Ctrl+Alt+KP_END
+        term.ungetch('\x1b[57424;7u')
+        ks = term.inkey(timeout=0)
+        assert ks._ctrl is True
+        assert ks._alt is True
+        assert ks.name == 'KEY_CTRL_ALT_KP_END_PUA'
+
+    child()
+
+
+def test_kitty_keypad_release_events():
+    """Test keypad key release events."""
+    @as_subprocess
+    def child():
+        term = Terminal(stream=io.StringIO(), force_styling=True)
+
+        # KP_END release
+        term.ungetch('\x1b[57424;1:3u')
+        ks = term.inkey(timeout=0)
+        assert ks.released is True
+        assert ks.pressed is False
+        assert ks.name == 'KEY_KP_END_PUA_RELEASED'
+
+    child()
+
+
+def test_kitty_keypad_repeat_events():
+    """Test keypad key repeat events."""
+    @as_subprocess
+    def child():
+        term = Terminal(stream=io.StringIO(), force_styling=True)
+
+        # KP_END repeat
+        term.ungetch('\x1b[57424;1:2u')
+        ks = term.inkey(timeout=0)
+        assert ks.repeated is True
+        assert ks.pressed is False
+        assert ks.name == 'KEY_KP_END_PUA_REPEATED'
+
+    child()
+
+
+def test_kitty_keypad_does_not_produce_text():
+    """Test that keypad keys in Kitty mode don't produce text."""
+    ks = _match_kitty_key('\x1b[57424u')
+    assert ks.value == ''
+
+    ks = _match_kitty_key('\x1b[57399u')
+    assert ks.value == ''
+
+
+def test_kitty_keypad_navigation_keys():
+    """Test keypad navigation keys (arrows, page up/down, home/end)."""
+    navigation_tests = [
+        ('\x1b[57417u', 'KEY_KP_LEFT_PUA'),
+        ('\x1b[57418u', 'KEY_KP_RIGHT_PUA'),
+        ('\x1b[57419u', 'KEY_KP_UP_PUA'),
+        ('\x1b[57420u', 'KEY_KP_DOWN_PUA'),
+        ('\x1b[57421u', 'KEY_KP_PAGE_UP_PUA'),
+        ('\x1b[57422u', 'KEY_KP_PAGE_DOWN_PUA'),
+        ('\x1b[57423u', 'KEY_KP_HOME_PUA'),
+        ('\x1b[57424u', 'KEY_KP_END_PUA'),
+    ]
+
+    for sequence, expected_name in navigation_tests:
+        ks = _match_kitty_key(sequence)
+        assert ks is not None
+        assert ks.name == expected_name
+
+
+def test_kitty_keypad_arithmetic_keys():
+    """Test keypad arithmetic operation keys."""
+    arithmetic_tests = [
+        ('\x1b[57410u', 'KEY_KP_DIVIDE_PUA'),
+        ('\x1b[57411u', 'KEY_KP_MULTIPLY_PUA'),
+        ('\x1b[57412u', 'KEY_KP_SUBTRACT_PUA'),
+        ('\x1b[57413u', 'KEY_KP_ADD_PUA'),
+        ('\x1b[57415u', 'KEY_KP_EQUAL_PUA'),
+    ]
+
+    for sequence, expected_name in arithmetic_tests:
+        ks = _match_kitty_key(sequence)
+        assert ks is not None
+        assert ks.name == expected_name
+
+
+def test_kitty_keypad_digit_keys():
+    """Test keypad digit keys 0-9."""
+    for digit in range(10):
+        code = 57399 + digit
+        sequence = f'\x1b[{code}u'
+        expected_name = f'KEY_KP_{digit}_PUA'
+
+        ks = _match_kitty_key(sequence)
+        assert ks is not None
+        assert ks.code == code
+        assert ks.name == expected_name

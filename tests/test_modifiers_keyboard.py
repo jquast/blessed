@@ -1707,7 +1707,7 @@ def test_application_key_predicates_invalid_key_name():
 
     with pytest.raises(AttributeError) as exc_info:
         ks.is_nonexistent_key()
-    assert 'invalid modifier tokens' in str(exc_info.value)
+    assert 'invalid modifier or application key tokens' in str(exc_info.value)
 
 
 @pytest.mark.parametrize('sequence,code,predicate', [

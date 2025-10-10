@@ -7,7 +7,7 @@ import time
 import typing
 import platform
 import functools
-from typing import Set, Dict, Match, Tuple, TypeVar, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Set, Dict, Match, Tuple, TypeVar, Optional
 from collections import OrderedDict, namedtuple
 
 # local
@@ -153,7 +153,7 @@ class Keystroke(str):
     When the string is a known sequence, :attr:`code` matches terminal
     class attributes for comparison, such as ``term.KEY_LEFT``.
 
-    The string-name of the sequence, such as ``u'KEY_LEFT'`` is accessed
+    The string-name of the sequence, such as ``'KEY_LEFT'`` is accessed
     by property :attr:`name`, and is used by the :meth:`__repr__` method
     to display a human-readable form of the Keystroke this class
     instance represents. It may otherwise by joined, split, or evaluated
@@ -257,8 +257,10 @@ class Keystroke(str):
             if getattr(self, f'_{mod_name}'):        # 'if self._shift'
                 mod_parts.append(mod_name.upper())   # -> 'SHIFT'
 
-        # For press events with no modifiers, return None (no special name needed)
-        if not mod_parts and not (self.released or self.repeated):
+        # For press events with no modifiers, check if this is a keypad key
+        # Keypad keys (PUA range 57399-57427) always need names even without modifiers
+        is_keypad_key = KEY_KP_0_PUA <= self._code <= KEY_KP_BEGIN_PUA
+        if not mod_parts and not (self.released or self.repeated) and not is_keypad_key:
             return None
 
         # Build base result with modifiers (if any)
@@ -568,6 +570,11 @@ class Keystroke(str):
             # Check if this is a PUA modifier key (which don't produce text)
             if KEY_LEFT_SHIFT <= self._match.unicode_key <= KEY_RIGHT_META:
                 return ''  # Modifier keys don't produce text
+            
+            # Check if this is a PUA keypad key (which don't produce text in disambiguate mode)
+            if KEY_KP_0_PUA <= self._match.unicode_key <= KEY_KP_BEGIN_PUA:
+                return ''  # Keypad keys in PUA range don't produce text
+            
             return chr(self._match.unicode_key)
 
         # ModifyOtherKeys protocol - extract character from key
@@ -587,7 +594,6 @@ class Keystroke(str):
 
     @property
     def value(self) -> str:
-        # pylint: disable=too-many-return-statements
         r"""
         The textual character represented by this keystroke.
 
@@ -902,35 +908,84 @@ class Keystroke(str):
                     'repeated': self.repeated}.get(event_type, False)
         return event_predicate
 
-    def _build_modifier_predicate(
-            self, tokens: typing.List[str]) -> typing.Callable[[Optional[str], bool], bool]:
-        """
-        Build a predicate function for modifier checking.
+    @staticmethod
+    def _make_expected_bits(tokens_modifiers: typing.List[str]) -> int:
+        expected_bits = 0
+        for token in tokens_modifiers:
+            expected_bits |= getattr(KittyModifierBits, token)
+        return expected_bits
 
-        Returns a callable that checks if keystroke has the specified modifiers.
+    def _make_effective_bits(self) -> int:
+        """
+        Returns modifier bits stripped of caps_lock and num_lock for "magic" predicate functions
+        """
+        return self.modifiers_bits & ~(KittyModifierBits.caps_lock | KittyModifierBits.num_lock)
+ 
+    def _build_appkeys_predicate(self, tokens_modifiers: typing.List[str],
+                                 key_name: str) -> typing.Callable[[Optional[str], bool], bool]:
+        """
+        Build a predicate function for checking modifiers of application keys
+
+        Returns a callable that checks only 'token_modifiers'
+        """
+        def keycode_predicate(
+                # pylint: disable=unused-argument
+                # ignore_case parameter is accepted but not used for application keys
+                char: Optional[str] = None,
+                ignore_case: bool = True) -> bool:
+
+            # Application keys never match when 'char' is non-None/non-Empty
+            if char:
+                return False
+
+            # Get expected keycode from key name
+            keycodes = get_keyboard_codes()
+            expected_key_constant = f'KEY_{key_name.upper()}'
+ 
+            # Find the keycode value
+            expected_code = None
+            for code, name in keycodes.items():
+                if name == expected_key_constant:
+                    expected_code = code
+                    break
+ 
+            if expected_code is None or self._code != expected_code:
+                return False
+
+            # validate only the modifier tokens
+            return self._make_expected_bits(tokens_modifiers) == self._make_effective_bits()
+
+
+        return keycode_predicate
+
+
+    def _build_alphanum_predicate(
+            self, tokens_modifiers: typing.List[str]) -> typing.Callable[[Optional[str], bool], bool]:
+        """
+        Build a predicate function for modifier checking of alphanumeric input.
+
+        Returns a callable that checks if keystroke matches the predicate
+        'tokens_modifiers', as well as the alphanumeric checks of optional
+        'char' and 'ignore_case'.
         """
         def modifier_predicate(char: Optional[str] = None, ignore_case: bool = True) -> bool:
-            # Build expected modifier bits from tokens
-            expected_bits = 0
-            for token in tokens:
-                expected_bits |= getattr(KittyModifierBits, token)
-
-            # Strip lock bits to ignore caps_lock and num_lock
+            # Build expected modifier bits from tokens,
+            # Stripped to ignore caps_lock and num_lock
+            expected_bits = self._make_expected_bits(tokens_modifiers)
             effective_bits = self.modifiers_bits & ~(
                 KittyModifierBits.caps_lock | KittyModifierBits.num_lock)
 
-            # When matching with a character and it's alphabetic, be lenient about Shift
-            # because shift is implicit in the case of the letter
+            # When matching with a character and it's alphabetic, be lenient
+            # about Shift because it is implicit in the case of the letter
             if char and len(char) == 1 and char.isalpha():
                 # Strip shift from both sides for letter matching
                 effective_bits_no_shift = effective_bits & ~KittyModifierBits.shift
                 expected_bits_no_shift = expected_bits & ~KittyModifierBits.shift
                 if effective_bits_no_shift != expected_bits_no_shift:
                     return False
-            else:
+            elif effective_bits != expected_bits:
                 # Exact matching (no char, or non-alpha char)
-                if effective_bits != expected_bits:
-                    return False
+                return False
 
             # If no character specified
             if char is None:
@@ -938,7 +993,6 @@ class Keystroke(str):
                 keystroke_char = self.value
                 if keystroke_char and len(keystroke_char) == 1 and keystroke_char.isprintable():
                     return False
-                # Non-text keys can match on modifiers alone
                 return True
 
             # Check character match using same logic as value property
@@ -955,46 +1009,6 @@ class Keystroke(str):
             return keystroke_char == char
 
         return modifier_predicate
-
-    def _build_keycode_predicate(
-            self, modifier_tokens: typing.List[str],
-            key_name: str) -> typing.Callable[[Optional[str], bool], bool]:
-        """
-        Build a predicate function for application key checking.
-
-        Returns a callable that checks if keystroke matches the expected keycode and modifiers.
-        """
-        def keycode_predicate(char: Optional[str] = None, ignore_case: bool = True) -> bool:
-            # ignore_case parameter is accepted but not used for application keys
-            # Application keys don't match when a character is provided
-            if char is not None:
-                return False
-
-            # Get expected keycode from key name
-            keycodes = get_keyboard_codes()
-            expected_key_constant = f'KEY_{key_name.upper()}'
-
-            # Find the keycode value
-            expected_code = None
-            for code, name in keycodes.items():
-                if name == expected_key_constant:
-                    expected_code = code
-                    break
-
-            if expected_code is None or self._code != expected_code:
-                return False
-
-            # Build expected modifier bits (same as _build_modifier_predicate)
-            expected_bits = 0
-            for token in modifier_tokens:
-                expected_bits |= getattr(KittyModifierBits, token)
-
-            # Check modifiers - exact match only
-            effective_bits = self.modifiers_bits & ~(
-                KittyModifierBits.caps_lock | KittyModifierBits.num_lock)
-            return effective_bits == expected_bits
-
-        return keycode_predicate
 
     def __getattr__(self, attr: str) -> typing.Callable[[Optional[str], bool], bool]:
         """
@@ -1022,20 +1036,20 @@ class Keystroke(str):
         # Extract tokens after 'is_'
         tokens_str = attr[3:]  # Remove 'is_' prefix
         if not tokens_str:
-            raise AttributeError(
-                f"'{self.__class__.__name__}' object has no attribute '{attr}'")
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}'")
 
         # Check if this matches the keystroke name directly (for key names with event types)
-        # e.g., is_key_shift_f2_released() should match name='KEY_SHIFT_F2_RELEASED'
+        # e.g., is_key_shift_f2_released() should match name='KEY_SHIFT_F2_RELEASED', this
+        # is the preferred and most exact match, but possible only for application keys.
         expected_name = tokens_str.upper()
         if self.name == expected_name:
             return lambda: True
 
-        # Try extracting event type suffix, only one of them should be used
+        # Try extracting event type suffix, only one may be used
         event_type = None
         for match_name in ('pressed', 'released', 'repeated'):
             if tokens_str.endswith(f'_{match_name}'):
-                # Remove '_pressed', etc. (length + 1 for the underscore)
+                # Mutate 'tokens_str', remove '_pressed', etc. 
                 event_type = match_name
                 tokens_str = tokens_str[:-len(match_name) - 1]
                 break
@@ -1050,42 +1064,45 @@ class Keystroke(str):
         tokens = tokens_str.split('_')
 
         # Separate modifiers from potential key name
-        modifiers = []
-        key_name_tokens = []
+        tokens_modifiers = []
+        tokens_key_names = []
 
+        # a mini 'getopt' for breaking modifiers_key_names -> [modifiers], [key_name_tokens]
         for i, token in enumerate(tokens):
             if token in KittyModifierBits.names_modifiers_only:
-                modifiers.append(token)
+                tokens_modifiers.append(token)
             else:
                 # Remaining tokens could be a key name
-                key_name_tokens = tokens[i:]
+                tokens_key_names = tokens[i:]
                 break
 
-        # If we have key name tokens, check if they form a valid application key
-        if key_name_tokens:
-            key_name = '_'.join(key_name_tokens)
+        # If we have any non-modifier tokens,
+        if tokens_key_names:
+            # check if they form a valid application key,
+            key_name = '_'.join(tokens_key_names)
             keycodes = get_keyboard_codes()
             expected_key_constant = f'KEY_{key_name.upper()}'
-
-            # Check if this is a valid application key
             if expected_key_constant in keycodes.values():
-                return self._build_keycode_predicate(modifiers, key_name)
+                # and return as predicate function
+                return self._build_appkeys_predicate(tokens_modifiers, key_name)
 
-        # No valid key name found - validate as modifier-only predicate
+        # No valid key name was found by 'tokens_key_names', this could just as
+        # easily be asking for an attribute that doesn't exist, or a spelling
+        # error of application key or modifier, report as 'invalid' token
         invalid_tokens = [token for token in tokens
                           if token not in KittyModifierBits.names_modifiers_only]
         if invalid_tokens:
             raise AttributeError(
                 f"'{self.__class__.__name__}' object has no attribute '{attr}' "
-                f"(invalid modifier tokens: {invalid_tokens})")
+                f"(invalid modifier or application key tokens: {invalid_tokens})")
 
-        # Return modifier predicate
-        return self._build_modifier_predicate(tokens)
+        # Return modifier predicate for alphanumeric keys
+        return self._build_alphanum_predicate(tokens_modifiers)
 
 # Device Attributes (DA1) response representation
 
 
-class DeviceAttribute(object):
+class DeviceAttribute():
     """
     Represents a terminal's Device Attributes (DA1) response.
 
@@ -1164,8 +1181,8 @@ class DeviceAttribute(object):
 
     def __repr__(self) -> str:
         """String representation of DeviceAttribute."""
-        return ('DeviceAttribute(service_class={}, extensions={}, supports_sixel={})'
-                .format(self.service_class, sorted(self.extensions), self.supports_sixel))
+        return (f'DeviceAttribute(service_class={self.service_class}, '
+                f'extensions={self.extensions}, supports_sixel={self.supports_sixel})')
 
     def __eq__(self, other: typing.Any) -> bool:
         """Check equality based on service class and extensions."""
@@ -1182,7 +1199,7 @@ def get_curses_keycodes() -> Dict[str, int]:
     :rtype: dict
     :returns: Dictionary of (name, code) pairs for curses keyboard constant
         values and their mnemonic name. Such as code ``260``, with the value of
-        its key-name identity, ``u'KEY_LEFT'``.
+        its key-name identity, ``'KEY_LEFT'``.
     """
     _keynames = [attr for attr in dir(curses)
                  if attr.startswith('KEY_')]
@@ -1197,7 +1214,7 @@ def get_keyboard_codes() -> Dict[int, str]:
     :rtype: dict
     :returns: Dictionary of (code, name) pairs for curses keyboard constant
         values and their mnemonic name. Such as key ``260``, with the value of
-        its identity, ``u'KEY_LEFT'``.
+        its identity, ``'KEY_LEFT'``.
 
     These keys are derived from the attributes by the same of the curses module,
     with the following exceptions:
@@ -1240,14 +1257,14 @@ def _alternative_left_right(term: 'Terminal') -> Dict[str, int]:
     the preferred input sequence for the left and right application keys.
 
     It is necessary to check the value of these sequences to ensure we do not
-    use ``u' '`` and ``u'\b'`` for ``KEY_RIGHT`` and ``KEY_LEFT``,
+    use ``' '`` and ``'\b'`` for ``KEY_RIGHT`` and ``KEY_LEFT``,
     preferring their true application key sequence, instead.
     """
     # pylint: disable=protected-access
     keymap = {}
-    if term._cuf1 and term._cuf1 != u' ':
+    if term._cuf1 and term._cuf1 != ' ':
         keymap[term._cuf1] = curses.KEY_RIGHT
-    if term._cub1 and term._cub1 != u'\b':
+    if term._cub1 and term._cub1 != '\b':
         keymap[term._cub1] = curses.KEY_LEFT
     return keymap
 
@@ -1265,7 +1282,7 @@ def get_keyboard_sequences(term: 'Terminal') -> 'OrderedDict[str, int]':
     Initialize and return a keyboard map and sequence lookup table,
     (sequence, keycode) from :class:`~.Terminal` instance ``term``,
     where ``sequence`` is a multibyte input sequence of unicode
-    characters, such as ``u'\x1b[D'``, and ``keycode`` is an integer
+    characters, such as ``'\x1b[D'``, and ``keycode`` is an integer
     value, matching curses constant such as term.KEY_LEFT.
 
     The return value is an OrderedDict instance, with their keys
@@ -1313,7 +1330,7 @@ def get_leading_prefixes(sequences: typing.Iterable[str]) -> Set[str]:
     input is a sequence that **may** lead to a final matching pattern.
 
     >>> prefixes(['abc', 'abdf', 'e', 'jkl'])
-    set([u'a', u'ab', u'abd', u'j', u'jk'])
+    set(['a', 'ab', 'abd', 'j', 'jk'])
     """
     return {seq[:i] for seq in sequences for i in range(1, len(seq))}
 
@@ -1329,7 +1346,7 @@ def resolve_sequence(  # pylint: disable=too-many-positional-arguments
     Return a single :class:`Keystroke` instance for given sequence ``text``.
 
     :arg str text: string of characters received from terminal input stream.
-    :arg OrderedDict mapper: unicode multibyte sequences, such as ``u'\x1b[D'``
+    :arg OrderedDict mapper: unicode multibyte sequences, such as ``'\x1b[D'``
         paired by their integer value (260)
     :arg dict codes: a :type:`dict` of integer values (such as 260) paired
         by their mnemonic name, such as ``'KEY_LEFT'``.
@@ -1465,11 +1482,12 @@ def _match_dec_event(text: str, mode_1016_active: Optional[bool] = None) -> Opti
     """
     for mode, pattern in DEC_EVENT_PATTERNS:
         match = pattern.match(text)
+        ref_mode = mode
         if match:
-            if mode == DecPrivateMode.MOUSE_EXTENDED_SGR and mode_1016_active:
+            if ref_mode == DecPrivateMode.MOUSE_EXTENDED_SGR and mode_1016_active:
                 # recast mode 1006 as mode 1016 if that mode is known to be active
-                mode = DecPrivateMode.MOUSE_SGR_PIXELS
-            return Keystroke(ucs=match.group(0), mode=mode, match=match)
+                ref_mode = DecPrivateMode.MOUSE_SGR_PIXELS
+            return Keystroke(ucs=match.group(0), mode=ref_mode, match=match)
     return None
 
 
@@ -1506,9 +1524,11 @@ def _match_kitty_key(text: str) -> Optional[Keystroke]:
             _codepoints_text = match.group('text_codepoints').split(':')
             _int_codepoints = tuple(int(cp) for cp in _codepoints_text if cp)
 
+        unicode_key = int(match.group('unicode_key'))
+
         # Create KittyKeyEvent namedtuple
         kitty_event = KittyKeyEvent(
-            unicode_key=int(match.group('unicode_key')),
+            unicode_key=unicode_key,
             shifted_key=int_when_non_empty(match, 'shifted_key'),
             base_key=int_when_non_empty(match, 'base_key'),
             modifiers=int_when_non_empty_otherwise_1(match, 'modifiers'),
@@ -1516,8 +1536,17 @@ def _match_kitty_key(text: str) -> Optional[Keystroke]:
             int_codepoints=_int_codepoints
         )
 
+        # Map PUA keypad codes to their key constants
+        # This allows keypad keys to have proper names like KEY_KP_END_PUA
+        # Note: We set code but NOT name, so _get_modified_keycode_name() can
+        # dynamically generate names with modifiers and event types
+        keycode = None
+        if unicode_key in range(57399, 57428):
+            keycode = unicode_key
+
         # Create Keystroke with special mode to indicate Kitty protocol
         return Keystroke(ucs=match.group(0),
+                         code=keycode,
                          mode=DecPrivateMode.SpecialInternalKitty,
                          match=kitty_event)
 
@@ -1581,6 +1610,7 @@ def _match_legacy_csi_modifiers(text: str) -> Optional[Keystroke]:
             'B': curses.KEY_DOWN,
             'C': curses.KEY_RIGHT,
             'D': curses.KEY_LEFT,
+            'E': curses.KEY_B2,
             'F': curses.KEY_END,
             'H': curses.KEY_HOME,
             'P': curses.KEY_F1,
@@ -1725,6 +1755,38 @@ KEY_RIGHT_SUPER = 57450         # 0xE06A
 KEY_RIGHT_HYPER = 57451         # 0xE06B
 KEY_RIGHT_META = 57452          # 0xE06C
 
+# Kitty keyboard protocol PUA key codes for numeric keypad keys
+# These allow distinguishing keypad keys from main keyboard keys in disambiguate mode
+KEY_KP_0_PUA = 57399            # 0xE047
+KEY_KP_1_PUA = 57400            # 0xE048
+KEY_KP_2_PUA = 57401            # 0xE049
+KEY_KP_3_PUA = 57402            # 0xE04A
+KEY_KP_4_PUA = 57403            # 0xE04B
+KEY_KP_5_PUA = 57404            # 0xE04C
+KEY_KP_6_PUA = 57405            # 0xE04D
+KEY_KP_7_PUA = 57406            # 0xE04E
+KEY_KP_8_PUA = 57407            # 0xE04F
+KEY_KP_9_PUA = 57408            # 0xE050
+KEY_KP_DECIMAL_PUA = 57409      # 0xE051
+KEY_KP_DIVIDE_PUA = 57410       # 0xE052
+KEY_KP_MULTIPLY_PUA = 57411     # 0xE053
+KEY_KP_SUBTRACT_PUA = 57412     # 0xE054
+KEY_KP_ADD_PUA = 57413          # 0xE055
+KEY_KP_ENTER_PUA = 57414        # 0xE056
+KEY_KP_EQUAL_PUA = 57415        # 0xE057
+KEY_KP_SEPARATOR_PUA = 57416    # 0xE058
+KEY_KP_LEFT_PUA = 57417         # 0xE059
+KEY_KP_RIGHT_PUA = 57418        # 0xE05A
+KEY_KP_UP_PUA = 57419           # 0xE05B
+KEY_KP_DOWN_PUA = 57420         # 0xE05C
+KEY_KP_PAGE_UP_PUA = 57421      # 0xE05D
+KEY_KP_PAGE_DOWN_PUA = 57422    # 0xE05E
+KEY_KP_HOME_PUA = 57423         # 0xE05F
+KEY_KP_END_PUA = 57424          # 0xE060
+KEY_KP_INSERT_PUA = 57425       # 0xE061
+KEY_KP_DELETE_PUA = 57426       # 0xE062
+KEY_KP_BEGIN_PUA = 57427        # 0xE063
+
 #: In a perfect world, terminal emulators would always send exactly what
 #: the terminfo(5) capability database plans for them, accordingly by the
 #: value of the ``TERM`` name they declare.
@@ -1751,15 +1813,16 @@ DEFAULT_SEQUENCE_MIXIN = (
     (chr(27), curses.KEY_EXIT),
     (chr(127), curses.KEY_BACKSPACE),
 
-    (u"\x1b[A", curses.KEY_UP),
-    (u"\x1b[B", curses.KEY_DOWN),
-    (u"\x1b[C", curses.KEY_RIGHT),
-    (u"\x1b[D", curses.KEY_LEFT),
-    (u"\x1b[F", curses.KEY_END),
-    (u"\x1b[H", curses.KEY_HOME),
-    (u"\x1b[K", curses.KEY_END),
-    (u"\x1b[U", curses.KEY_NPAGE),
-    (u"\x1b[V", curses.KEY_PPAGE),
+    ("\x1b[A", curses.KEY_UP),
+    ("\x1b[B", curses.KEY_DOWN),
+    ("\x1b[C", curses.KEY_RIGHT),
+    ("\x1b[D", curses.KEY_LEFT),
+    ("\x1b[E", curses.KEY_B2),
+    ("\x1b[F", curses.KEY_END),
+    ("\x1b[H", curses.KEY_HOME),
+    ("\x1b[K", curses.KEY_END),
+    ("\x1b[U", curses.KEY_NPAGE),
+    ("\x1b[V", curses.KEY_PPAGE),
 
     # keys sent after term.smkx (keypad_xmit) is emitted, source:
     # http://www.xfree86.org/current/ctlseqs.html#PC-Style%20Function%20Keys
@@ -1768,59 +1831,59 @@ DEFAULT_SEQUENCE_MIXIN = (
     # keypad, numlock on -- these sequences cause quite a stir, unlike almost
     # every other kind of application or "special input" keys, they do not begin
     # with CSI !!
-    (u"\x1bOM", curses.KEY_ENTER),
-    (u"\x1bOj", KEY_KP_MULTIPLY),
-    (u"\x1bOk", KEY_KP_ADD),
-    (u"\x1bOl", KEY_KP_SEPARATOR),
-    (u"\x1bOm", KEY_KP_SUBTRACT),
-    (u"\x1bOn", KEY_KP_DECIMAL),
-    (u"\x1bOo", KEY_KP_DIVIDE),
-    (u"\x1bOX", KEY_KP_EQUAL),
-    (u"\x1bOp", KEY_KP_0),
-    (u"\x1bOq", KEY_KP_1),
-    (u"\x1bOr", KEY_KP_2),
-    (u"\x1bOs", KEY_KP_3),
-    (u"\x1bOt", KEY_KP_4),
-    (u"\x1bOu", KEY_KP_5),
-    (u"\x1bOv", KEY_KP_6),
-    (u"\x1bOw", KEY_KP_7),
-    (u"\x1bOx", KEY_KP_8),
-    (u"\x1bOy", KEY_KP_9),
+    ("\x1bOM", curses.KEY_ENTER),
+    ("\x1bOj", KEY_KP_MULTIPLY),
+    ("\x1bOk", KEY_KP_ADD),
+    ("\x1bOl", KEY_KP_SEPARATOR),
+    ("\x1bOm", KEY_KP_SUBTRACT),
+    ("\x1bOn", KEY_KP_DECIMAL),
+    ("\x1bOo", KEY_KP_DIVIDE),
+    ("\x1bOX", KEY_KP_EQUAL),
+    ("\x1bOp", KEY_KP_0),
+    ("\x1bOq", KEY_KP_1),
+    ("\x1bOr", KEY_KP_2),
+    ("\x1bOs", KEY_KP_3),
+    ("\x1bOt", KEY_KP_4),
+    ("\x1bOu", KEY_KP_5),
+    ("\x1bOv", KEY_KP_6),
+    ("\x1bOw", KEY_KP_7),
+    ("\x1bOx", KEY_KP_8),
+    ("\x1bOy", KEY_KP_9),
 
     # We wouldn't even bother to detect them unless 'term.smkx' was known to be
     # emitted with a context manager... if it weren't for these "legacy" DEC VT
     # special keys, that are now transmitted as F1-F4 for many terminals, unless
     # negotiated to do something else! There is a lot of legacy to these F keys
     # in particular, a bit of sordid story.
-    (u"\x1bOP", curses.KEY_F1),
-    (u"\x1bOQ", curses.KEY_F2),
-    (u"\x1bOR", curses.KEY_F3),
-    (u"\x1bOS", curses.KEY_F4),
+    ("\x1bOP", curses.KEY_F1),
+    ("\x1bOQ", curses.KEY_F2),
+    ("\x1bOR", curses.KEY_F3),
+    ("\x1bOS", curses.KEY_F4),
 
     # Kitty disambiguate mode: F1-F4 sent as CSI sequences instead of SS3
     # F1 = CSI P, F2 = CSI Q, F3 = CSI 13~, F4 = CSI S
     # Note: These must come after longer sequences that start with \x1b[ to avoid
     # premature matching, but get_keyboard_sequences() sorts by length anyway.
-    (u"\x1b[P", curses.KEY_F1),
-    (u"\x1b[Q", curses.KEY_F2),
-    (u"\x1b[13~", curses.KEY_F3),
-    (u"\x1b[S", curses.KEY_F4),
+    ("\x1b[P", curses.KEY_F1),
+    ("\x1b[Q", curses.KEY_F2),
+    ("\x1b[13~", curses.KEY_F3),
+    ("\x1b[S", curses.KEY_F4),
 
     # keypad, numlock off
-    (u"\x1b[1~", curses.KEY_FIND),         # find
-    (u"\x1b[2~", curses.KEY_IC),           # insert (0)
-    (u"\x1b[3~", curses.KEY_DC),           # delete (.), "Execute"
-    (u"\x1b[4~", curses.KEY_SELECT),       # select
-    (u"\x1b[5~", curses.KEY_PPAGE),        # pgup   (9)
-    (u"\x1b[6~", curses.KEY_NPAGE),        # pgdown (3)
-    (u"\x1b[7~", curses.KEY_HOME),         # home
-    (u"\x1b[8~", curses.KEY_END),          # end
-    (u"\x1b[OA", curses.KEY_UP),           # up     (8)
-    (u"\x1b[OB", curses.KEY_DOWN),         # down   (2)
-    (u"\x1b[OC", curses.KEY_RIGHT),        # right  (6)
-    (u"\x1b[OD", curses.KEY_LEFT),         # left   (4)
-    (u"\x1b[OF", curses.KEY_END),          # end    (1)
-    (u"\x1b[OH", curses.KEY_HOME),         # home   (7)
+    ("\x1b[1~", curses.KEY_FIND),         # find
+    ("\x1b[2~", curses.KEY_IC),           # insert (0)
+    ("\x1b[3~", curses.KEY_DC),           # delete (.), "Execute"
+    ("\x1b[4~", curses.KEY_SELECT),       # select
+    ("\x1b[5~", curses.KEY_PPAGE),        # pgup   (9)
+    ("\x1b[6~", curses.KEY_NPAGE),        # pgdown (3)
+    ("\x1b[7~", curses.KEY_HOME),         # home
+    ("\x1b[8~", curses.KEY_END),          # end
+    ("\x1b[OA", curses.KEY_UP),           # up     (8)
+    ("\x1b[OB", curses.KEY_DOWN),         # down   (2)
+    ("\x1b[OC", curses.KEY_RIGHT),        # right  (6)
+    ("\x1b[OD", curses.KEY_LEFT),         # left   (4)
+    ("\x1b[OF", curses.KEY_END),          # end    (1)
+    ("\x1b[OH", curses.KEY_HOME),         # home   (7)
 
 )
 

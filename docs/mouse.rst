@@ -18,15 +18,15 @@ Here's a simple example that waits for you to click anywhere:
 
     term = Terminal()
     print("Click anywhere!")
-    
+
     # Enable mouse click tracking with modern SGR format
     with term.cbreak(), term.dec_modes_enabled(
             DecPrivateMode.MOUSE_REPORT_CLICK,
             DecPrivateMode.MOUSE_EXTENDED_SGR, timeout=1):
-        
+
         while True:
             event = term.inkey()
-            
+
             # Check if this is a mouse event
             if event.mode == DecPrivateMode.MOUSE_EXTENDED_SGR:
                 mouse = event.mode_values()
@@ -61,11 +61,11 @@ Not all terminals support mouse modes. You can test for DEC Private Mode,
    from blessed import Terminal, DecPrivateMode
 
    term = Terminal()
-   
+
    # Query mouse support with a 1 second timeout
    mode_test = DecPrivateMode.MOUSE_EXTENDED_SGR
    response = term.get_dec_mode(mode_test, timeout=1)
-   
+
    if response.is_supported():
        print("Mouse tracking is supported", end='')
        if response.is_enabled():
@@ -74,7 +74,7 @@ Not all terminals support mouse modes. You can test for DEC Private Mode,
            print(", and may be enabled")
    else:
        print("Mode not supported, {mode}")
-        
+
 The :meth:`~.Terminal.get_dec_mode` method queries the terminal's capabilities
 for any particular mode with a response that can be tested with
 ``is_supported()`` and ``is_enabled()``.
@@ -134,9 +134,9 @@ The :class:`~.MouseEvent` fields are:
 
         if not term.get_dec_mode(DecPrivateMode.MOUSE_EXTENDED_SGR).is_supported():
             print("SGR Mouse mode not supported! This example won't work :(")
-        
+
         event = term.inkey()
-        
+
         if event.mode == DecPrivateMode.MOUSE_EXTENDED_SGR:
             print("This is a mouse event!")
             mouse = event.mode_values()
@@ -162,14 +162,14 @@ This example shows the details of a Mouse Event after enabling
     with term.cbreak(), term.dec_modes_enabled(
             DecPrivateMode.MOUSE_REPORT_CLICK,
             DecPrivateMode.MOUSE_EXTENDED_SGR, timeout=1):
-        
+
         print("Click anywhere (or press 'q' to quit):")
         while True:
             event = term.inkey()
-            
+
             if event == 'q':
                 break
-            
+
             if event.mode == DecPrivateMode.MOUSE_EXTENDED_SGR:
                 mouse = event.mode_values()
                 if not mouse.is_release:

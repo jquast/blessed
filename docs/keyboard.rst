@@ -43,7 +43,7 @@ is returned, ``''``
     print("Cross animation, press any key to stop: ", end="", flush=True)
     with term.cbreak(), term.hidden_cursor():
         cross = '|'
-        
+
         while True:
             key = term.inkey(timeout=0.1)
             if key:
@@ -79,7 +79,7 @@ function keys, and any character key combined with modifiers (Ctrl, Alt, Shift).
     term = Terminal()
     with term.cbreak():
         key = term.inkey()
-        
+
         if key.is_sequence:
             print(f"Special key: {key.name}")
         else:
@@ -158,9 +158,9 @@ When multiple modifiers are specified, they always in the following order
 - ``ALT``
 - ``SHIFT``
 
-The escape sequence, ``'\x1b['``, is always decoded as name ``CSI`` when it                                               
-arrives without any known matching sequence. There is no ``KEY_ALT_[`` except                                             
-when Kitty_ modes disambiguate, are active.
+The escape sequence, ``'\x1b['``, is always decoded as name ``CSI`` when it
+arrives without any known matching sequence. There are not any matches
+for Keystroke name ``KEY_ALT_[`` except when Kitty_ modes are used.
 
 Magic Methods
 ~~~~~~~~~~~~~
@@ -176,16 +176,16 @@ keys with modifiers. These methods all start with ``is_``:
     print('Press ^C or F10 to exit raw mode!')
     with term.raw():
         key = term.inkey()
-        
+
         # Check for specific character with modifier
         if key.is_ctrl('c') or key.is_f10():
             print(f"Exit by key named {key.name}")
             break
-        
+
         # Check for function key
         if key.is_f1():
             print("F1 pressed")
-        
+
         # Check for arrow key with modifier
         if key.is_shift_left():
             print("Shift+Left arrow pressed")

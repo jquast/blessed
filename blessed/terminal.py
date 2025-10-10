@@ -271,7 +271,6 @@ class Terminal():
         self._kitty_kb_first_query_attempted = False
 
         # Device Attributes (DA1) cache
-        # pylint: disable=attribute-defined-outside-init
         self._device_attributes_cache: Optional[DeviceAttribute] = None
 
     def __init_set_styling(self, force_styling: bool) -> None:
@@ -336,7 +335,7 @@ class Terminal():
         self._init_descriptor = stream_fd
         if stream_fd is None:
             try:
-                self._init_descriptor = sys.__stdout__.fileno()  # type: ignore
+                self._init_descriptor = sys.__stdout__.fileno()
             except ValueError as err:
                 self.errors.append(f'Unable to determine __stdout__ file descriptor: {err}')
 
@@ -632,7 +631,7 @@ class Terminal():
             self.stream.flush()
 
             # Wait for response
-            match, data = _read_until(term=self,  # pylint: disable=unpacking-non-sequence
+            match, data = _read_until(term=self,
                                       pattern=response_re,
                                       timeout=timeout)
 
@@ -834,14 +833,14 @@ class Terminal():
             elif isinstance(mode, int):
                 mode_num = mode
             else:
-                raise TypeError("Invalid mode argument number {0}, got {1!r}, "
-                                "DecPrivateMode or int expected".format(arg_pos, mode))
+                raise TypeError(f"Invalid mode argument number {arg_pos}, got {mode!r}, "
+                                "DecPrivateMode or int expected")
             mode_numbers.append(mode_num)
 
         if not self.does_styling or not mode_numbers:
             return
 
-        sequence = '\x1b[?{0}h'.format(';'.join(str(val) for val in mode_numbers))
+        sequence = f'\x1b[?{";".join(str(val) for val in mode_numbers)}h'
         self.stream.write(sequence)
         self.stream.flush()
 
@@ -874,14 +873,14 @@ class Terminal():
             elif isinstance(mode, int):
                 mode_num = mode
             else:
-                raise TypeError("Invalid mode argument number {0}, got {1!r}, "
-                                "DecPrivateMode or int expected".format(arg_pos, mode))
+                raise TypeError(f"Invalid mode argument number {arg_pos}, got {mode!r}, "
+                                "DecPrivateMode or int expected")
             mode_numbers.append(mode_num)
 
         if not self.does_styling or not modes:
             return
 
-        sequence = '\x1b[?{0}l'.format(';'.join(str(val) for val in mode_numbers))
+        sequence = f'\x1b[?{";".join(str(val) for val in mode_numbers)}l'
         self.stream.write(sequence)
         self.stream.flush()
 
@@ -939,10 +938,9 @@ class Terminal():
             if response.is_supported():
                 print("Synchronized output is available")
         """
-        # pylint: disable=too-many-return-statements
         if not isinstance(mode, (int, DecPrivateMode)):
-            raise TypeError("Invalid mode argument, got {0!r}, "
-                            "DecPrivateMode or int expected".format(mode))
+            raise TypeError(f"Invalid mode argument, got {mode!r}, "
+                            "DecPrivateMode or int expected")
 
         if not self.does_styling or not self.is_a_tty:
             # no query is ever done for terminals where does_styling is False
@@ -959,13 +957,10 @@ class Terminal():
             return DecModeResponse(mode, cached_value)
 
         # Build and send query sequence and expected response pattern
-        query = '\x1b[?{0:d}$p'.format(int(mode))
-        response_pattern = re.compile('\x1b\\[\\?{0:d};([0-4])\\$y'.format(int(mode)))
+        query = f'\x1b[?{int(mode):d}$p'
+        response_pattern = re.compile(f'\x1b\\[\\?{int(mode):d};([0-4])\\$y')
 
-        match = self._query_response(query, response_pattern, timeout)
-
-        # pylint issues with _dec_first_query_failed and _dec_any_query_succeeded
-        # ignored, pylint: disable=attribute-defined-outside-init
+        match = self._query_response(query, response_pattern, timeout)  # type: ignore
 
         # invalid or no response (timeout)
         if match is None:
@@ -983,6 +978,7 @@ class Terminal():
 
         # parse, cache, and return the response value
         response_value = int(match.group(1))
+        # pylint: disable=attribute-defined-outside-init
         self._dec_mode_cache[int(mode)] = response_value
         self._dec_any_query_succeeded = True
         return DecModeResponse(mode, response_value)
@@ -1230,8 +1226,8 @@ class Terminal():
             elif isinstance(mode, int):
                 mode_num = mode
             else:
-                raise TypeError("Invalid mode argument number {0}, got {1!r}, "
-                                "DecPrivateMode or int expected".format(arg_pos, mode))
+                raise TypeError(f"Invalid mode argument number {arg_pos}, got {mode!r}, "
+                                "DecPrivateMode or int expected")
 
             response = self.get_dec_mode(mode_num, timeout=timeout)
             if response.is_supported() and not response.is_enabled():
@@ -1267,8 +1263,8 @@ class Terminal():
             elif isinstance(mode, int):
                 mode_num = mode
             else:
-                raise TypeError("Invalid mode argument number {0}, got {1!r}, "
-                                "DecPrivateMode or int expected".format(arg_pos, mode))
+                raise TypeError(f"Invalid mode argument number {arg_pos}, got {mode!r}, "
+                                "DecPrivateMode or int expected")
 
             response = self.get_dec_mode(mode_num, timeout=timeout)
             if response.is_supported() and response.is_enabled():

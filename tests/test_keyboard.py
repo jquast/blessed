@@ -304,6 +304,7 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
         assert resolve("\x1b[B").name == "KEY_DOWN"
         assert resolve("\x1b[C").name == "KEY_RIGHT"
         assert resolve("\x1b[D").name == "KEY_LEFT"
+        assert resolve("\x1b[E").name == "KEY_CENTER"
         assert resolve("\x1b[U").name == "KEY_PGDOWN"
         assert resolve("\x1b[V").name == "KEY_PGUP"
         assert resolve("\x1b[H").name == "KEY_HOME"
@@ -337,6 +338,59 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
         assert resolve("\x1b[8~").name == "KEY_END"
 
     child('xterm')
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="no multiprocess")
+def test_kp_begin_center_key():
+    """Test KP_BEGIN/center key (numpad 5) with modifiers and event types."""
+    @as_subprocess
+    def child():
+        from blessed.keyboard import _match_legacy_csi_modifiers
+        
+        # Basic sequence without modifiers
+        ks = _match_legacy_csi_modifiers('\x1b[E')
+        assert ks is None  # Doesn't match - needs modifiers for legacy CSI
+        
+        # With modifiers - Ctrl
+        ks = _match_legacy_csi_modifiers('\x1b[1;5E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.name == 'KEY_CTRL_CENTER'
+        
+        # With modifiers - Alt
+        ks = _match_legacy_csi_modifiers('\x1b[1;3E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.name == 'KEY_ALT_CENTER'
+        
+        # With modifiers - Ctrl+Alt
+        ks = _match_legacy_csi_modifiers('\x1b[1;7E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.name == 'KEY_CTRL_ALT_CENTER'
+        
+        # With event type - release (the original issue case)
+        ks = _match_legacy_csi_modifiers('\x1b[1;1:3E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.released
+        assert ks.name == 'KEY_CENTER_RELEASED'
+        
+        # With event type - repeat
+        ks = _match_legacy_csi_modifiers('\x1b[1;1:2E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.repeated
+        assert ks.name == 'KEY_CENTER_REPEATED'
+        
+        # With modifiers and event type
+        ks = _match_legacy_csi_modifiers('\x1b[1;5:3E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.released
+        assert ks.name == 'KEY_CTRL_CENTER_RELEASED'
+        
+    child()
 
 
 def test_ESCDELAY_unset_unchanged():

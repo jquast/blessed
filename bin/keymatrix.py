@@ -285,7 +285,20 @@ def format_key_event(term, keystroke) -> str:
     if keystroke.mode and int(keystroke.mode) > 0:
         extra = f'{keystroke.mode}:{keystroke.mode_values()!r}'
     else:
-        extra = f'modifiers?={keystroke.modifiers!r}'
+        events = []
+        for event_name in ('pressed', 'released', 'repeated'):
+            if getattr(keystroke, event_name):
+                events.append(event_name)
+        assert len(events) == 1, events
+        modifiers = []
+        for modifier_name in (
+            # possible with most terminals
+            'shift', 'alt', 'ctrl',
+            # kitty, only
+            'super', 'hyper', 'meta', 'caps_lock', 'num_lock'):
+                if getattr(keystroke, f'_{modifier_name}'):
+                    modifiers.append(modifier_name.upper())
+        extra = f'{events[0]} {"+".join(modifiers)}'
 
     trim_mode = max(10, term.width - 25 - 20 - 6 - 3)
     return f"{value_repr:<6} {seq_repr:<20} {name_repr:<25} {extra[:trim_mode]}"
@@ -327,7 +340,7 @@ def main():
         do_exit = False
         while not do_exit:
             # Handle user input
-            inp = term.inkey(0.1)
+            inp = term.inkey()
             for mgr in (dec_manager, kitty_manager):
                 if inp.name in mgr.toggle_keynames():
                     index = mgr.get_index_by_key(inp.name)

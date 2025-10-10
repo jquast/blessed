@@ -36,7 +36,7 @@ class DecModeResponse:
         elif isinstance(mode, int):
             self._mode_value = mode
         else:
-            raise TypeError("Invalid mode got {0!r}, DecPrivateMode or int expected".format(mode))
+            raise TypeError(f"Invalid mode got {mode!r}, DecPrivateMode or int expected")
         self._value = value
 
     @property
@@ -95,7 +95,7 @@ class DecModeResponse:
         :rtype: bool
         :returns: True if mode is set (temporarily or permanently)
         """
-        return self.value in (1, 3)
+        return self.value in {1, 3}
 
     def is_disabled(self) -> bool:
         """
@@ -104,7 +104,7 @@ class DecModeResponse:
         :rtype: bool
         :returns: True if mode is reset (temporarily or permanently)
         """
-        return self.value in (2, 4)
+        return self.value in {2, 4}
 
     def is_changeable(self) -> bool:
         """
@@ -113,7 +113,7 @@ class DecModeResponse:
         :rtype: bool
         :returns: True if mode can be toggled by applications
         """
-        return self.value in (1, 2)
+        return self.value in {1, 2}
 
     def is_permanent(self) -> bool:
         """
@@ -122,7 +122,7 @@ class DecModeResponse:
         :rtype: bool
         :returns: True if mode cannot be changed by applications
         """
-        return self.value in (3, 4)
+        return self.value in {3, 4}
 
     def is_failed(self) -> bool:
         """

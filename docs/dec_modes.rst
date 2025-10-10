@@ -24,7 +24,7 @@ A simple example:
         # Cursor is hidden
         print("Working...")
         time.sleep(2)
- 
+
 
 Using get_dec_mode (DECRQM)
 ---------------------------
@@ -39,9 +39,9 @@ reporting", :attr:`~blessed.dec_mode.DecPrivateMode.MOUSE_REPORT_CLICK` like so:
 
    from blessed import Terminal
    from blessed.dec_modes import DecPrivateMode
-   
+
    term = Terminal()
-   
+
    # make query
    response = term.get_dec_mode(DecPrivateMode.MOUSE_REPORT_CLICK, timeout=1.0)
 
@@ -100,7 +100,7 @@ DEC Private Mode queries involve terminal communication and *may* timeout:
 
     mode = DecPrivateMode(DecPrivateMode.DECTCEM)
     resp = term.get_dec_mode(mode, timeout=1.0)
-    
+
     if resp.is_failed():
         print("Query failed for mode", repr(mode))
 
@@ -168,9 +168,10 @@ used, causing a 1 second delay on first loop.
 Receiving DEC Events
 ~~~~~~~~~~~~~~~~~~~~
 
-When DEC Private Modes are enabled, the terminal sends special event sequences that can be received 
-through :meth:`~blessed.Terminal.inkey`. These events have an :attr:`~blessed.keyboard.Keystroke.event_mode` 
-property and provide structured data through :meth:`~blessed.keyboard.Keystroke.mode_values`.
+When DEC Private Modes are enabled, the terminal sends special event sequences
+that can be received through :meth:`~blessed.Terminal.inkey`. These events have
+an :attr:`~blessed.keyboard.Keystroke.event_mode` property and provide
+structured data through :meth:`~blessed.keyboard.Keystroke.mode_values`.
 
 Bracketed Paste Events
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -183,13 +184,13 @@ received by a :class:`Keystroke` from the :meth:`~Terminal.inkey` method.
     from blessed import Terminal
     from blessed.dec_modes import DecPrivateMode
     from blessed.keyboard import BracketedPasteEvent
-    
+
     term = Terminal()
-    
+
     with term.dec_modes_enabled(DecPrivateMode.BRACKETED_PASTE):
         print("Paste some text...")
         ks = term.inkey()
-        
+
         if ks.event_mode == DecPrivateMode.BRACKETED_PASTE:
             event = ks.mode_values()
             print(f"Pasted: {repr(event.text)}")
@@ -206,19 +207,19 @@ Mouse tracking modes send detailed mouse event information:
     from blessed import Terminal
     from blessed.dec_modes import DecPrivateMode
     from blessed.keyboard import MouseSGREvent
-    
+
     term = Terminal()
-    
+
     with term.dec_modes_enabled(DecPrivateMode.MOUSE_EXTENDED_SGR):
         print("Click, drag, or scroll...")
         while True:
             ks = term.inkey()
-            
+
             if ks.event_mode == DecPrivateMode.MOUSE_EXTENDED_SGR:
                 event = ks.mode_values()
-                action = "release" if event.is_release else "press" 
+                action = "release" if event.is_release else "press"
                 print(f"Mouse {action}: button={event.button} at ({event.x}, {event.y})")
-                
+
                 if event.shift:
                     print("  + Shift modifier")
                 if event.is_wheel:
@@ -227,7 +228,7 @@ Mouse tracking modes send detailed mouse event information:
             elif ks == 'q':
                 break
 
-Focus Events  
+Focus Events
 ^^^^^^^^^^^^
 
 Focus tracking reports when the terminal window gains or loses focus:
@@ -237,14 +238,14 @@ Focus tracking reports when the terminal window gains or loses focus:
     from blessed import Terminal
     from blessed.dec_modes import DecPrivateMode
     from blessed.keyboard import FocusEvent
-    
+
     term = Terminal()
-    
+
     with term.dec_modes_enabled(DecPrivateMode.FOCUS_IN_OUT_EVENTS):
         print("Switch focus to/from terminal window...")
         while True:
             ks = term.inkey()
-            
+
             if ks.event_mode == DecPrivateMode.FOCUS_IN_OUT_EVENTS:
                 event = ks.mode_values()
                 status = "gained" if event.gained else "lost"
@@ -256,20 +257,22 @@ Focus tracking reports when the terminal window gains or loses focus:
 Focus Events
 ------------
 
-As a bonus, blessed also supports focus tracking! Enable :attr:`DecPrivateMode.FOCUS_IN_OUT_EVENTS` to receive events when the terminal window gains or loses focus:
+As a bonus, blessed also supports focus tracking! Enable
+:attr:`DecPrivateMode.FOCUS_IN_OUT_EVENTS` to receive events when the terminal
+window gains or loses focus:
 
 .. code-block:: python
 
     from blessed import Terminal, DecPrivateMode
 
     term = Terminal()
-    
+
     with term.cbreak(), term.dec_modes_enabled(DecPrivateMode.FOCUS_IN_OUT_EVENTS):
         print("Switch to another window and back...")
-        
+
         while True:
             event = term.inkey()
-            
+
             if event.mode == DecPrivateMode.FOCUS_IN_OUT_EVENTS:
                 focus = event.mode_values()
                 if focus.gained:
@@ -278,7 +281,8 @@ As a bonus, blessed also supports focus tracking! Enable :attr:`DecPrivateMode.F
                     print("Window lost focus!")
                 break
 
-This can be useful for pausing animations or updating status when the user switches away from your application.
+This can be useful for pausing animations or updating status when the user
+switches away from your application.
 
 Summary
 -------
