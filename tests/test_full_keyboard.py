@@ -136,6 +136,9 @@ def test_kbhit_interrupted_nonetype():
     assert math.floor(time.time() - stime) == 0
 
 
+
+
+
 def test_kbhit_no_kb():
     """kbhit() always immediately returns False without a keyboard."""
     @as_subprocess
@@ -885,3 +888,6 @@ def test_get_device_attributes_no_response():
     stime = time.time()
     pid, status = os.waitpid(pid, 0)
     assert os.WEXITSTATUS(status) == 0
+
+
+
