@@ -14,6 +14,7 @@ References,
 
 # std imports
 import collections
+from typing import Set, Dict, Tuple
 
 __all__ = (
     'CGA_COLORS',
@@ -22,18 +23,18 @@ __all__ = (
     'X11_COLORNAMES_TO_RGB',
 )
 
-CGA_COLORS = {'black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'}
+CGA_COLORS: Set[str] = {'black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'}
 
 
 class RGBColor(collections.namedtuple("RGBColor", ["red", "green", "blue"])):
     """Named tuple for an RGB color definition."""
 
-    def __str__(self):
-        return '#{0:02x}{1:02x}{2:02x}'.format(*self)
+    def __str__(self) -> str:
+        return f'#{self.red:02x}{self.green:02x}{self.blue:02x}'
 
 
 #: X11 Color names to (XTerm-defined) RGB values from xorg-rgb/rgb.txt
-X11_COLORNAMES_TO_RGB = {
+X11_COLORNAMES_TO_RGB: Dict[str, RGBColor] = {
     'aliceblue': RGBColor(240, 248, 255),
     'antiquewhite': RGBColor(250, 235, 215),
     'antiquewhite1': RGBColor(255, 239, 219),
@@ -713,7 +714,7 @@ X11_COLORNAMES_TO_RGB = {
 }
 
 #: Curses color indices of 8, 16, and 256-color terminals
-RGB_256TABLE = (
+RGB_256TABLE: Tuple[RGBColor, ...] = (
     RGBColor(0, 0, 0),
     RGBColor(205, 0, 0),
     RGBColor(0, 205, 0),

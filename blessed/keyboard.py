@@ -6,12 +6,13 @@ import re
 import time
 import typing
 import platform
-import functools
 from typing import Set, Dict, Match, Tuple, TypeVar, Optional
 from collections import OrderedDict, namedtuple
 
-# local
-from blessed._compat import TextType, unicode_chr
+if TYPE_CHECKING:  # pragma: no cover
+    # local
+    from blessed.terminal import Terminal
+
 
 _T = TypeVar('_T', bound='Keystroke')
 
@@ -87,6 +88,8 @@ class Keystroke(str):
     :attr:`modifiers` property and helper methods like :meth:`is_ctrl`,
     :meth:`is_alt`, etc.
     """
+    _name = None
+    _code = None
 
     def __new__(cls: typing.Type[_T], ucs: str = '', code: Optional[int] = None,
                 name: Optional[str] = None, mode: Optional[int] = None,
@@ -324,6 +327,11 @@ class Keystroke(str):
     def code(self) -> Optional[int]:
         """Legacy curses-alike keycode value (int)."""
         return self._code
+
+    @property
+    def name(self) -> typing.Optional[str]:
+        """String-name of key sequence, such as ``'KEY_LEFT'`` (str)."""
+        return self._name
 
     @property
     def modifiers(self) -> int:
@@ -699,7 +707,7 @@ def get_curses_keycodes() -> Dict[str, int]:
     :rtype: dict
     :returns: Dictionary of (name, code) pairs for curses keyboard constant
         values and their mnemonic name. Such as code ``260``, with the value of
-        its key-name identity, ``u'KEY_LEFT'``.
+        its key-name identity, ``'KEY_LEFT'``.
     """
     _keynames = [attr for attr in dir(curses)
                  if attr.startswith('KEY_')]
@@ -713,7 +721,7 @@ def get_keyboard_codes() -> Dict[int, str]:
     :rtype: dict
     :returns: Dictionary of (code, name) pairs for curses keyboard constant
         values and their mnemonic name. Such as key ``260``, with the value of
-        its identity, ``u'KEY_LEFT'``.
+        its identity, ``'KEY_LEFT'``.
 
     These keys are derived from the attributes by the same of the curses module,
     with the following exceptions:
@@ -744,7 +752,7 @@ def get_keyboard_codes() -> Dict[int, str]:
     return dict(zip(keycodes.values(), keycodes.keys()))
 
 
-def _alternative_left_right(term) -> Dict[str, int]:
+def _alternative_left_right(term: 'Terminal') -> typing.Dict[str, int]:
     r"""
     Determine and return mapping of left and right arrow keys sequences.
 
@@ -757,19 +765,19 @@ def _alternative_left_right(term) -> Dict[str, int]:
     the preferred input sequence for the left and right application keys.
 
     It is necessary to check the value of these sequences to ensure we do not
-    use ``u' '`` and ``u'\b'`` for ``KEY_RIGHT`` and ``KEY_LEFT``,
+    use ``' '`` and ``'\b'`` for ``KEY_RIGHT`` and ``KEY_LEFT``,
     preferring their true application key sequence, instead.
     """
     # pylint: disable=protected-access
-    keymap = {}
-    if term._cuf1 and term._cuf1 != u' ':
+    keymap: typing.Dict[str, int] = {}
+    if term._cuf1 and term._cuf1 != ' ':
         keymap[term._cuf1] = curses.KEY_RIGHT
-    if term._cub1 and term._cub1 != u'\b':
+    if term._cub1 and term._cub1 != '\b':
         keymap[term._cub1] = curses.KEY_LEFT
     return keymap
 
 
-def get_keyboard_sequences(term) -> 'OrderedDict[str, int]':
+def get_keyboard_sequences(term: 'Terminal') -> typing.OrderedDict[str, int]:
     r"""
     Return mapping of keyboard sequences paired by keycodes.
 
@@ -782,7 +790,7 @@ def get_keyboard_sequences(term) -> 'OrderedDict[str, int]':
     Initialize and return a keyboard map and sequence lookup table,
     (sequence, keycode) from :class:`~.Terminal` instance ``term``,
     where ``sequence`` is a multibyte input sequence of unicode
-    characters, such as ``u'\x1b[D'``, and ``keycode`` is an integer
+    characters, such as ``'\x1b[D'``, and ``keycode`` is an integer
     value, matching curses constant such as term.KEY_LEFT.
 
     The return value is an OrderedDict instance, with their keys
@@ -799,13 +807,11 @@ def get_keyboard_sequences(term) -> 'OrderedDict[str, int]':
     # of a kermit or avatar terminal, for example, remains unchanged
     # in its byte sequence values even when represented by unicode.
     #
-    sequence_map = dict((
-        (seq.decode('latin1'), val)
-        for (seq, val) in (
-            (curses.tigetstr(cap), val)
-            for (val, cap) in capability_names.items()
+    sequence_map = {
+        seq.decode('latin1'): val for seq, val in (
+            (curses.tigetstr(cap), val) for (val, cap) in capability_names.items()
         ) if seq
-    ) if term.does_styling else ())
+    } if term.does_styling else {}
 
     sequence_map.update(_alternative_left_right(term))
     sequence_map.update(DEFAULT_SEQUENCE_MIXIN)
@@ -832,18 +838,21 @@ def get_leading_prefixes(sequences: typing.Iterable[str]) -> Set[str]:
     input is a sequence that **may** lead to a final matching pattern.
 
     >>> prefixes(['abc', 'abdf', 'e', 'jkl'])
-    set([u'a', u'ab', u'abd', u'j', u'jk'])
+    set(['a', 'ab', 'abd', 'j', 'jk'])
     """
     return {seq[:i] for seq in sequences for i in range(1, len(seq))}
 
 
-def resolve_sequence(text: str, mapper: 'OrderedDict[str, int]', codes: Dict[int, str],
-                     prefixes: Optional[Set[str]] = None, final: bool = False) -> 'Keystroke':
+def resolve_sequence(text: str,
+                     mapper: typing.Mapping[str, int],
+                     codes: typing.Mapping[int, str],
+                     prefixes: Optional[Set[str]] = None,
+                     final: bool = False) -> Keystroke:
     r"""
     Return a single :class:`Keystroke` instance for given sequence ``text``.
 
     :arg str text: string of characters received from terminal input stream.
-    :arg OrderedDict mapper: unicode multibyte sequences, such as ``u'\x1b[D'``
+    :arg OrderedDict mapper: unicode multibyte sequences, such as ``'\x1b[D'``
         paired by their integer value (260)
     :arg dict codes: a :type:`dict` of integer values (such as 260) paired
         by their mnemonic name, such as ``'KEY_LEFT'``.
@@ -909,7 +918,10 @@ def _time_left(stime: float, timeout: Optional[float]) -> Optional[float]:
     return max(0, timeout - (time.time() - stime)) if timeout else timeout
 
 
-def _read_until(term, pattern: str, timeout: Optional[float]) -> Tuple[Optional[Match[str]], str]:
+def _read_until(term: 'Terminal',
+                pattern: str,
+                timeout: typing.Optional[float]
+                ) -> typing.Tuple[typing.Optional[Match[str]], str]:
     """
     Convenience read-until-pattern function, supporting :meth:`~.get_location`.
 
@@ -934,7 +946,7 @@ def _read_until(term, pattern: str, timeout: Optional[float]) -> Tuple[Optional[
     term.inkey() without delay.
     """
     stime = time.time()
-    match, buf = None, u''
+    match, buf = None, ''
 
     # first, buffer all pending data. pexpect library provides a
     # 'searchwindowsize' attribute that limits this memory region.  We're not
@@ -1119,7 +1131,7 @@ def _match_legacy_csi_modifiers(text: str) -> Optional['Keystroke']:
 
 #: Though we may determine *keynames* and codes for keyboard input that
 #: generate multibyte sequences, it is also especially useful to aliases
-#: a few basic ASCII characters such as ``KEY_TAB`` instead of ``u'\t'`` for
+#: a few basic ASCII characters such as ``KEY_TAB`` instead of ``'\t'`` for
 #: uniformity.
 #:
 #: Furthermore, many key-names for application keys enabled only by context
@@ -1148,7 +1160,7 @@ _CURSES_KEYCODE_ADDINS = (
 _LASTVAL = max(get_curses_keycodes().values())
 for keycode_name in _CURSES_KEYCODE_ADDINS:
     _LASTVAL += 1
-    globals()['KEY_' + keycode_name] = _LASTVAL
+    globals()[f'KEY_{keycode_name}'] = _LASTVAL
 
 #: In a perfect world, terminal emulators would always send exactly what
 #: the terminfo(5) capability database plans for them, accordingly by the
@@ -1168,75 +1180,75 @@ for keycode_name in _CURSES_KEYCODE_ADDINS:
 DEFAULT_SEQUENCE_MIXIN = (
     # these common control characters (and 127, ctrl+'?') mapped to
     # an application key definition.
-    (unicode_chr(10), curses.KEY_ENTER),
-    (unicode_chr(13), curses.KEY_ENTER),
-    (unicode_chr(8), curses.KEY_BACKSPACE),
-    (unicode_chr(9), KEY_TAB),  # noqa  # pylint: disable=undefined-variable
-    (unicode_chr(27), curses.KEY_EXIT),
-    (unicode_chr(127), curses.KEY_BACKSPACE),
+    (chr(10), curses.KEY_ENTER),
+    (chr(13), curses.KEY_ENTER),
+    (chr(8), curses.KEY_BACKSPACE),
+    (chr(9), KEY_TAB),  # noqa  # pylint: disable=undefined-variable
+    (chr(27), curses.KEY_EXIT),
+    (chr(127), curses.KEY_BACKSPACE),
 
-    (u"\x1b[A", curses.KEY_UP),
-    (u"\x1b[B", curses.KEY_DOWN),
-    (u"\x1b[C", curses.KEY_RIGHT),
-    (u"\x1b[D", curses.KEY_LEFT),
-    (u"\x1b[1;2A", curses.KEY_SR),
-    (u"\x1b[1;2B", curses.KEY_SF),
-    (u"\x1b[1;2C", curses.KEY_SRIGHT),
-    (u"\x1b[1;2D", curses.KEY_SLEFT),
-    (u"\x1b[F", curses.KEY_END),
-    (u"\x1b[H", curses.KEY_HOME),
+    ("\x1b[A", curses.KEY_UP),
+    ("\x1b[B", curses.KEY_DOWN),
+    ("\x1b[C", curses.KEY_RIGHT),
+    ("\x1b[D", curses.KEY_LEFT),
+    ("\x1b[1;2A", curses.KEY_SR),
+    ("\x1b[1;2B", curses.KEY_SF),
+    ("\x1b[1;2C", curses.KEY_SRIGHT),
+    ("\x1b[1;2D", curses.KEY_SLEFT),
+    ("\x1b[F", curses.KEY_END),
+    ("\x1b[H", curses.KEY_HOME),
     # not sure where these are from .. please report
-    (u"\x1b[K", curses.KEY_END),
-    (u"\x1b[U", curses.KEY_NPAGE),
-    (u"\x1b[V", curses.KEY_PPAGE),
+    ("\x1b[K", curses.KEY_END),
+    ("\x1b[U", curses.KEY_NPAGE),
+    ("\x1b[V", curses.KEY_PPAGE),
 
     # keys sent after term.smkx (keypad_xmit) is emitted, source:
     # http://www.xfree86.org/current/ctlseqs.html#PC-Style%20Function%20Keys
     # http://fossies.org/linux/rxvt/doc/rxvtRef.html#KeyCodes
     #
     # keypad, numlock on
-    (u"\x1bOM", curses.KEY_ENTER),  # noqa return
-    (u"\x1bOj", KEY_KP_MULTIPLY),   # noqa *  # pylint: disable=undefined-variable
-    (u"\x1bOk", KEY_KP_ADD),        # noqa +  # pylint: disable=undefined-variable
-    (u"\x1bOl", KEY_KP_SEPARATOR),  # noqa ,  # pylint: disable=undefined-variable
-    (u"\x1bOm", KEY_KP_SUBTRACT),   # noqa -  # pylint: disable=undefined-variable
-    (u"\x1bOn", KEY_KP_DECIMAL),    # noqa .  # pylint: disable=undefined-variable
-    (u"\x1bOo", KEY_KP_DIVIDE),     # noqa /  # pylint: disable=undefined-variable
-    (u"\x1bOX", KEY_KP_EQUAL),      # noqa =  # pylint: disable=undefined-variable
-    (u"\x1bOp", KEY_KP_0),          # noqa 0  # pylint: disable=undefined-variable
-    (u"\x1bOq", KEY_KP_1),          # noqa 1  # pylint: disable=undefined-variable
-    (u"\x1bOr", KEY_KP_2),          # noqa 2  # pylint: disable=undefined-variable
-    (u"\x1bOs", KEY_KP_3),          # noqa 3  # pylint: disable=undefined-variable
-    (u"\x1bOt", KEY_KP_4),          # noqa 4  # pylint: disable=undefined-variable
-    (u"\x1bOu", KEY_KP_5),          # noqa 5  # pylint: disable=undefined-variable
-    (u"\x1bOv", KEY_KP_6),          # noqa 6  # pylint: disable=undefined-variable
-    (u"\x1bOw", KEY_KP_7),          # noqa 7  # pylint: disable=undefined-variable
-    (u"\x1bOx", KEY_KP_8),          # noqa 8  # pylint: disable=undefined-variable
-    (u"\x1bOy", KEY_KP_9),          # noqa 9  # pylint: disable=undefined-variable
+    ("\x1bOM", curses.KEY_ENTER),  # noqa return
+    ("\x1bOj", KEY_KP_MULTIPLY),   # noqa *  # pylint: disable=undefined-variable
+    ("\x1bOk", KEY_KP_ADD),        # noqa +  # pylint: disable=undefined-variable
+    ("\x1bOl", KEY_KP_SEPARATOR),  # noqa ,  # pylint: disable=undefined-variable
+    ("\x1bOm", KEY_KP_SUBTRACT),   # noqa -  # pylint: disable=undefined-variable
+    ("\x1bOn", KEY_KP_DECIMAL),    # noqa .  # pylint: disable=undefined-variable
+    ("\x1bOo", KEY_KP_DIVIDE),     # noqa /  # pylint: disable=undefined-variable
+    ("\x1bOX", KEY_KP_EQUAL),      # noqa =  # pylint: disable=undefined-variable
+    ("\x1bOp", KEY_KP_0),          # noqa 0  # pylint: disable=undefined-variable
+    ("\x1bOq", KEY_KP_1),          # noqa 1  # pylint: disable=undefined-variable
+    ("\x1bOr", KEY_KP_2),          # noqa 2  # pylint: disable=undefined-variable
+    ("\x1bOs", KEY_KP_3),          # noqa 3  # pylint: disable=undefined-variable
+    ("\x1bOt", KEY_KP_4),          # noqa 4  # pylint: disable=undefined-variable
+    ("\x1bOu", KEY_KP_5),          # noqa 5  # pylint: disable=undefined-variable
+    ("\x1bOv", KEY_KP_6),          # noqa 6  # pylint: disable=undefined-variable
+    ("\x1bOw", KEY_KP_7),          # noqa 7  # pylint: disable=undefined-variable
+    ("\x1bOx", KEY_KP_8),          # noqa 8  # pylint: disable=undefined-variable
+    ("\x1bOy", KEY_KP_9),          # noqa 9  # pylint: disable=undefined-variable
 
     # keypad, numlock off
-    (u"\x1b[1~", curses.KEY_FIND),         # find
-    (u"\x1b[2~", curses.KEY_IC),           # insert (0)
-    (u"\x1b[3~", curses.KEY_DC),           # delete (.), "Execute"
-    (u"\x1b[4~", curses.KEY_SELECT),       # select
-    (u"\x1b[5~", curses.KEY_PPAGE),        # pgup   (9)
-    (u"\x1b[6~", curses.KEY_NPAGE),        # pgdown (3)
-    (u"\x1b[7~", curses.KEY_HOME),         # home
-    (u"\x1b[8~", curses.KEY_END),          # end
-    (u"\x1b[OA", curses.KEY_UP),           # up     (8)
-    (u"\x1b[OB", curses.KEY_DOWN),         # down   (2)
-    (u"\x1b[OC", curses.KEY_RIGHT),        # right  (6)
-    (u"\x1b[OD", curses.KEY_LEFT),         # left   (4)
-    (u"\x1b[OF", curses.KEY_END),          # end    (1)
-    (u"\x1b[OH", curses.KEY_HOME),         # home   (7)
+    ("\x1b[1~", curses.KEY_FIND),         # find
+    ("\x1b[2~", curses.KEY_IC),           # insert (0)
+    ("\x1b[3~", curses.KEY_DC),           # delete (.), "Execute"
+    ("\x1b[4~", curses.KEY_SELECT),       # select
+    ("\x1b[5~", curses.KEY_PPAGE),        # pgup   (9)
+    ("\x1b[6~", curses.KEY_NPAGE),        # pgdown (3)
+    ("\x1b[7~", curses.KEY_HOME),         # home
+    ("\x1b[8~", curses.KEY_END),          # end
+    ("\x1b[OA", curses.KEY_UP),           # up     (8)
+    ("\x1b[OB", curses.KEY_DOWN),         # down   (2)
+    ("\x1b[OC", curses.KEY_RIGHT),        # right  (6)
+    ("\x1b[OD", curses.KEY_LEFT),         # left   (4)
+    ("\x1b[OF", curses.KEY_END),          # end    (1)
+    ("\x1b[OH", curses.KEY_HOME),         # home   (7)
 
     # The vt220 placed F1-F4 above the keypad, in place of actual
     # F1-F4 were local functions (hold screen, print screen,
     # set up, data/talk, break).
-    (u"\x1bOP", curses.KEY_F1),
-    (u"\x1bOQ", curses.KEY_F2),
-    (u"\x1bOR", curses.KEY_F3),
-    (u"\x1bOS", curses.KEY_F4),
+    ("\x1bOP", curses.KEY_F1),
+    ("\x1bOQ", curses.KEY_F2),
+    ("\x1bOR", curses.KEY_F3),
+    ("\x1bOS", curses.KEY_F4),
 )
 
 #: Override mixins for a few curses constants with easier
@@ -1264,8 +1276,8 @@ CURSES_KEYCODE_OVERRIDE_MIXIN = (
 DEFAULT_ESCDELAY = 0.35
 
 
-def _reinit_escdelay():
-    # pylint: disable=W0603
+def _reinit_escdelay() -> None:
+    # pylint: disable=global-statement
     # Using the global statement: this is necessary to
     # allow test coverage without complex module reload
     global DEFAULT_ESCDELAY

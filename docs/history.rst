@@ -2,6 +2,12 @@
 
 Version History
 ===============
+*next*
+  * Environment values FORCE_COLOR_, CLICOLOR_FORCE_, and NO_COLOR_ overrides
+    :class:`blessed.Terminal` argument value, ``force_styling``.
+  * performance improvements in :meth:`~Terminal.rgb_downconvert` for 256-color
+    terminals, :ghpull:`298`.
+
 1.22
   * performance improvements to :meth:`~Terminal.length` and
     :meth:`~Terminal.wrap` via :ghpull:`286`, :ghpull:`287`, :ghpull:`289`, and
@@ -335,3 +341,7 @@ Version History
 .. _`API Documentation`: http://blessed.rtfd.org
 .. _`PDCurses`: https://www.lfd.uci.edu/~gohlke/pythonlibs/#curses
 .. _`ansi`: https://github.com/tehmaze/ansi
+.. _FORCE_COLOR: https://force-color.org/
+.. _CLICOLOR_FORCE: https://bixense.com/clicolors/
+.. _NO_COLOR: https://no-color.org/
+

@@ -8,8 +8,8 @@ import textwrap
 import pytest
 
 # local
-from .accessories import TestTerminal, as_subprocess
 from .conftest import TEST_QUICK
+from .accessories import TestTerminal, as_subprocess
 
 TEXTWRAP_KEYWORD_COMBINATIONS = [
     {'break_long_words': False, 'drop_whitespace': False, 'subsequent_indent': ''},
@@ -36,11 +36,9 @@ def test_SequenceWrapper_invalid_width():
     def child():
         term = TestTerminal()
         try:
-            my_wrapped = term.wrap(u'------- -------------', WIDTH)
+            my_wrapped = term.wrap('------- -------------', WIDTH)
         except ValueError as err:
-            assert err.args[0] == (
-                "invalid width %r(%s) (must be integer > 0)" % (
-                    WIDTH, type(WIDTH)))
+            assert err.args[0] == f"invalid width {WIDTH}({type(WIDTH)}) (must be integer > 0)"
         else:
             assert False, 'Previous stmt should have raised exception.'
             del my_wrapped  # assigned but never used
@@ -65,9 +63,9 @@ def test_SequenceWrapper(many_columns, kwargs):
         term.red_on_white('x')
         term.on_bright_white('x')
 
-        pgraph_colored = u''.join(
+        pgraph_colored = ''.join(
             getattr(term, (attributes[idx % len(attributes)]))(char)
-            if char != u' ' else u' '
+            if char != ' ' else ' '
             for idx, char in enumerate(pgraph))
 
         internal_wrapped = textwrap.wrap(pgraph, width=width, **kwargs)
@@ -86,8 +84,8 @@ def test_SequenceWrapper(many_columns, kwargs):
         assert (len(internal_wrapped) == len(my_wrapped_colored))
 
     child(width=many_columns, kwargs=kwargs,
-          pgraph=u' Z! a bc defghij klmnopqrstuvw<<>>xyz012345678900 ' * 2)
-    child(width=many_columns, kwargs=kwargs, pgraph=u'a bb ccc')
+          pgraph=' Z! a bc defghij klmnopqrstuvw<<>>xyz012345678900 ' * 2)
+    child(width=many_columns, kwargs=kwargs, pgraph='a bb ccc')
 
 
 def test_multiline():
@@ -97,9 +95,7 @@ def test_multiline():
     def child():
         # build a test paragraph, along with a very colorful version
         term = TestTerminal()
-        given_string = ('\n' + (32 * 'A') + '\n' +
-                        (32 * 'B') + '\n' +
-                        (32 * 'C') + '\n\n')
+        given_string = f'\n{32 * "A"}\n{32 * "B"}\n{32 * "C"}\n\n'
         expected = [
             '',
             'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
@@ -122,14 +118,14 @@ def test_east_asian_emojis_width_1():
     def child():
         term = TestTerminal()
         # by @grayjk from https://github.com/jquast/blessed/issues/273
-        result = term.wrap(u'\u5973', 1)
-        assert result == [u'\u5973']
+        result = term.wrap('\u5973', 1)
+        assert result == ['\u5973']
 
         # much like test_length_with_zwj_is_wrong(), blessed gets ZWJ wrong when wrapping, also.
         # In this case, each character gets its own line--even though '\u200D' is considered
         # a width of 0, the next emoji is "too large to fit".
         # RGI_Emoji_ZWJ_Sequence  ; family: woman, woman, girl, boy
-        given = u'\U0001F469\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466'
+        given = '\U0001F469\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466'
         result = term.wrap(given, 1)
         assert result == list(given)
 
@@ -139,7 +135,7 @@ def test_east_asian_emojis_width_1():
         # SYLLABLE GA. Ideally, a native speaker would rather have the cojoined
         # wide character, and word-wrapping to a column width of '1' for any
         # language that includes wide characters or emoji is a bit foolish!
-        given = u'\u1100\u1161'
+        given = '\u1100\u1161'
         result = term.wrap(given, 1)
         assert result == list(given)
 
@@ -151,19 +147,19 @@ def test_emojis_width_2_and_greater():
     @as_subprocess
     def child():
         term = TestTerminal()
-        given = u'\U0001F469\U0001F467\U0001F466'  # woman, girl, boy
+        given = '\U0001F469\U0001F467\U0001F466'  # woman, girl, boy
         result = term.wrap(given, 2)
         assert result == list(given)
         result = term.wrap(given, 3)
         assert result == list(given)
         result = term.wrap(given, 4)
-        assert result == [u'\U0001F469\U0001F467', u'\U0001F466']
+        assert result == ['\U0001F469\U0001F467', '\U0001F466']
         result = term.wrap(given, 5)
-        assert result == [u'\U0001F469\U0001F467', u'\U0001F466']
+        assert result == ['\U0001F469\U0001F467', '\U0001F466']
         result = term.wrap(given, 6)
-        assert result == [u'\U0001F469\U0001F467\U0001F466']
+        assert result == ['\U0001F469\U0001F467\U0001F466']
         result = term.wrap(given, 7)
-        assert result == [u'\U0001F469\U0001F467\U0001F466']
+        assert result == ['\U0001F469\U0001F467\U0001F466']
 
     child()
 
@@ -173,14 +169,14 @@ def test_greedy_join_with_cojoining():
     @as_subprocess
     def child():
         term = TestTerminal()
-        given = u'cafe\u0301-latte'
+        given = 'cafe\u0301-latte'
         result = term.wrap(given, 5)
-        assert result == [u'cafe\u0301-', u'latte']
+        assert result == ['cafe\u0301-', 'latte']
         result = term.wrap(given, 4)
-        assert result == [u'cafe\u0301', u'-lat', u'te']
+        assert result == ['cafe\u0301', '-lat', 'te']
         result = term.wrap(given, 3)
-        assert result == [u'caf', u'e\u0301-l', u'att', u'e']
+        assert result == ['caf', 'e\u0301-l', 'att', 'e']
         result = term.wrap(given, 2)
-        assert result == [u'ca', u'fe\u0301', u'-l', u'at', u'te']
+        assert result == ['ca', 'fe\u0301', '-l', 'at', 'te']
 
     child()

@@ -14,10 +14,19 @@ import platform
 import warnings
 import contextlib
 import collections
+from typing import IO, List, Match, Tuple, Union, Optional, Generator
+
+# SupportsIndex was added in Python 3.8
+if sys.version_info >= (3, 8):
+    # std imports
+    from typing import SupportsIndex
+else:
+    SupportsIndex = int  # type: ignore
 
 # local
-from .color import COLOR_DISTANCE_ALGORITHMS
+from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
 from .keyboard import (DEFAULT_ESCDELAY,
+                       Keystroke,
                        _time_left,
                        _read_until,
                        resolve_sequence,
@@ -42,11 +51,6 @@ from ._capabilities import (CAPABILITY_DATABASE,
 
 # isort: off
 
-# Alias py2 exception to py3
-if sys.version_info[:2] < (3, 3):
-    InterruptedError = select.error  # pylint: disable=redefined-builtin
-
-
 HAS_TTY = True
 if platform.system() == 'Windows':
     IS_WINDOWS = True
@@ -64,18 +68,21 @@ else:
         _TTY_METHODS = ('setraw', 'cbreak', 'kbhit', 'height', 'width')
         _MSG_NOSUPPORT = (
             "One or more of the modules: 'termios', 'fcntl', and 'tty' "
-            "are not found on your platform '{platform}'. "
+            f"are not found on your platform '{platform.system()}'. "
             "The following methods of Terminal are dummy/no-op "
-            "unless a deriving class overrides them: {tty_methods}."
-            .format(platform=platform.system(),
-                    tty_methods=', '.join(_TTY_METHODS)))
+            f"unless a deriving class overrides them: {', '.join(_TTY_METHODS)}."
+        )
         warnings.warn(_MSG_NOSUPPORT)
         HAS_TTY = False
 
 _CUR_TERM = None  # See comments at end of file
+_RE_GET_FGCOLOR_RESPONSE = re.compile(
+    '\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+_RE_GET_BGCOLOR_RESPONSE = re.compile(
+    '\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
 
 
-class Terminal(object):
+class Terminal():
     """
     An abstraction for color, style, positioning, and input in the terminal.
 
@@ -124,7 +131,10 @@ class Terminal(object):
         'terminal_enquire': 'u9',
     }
 
-    def __init__(self, kind=None, stream=None, force_styling=False):
+    def __init__(self,
+                 kind: Optional[str] = None,
+                 stream: Optional[IO[str]] = None,
+                 force_styling: bool = False) -> None:
         """
         Initialize the terminal.
 
@@ -150,11 +160,25 @@ class Terminal(object):
             This comes in handy if users are trying to pipe your output through
             something like ``less -r`` or build systems which support decoding
             of terminal sequences.
+
+            When the OS Environment variable FORCE_COLOR_ or CLICOLOR_FORCE_ is
+            *non-empty*, styling is used no matter the value specified by
+            ``force_styling``.
+
+            Conversely, When OS Environment variable NO_COLOR_ is *non-empty*,
+            styling is **not** used no matter the value specified by
+            ``force_styling`` and has precedence over FORCE_COLOR_ and
+            CLICOLOR_FORCE_.
+
+            .. _FORCE_COLOR: https://force-color.org/
+            .. _CLICOLOR_FORCE: https://bixense.com/clicolors/
+            .. _NO_COLOR: https://no-color.org/
         """
-        # pylint: disable=global-statement,too-many-branches
+        # pylint: disable=global-statement
         global _CUR_TERM
-        self.errors = ['parameters: kind=%r, stream=%r, force_styling=%r' %
-                       (kind, stream, force_styling)]
+        self.errors = [
+            f'parameters: kind={kind!r}, stream={stream!r}, force_styling={force_styling!r}',
+        ]
         self._normal = None  # cache normal attr, preventing recursive lookups
         # we assume our input stream to be line-buffered until either the
         # cbreak of raw context manager methods are entered with an attached tty.
@@ -171,18 +195,13 @@ class Terminal(object):
         else:
             self._kind = kind or os.environ.get('TERM', 'dumb') or 'dumb'
 
-        self._does_styling = False
-        if force_styling is None and self.is_a_tty:
-            self.errors.append('force_styling is None')
-        elif force_styling or self.is_a_tty:
-            self._does_styling = True
-
+        self.__init_set_styling(force_styling)
         if self.does_styling:
             # Initialize curses (call setupterm), so things like tigetstr() work.
             try:
                 curses.setupterm(self._kind, self._init_descriptor)
             except curses.error as err:
-                msg = 'Failed to setupterm(kind={0!r}): {1}'.format(self._kind, err)
+                msg = f'Failed to setupterm(kind={self._kind!r}): {err}'
                 warnings.warn(msg)
                 self.errors.append(msg)
                 self._kind = None
@@ -197,17 +216,32 @@ class Terminal(object):
                     # are a downstream developer and you need this
                     # functionality, consider sub-processing, instead.
                     warnings.warn(
-                        'A terminal of kind "%s" has been requested; due to an'
+                        f'A terminal of kind "{kind}" has been requested; due to an'
                         ' internal python curses bug, terminal capabilities'
-                        ' for a terminal of kind "%s" will continue to be'
-                        ' returned for the remainder of this process.' % (
-                            self._kind, _CUR_TERM,))
+                        f' for a terminal of kind "{_CUR_TERM}" will continue to be'
+                        ' returned for the remainder of this process.'
+                    )
 
         self.__init__color_capabilities()
         self.__init__capabilities()
         self.__init__keycodes()
 
-    def __init__streams(self):
+    def __init_set_styling(self, force_styling: bool) -> None:
+        self._does_styling = False
+        if os.getenv('NO_COLOR'):
+            self.errors.append(f'NO_COLOR={os.getenv("NO_COLOR")!r}')
+        elif os.getenv('FORCE_COLOR'):
+            self.errors.append(f'FORCE_COLOR={os.getenv("FORCE_COLOR")!r}')
+            self._does_styling = True
+        elif os.getenv('CLICOLOR_FORCE'):
+            self.errors.append(f'CLICOLOR_FORCE={os.getenv("CLICOLOR_FORCE")!r}')
+            self._does_styling = True
+        elif force_styling is None and self.is_a_tty:
+            self.errors.append('force_styling is None')
+        elif force_styling or self.is_a_tty:
+            self._does_styling = True
+
+    def __init__streams(self) -> None:
         # pylint: disable=too-complex,too-many-branches
         #         Agree to disagree !
         stream_fd = None
@@ -218,15 +252,15 @@ class Terminal(object):
 
         if not hasattr(self._stream, 'fileno'):
             self.errors.append('stream has no fileno method')
-        elif not callable(self._stream.fileno):
+        elif not callable(self._stream.fileno):  # type: ignore[union-attr]
             self.errors.append('stream.fileno is not callable')
         else:
             try:
-                stream_fd = self._stream.fileno()
+                stream_fd = self._stream.fileno()  # type: ignore[union-attr]
             except ValueError as err:
                 # The stream is not a file, such as the case of StringIO, or, when it has been
                 # "detached", such as might be the case of stdout in some test scenarios.
-                self.errors.append('Unable to determine output stream file descriptor: %s' % err)
+                self.errors.append(f'Unable to determine output stream file descriptor: {err}')
             else:
                 self._is_a_tty = os.isatty(stream_fd)
                 if not self._is_a_tty:
@@ -235,9 +269,9 @@ class Terminal(object):
         # Keyboard valid as stdin only when output stream is stdout or stderr and is a tty.
         if self._stream in (sys.__stdout__, sys.__stderr__):
             try:
-                self._keyboard_fd = sys.__stdin__.fileno()
+                self._keyboard_fd = sys.__stdin__.fileno()  # type: ignore[union-attr]
             except (AttributeError, ValueError) as err:
-                self.errors.append('Unable to determine input stream file descriptor: %s' % err)
+                self.errors.append(f'Unable to determine input stream file descriptor: {err}')
             else:
                 # _keyboard_fd only non-None if both stdin and stdout is a tty.
                 if not self.is_a_tty:
@@ -253,24 +287,24 @@ class Terminal(object):
         self._init_descriptor = stream_fd
         if stream_fd is None:
             try:
-                self._init_descriptor = sys.__stdout__.fileno()
+                self._init_descriptor = sys.__stdout__.fileno()  # type: ignore[union-attr]
             except ValueError as err:
-                self.errors.append('Unable to determine __stdout__ file descriptor: %s' % err)
+                self.errors.append(f'Unable to determine __stdout__ file descriptor: {err}')
 
-    def __init__color_capabilities(self):
+    def __init__color_capabilities(self) -> None:
         self._color_distance_algorithm = 'cie2000'
         if not self.does_styling:
             self.number_of_colors = 0
-        elif IS_WINDOWS or os.environ.get('COLORTERM') in ('truecolor', '24bit'):
+        elif IS_WINDOWS or os.environ.get('COLORTERM') in {'truecolor', '24bit'}:
             self.number_of_colors = 1 << 24
         else:
             self.number_of_colors = max(0, curses.tigetnum('colors') or -1)
 
-    def __clear_color_capabilities(self):
+    def __clear_color_capabilities(self) -> None:
         for cached_color_cap in set(dir(self)) & COLORS:
             delattr(self, cached_color_cap)
 
-    def __init__capabilities(self):
+    def __init__capabilities(self) -> None:
         # important that we lay these in their ordered direction, so that our
         # preferred, 'color' over 'set_a_attributes1', for example.
         self.caps = collections.OrderedDict()
@@ -308,14 +342,14 @@ class Terminal(object):
         )
         # for tokenizer, the '.lastgroup' is the primary lookup key for
         # 'self.caps', unless 'MISMATCH'; then it is an unmatched character.
-        self._caps_compiled_any = re.compile('|'.join(
-            cap.named_pattern for cap in self.caps.values()
-        ) + '|(?P<MISMATCH>.)')
-        self._caps_unnamed_any = re.compile('|'.join(
-            '({0})'.format(cap.pattern) for cap in self.caps.values()
-        ) + '|(.)')
+        self._caps_compiled_any = re.compile(
+            f'{"|".join(cap.named_pattern for cap in self.caps.values())}|(?P<MISMATCH>.)'
+        )
+        self._caps_unnamed_any = re.compile(
+            f'{"|".join(f"({cap.pattern})" for cap in self.caps.values())}|(.)'
+        )
 
-    def __init__keycodes(self):
+    def __init__keycodes(self) -> None:
         # Initialize keyboard data determined by capability.
         # Build database of int code <=> KEY_NAME.
         self._keycodes = get_keyboard_codes()
@@ -331,7 +365,7 @@ class Terminal(object):
         self._keymap_prefixes = get_leading_prefixes(self._keymap)
 
         # keyboard stream buffer
-        self._keyboard_buf = collections.deque()
+        self._keyboard_buf: collections.deque[str] = collections.deque()
 
         if self._keyboard_fd is not None:
             # set input encoding and initialize incremental decoder
@@ -347,11 +381,14 @@ class Terminal(object):
                 self._keyboard_decoder = codecs.getincrementaldecoder(self._encoding)()
             except LookupError as err:
                 # encoding is illegal or unsupported, use 'UTF-8'
-                warnings.warn('LookupError: {0}, defaulting to UTF-8 for keyboard.'.format(err))
+                warnings.warn(f'LookupError: {err}, defaulting to UTF-8 for keyboard.')
                 self._encoding = 'UTF-8'
                 self._keyboard_decoder = codecs.getincrementaldecoder(self._encoding)()
 
-    def __getattr__(self, attr):
+    def __getattr__(self,
+                    attr: str) -> Union[NullCallableString,
+                                        ParameterizingString,
+                                        FormattingString]:
         r"""
         Return a terminal capability as Unicode string.
 
@@ -386,7 +423,7 @@ class Terminal(object):
         return val
 
     @property
-    def kind(self):
+    def kind(self) -> str:
         """
         Read-only property: Terminal kind determined on class initialization.
 
@@ -395,7 +432,7 @@ class Terminal(object):
         return self._kind
 
     @property
-    def does_styling(self):
+    def does_styling(self) -> bool:
         """
         Read-only property: Whether this class instance may emit sequences.
 
@@ -404,7 +441,7 @@ class Terminal(object):
         return self._does_styling
 
     @property
-    def is_a_tty(self):
+    def is_a_tty(self) -> bool:
         """
         Read-only property: Whether :attr:`~.stream` is a terminal.
 
@@ -413,7 +450,7 @@ class Terminal(object):
         return self._is_a_tty
 
     @property
-    def height(self):
+    def height(self) -> int:
         """
         Read-only property: Height of the terminal (in number of lines).
 
@@ -422,7 +459,7 @@ class Terminal(object):
         return self._height_and_width().ws_row
 
     @property
-    def width(self):
+    def width(self) -> int:
         """
         Read-only property: Width of the terminal (in number of columns).
 
@@ -431,7 +468,7 @@ class Terminal(object):
         return self._height_and_width().ws_col
 
     @property
-    def pixel_height(self):
+    def pixel_height(self) -> int:
         """
         Read-only property: Height of the terminal (in pixels).
 
@@ -440,7 +477,7 @@ class Terminal(object):
         return self._height_and_width().ws_ypixel
 
     @property
-    def pixel_width(self):
+    def pixel_width(self) -> int:
         """
         Read-only property: Width of terminal (in pixels).
 
@@ -449,7 +486,7 @@ class Terminal(object):
         return self._height_and_width().ws_xpixel
 
     @staticmethod
-    def _winsize(fd):
+    def _winsize(fd):  # type: ignore[no-untyped-def]
         """
         Return named tuple describing size of the terminal by ``fd``.
 
@@ -477,7 +514,7 @@ class Terminal(object):
             return WINSZ(*struct.unpack(WINSZ._FMT, data))
         return WINSZ(ws_row=25, ws_col=80, ws_xpixel=0, ws_ypixel=0)
 
-    def _height_and_width(self):
+    def _height_and_width(self):    # type: ignore[no-untyped-def]
         """
         Return a tuple of (terminal height, terminal width).
 
@@ -514,7 +551,8 @@ class Terminal(object):
                      ws_xpixel=None,
                      ws_ypixel=None)
 
-    def _query_response(self, query_str, response_re, timeout):
+    def _query_response(self, query_str: str, response_re: str,
+                        timeout: Optional[float]) -> Optional[Match[str]]:
         """
         Sends a query string to the terminal and waits for a response.
 
@@ -534,14 +572,14 @@ class Terminal(object):
         try:
             if self._line_buffered:
                 ctx = self.cbreak()
-                ctx.__enter__()  # pylint: disable=no-member
+                ctx.__enter__()
 
             # Emit the query sequence,
             self.stream.write(query_str)
             self.stream.flush()
 
             # Wait for response
-            match, data = _read_until(term=self,  # pylint: disable=unpacking-non-sequence
+            match, data = _read_until(term=self,
                                       pattern=response_re,
                                       timeout=timeout)
 
@@ -554,12 +592,13 @@ class Terminal(object):
 
         finally:
             if ctx is not None:
-                ctx.__exit__(None, None, None)  # pylint: disable=no-member
+                ctx.__exit__(None, None, None)
 
         return match
 
     @contextlib.contextmanager
-    def location(self, x=None, y=None):
+    def location(self, x: Optional[int] = None, y: Optional[int]
+                 = None) -> Generator[None, None, None]:
         """
         Context manager for temporarily moving the cursor.
 
@@ -592,9 +631,6 @@ class Terminal(object):
             of :meth:`get_location`, or argument order *(y, x)* of :meth:`move`. This is
             for API Compatibility with the blessings library, sorry for the trouble!
         """
-        # pylint: disable=invalid-name
-        #         Invalid argument name "x"
-
         # Save position and move to the requested column, row, or both:
         self.stream.write(self.save)
         if x is not None and y is not None:
@@ -611,7 +647,7 @@ class Terminal(object):
             self.stream.write(self.restore)
             self.stream.flush()
 
-    def get_location(self, timeout=None):
+    def get_location(self, timeout: Optional[float] = None) -> Tuple[int, int]:
         r"""
         Return tuple (row, column) of cursor position.
 
@@ -660,9 +696,9 @@ class Terminal(object):
         # >  u7   cursor position request (equiv. to VT100/ANSI/ECMA-48 DSR 6)
         # >  u6   cursor position report (equiv. to ANSI/ECMA-48 CPR)
 
-        response_str = getattr(self, self.caps['cursor_report'].attribute) or u'\x1b[%i%d;%dR'
+        response_str = getattr(self, self.caps['cursor_report'].attribute) or '\x1b[%i%d;%dR'
         match = self._query_response(
-            self.u7 or u'\x1b[6n', self.caps['cursor_report'].re_compiled, timeout
+            self.u7 or '\x1b[6n', self.caps['cursor_report'].re_compiled.pattern, timeout
         )
 
         if match:
@@ -676,7 +712,7 @@ class Terminal(object):
             # If the string contains the sequence %i, it is taken as an
             # instruction to decrement each value after reading it (this is
             # the inverse sense from the cup string).
-            if u'%i' in response_str:
+            if '%i' in response_str:
                 row -= 1
                 col -= 1
             return row, col
@@ -686,7 +722,7 @@ class Terminal(object):
         # rather than crowbarring such logic into an exception handler.
         return -1, -1
 
-    def get_fgcolor(self, timeout=None):
+    def get_fgcolor(self, timeout: Optional[float] = None) -> Tuple[int, int, int]:
         """
         Return tuple (r, g, b) of foreground color.
 
@@ -699,15 +735,10 @@ class Terminal(object):
         The foreground color is determined by emitting an `OSC 10 color query
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
         """
-        match = self._query_response(
-            u'\x1b]10;?\x07',
-            re.compile(u'\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07'),
-            timeout
-        )
-
+        match = self._query_response('\x1b]10;?\x07', _RE_GET_FGCOLOR_RESPONSE, timeout)
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
 
-    def get_bgcolor(self, timeout=None):
+    def get_bgcolor(self, timeout: Optional[float] = None) -> Tuple[int, int, int]:
         """
         Return tuple (r, g, b) of background color.
 
@@ -720,16 +751,11 @@ class Terminal(object):
         The background color is determined by emitting an `OSC 11 color query
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
         """
-        match = self._query_response(
-            u'\x1b]11;?\x07',
-            re.compile(u'\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07'),
-            timeout
-        )
-
+        match = self._query_response('\x1b]11;?\x07', _RE_GET_BGCOLOR_RESPONSE, timeout)
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
 
     @contextlib.contextmanager
-    def fullscreen(self):
+    def fullscreen(self) -> Generator[None, None, None]:
         """
         Context manager that switches to secondary screen, restoring on exit.
 
@@ -754,7 +780,7 @@ class Terminal(object):
             self.stream.flush()
 
     @contextlib.contextmanager
-    def hidden_cursor(self):
+    def hidden_cursor(self) -> Generator[None, None, None]:
         """
         Context manager that hides the cursor, setting visibility on exit.
 
@@ -772,7 +798,7 @@ class Terminal(object):
             self.stream.write(self.normal_cursor)
             self.stream.flush()
 
-    def move_xy(self, x, y):
+    def move_xy(self, x: int, y: int) -> str:
         """
         A callable string that moves the cursor to the given ``(x, y)`` screen coordinates.
 
@@ -787,7 +813,7 @@ class Terminal(object):
         # alias.
         return self.move(y, x)
 
-    def move_yx(self, y, x):
+    def move_yx(self, y: int, x: int) -> str:
         """
         A callable string that moves the cursor to the given ``(y, x)`` screen coordinates.
 
@@ -799,27 +825,27 @@ class Terminal(object):
         return self.move(y, x)
 
     @property
-    def move_left(self):
+    def move_left(self) -> FormattingOtherString:
         """Move cursor 1 cells to the left, or callable string for n>1 cells."""
         return FormattingOtherString(self.cub1, ParameterizingString(self.cub))
 
     @property
-    def move_right(self):
+    def move_right(self) -> FormattingOtherString:
         """Move cursor 1 or more cells to the right, or callable string for n>1 cells."""
         return FormattingOtherString(self.cuf1, ParameterizingString(self.cuf))
 
     @property
-    def move_up(self):
+    def move_up(self) -> FormattingOtherString:
         """Move cursor 1 or more cells upwards, or callable string for n>1 cells."""
         return FormattingOtherString(self.cuu1, ParameterizingString(self.cuu))
 
     @property
-    def move_down(self):
+    def move_down(self) -> FormattingOtherString:
         """Move cursor 1 or more cells downwards, or callable string for n>1 cells."""
         return FormattingOtherString(self.cud1, ParameterizingString(self.cud))
 
     @property
-    def color(self):
+    def color(self) -> Union[NullCallableString, ParameterizingString]:
         """
         A callable string that sets the foreground color.
 
@@ -837,7 +863,7 @@ class Terminal(object):
 
         return NullCallableString()
 
-    def color_rgb(self, red, green, blue):
+    def color_rgb(self, red: int, green: int, blue: int) -> FormattingString:
         """
         Provides callable formatting string to set foreground color to the specified RGB color.
 
@@ -852,7 +878,7 @@ class Terminal(object):
         """
         if self.number_of_colors == 1 << 24:
             # "truecolor" 24-bit
-            fmt_attr = u'\x1b[38;2;{0};{1};{2}m'.format(red, green, blue)
+            fmt_attr = f'\x1b[38;2;{red};{green};{blue}m'
             return FormattingString(fmt_attr, self.normal)
 
         # color by approximation to 256 or 16-color terminals
@@ -860,7 +886,7 @@ class Terminal(object):
         return FormattingString(self._foreground_color(color_idx), self.normal)
 
     @property
-    def on_color(self):
+    def on_color(self) -> Union[NullCallableString, ParameterizingString]:
         """
         A callable capability that sets the background color.
 
@@ -871,7 +897,7 @@ class Terminal(object):
 
         return NullCallableString()
 
-    def on_color_rgb(self, red, green, blue):
+    def on_color_rgb(self, red: int, green: int, blue: int) -> FormattingString:
         """
         Provides callable formatting string to set background color to the specified RGB color.
 
@@ -885,13 +911,13 @@ class Terminal(object):
         color will be determined using :py:attr:`color_distance_algorithm`.
         """
         if self.number_of_colors == 1 << 24:
-            fmt_attr = u'\x1b[48;2;{0};{1};{2}m'.format(red, green, blue)
+            fmt_attr = f'\x1b[48;2;{red};{green};{blue}m'
             return FormattingString(fmt_attr, self.normal)
 
         color_idx = self.rgb_downconvert(red, green, blue)
         return FormattingString(self._background_color(color_idx), self.normal)
 
-    def formatter(self, value):
+    def formatter(self, value: str) -> Union[NullCallableString, FormattingString]:
         """
         Provides callable formatting string to set color and other text formatting options.
 
@@ -906,15 +932,16 @@ class Terminal(object):
         inadvertently returning another terminal capability.
         """
         formatters = split_compound(value)
-        # Pylint sometimes thinks formatters isn't a list  # pylint: disable=not-an-iterable
         if all((fmt in COLORS or fmt in COMPOUNDABLES) for fmt in formatters):
             return getattr(self, value)
 
         return NullCallableString()
 
-    def rgb_downconvert(self, red, green, blue):
+    def rgb_downconvert(self, red: int, green: int, blue: int) -> int:
         """
         Translate an RGB color to a color code of the terminal's color depth.
+
+        This method is only be used to downconvert for terminals of 256 or fewer colors.
 
         :arg int red: RGB value of Red (0-255).
         :arg int green: RGB value of Green (0-255).
@@ -922,26 +949,40 @@ class Terminal(object):
         :rtype: int
         :returns: Color code of downconverted RGB color
         """
-        # Though pre-computing all 1 << 24 options is memory-intensive, a pre-computed
-        # "k-d tree" of 256 (x,y,z) vectors of a colorspace in 3 dimensions, such as a
-        # cone of HSV, or simply 255x255x255 RGB square, any given rgb value is just a
-        # nearest-neighbor search of 256 points, which k-d should be much faster by
-        # sub-dividing / culling search points, rather than our "search all 256 points
-        # always" approach.
+        # pylint: disable=too-many-locals
+
+        if self.number_of_colors == 0:
+            # bit of a waste to downconvert to no color at all, the final
+            # formatting string will be empty, we play along with color #7
+            return 7
+
+        target_rgb = (red, green, blue)
         fn_distance = COLOR_DISTANCE_ALGORITHMS[self.color_distance_algorithm]
-        color_idx = 7
-        shortest_distance = None
-        for cmp_depth, cmp_rgb in enumerate(RGB_256TABLE):
-            cmp_distance = fn_distance(cmp_rgb, (red, green, blue))
-            if shortest_distance is None or cmp_distance < shortest_distance:
-                shortest_distance = cmp_distance
-                color_idx = cmp_depth
-            if cmp_depth >= self.number_of_colors:
-                break
-        return color_idx
+
+        if self.number_of_colors < 256:  # 8 or 16 colors
+            # because there just are not very many colors, we can use a color distance
+            # algorithm to measure all of 8 or 16 colors, selecting the nearest match.
+            best_idx = 7
+            best_distance = float('inf')
+            for idx in range(min(self.number_of_colors, 16)):
+                distance = fn_distance(RGB_256TABLE[idx], target_rgb)
+                if distance < best_distance:
+                    best_distance = distance
+                    best_idx = idx
+            return best_idx
+
+        # For 256-color terminals, use *only* cube (16-231) and grayscale
+        # (232-255) color matches, avoid ANSI colors 0-15 altogether, to prevent
+        # interference from user themes, and its fastest for our purpose,
+        # anyway! We chose the nearest distance of either color.
+        cube_idx, cube_rgb = xterm256color_from_rgb(red, green, blue)
+        gray_idx, gray_rgb = xterm256gray_from_rgb(red, green, blue)
+        cube_distance = fn_distance(cube_rgb, target_rgb)
+        gray_distance = fn_distance(gray_rgb, target_rgb)
+        return cube_idx if cube_distance <= gray_distance else gray_idx
 
     @property
-    def normal(self):
+    def normal(self) -> str:
         """
         A capability that resets all video attributes.
 
@@ -956,7 +997,7 @@ class Terminal(object):
         self._normal = resolve_capability(self, 'normal')
         return self._normal
 
-    def link(self, url, text, url_id=''):
+    def link(self, url: str, text: str, url_id: str = '') -> str:
         """
         Display ``text`` that when touched or clicked, navigates to ``url``.
 
@@ -974,16 +1015,15 @@ class Terminal(object):
         assert len(url) < 2000, (len(url), url)
         if url_id:
             assert len(str(url_id)) < 250, (len(str(url_id)), url_id)
-            params = 'id={0}'.format(url_id)
+            params = f'id={url_id}'
         else:
             params = ''
         if not self.does_styling:
             return text
-        return ('\x1b]8;{0};{1}\x1b\\{2}'
-                '\x1b]8;;\x1b\\'.format(params, url, text))
+        return f'\x1b]8;{params};{url}\x1b\\{text}\x1b]8;;\x1b\\'
 
     @property
-    def stream(self):
+    def stream(self) -> IO[str]:
         """
         Read-only property: stream the terminal outputs to.
 
@@ -994,7 +1034,7 @@ class Terminal(object):
         return self._stream
 
     @property
-    def number_of_colors(self):
+    def number_of_colors(self) -> int:
         """
         Number of colors supported by terminal.
 
@@ -1012,7 +1052,7 @@ class Terminal(object):
         return self._number_of_colors
 
     @number_of_colors.setter
-    def number_of_colors(self, value):
+    def number_of_colors(self, value: int) -> None:
         assert value in (0, 4, 8, 16, 88, 256, 1 << 24)
         # Because 88 colors is rare and we can't guarantee consistent behavior,
         # when 88 colors is detected, it is treated as 16 colors
@@ -1020,23 +1060,24 @@ class Terminal(object):
         self.__clear_color_capabilities()
 
     @property
-    def color_distance_algorithm(self):
+    def color_distance_algorithm(self) -> str:
         """
         Color distance algorithm used by :meth:`rgb_downconvert`.
 
         The slowest, but most accurate, 'cie2000', is default. Other available options are 'rgb',
-        'rgb-weighted', 'cie76', and 'cie94'.
+        'rgb-weighted', 'cie76', and 'cie94'. This function is only be used to downconvert for
+        terminals of 256 or fewer colors.
         """
         return self._color_distance_algorithm
 
     @color_distance_algorithm.setter
-    def color_distance_algorithm(self, value):
+    def color_distance_algorithm(self, value: str) -> None:
         assert value in COLOR_DISTANCE_ALGORITHMS
         self._color_distance_algorithm = value
         self.__clear_color_capabilities()
 
     @property
-    def _foreground_color(self):
+    def _foreground_color(self):  # type: ignore[no-untyped-def]
         """
         Convenience capability to support :attr:`~.on_color`.
 
@@ -1047,7 +1088,7 @@ class Terminal(object):
         return self.setaf or self.setf
 
     @property
-    def _background_color(self):
+    def _background_color(self):  # type: ignore[no-untyped-def]
         """
         Convenience capability to support :attr:`~.on_color`.
 
@@ -1057,7 +1098,7 @@ class Terminal(object):
         """
         return self.setab or self.setb
 
-    def ljust(self, text, width=None, fillchar=u' '):
+    def ljust(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
         Left-align ``text``, which may contain terminal sequences.
 
@@ -1074,7 +1115,7 @@ class Terminal(object):
             width = self.width
         return Sequence(text, self).ljust(width, fillchar)
 
-    def rjust(self, text, width=None, fillchar=u' '):
+    def rjust(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
         Right-align ``text``, which may contain terminal sequences.
 
@@ -1089,7 +1130,7 @@ class Terminal(object):
             width = self.width
         return Sequence(text, self).rjust(width, fillchar)
 
-    def center(self, text, width=None, fillchar=u' '):
+    def center(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
         Center ``text``, which may contain terminal sequences.
 
@@ -1104,7 +1145,7 @@ class Terminal(object):
             width = self.width
         return Sequence(text, self).center(width, fillchar)
 
-    def truncate(self, text, width=None):
+    def truncate(self, text: str, width: Optional[SupportsIndex] = None) -> str:
         r"""
         Truncate ``text`` to maximum ``width`` printable characters, retaining terminal sequences.
 
@@ -1113,15 +1154,15 @@ class Terminal(object):
         :rtype: str
         :returns: ``text`` truncated to at most ``width`` printable characters
 
-        >>> term.truncate(u'xyz\x1b[0;3m', 2)
-        u'xy\x1b[0;3m'
+        >>> term.truncate('xyz\x1b[0;3m', 2)
+        'xy\x1b[0;3m'
         """
         if width is None:
             width = self.width
         return Sequence(text, self).truncate(width)
 
-    def length(self, text):
-        u"""
+    def length(self, text: str) -> int:
+        """
         Return printable length of a string containing sequences.
 
         :arg str text: String to measure. May contain terminal sequences.
@@ -1132,7 +1173,7 @@ class Terminal(object):
         Wide characters that consume 2 character cells are supported:
 
         >>> term = Terminal()
-        >>> term.length(term.clear + term.red(u'コンニチハ'))
+        >>> term.length(term.clear + term.red('コンニチハ'))
         10
 
         .. note:: Sequences such as 'clear', which is considered as a
@@ -1142,53 +1183,53 @@ class Terminal(object):
         """
         return Sequence(text, self).length()
 
-    def strip(self, text, chars=None):
+    def strip(self, text: str, chars: Optional[str] = None) -> str:
         r"""
         Return ``text`` without sequences and leading or trailing whitespace.
 
         :rtype: str
         :returns: Text with leading and trailing whitespace removed
 
-        >>> term.strip(u' \x1b[0;3m xyz ')
-        u'xyz'
+        >>> term.strip(' \x1b[0;3m xyz ')
+        'xyz'
         """
         return Sequence(text, self).strip(chars)
 
-    def rstrip(self, text, chars=None):
+    def rstrip(self, text: str, chars: Optional[str] = None) -> str:
         r"""
         Return ``text`` without terminal sequences or trailing whitespace.
 
         :rtype: str
         :returns: Text with terminal sequences and trailing whitespace removed
 
-        >>> term.rstrip(u' \x1b[0;3m xyz ')
-        u'  xyz'
+        >>> term.rstrip(' \x1b[0;3m xyz ')
+        '  xyz'
         """
         return Sequence(text, self).rstrip(chars)
 
-    def lstrip(self, text, chars=None):
+    def lstrip(self, text: str, chars: Optional[str] = None) -> str:
         r"""
         Return ``text`` without terminal sequences or leading whitespace.
 
         :rtype: str
         :returns: Text with terminal sequences and leading whitespace removed
 
-        >>> term.lstrip(u' \x1b[0;3m xyz ')
-        u'xyz '
+        >>> term.lstrip(' \x1b[0;3m xyz ')
+        'xyz '
         """
         return Sequence(text, self).lstrip(chars)
 
-    def strip_seqs(self, text):
+    def strip_seqs(self, text: str) -> str:
         r"""
         Return ``text`` stripped of only its terminal sequences.
 
         :rtype: str
         :returns: Text with terminal sequences removed
 
-        >>> term.strip_seqs(u'\x1b[0;3mxyz')
-        u'xyz'
-        >>> term.strip_seqs(term.cuf(5) + term.red(u'test'))
-        u'     test'
+        >>> term.strip_seqs('\x1b[0;3mxyz')
+        'xyz'
+        >>> term.strip_seqs(term.cuf(5) + term.red('test'))
+        '     test'
 
         .. note:: Non-destructive sequences that adjust horizontal distance
             (such as ``\b`` or ``term.cuf(5)``) are replaced by destructive
@@ -1196,7 +1237,7 @@ class Terminal(object):
         """
         return Sequence(text, self).strip_seqs()
 
-    def split_seqs(self, text, maxsplit=0):
+    def split_seqs(self, text: str, maxsplit: int = 0) -> List[str]:
         r"""
         Return ``text`` split by individual character elements and sequences.
 
@@ -1207,24 +1248,21 @@ class Terminal(object):
         :rtype: list[str]
         :returns: List of sequences and individual characters
 
-        >>> term.split_seqs(term.underline(u'xyz'))
+        >>> term.split_seqs(term.underline('xyz'))
         ['\x1b[4m', 'x', 'y', 'z', '\x1b(B', '\x1b[m']
 
-        >>> term.split_seqs(term.underline(u'xyz'), 1)
+        >>> term.split_seqs(term.underline('xyz'), 1)
         ['\x1b[4m', r'xyz\x1b(B\x1b[m']
         """
-        pattern = self._caps_unnamed_any
         result = []
-        for idx, match in enumerate(re.finditer(pattern, text)):
+        for idx, match in enumerate(re.finditer(self._caps_unnamed_any, text)):
             result.append(match.group())
             if maxsplit and idx == maxsplit:
-                remaining = text[match.end():]
-                if remaining:
-                    result[-1] += remaining
+                result[-1] += text[match.end():]
                 break
         return result
 
-    def wrap(self, text, width=None, **kwargs):
+    def wrap(self, text: str, width: Optional[int] = None, **kwargs: object) -> List[str]:
         r"""
         Text-wrap a string, returning a list of wrapped lines.
 
@@ -1243,18 +1281,18 @@ class Terminal(object):
         """
         width = self.width if width is None else width
         wrapper = SequenceTextWrapper(width=width, term=self, **kwargs)
-        lines = []
+        lines: List[str] = []
         for line in text.splitlines():
-            lines.extend(iter(wrapper.wrap(line)) if line.strip() else (u'',))
+            lines.extend(iter(wrapper.wrap(line)) if line.strip() else ('',))
 
         return lines
 
-    def getch(self):
+    def getch(self) -> str:
         """
         Read, decode, and return the next byte from the keyboard stream.
 
         :rtype: unicode
-        :returns: a single unicode character, or ``u''`` if a multi-byte
+        :returns: a single unicode character, or ``''`` if a multi-byte
             sequence has not yet been fully received.
 
         This method name and behavior mimics curses ``getch(void)``, and
@@ -1269,7 +1307,7 @@ class Terminal(object):
         byte = os.read(self._keyboard_fd, 1)
         return self._keyboard_decoder.decode(byte, final=False)
 
-    def ungetch(self, text):
+    def ungetch(self, text: str) -> None:
         """
         Buffer input data to be discovered by next call to :meth:`~.inkey`.
 
@@ -1277,7 +1315,7 @@ class Terminal(object):
         """
         self._keyboard_buf.extendleft(text)
 
-    def kbhit(self, timeout=None):
+    def kbhit(self, timeout: Optional[float] = None) -> bool:
         """
         Return whether a keypress has been detected on the keyboard.
 
@@ -1295,42 +1333,16 @@ class Terminal(object):
             attached to this terminal.  When input is not a terminal, False is
             always returned.
         """
-        stime = time.time()
         ready_r = [None, ]
         check_r = [self._keyboard_fd] if self._keyboard_fd is not None else []
 
-        while HAS_TTY:
-            try:
-                ready_r, _, _ = select.select(check_r, [], [], timeout)
-            except InterruptedError:
-                # Beginning with python3.5, IntrruptError is no longer thrown
-                # https://www.python.org/dev/peps/pep-0475/
-                #
-                # For previous versions of python, we take special care to
-                # retry select on InterruptedError exception, namely to handle
-                # a custom SIGWINCH handler. When installed, it would cause
-                # select() to be interrupted with errno 4 (EAGAIN).
-                #
-                # Just as in python3.5, it is ignored, and a new timeout value
-                # is derived from the previous unless timeout becomes negative.
-                # because the signal handler has blocked beyond timeout, then
-                # False is returned. Otherwise, when timeout is None, we
-                # continue to block indefinitely (default).
-                if timeout is not None:
-                    # subtract time already elapsed,
-                    timeout -= time.time() - stime
-                    if timeout > 0:
-                        continue
-                    # no time remains after handling exception (rare)
-                    ready_r = []        # pragma: no cover
-                    break               # pragma: no cover
-            else:
-                break
+        if HAS_TTY:
+            ready_r, _, _ = select.select(check_r, [], [], timeout)
 
         return False if self._keyboard_fd is None else check_r == ready_r
 
     @contextlib.contextmanager
-    def cbreak(self):
+    def cbreak(self) -> Generator[None, None, None]:
         """
         Allow each keystroke to be read immediately after it is pressed.
 
@@ -1378,21 +1390,21 @@ class Terminal(object):
             yield
 
     @contextlib.contextmanager
-    def raw(self):
+    def raw(self) -> Generator[None, None, None]:
         r"""
         A context manager for :func:`tty.setraw`.
 
         Although both :meth:`cbreak` and :meth:`raw` modes allow each keystroke
         to be read immediately after it is pressed, Raw mode disables
-        processing of input and output.
+        processing of input and output by the terminal driver.
 
         In cbreak mode, special input characters such as ``^C`` or ``^S`` are
         interpreted by the terminal driver and excluded from the stdin stream.
         In raw mode these values are received by the :meth:`inkey` method.
 
-        Because output processing is not done, the newline ``'\n'`` is not
-        enough, you must also print carriage return to ensure that the cursor
-        is returned to the first column::
+        Because output processing is not done by the terminal driver, the
+        newline ``'\n'`` is not enough, you must also print carriage return to
+        ensure that the cursor is returned to the first column::
 
             with term.raw():
                 print("printing in raw mode", end="\r\n")
@@ -1415,7 +1427,7 @@ class Terminal(object):
             yield
 
     @contextlib.contextmanager
-    def keypad(self):
+    def keypad(self) -> Generator[None, None, None]:
         r"""
         Context manager that enables directional keypad input.
 
@@ -1440,7 +1452,8 @@ class Terminal(object):
             self.stream.write(self.rmkx)
             self.stream.flush()
 
-    def inkey(self, timeout=None, esc_delay=DEFAULT_ESCDELAY):
+    def inkey(self, timeout: Optional[float] = None,
+              esc_delay: float = DEFAULT_ESCDELAY) -> Keystroke:
         r"""
         Read and return the next keyboard event within given timeout.
 
@@ -1460,7 +1473,7 @@ class Terminal(object):
            the value as an argument to this function will override any
            such preference.
         :rtype: :class:`~.Keystroke`.
-        :returns: :class:`~.Keystroke`, which may be empty (``u''``) if
+        :returns: :class:`~.Keystroke`, which may be empty (``''``) if
            ``timeout`` is specified and keystroke is not received.
 
         .. note:: When used without the context manager :meth:`cbreak`, or
@@ -1479,7 +1492,7 @@ class Terminal(object):
         stime = time.time()
 
         # re-buffer previously received keystrokes,
-        ucs = u''
+        ucs = ''
         while self._keyboard_buf:
             ucs += self._keyboard_buf.pop()
 
@@ -1511,9 +1524,9 @@ class Terminal(object):
         # returned more quickly than esc_delay otherwise blocks for.
         if ks.code == self.KEY_ESCAPE:
             esctime = time.time()
-            while (ks.code == self.KEY_ESCAPE and
-                   ucs in self._keymap_prefixes and  # pylint: disable=unsupported-membership-test
-                   self.kbhit(timeout=_time_left(esctime, esc_delay))):
+            while (ks.code == self.KEY_ESCAPE
+                   and ucs in self._keymap_prefixes
+                   and self.kbhit(timeout=_time_left(esctime, esc_delay))):
                 ucs += self.getch()
                 # re-check 'final' after reading more bytes
                 final = bool(ucs) and ucs not in self._keymap_prefixes

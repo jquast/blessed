@@ -1,7 +1,6 @@
 # std imports
 import os
 import sys
-import json
 import runpy
 import functools
 
@@ -40,7 +39,7 @@ def no_op_wraps(func):
         return functools.orig_wraps(func)
 
     def wrapper(decorator):
-        sys.stderr.write('patched for function signature: {0!r}\n'.format(func))
+        sys.stderr.write(f'patched for function signature: {func!r}\n')
         return func
     return wrapper
 
@@ -91,17 +90,15 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Blessed'
-copyright = u'2011 Erik Rose, Jeff Quast, Avram Lubkin'
+project = 'Blessed'
+copyright = '2011 Erik Rose, Jeff Quast, Avram Lubkin'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
 # The short X.Y version.
-version = json.load(
-    open(os.path.join(HERE, os.pardir, 'version.json'), 'r')
-)['version']
+from blessed import __version__ as version  # isort:skip # noqa
 
 # The full version, including alpha/beta/rc tags.
 release = version
@@ -234,8 +231,8 @@ htmlhelp_basename = 'blesseddoc'
 # (source start file, target name, title, author, documentclass
 # [howto/manual]).
 latex_documents = [
-    ('index', 'blessed.tex', u'Blessed Documentation',
-     u'Erik Rose, Jeff Quast, Avram Lubkin', 'manual'),
+    ('index', 'blessed.tex', 'Blessed Documentation',
+     'Erik Rose, Jeff Quast, Avram Lubkin', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -267,8 +264,8 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'Blessed', u'Blessed Documentation',
-     [u'Erik Rose, Jeff Quast, Avram Lubkin'], 1)
+    ('index', 'Blessed', 'Blessed Documentation',
+     ['Erik Rose, Jeff Quast, Avram Lubkin'], 1)
 ]
 
 # sort order of API documentation is by their appearance in source code
