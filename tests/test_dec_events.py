@@ -1,0 +1,320 @@
+# -*- coding: utf-8 -*-
+"""Tests for DEC Private Mode event handling."""
+# std imports
+import re
+import io
+
+# 3rd party
+import pytest
+
+# local
+from blessed import Terminal
+from blessed.keyboard import (
+    Keystroke,
+    _match_dec_event,
+    BracketedPasteEvent,
+    MouseEvent,
+    MouseSGREvent,
+    MouseLegacyEvent,
+    FocusEvent,
+)
+from .accessories import TestTerminal
+
+
+class TestDECEventMatching:
+    """Test DEC event pattern matching functionality."""
+
+    @pytest.mark.parametrize("sequence", ['hello', 'abc123', '', '\x1b[9999z', '\x1b[unknown'])
+    def test_match_dec_event_invalid(self, sequence):
+        """Test that invalid sequences return None."""
+        assert _match_dec_event(sequence) is None
+
+    def test_bracketed_paste_detection(self):
+        """Test bracketed paste sequence detection."""
+        sequence = '\x1b[200~hello world\x1b[201~'
+        ks = _match_dec_event(sequence)
+
+        assert ks is not None
+        assert ks == sequence
+        assert ks.event_mode == Terminal.DecPrivateMode.BRACKETED_PASTE
+        assert ks._mode == 2004
+
+        values = ks.mode_values()
+        assert isinstance(values, BracketedPasteEvent)
+        assert values.text == 'hello world'
+
+    def test_bracketed_paste_multiline(self):
+        """Test bracketed paste with multiline content."""
+        sequence = '\x1b[200~line1\nline2\tindented\x1b[201~'
+        ks = _match_dec_event(sequence)
+
+        assert ks is not None
+        values = ks.mode_values()
+        assert values.text == 'line1\nline2\tindented'
+
+    @pytest.mark.parametrize("sequence,expected", [
+        # (sequence, (button, x, y, is_release, shift, meta, ctrl, is_wheel))
+        ('\x1b[0;10;20M', (0, 10, 20, False, False, False, False, False)),
+        ('\x1b[0;15;25m', (0, 15, 25, True, False, False, False, False)),
+        ('\x1b[28;5;5M', (0, 5, 5, False, True, True, True, False)),
+        ('\x1b[64;10;10M', (64, 10, 10, False, False, False, False, True)),
+        ('\x1b[65;10;10M', (65, 10, 10, False, False, False, False, True)),
+    ])
+    def test_mouse_sgr_events(self, sequence, expected):
+        """Test SGR mouse events with various button, modifier, and wheel states."""
+        button, x, y, is_release, shift, meta, ctrl, is_wheel = expected
+        ks = _match_dec_event(sequence)
+
+        assert ks is not None
+        assert ks.event_mode == Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR
+
+        values = ks.mode_values()
+        assert isinstance(values, MouseSGREvent)
+        assert values.button == button
+        assert values.x == x
+        assert values.y == y
+        assert values.is_release == is_release
+        assert values.shift == shift
+        assert values.meta == meta
+        assert values.ctrl == ctrl
+        assert values.is_wheel == is_wheel
+
+    @pytest.mark.parametrize("sequence,expected_release", [
+        ('\x1b[M   ', False),  # Press event
+        ('\x1b[M#@@', True),   # Release event
+    ])
+    def test_mouse_legacy_events(self, sequence, expected_release):
+        """Test legacy mouse events for press and release."""
+        ks = _match_dec_event(sequence)
+        assert ks.event_mode.value == 1000  # Default legacy mode
+
+        values = ks.mode_values()
+        assert isinstance(values, MouseLegacyEvent)
+        assert values.is_release == expected_release
+        assert not values.is_motion
+        assert not values.is_wheel
+
+    @pytest.mark.parametrize("sequence,expected_gained", [
+        ('\x1b[I', True),   # Focus gained
+        ('\x1b[O', False),  # Focus lost
+    ])
+    def test_focus_events(self, sequence, expected_gained):
+        """Test focus events for gained and lost."""
+        ks = _match_dec_event(sequence)
+        assert ks.event_mode == Terminal.DecPrivateMode.FOCUS_IN_OUT_EVENTS
+
+        values = ks.mode_values()
+        assert isinstance(values, FocusEvent)
+        assert values.gained is expected_gained
+
+
+@pytest.mark.parametrize("mode,expected_error", [
+    (None, "Should only call mode_values.*when event_mode is non-None"),
+    (9999, "Unknown DEC mode 9999")
+])
+def test_mode_values_errors(mode, expected_error):
+    """Test mode_values() error cases."""
+    match = None
+    if mode:
+        match = re.match(r'\x1b\[test', '\x1b[test')
+
+    ks = Keystroke('xxxxxxxxx', mode=mode, match=match)
+
+    with pytest.raises(TypeError, match=expected_error):
+        ks.mode_values()
+
+
+def test_keystroke_with_dec_mode():
+    """Test keystroke with DEC mode - minimal test."""
+    match = re.match(r'\x1b\[200~(?P<text>.*?)\x1b\[201~', '\x1b[200~test\x1b[201~')
+    ks = Keystroke('\x1b[200~test\x1b[201~', mode=2004, match=match)
+    assert ks.event_mode == Terminal.DecPrivateMode.BRACKETED_PASTE
+    assert ks.mode == Terminal.DecPrivateMode.BRACKETED_PASTE
+    assert ks.is_sequence
+
+
+def test_terminal_dec_mode_context_no_styling():
+    """Test DEC mode context managers with force_styling=False"""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=False)
+    with term.dec_modes_enabled(Terminal.DecPrivateMode.BRACKETED_PASTE):
+        pass
+    with term.dec_modes_enabled(Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR):
+        pass
+    output = stream.getvalue()
+    assert output == ''
+
+
+def test_mouse_sgr_csi_lt_events():
+    """Test SGR mouse events with proper CSI < format."""
+    # Test standard SGR format: CSI < button ; x ; y M/m
+
+    # Test press event with CSI < prefix
+    ks_press = _match_dec_event('\x1b[<0;10;20M')
+    assert ks_press.event_mode == Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR
+
+    values = ks_press.mode_values()
+    assert isinstance(values, MouseSGREvent)
+    assert values.button == 0  # Left button
+    assert values.x == 10
+    assert values.y == 20
+    assert not values.is_release
+    assert not values.shift and not values.meta and not values.ctrl
+
+    # Test release event with CSI < prefix
+    ks_release = _match_dec_event('\x1b[<0;15;25m')
+    values = ks_release.mode_values()
+    assert values.x == 15
+    assert values.y == 25
+    assert values.is_release
+
+    # Test modifiers with CSI < prefix (shift=4, meta=8, ctrl=16, combined=28)
+    ks_mod = _match_dec_event('\x1b[<28;5;5M')
+    values = ks_mod.mode_values()
+    assert values.shift and values.meta and values.ctrl
+    assert values.button == 0  # Base button after masking
+
+    # Test wheel events with CSI < prefix
+    ks_wheel_up = _match_dec_event('\x1b[<64;10;10M')
+    values_up = ks_wheel_up.mode_values()
+    assert values_up.button == 64 and values_up.is_wheel
+
+    ks_wheel_down = _match_dec_event('\x1b[<65;10;10M')
+    values_down = ks_wheel_down.mode_values()
+    assert values_down.button == 65 and values_down.is_wheel
+
+
+def test_mouse_sgr_pixels_format():
+    """Test SGR-Pixels format compatibility (mode 1016).
+
+    SGR-Pixels (mode 1016) uses identical wire format to SGR (mode 1006).
+    The difference is semantic - coordinates represent pixels vs character cells.
+    Since wire format is identical, the decoder cannot distinguish between them;
+    applications must interpret coordinates based on which mode was enabled.
+    """
+    # Test large coordinates typical of pixel-based reporting
+    ks_pixels = _match_dec_event('\x1b[<0;1234;567M')
+
+    # Should parse as regular SGR event (mode 1006) since wire format is identical
+    assert ks_pixels.event_mode == Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR
+
+    values = ks_pixels.mode_values()
+    assert isinstance(values, MouseSGREvent)
+    assert values.button == 0  # Left button
+    assert values.x == 1234  # Large x coordinate (pixels)
+    assert values.y == 567   # Large y coordinate (pixels)
+    assert not values.is_release
+    assert not values.shift and not values.meta and not values.ctrl
+
+    # The interpretation of these coordinates as pixels (vs cells) depends on
+    # whether the application enabled mode 1016, not on the sequence structure
+
+
+def test_resolve_sequence():
+    """Test that DEC events don't interfere with regular sequence resolution."""
+    from blessed.keyboard import resolve_sequence, OrderedDict, get_leading_prefixes
+
+    # Mock keymap and codes for basic resolver
+    keymap = OrderedDict([('\x1b[A', 100)])  # Up arrow
+    prefixes = get_leading_prefixes(keymap)
+    codes = {100: 'KEY_UP'}
+
+    # Regular sequence should resolve normally
+    ks = resolve_sequence('\x1b[A', keymap, codes, prefixes)
+    assert ks.code == 100
+    assert ks.name == 'KEY_UP'
+
+    # DEC event sequence should also match with same keymap
+    dec_sequence = '\x1b[200~test\x1b[201~'
+    ks_dec = resolve_sequence(dec_sequence, keymap, codes, prefixes)
+    event_value = ks_dec.mode_values()
+    assert isinstance(event_value, BracketedPasteEvent)
+    assert event_value.text == 'test'
+    assert ks_dec.mode == Terminal.DecPrivateMode.BRACKETED_PASTE
+
+
+def test_mouse_event_is_motion_field():
+    """Test that is_motion field is present and correct for both SGR and legacy events."""
+    # Test SGR mouse event with motion (drag)
+    ks_drag = _match_dec_event('\x1b[<32;10;20M')  # bit 32 set = motion
+    values = ks_drag.mode_values()
+    assert isinstance(values, MouseEvent)
+    assert values.is_motion is True
+    assert not values.is_release
+
+    # Test SGR mouse press without motion
+    ks_press = _match_dec_event('\x1b[<0;10;20M')
+    values = ks_press.mode_values()
+    assert values.is_motion is False
+
+    # Test SGR mouse release with motion bit set
+    ks_release = _match_dec_event('\x1b[<32;10;20m')  # lowercase 'm' = release
+    values = ks_release.mode_values()
+    assert values.is_motion is True
+    assert values.is_release is True
+
+    # Test legacy mouse event with motion
+    # cb byte: 32 (motion bit) + offset 32 = 64 = '@'
+    ks_legacy_motion = _match_dec_event('\x1b[M@  ')
+    values = ks_legacy_motion.mode_values()
+    assert isinstance(values, MouseEvent)
+    assert values.is_motion is True
+
+    # Test legacy mouse event without motion
+    ks_legacy_press = _match_dec_event('\x1b[M   ')  # cb=32, button=0, no motion
+    values = ks_legacy_press.mode_values()
+    assert values.is_motion is False
+
+
+def test_mouse_event_repr():
+    """Test that MouseEvent __repr__ only shows active attributes."""
+    # Test simple press event - should only show button, x, y
+    ks_press = _match_dec_event('\x1b[<0;10;20M')
+    values = ks_press.mode_values()
+    repr_str = repr(values)
+    assert repr_str == "MouseEvent(button=0, x=10, y=20)"
+    assert 'is_release' not in repr_str
+    assert 'shift' not in repr_str
+
+    # Test release event - should show is_release
+    ks_release = _match_dec_event('\x1b[<0;10;20m')
+    values = ks_release.mode_values()
+    repr_str = repr(values)
+    assert 'is_release=True' in repr_str
+    assert repr_str == "MouseEvent(button=0, x=10, y=20, is_release=True)"
+
+    # Test with modifiers - should show shift, meta, ctrl
+    ks_mod = _match_dec_event('\x1b[<28;5;5M')  # 28 = 4 (shift) + 8 (meta) + 16 (ctrl)
+    values = ks_mod.mode_values()
+    repr_str = repr(values)
+    assert 'shift=True' in repr_str
+    assert 'meta=True' in repr_str
+    assert 'ctrl=True' in repr_str
+    assert repr_str == "MouseEvent(button=0, x=5, y=5, shift=True, meta=True, ctrl=True)"
+
+    # Test wheel event - should show is_wheel
+    ks_wheel = _match_dec_event('\x1b[<64;10;10M')
+    values = ks_wheel.mode_values()
+    repr_str = repr(values)
+    assert 'is_wheel=True' in repr_str
+    assert repr_str == "MouseEvent(button=64, x=10, y=10, is_wheel=True)"
+
+
+def test_mouse_event_backwards_compatibility():
+    """Test that MouseSGREvent and MouseLegacyEvent still work as aliases."""
+    # Verify they are the same class
+    assert MouseSGREvent is MouseEvent
+    assert MouseLegacyEvent is MouseEvent
+
+    # Verify isinstance checks work with old names
+    ks_sgr = _match_dec_event('\x1b[<0;10;20M')
+    values = ks_sgr.mode_values()
+    assert isinstance(values, MouseSGREvent)
+    assert isinstance(values, MouseLegacyEvent)
+    assert isinstance(values, MouseEvent)
+
+    ks_legacy = _match_dec_event('\x1b[M   ')
+    values = ks_legacy.mode_values()
+    assert isinstance(values, MouseSGREvent)
+    assert isinstance(values, MouseLegacyEvent)
+    assert isinstance(values, MouseEvent)

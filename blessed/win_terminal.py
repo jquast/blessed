@@ -5,6 +5,7 @@ from __future__ import absolute_import
 
 # std imports
 import time
+import codecs
 import msvcrt  # pylint: disable=import-error
 import contextlib
 from typing import Optional, Generator
@@ -20,11 +21,12 @@ from .terminal import Terminal as _Terminal
 class Terminal(_Terminal):
     """Windows subclass of :class:`Terminal`."""
 
-    def getch(self) -> str:
+    def getch(self, decoder: Optional[codecs.IncrementalDecoder] = None) -> str:
         r"""
         Read, decode, and return the next byte from the keyboard stream.
 
         :rtype: unicode
+        :arg decoder: Not used on the Windows Platform
         :returns: a single unicode character, or ``''`` if a multi-byte
             sequence has not yet been fully received.
 

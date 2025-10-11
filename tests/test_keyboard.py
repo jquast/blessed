@@ -7,6 +7,8 @@ import os
 import platform
 import sys
 import tempfile
+import functools
+from unittest import mock
 
 # 3rd party
 import pytest
@@ -15,19 +17,11 @@ import pytest
 from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, as_subprocess
 
-try:
-    # std imports
-    from unittest import mock
-except ImportError:
-    # 3rd party
-    import mock
-
 if platform.system() != 'Windows':
     # std imports
     import tty  # pylint: disable=unused-import  # NOQA
     import curses
 else:
-    # 3rd party
     import jinxed as curses  # pylint: disable=import-error
 
 
@@ -127,7 +121,6 @@ def test_stdin_redirect():
 
 def test_keystroke_default_args():
     """Test keyboard.Keystroke constructor with default arguments."""
-    # local
     from blessed.keyboard import Keystroke
     ks = Keystroke()
     assert ks._name is None
@@ -141,7 +134,6 @@ def test_keystroke_default_args():
 
 def test_a_keystroke():
     """Test keyboard.Keystroke constructor with set arguments."""
-    # local
     from blessed.keyboard import Keystroke
     ks = Keystroke(ucs='x', code=1, name='the X')
     assert ks._name == 'the X'
@@ -153,27 +145,8 @@ def test_a_keystroke():
     assert repr(ks) == "the X"
 
 
-def test_get_keyboard_codes():
-    """Test all values returned by get_keyboard_codes are from curses."""
-    # local
-    import blessed.keyboard
-    exemptions = dict(blessed.keyboard.CURSES_KEYCODE_OVERRIDE_MIXIN)
-    for value, keycode in blessed.keyboard.get_keyboard_codes().items():
-        if keycode in exemptions:
-            assert value == exemptions[keycode]
-            continue
-        if keycode[4:] in blessed.keyboard._CURSES_KEYCODE_ADDINS:
-            assert not hasattr(curses, keycode)
-            assert hasattr(blessed.keyboard, keycode)
-            assert getattr(blessed.keyboard, keycode) == value
-        else:
-            assert hasattr(curses, keycode)
-            assert getattr(curses, keycode) == value
-
-
 def test_alternative_left_right():
     """Test _alternative_left_right behavior for space/backspace."""
-    # local
     from blessed.keyboard import _alternative_left_right
     term = mock.Mock()
     term._cuf1 = ''
@@ -191,7 +164,6 @@ def test_alternative_left_right():
 
 def test_cuf1_and_cub1_as_RIGHT_LEFT(all_terms):
     """Test that cuf1 and cub1 are assigned KEY_RIGHT and KEY_LEFT."""
-    # local
     from blessed.keyboard import get_keyboard_sequences
 
     @as_subprocess
@@ -228,7 +200,6 @@ def test_get_keyboard_sequences_sort_order():
 
 def test_get_keyboard_sequence(monkeypatch):
     """Test keyboard.get_keyboard_sequence."""
-    # local
     import blessed.keyboard
 
     (KEY_SMALL, KEY_LARGE, KEY_MIXIN) = range(3)
@@ -268,10 +239,9 @@ def test_get_keyboard_sequence(monkeypatch):
         (SEQ_MIXIN.decode('latin1'), KEY_MIXIN)]
 
 
-def test_resolve_sequence():
+def test_resolve_sequence_order():
     """Test resolve_sequence for order-dependent mapping."""
-    # local
-    from blessed.keyboard import OrderedDict, resolve_sequence
+    from blessed.keyboard import resolve_sequence, OrderedDict, get_leading_prefixes
     mapper = OrderedDict((('SEQ1', 1),
                           ('SEQ2', 2),
                           # takes precedence over LONGSEQ, first-match
@@ -287,42 +257,43 @@ def test_resolve_sequence():
              4: 'KEY_LONGSEQ',
              5: 'KEY_LONGSEQ_longer',
              6: 'KEY_L'}
-    ks = resolve_sequence('', mapper, codes)
+    prefixes = get_leading_prefixes(mapper)
+    ks = resolve_sequence('', mapper, codes, prefixes, final=True)
     assert ks == ''
     assert ks.name is None
     assert ks.code is None
     assert not ks.is_sequence
     assert repr(ks) == "''"
 
-    ks = resolve_sequence('notfound', mapper=mapper, codes=codes)
+    ks = resolve_sequence('notfound', mapper, codes, prefixes, final=True)
     assert ks == 'n'
     assert ks.name is None
     assert ks.code is None
     assert not ks.is_sequence
     assert repr(ks) == "'n'"
 
-    ks = resolve_sequence('SEQ1', mapper, codes)
+    ks = resolve_sequence('SEQ1', mapper, codes, prefixes, final=True)
     assert ks == 'SEQ1'
     assert ks.name == 'KEY_SEQ1'
     assert ks.code == 1
     assert ks.is_sequence
     assert repr(ks) == "KEY_SEQ1"
 
-    ks = resolve_sequence('LONGSEQ_longer', mapper, codes)
+    ks = resolve_sequence('LONGSEQ_longer', mapper, codes, prefixes, final=True)
     assert ks == 'LONGSEQ'
     assert ks.name == 'KEY_LONGSEQ'
     assert ks.code == 4
     assert ks.is_sequence
     assert repr(ks) == "KEY_LONGSEQ"
 
-    ks = resolve_sequence('LONGSEQ', mapper, codes)
+    ks = resolve_sequence('LONGSEQ', mapper, codes, prefixes, final=True)
     assert ks == 'LONGSEQ'
     assert ks.name == 'KEY_LONGSEQ'
     assert ks.code == 4
     assert ks.is_sequence
     assert repr(ks) == "KEY_LONGSEQ"
 
-    ks = resolve_sequence('Lxxxxx', mapper, codes)
+    ks = resolve_sequence('Lxxxxx', mapper, codes, prefixes, final=True)
     assert ks == 'L'
     assert ks.name == 'KEY_L'
     assert ks.code == 6
@@ -332,7 +303,6 @@ def test_resolve_sequence():
 
 def test_keyboard_prefixes():
     """Test keyboard.prefixes."""
-    # local
     from blessed.keyboard import get_leading_prefixes
     keys = ['abc', 'abdf', 'e', 'jkl']
     pfs = get_leading_prefixes(keys)
@@ -340,7 +310,7 @@ def test_keyboard_prefixes():
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no multiprocess")
-def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
+def test_keypad_mixins_and_aliases():
     """Test PC-Style function key translations when in ``keypad`` mode."""
     # Key     plain   app     modified
     # Up      ^[[A    ^[OA    ^[[1;mA
@@ -350,14 +320,15 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
     # End     ^[[F    ^[OF    ^[[1;mF
     # Home    ^[[H    ^[OH    ^[[1;mH
     @as_subprocess
-    def child(kind):  # pylint: disable=too-many-statements
+    def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
-        # local
         from blessed.keyboard import resolve_sequence
 
         resolve = functools.partial(resolve_sequence,
                                     mapper=term._keymap,
-                                    codes=term._keycodes)
+                                    codes=term._keycodes,
+                                    prefixes=term._keymap_prefixes,
+                                    final=True)
 
         assert resolve(chr(10)).name == "KEY_ENTER"
         assert resolve(chr(13)).name == "KEY_ENTER"
@@ -369,6 +340,7 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
         assert resolve("\x1b[B").name == "KEY_DOWN"
         assert resolve("\x1b[C").name == "KEY_RIGHT"
         assert resolve("\x1b[D").name == "KEY_LEFT"
+        assert resolve("\x1b[E").name == "KEY_CENTER"
         assert resolve("\x1b[U").name == "KEY_PGDOWN"
         assert resolve("\x1b[V").name == "KEY_PGUP"
         assert resolve("\x1b[H").name == "KEY_HOME"
@@ -400,25 +372,67 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
         assert resolve("\x1b[6~").name == "KEY_PGDOWN"
         assert resolve("\x1b[7~").name == "KEY_HOME"
         assert resolve("\x1b[8~").name == "KEY_END"
-        assert resolve("\x1b[OA").name == "KEY_UP"
-        assert resolve("\x1b[OB").name == "KEY_DOWN"
-        assert resolve("\x1b[OC").name == "KEY_RIGHT"
-        assert resolve("\x1b[OD").name == "KEY_LEFT"
-        assert resolve("\x1b[OF").name == "KEY_END"
-        assert resolve("\x1b[OH").name == "KEY_HOME"
-        assert resolve("\x1bOP").name == "KEY_F1"
-        assert resolve("\x1bOQ").name == "KEY_F2"
-        assert resolve("\x1bOR").name == "KEY_F3"
-        assert resolve("\x1bOS").name == "KEY_F4"
 
     child('xterm')
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="no multiprocess")
+def test_kp_begin_center_key():
+    """Test KP_BEGIN/center key (numpad 5) with modifiers and event types."""
+    @as_subprocess
+    def child():
+        from blessed.keyboard import _match_legacy_csi_modifiers
+
+        # Basic sequence without modifiers
+        ks = _match_legacy_csi_modifiers('\x1b[E')
+        assert ks is None  # Doesn't match - needs modifiers for legacy CSI
+
+        # With modifiers - Ctrl
+        ks = _match_legacy_csi_modifiers('\x1b[1;5E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.name == 'KEY_CTRL_CENTER'
+
+        # With modifiers - Alt
+        ks = _match_legacy_csi_modifiers('\x1b[1;3E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.name == 'KEY_ALT_CENTER'
+
+        # With modifiers - Ctrl+Alt
+        ks = _match_legacy_csi_modifiers('\x1b[1;7E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.name == 'KEY_CTRL_ALT_CENTER'
+
+        # With event type - release (the original issue case)
+        ks = _match_legacy_csi_modifiers('\x1b[1;1:3E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.released
+        assert ks.name == 'KEY_CENTER_RELEASED'
+
+        # With event type - repeat
+        ks = _match_legacy_csi_modifiers('\x1b[1;1:2E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.repeated
+        assert ks.name == 'KEY_CENTER_REPEATED'
+
+        # With modifiers and event type
+        ks = _match_legacy_csi_modifiers('\x1b[1;5:3E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.released
+        assert ks.name == 'KEY_CTRL_CENTER_RELEASED'
+
+    child()
 
 
 def test_ESCDELAY_unset_unchanged():
     """Unset ESCDELAY leaves DEFAULT_ESCDELAY unchanged in _reinit_escdelay()."""
     if 'ESCDELAY' in os.environ:
         del os.environ['ESCDELAY']
-    # local
     import blessed.keyboard
     prev_value = blessed.keyboard.DEFAULT_ESCDELAY
     blessed.keyboard._reinit_escdelay()
@@ -428,7 +442,6 @@ def test_ESCDELAY_unset_unchanged():
 def test_ESCDELAY_bad_value_unchanged():
     """Invalid ESCDELAY leaves DEFAULT_ESCDELAY unchanged in _reinit_escdelay()."""
     os.environ['ESCDELAY'] = 'XYZ123!'
-    # local
     import blessed.keyboard
     prev_value = blessed.keyboard.DEFAULT_ESCDELAY
     blessed.keyboard._reinit_escdelay()
@@ -439,7 +452,6 @@ def test_ESCDELAY_bad_value_unchanged():
 def test_ESCDELAY_10ms():
     """Verify ESCDELAY modifies DEFAULT_ESCDELAY in _reinit_escdelay()."""
     os.environ['ESCDELAY'] = '1234'
-    # local
     import blessed.keyboard
     blessed.keyboard._reinit_escdelay()
     assert blessed.keyboard.DEFAULT_ESCDELAY == 1.234

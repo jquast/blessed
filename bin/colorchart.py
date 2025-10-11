@@ -51,7 +51,7 @@ def draw_chart(term):
             line += '\n'
             line_len = 0
 
-        line += ' %s' % chart
+        line += f' {chart}'
         line_len += 5
 
     elapsed = round((timeit.default_timer() - start) * 1000)
