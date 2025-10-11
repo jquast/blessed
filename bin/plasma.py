@@ -9,7 +9,6 @@ import contextlib
 
 # local
 import blessed
-from blessed.dec_modes import DecPrivateMode
 
 
 def scale_255(val): return int(round(val * 255))
@@ -102,7 +101,7 @@ def main(term):
                     outp = term.home + screen_plasma(term, rgb_at_xy, t)
                 outp += status(term, elapsed())
                 # Use synchronized output to reduce tearing and improve smoothness
-                with term.dec_modes_enabled(DecPrivateMode.SYNCHRONIZED_OUTPUT, timeout=0.1):
+                with term.dec_modes_enabled(term.DecPrivateMode.SYNCHRONIZED_OUTPUT, timeout=0.1):
                     print(outp, end='')
                     sys.stdout.flush()
                 dirty = False

@@ -16,7 +16,10 @@ import functools
 from collections import deque
 
 # local
-from blessed import Terminal, DecPrivateMode
+from blessed import Terminal
+
+# For convenience in type hints and initialization
+DecPrivateMode = Terminal.DecPrivateMode
 
 
 class DecModeManager:

@@ -27,7 +27,6 @@ import collections
 
 # local
 from blessed import Terminal
-from blessed.dec_modes import DecPrivateMode
 from blessed.keyboard import MouseSGREvent
 
 # python 2/3 compatibility, provide 'echo' function as an
@@ -230,7 +229,7 @@ def main():
             term.location(), \
             term.fullscreen(), \
             term.keypad(), \
-            term.dec_modes_enabled(DecPrivateMode.MOUSE_EXTENDED_SGR):
+            term.dec_modes_enabled(term.DecPrivateMode.MOUSE_EXTENDED_SGR):
         inp = None
         while True:
             echo_yx(csr, term.reverse(screen.get((csr.y, csr.x), u' ')))
@@ -256,7 +255,7 @@ def main():
                 # ^l refreshes
                 redraw(term=term, screen=screen)
 
-            elif inp.event_mode == DecPrivateMode.MOUSE_EXTENDED_SGR:
+            elif inp.event_mode == term.DecPrivateMode.MOUSE_EXTENDED_SGR:
                 # Handle mouse events
                 mouse_event = inp.mode_values()
                 if isinstance(mouse_event, MouseSGREvent) and not mouse_event.is_release:

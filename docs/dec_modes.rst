@@ -10,17 +10,21 @@ terminal behaviors. The blessed library provides a clean API for:
 - and *Disable* using the :meth:`~blessed.Terminal.dec_modes_disabled` ("DECRST")
   context manager.
 
-Each mode is identified by a numeric value, and can be found as a static
-attribute of :class:`~blessed.dec_modes.DecPrivateMode`. Our list of modes
-was derived from https://wiki.tau.garden/dec-modes/
+Each mode is identified by a numeric value, and can be accessed as a class
+attribute via :attr:`Terminal.DecPrivateMode <blessed.Terminal.DecPrivateMode>`.
+Our list of modes was derived from https://wiki.tau.garden/dec-modes/
 
 A simple example:
 
 .. code-block:: python
    :emphasize-lines: 7,11,13,17,22
 
+   from blessed import Terminal
+
+   term = Terminal()
+
    # Temporarily disable cursor
-   with term.dec_modes_disabled(DecPrivateMode.DECTCEM):
+   with term.dec_modes_disabled(term.DecPrivateMode.DECTCEM):
         # Cursor is hidden
         print("Working...")
         time.sleep(2)
@@ -38,12 +42,11 @@ reporting", :attr:`~blessed.dec_mode.DecPrivateMode.MOUSE_REPORT_CLICK` like so:
    :emphasize-lines: 7,11,13,17,22
 
    from blessed import Terminal
-   from blessed.dec_modes import DecPrivateMode
 
    term = Terminal()
 
    # make query
-   response = term.get_dec_mode(DecPrivateMode.MOUSE_REPORT_CLICK, timeout=1.0)
+   response = term.get_dec_mode(term.DecPrivateMode.MOUSE_REPORT_CLICK, timeout=1.0)
 
    # display response
    print("Status of basic mouse click reporting: ", end='')
@@ -96,9 +99,10 @@ DEC Private Mode queries involve terminal communication and *may* timeout:
 
 .. code-block:: python
 
-    from blessed import Terminal, DecPrivateMode
+    from blessed import Terminal
 
-    mode = DecPrivateMode(DecPrivateMode.DECTCEM)
+    term = Terminal()
+    mode = term.DecPrivateMode.DECTCEM
     resp = term.get_dec_mode(mode, timeout=1.0)
 
     if resp.is_failed():
@@ -112,7 +116,7 @@ Query results are cached automatically. Use ``force=True`` to bypass the cache:
 .. code-block:: python
 
     # Force a fresh query
-    response = term.get_dec_mode(DecPrivateMode.DECTCEM, force=True)
+    response = term.get_dec_mode(term.DecPrivateMode.DECTCEM, force=True)
 
 Because queries are cached, it is possible to repeatedly change modes using the
 context managers, and the timeout cost is only incurred on the first call, as
@@ -136,14 +140,14 @@ or half-frames:
 .. code-block:: python
    :emphasize-lines: 7,11,13,17,22
 
-    from blessed import Terminal, DecPrivateMode
+    from blessed import Terminal
 
     term = Terminal()
     # WARNING! This may rapidly blink your screen !!
     fillblocks = "█" * term.height * term.width
     emptyblocks = " " * term.height * term.width
     for _ in range(1000):
-        with term.dec_modes_enabled(DecPrivateMode.SYNCHRONIZED_OUTPUT, timeout=1):
+        with term.dec_modes_enabled(term.DecPrivateMode.SYNCHRONIZED_OUTPUT, timeout=1):
             print(term.home + emptyblocks, flush=True)
             print(term.home + fillblocks, flush=True)
 
@@ -157,8 +161,8 @@ used, causing a 1 second delay on first loop.
 
     # Enable multiple modes at once
     with term.dec_modes_enabled(
-        DecPrivateMode.MOUSE_REPORT_CLICK,
-        DecPrivateMode.BRACKETED_PASTE,
+        term.DecPrivateMode.MOUSE_REPORT_CLICK,
+        term.DecPrivateMode.BRACKETED_PASTE,
         timeout=0.5
     ):
         # Both mouse tracking and bracketed paste enabled
@@ -182,16 +186,15 @@ received by a :class:`Keystroke` from the :meth:`~Terminal.inkey` method.
 .. code-block:: python
 
     from blessed import Terminal
-    from blessed.dec_modes import DecPrivateMode
     from blessed.keyboard import BracketedPasteEvent
 
     term = Terminal()
 
-    with term.dec_modes_enabled(DecPrivateMode.BRACKETED_PASTE):
+    with term.dec_modes_enabled(term.DecPrivateMode.BRACKETED_PASTE):
         print("Paste some text...")
         ks = term.inkey()
 
-        if ks.event_mode == DecPrivateMode.BRACKETED_PASTE:
+        if ks.event_mode == term.DecPrivateMode.BRACKETED_PASTE:
             event = ks.mode_values()
             print(f"Pasted: {repr(event.text)}")
         else:
@@ -205,17 +208,16 @@ Mouse tracking modes send detailed mouse event information:
 .. code-block:: python
 
     from blessed import Terminal
-    from blessed.dec_modes import DecPrivateMode
     from blessed.keyboard import MouseSGREvent
 
     term = Terminal()
 
-    with term.dec_modes_enabled(DecPrivateMode.MOUSE_EXTENDED_SGR):
+    with term.dec_modes_enabled(term.DecPrivateMode.MOUSE_EXTENDED_SGR):
         print("Click, drag, or scroll...")
         while True:
             ks = term.inkey()
 
-            if ks.event_mode == DecPrivateMode.MOUSE_EXTENDED_SGR:
+            if ks.event_mode == term.DecPrivateMode.MOUSE_EXTENDED_SGR:
                 event = ks.mode_values()
                 action = "release" if event.is_release else "press"
                 print(f"Mouse {action}: button={event.button} at ({event.x}, {event.y})")
@@ -236,17 +238,16 @@ Focus tracking reports when the terminal window gains or loses focus:
 .. code-block:: python
 
     from blessed import Terminal
-    from blessed.dec_modes import DecPrivateMode
     from blessed.keyboard import FocusEvent
 
     term = Terminal()
 
-    with term.dec_modes_enabled(DecPrivateMode.FOCUS_IN_OUT_EVENTS):
+    with term.dec_modes_enabled(term.DecPrivateMode.FOCUS_IN_OUT_EVENTS):
         print("Switch focus to/from terminal window...")
         while True:
             ks = term.inkey()
 
-            if ks.event_mode == DecPrivateMode.FOCUS_IN_OUT_EVENTS:
+            if ks.event_mode == term.DecPrivateMode.FOCUS_IN_OUT_EVENTS:
                 event = ks.mode_values()
                 status = "gained" if event.gained else "lost"
                 print(f"Focus {status}")
@@ -263,17 +264,17 @@ window gains or loses focus:
 
 .. code-block:: python
 
-    from blessed import Terminal, DecPrivateMode
+    from blessed import Terminal
 
     term = Terminal()
 
-    with term.cbreak(), term.dec_modes_enabled(DecPrivateMode.FOCUS_IN_OUT_EVENTS):
+    with term.cbreak(), term.dec_modes_enabled(term.DecPrivateMode.FOCUS_IN_OUT_EVENTS):
         print("Switch to another window and back...")
 
         while True:
             event = term.inkey()
 
-            if event.mode == DecPrivateMode.FOCUS_IN_OUT_EVENTS:
+            if event.mode == term.DecPrivateMode.FOCUS_IN_OUT_EVENTS:
                 focus = event.mode_values()
                 if focus.gained:
                     print("Window gained focus!")

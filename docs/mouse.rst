@@ -14,21 +14,21 @@ Here's a simple example that waits for you to click anywhere:
 
 .. code-block:: python
 
-    from blessed import Terminal, DecPrivateMode
+    from blessed import Terminal
 
     term = Terminal()
     print("Click anywhere!")
 
     # Enable mouse click tracking with modern SGR format
     with term.cbreak(), term.dec_modes_enabled(
-            DecPrivateMode.MOUSE_REPORT_CLICK,
-            DecPrivateMode.MOUSE_EXTENDED_SGR, timeout=1):
+            term.DecPrivateMode.MOUSE_REPORT_CLICK,
+            term.DecPrivateMode.MOUSE_EXTENDED_SGR, timeout=1):
 
         while True:
             event = term.inkey()
 
             # Check if this is a mouse event
-            if event.mode == DecPrivateMode.MOUSE_EXTENDED_SGR:
+            if event.mode == term.DecPrivateMode.MOUSE_EXTENDED_SGR:
                 mouse = event.mode_values()
                 if not mouse.is_release:
                     button_name = {0: 'left', 1: 'middle', 2: 'right'}.get(mouse.button, 'unknown')
@@ -43,9 +43,12 @@ A brief overview:
 
 * Use :meth:`~.Terminal.inkey` to receive both keyboard and mouse events
 * Enable mouse modes with :meth:`~.Terminal.dec_modes_enabled`.
-* Always use :attr:`DecPrivateMode.MOUSE_EXTENDED_SGR` for reliable mouse tracking
-* Combine with :attr:`DecPrivateMode.MOUSE_REPORT_CLICK` for only clicks, or,
-  :attr:`DecPrivateMode.MOUSE_ALL_MOTION` for all motion.
+* Always use :attr:`Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR
+  <blessed.Terminal.DecPrivateMode>` for reliable mouse tracking
+* Combine with :attr:`Terminal.DecPrivateMode.MOUSE_REPORT_CLICK
+  <blessed.Terminal.DecPrivateMode>` for only clicks, or,
+  :attr:`Terminal.DecPrivateMode.MOUSE_ALL_MOTION
+  <blessed.Terminal.DecPrivateMode>` for all motion.
 * Test for support with :meth:`~.Terminal.get_dec_mode`
 * Always use an appropriate timeout value for :meth:`~.Terminal.get_dec_mode`
   and :meth:`~.Terminal.dec_modes_enabled` for unsupported terminals.
@@ -58,12 +61,12 @@ Not all terminals support mouse modes. You can test for DEC Private Mode,
 
 .. code-block:: python
 
-   from blessed import Terminal, DecPrivateMode
+   from blessed import Terminal
 
    term = Terminal()
 
    # Query mouse support with a 1 second timeout
-   mode_test = DecPrivateMode.MOUSE_EXTENDED_SGR
+   mode_test = term.DecPrivateMode.MOUSE_EXTENDED_SGR
    response = term.get_dec_mode(mode_test, timeout=1)
 
    if response.is_supported():
@@ -87,15 +90,19 @@ Mouse Tracking Modes
 
 Blessed supports several mouse tracking modes that can be enabled together in
 combination.  The most common primary mode is
-:attr:`DecPrivateMode.MOUSE_EXTENDED_SGR` (Mode 1006), combined with any of the
+:attr:`Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR <blessed.Terminal.DecPrivateMode>` (Mode 1006), combined with any of the
 following:
 
-- :attr:`DecPrivateMode.MOUSE_REPORT_CLICK` (1000) - Sends Mouse X & Y
-  coordinates and button value when clicked
-- :attr:`DecPrivateMode.MOUSE_REPORT_DRAG` (1002) - Extends 1000; also reports
-  motion while a button is held down (drag events).
-- :attr:`DecPrivateMode.MOUSE_ALL_MOTION` (1003) - Report all mouse movement.
-- :attr:`DecPrivateMode.MOUSE_SGR_PIXELS` (1016) - Report coordinates in pixels
+- :attr:`Terminal.DecPrivateMode.MOUSE_REPORT_CLICK
+  <blessed.Terminal.DecPrivateMode>` (1000) - Sends Mouse X & Y coordinates and
+  button value when clicked
+- :attr:`Terminal.DecPrivateMode.MOUSE_REPORT_DRAG
+  <blessed.Terminal.DecPrivateMode>` (1002) - Extends 1000; also reports motion
+  while a button is held down (drag events).
+- :attr:`Terminal.DecPrivateMode.MOUSE_ALL_MOTION
+  <blessed.Terminal.DecPrivateMode>` (1003) - Report all mouse movement.
+- :attr:`Terminal.DecPrivateMode.MOUSE_SGR_PIXELS
+  <blessed.Terminal.DecPrivateMode>` (1016) - Report coordinates in pixels
   rather than character cells.
 
 A demonstration program, :ref:`keymatrix.py` offers a UI to see raw mouse events
@@ -125,19 +132,19 @@ The :class:`~.MouseEvent` fields are:
 
 .. code-block:: python
 
-    from blessed import Terminal, DecPrivateMode
+    from blessed import Terminal
 
     term = Terminal()
     with term.cbreak(), term.dec_modes_enabled(
-            DecPrivateMode.MOUSE_REPORT_CLICK,
-            DecPrivateMode.MOUSE_EXTENDED_SGR, timeout=1):
+            term.DecPrivateMode.MOUSE_REPORT_CLICK,
+            term.DecPrivateMode.MOUSE_EXTENDED_SGR, timeout=1):
 
-        if not term.get_dec_mode(DecPrivateMode.MOUSE_EXTENDED_SGR).is_supported():
+        if not term.get_dec_mode(term.DecPrivateMode.MOUSE_EXTENDED_SGR).is_supported():
             print("SGR Mouse mode not supported! This example won't work :(")
 
         event = term.inkey()
 
-        if event.mode == DecPrivateMode.MOUSE_EXTENDED_SGR:
+        if event.mode == term.DecPrivateMode.MOUSE_EXTENDED_SGR:
             print("This is a mouse event!")
             mouse = event.mode_values()
         elif event.is_sequence:
@@ -151,17 +158,17 @@ MOUSE_REPORT_CLICK
 Reports only button press and release events:
 
 This example shows the details of a Mouse Event after enabling
-:attr:`DecPrivateMode.MOUSE_REPORT_CLICK` and
-:attr:`DecPrivateMode.MOUSE_SGR_PIXELS` together:
+:attr:`Terminal.DecPrivateMode.MOUSE_REPORT_CLICK <blessed.Terminal.DecPrivateMode>` and
+:attr:`Terminal.DecPrivateMode.MOUSE_SGR_PIXELS <blessed.Terminal.DecPrivateMode>` together:
 
 .. code-block:: python
 
-    from blessed import Terminal, DecPrivateMode
+    from blessed import Terminal
 
     term = Terminal()
     with term.cbreak(), term.dec_modes_enabled(
-            DecPrivateMode.MOUSE_REPORT_CLICK,
-            DecPrivateMode.MOUSE_EXTENDED_SGR, timeout=1):
+            term.DecPrivateMode.MOUSE_REPORT_CLICK,
+            term.DecPrivateMode.MOUSE_EXTENDED_SGR, timeout=1):
 
         print("Click anywhere (or press 'q' to quit):")
         while True:
@@ -170,7 +177,7 @@ This example shows the details of a Mouse Event after enabling
             if event == 'q':
                 break
 
-            if event.mode == DecPrivateMode.MOUSE_EXTENDED_SGR:
+            if event.mode == term.DecPrivateMode.MOUSE_EXTENDED_SGR:
                 mouse = event.mode_values()
                 if not mouse.is_release:
                     print(f"Clicked at ({mouse.y}, {mouse.x}) with button {mouse.button}")
@@ -196,15 +203,16 @@ This example demonstrates:
 
 * Using :meth:`~.Terminal.fullscreen` and :meth:`~.Terminal.hidden_cursor`
   for an empty canvas to paint on
-* Enables both :attr:`DecPrivateMode.MOUSE_ALL_MOTION` and
-  :attr:`DecPrivateMode.MOUSE_EXTENDED_SGR`
+* Enables both :attr:`Terminal.DecPrivateMode.MOUSE_ALL_MOTION
+  <blessed.Terminal.DecPrivateMode>` and
+  :attr:`Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR <blessed.Terminal.DecPrivateMode>`
 * Evaluates :class:`~.MouseEvent` object ``mouse`` returned by
   :meth:`~.Keystroke.mode_values` to determine mouse state
 
 .. note:: When enabling any mouse mode it is important to check for and process
    all input events quickly using :class:`~.Keystroke.inkey:`, Just a few
    seconds of unprocessed mouse events with
-   :attr:`DecPrivateMode.MOUSE_ALL_MOTION` can rapidly fill your input buffer
+   :attr:`Terminal.DecPrivateMode.MOUSE_ALL_MOTION <blessed.Terminal.DecPrivateMode>` can rapidly fill your input buffer
    and bog down your programs if input is not quickly processed!
 
 MOUSE_SGR_PIXELS
@@ -215,8 +223,9 @@ single character cell in the terminal grid. This is perfect for most terminal
 applications.
 
 For higher-precision needs, especially when combined with Sixel_, some terminals
-support :attr:`DecPrivateMode.MOUSE_SGR_PIXELS` (1016), which reports mouse
-position in pixels instead of cells.
+support :attr:`Terminal.DecPrivateMode.MOUSE_SGR_PIXELS
+<blessed.Terminal.DecPrivateMode>` (1016), which reports mouse position in
+pixels instead of cells.
 
 The :class:`~.MouseSGREvent` structure is identical for both cell and pixel
 modes - only the meaning of the ``x`` and ``y`` values changes.

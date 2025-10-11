@@ -36,7 +36,8 @@ from .keyboard import (DEFAULT_ESCDELAY,
                        get_keyboard_codes,
                        get_leading_prefixes,
                        get_keyboard_sequences)
-from .dec_modes import DecPrivateMode, DecModeResponse
+from .dec_modes import DecPrivateMode as _DecPrivateMode
+from .dec_modes import DecModeResponse
 from .sequences import Termcap, Sequence, SequenceTextWrapper
 from .colorspace import RGB_256TABLE
 from .formatters import (COLORS,
@@ -163,6 +164,9 @@ class Terminal():
         'terminal_answerback': 'u8',
         'terminal_enquire': 'u9',
     }
+
+    #: DEC Private Mode constants accessible via Terminal.DecPrivateMode or term.DecPrivateMode
+    DecPrivateMode = _DecPrivateMode
 
     def __init__(self, kind: Optional[str] = None, stream: Optional[IO[str]] = None,
                  force_styling: Union[bool, None] = False) -> None:
@@ -808,7 +812,7 @@ class Terminal():
 
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
 
-    def _dec_mode_set_enabled(self, *modes: Union[int, DecPrivateMode]) -> None:
+    def _dec_mode_set_enabled(self, *modes: Union[int, _DecPrivateMode]) -> None:
         """
         Enable one or more DEC Private Modes (DECSET).
 
@@ -828,7 +832,7 @@ class Terminal():
         # Extract mode numbers
         mode_numbers = []
         for arg_pos, mode in enumerate(modes):
-            if isinstance(mode, DecPrivateMode):
+            if isinstance(mode, _DecPrivateMode):
                 mode_num = mode.value
             elif isinstance(mode, int):
                 mode_num = mode
@@ -848,7 +852,7 @@ class Terminal():
         for mode_num in mode_numbers:
             self._dec_mode_cache[mode_num] = DecModeResponse.SET
 
-    def _dec_mode_set_disabled(self, *modes: Union[int, DecPrivateMode]) -> None:
+    def _dec_mode_set_disabled(self, *modes: Union[int, _DecPrivateMode]) -> None:
         """
         Disable one or more DEC Private Modes (DECRST).
 
@@ -868,7 +872,7 @@ class Terminal():
         # Extract mode numbers
         mode_numbers = []
         for arg_pos, mode in enumerate(modes):
-            if isinstance(mode, DecPrivateMode):
+            if isinstance(mode, _DecPrivateMode):
                 mode_num = mode.value
             elif isinstance(mode, int):
                 mode_num = mode
@@ -888,7 +892,7 @@ class Terminal():
         for mode_num in mode_numbers:
             self._dec_mode_cache[mode_num] = DecModeResponse.RESET
 
-    def get_dec_mode(self, mode: Union[int, DecPrivateMode],
+    def get_dec_mode(self, mode: Union[int, _DecPrivateMode],
                      timeout: Optional[float] = None, force: bool = False) -> DecModeResponse:
         """
         Query the state of a DEC Private Mode (DECRQM).
@@ -938,7 +942,7 @@ class Terminal():
             if response.is_supported():
                 print("Synchronized output is available")
         """
-        if not isinstance(mode, (int, DecPrivateMode)):
+        if not isinstance(mode, (int, _DecPrivateMode)):
             raise TypeError(f"Invalid mode argument, got {mode!r}, "
                             "DecPrivateMode or int expected")
 
@@ -1192,7 +1196,7 @@ class Terminal():
         return da.supports_sixel if da is not None else False
 
     @contextlib.contextmanager
-    def dec_modes_enabled(self, *modes: Union[int, DecPrivateMode],
+    def dec_modes_enabled(self, *modes: Union[int, _DecPrivateMode],
                           timeout: Optional[float] = None) -> Generator[None, None, None]:
         """
         Context manager for temporarily enabling DEC Private Modes.
@@ -1222,7 +1226,7 @@ class Terminal():
 
         # Query current state of each mode and build enable list
         for arg_pos, mode in enumerate(modes):
-            if isinstance(mode, DecPrivateMode):
+            if isinstance(mode, _DecPrivateMode):
                 mode_num = mode.value
             elif isinstance(mode, int):
                 mode_num = mode
@@ -1241,7 +1245,7 @@ class Terminal():
             self._dec_mode_set_disabled(*enabled_modes)
 
     @contextlib.contextmanager
-    def dec_modes_disabled(self, *modes: Union[int, DecPrivateMode],
+    def dec_modes_disabled(self, *modes: Union[int, _DecPrivateMode],
                            timeout: Optional[float] = None) -> Generator[None, None, None]:
         """
         Context manager for temporarily disabling DEC Private Modes.
@@ -1259,7 +1263,7 @@ class Terminal():
 
         # Query current state of each mode and build disable list
         for arg_pos, mode in enumerate(modes):
-            if isinstance(mode, DecPrivateMode):
+            if isinstance(mode, _DecPrivateMode):
                 mode_num = mode.value
             elif isinstance(mode, int):
                 mode_num = mode

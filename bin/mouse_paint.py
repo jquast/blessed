@@ -1,14 +1,14 @@
 #!/usr/bin/env python
-from blessed import Terminal, DecPrivateMode
+from blessed import Terminal
 
 term = Terminal()
 
-if not term.get_dec_mode(DecPrivateMode.MOUSE_ALL_MOTION, timeout=0.1).is_supported():
+if not term.get_dec_mode(term.DecPrivateMode.MOUSE_ALL_MOTION, timeout=0.1).is_supported():
     print("This terminal does not support MOUSE_ALL_MOTION tracking!")
 else:
     with term.cbreak(), term.fullscreen(), term.dec_modes_enabled(
-            DecPrivateMode.MOUSE_ALL_MOTION,
-            DecPrivateMode.MOUSE_EXTENDED_SGR):
+            term.DecPrivateMode.MOUSE_ALL_MOTION,
+            term.DecPrivateMode.MOUSE_EXTENDED_SGR):
 
         # header row displays mouse data
         quit_msg = "Press ^C to quit!"
@@ -21,7 +21,7 @@ else:
             if inp == 'q':
                 break
 
-            if inp.mode == DecPrivateMode.MOUSE_EXTENDED_SGR:
+            if inp.mode == term.DecPrivateMode.MOUSE_EXTENDED_SGR:
                 mouse = inp.mode_values()
 
                 # Display mouse data in header row, move the blinking cursor

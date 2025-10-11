@@ -25,7 +25,7 @@ def test_export_only_Terminal():
     "Ensure only Terminal instance is exported for import * statements."
     # local
     import blessed
-    assert blessed.__all__ == ('Terminal', 'DecPrivateMode')
+    assert blessed.__all__ == ('Terminal',)
 
 
 def test_null_location(all_terms):

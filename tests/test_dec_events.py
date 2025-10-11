@@ -8,6 +8,7 @@ import io
 import pytest
 
 # local
+from blessed import Terminal
 from blessed.keyboard import (
     Keystroke,
     _match_dec_event,
@@ -17,50 +18,7 @@ from blessed.keyboard import (
     MouseLegacyEvent,
     FocusEvent,
 )
-from blessed.dec_modes import DecPrivateMode
 from .accessories import TestTerminal
-
-
-@pytest.fixture
-def bracketed_paste_sequence():
-    """Bracketed paste test sequence."""
-    return '\x1b[200~hello world\x1b[201~'
-
-
-@pytest.fixture
-def multiline_paste_sequence():
-    """Multiline paste test sequence."""
-    return '\x1b[200~line1\nline2\tindented\x1b[201~'
-
-
-@pytest.fixture
-def sgr_mouse_sequences():
-    """SGR mouse test sequences."""
-    return {
-        'press': '\x1b[0;10;20M',
-        'release': '\x1b[0;15;25m',
-        'modifiers': '\x1b[28;5;5M',
-        'wheel_up': '\x1b[64;10;10M',
-        'wheel_down': '\x1b[65;10;10M'
-    }
-
-
-@pytest.fixture
-def legacy_mouse_sequences():
-    """Legacy mouse test sequences."""
-    return {
-        'press': '\x1b[M   ',
-        'release': '\x1b[M#@@'
-    }
-
-
-@pytest.fixture
-def focus_sequences():
-    """Focus event test sequences."""
-    return {
-        'gained': '\x1b[I',
-        'lost': '\x1b[O'
-    }
 
 
 class TestDECEventMatching:
@@ -71,90 +29,83 @@ class TestDECEventMatching:
         """Test that invalid sequences return None."""
         assert _match_dec_event(sequence) is None
 
-    def test_bracketed_paste_detection(self, bracketed_paste_sequence):
+    def test_bracketed_paste_detection(self):
         """Test bracketed paste sequence detection."""
-        ks = _match_dec_event(bracketed_paste_sequence)
+        sequence = '\x1b[200~hello world\x1b[201~'
+        ks = _match_dec_event(sequence)
 
         assert ks is not None
-        assert ks == bracketed_paste_sequence
-        assert ks.event_mode == DecPrivateMode.BRACKETED_PASTE
+        assert ks == sequence
+        assert ks.event_mode == Terminal.DecPrivateMode.BRACKETED_PASTE
         assert ks._mode == 2004
 
         values = ks.mode_values()
         assert isinstance(values, BracketedPasteEvent)
         assert values.text == 'hello world'
 
-    def test_bracketed_paste_multiline(self, multiline_paste_sequence):
+    def test_bracketed_paste_multiline(self):
         """Test bracketed paste with multiline content."""
-        ks = _match_dec_event(multiline_paste_sequence)
+        sequence = '\x1b[200~line1\nline2\tindented\x1b[201~'
+        ks = _match_dec_event(sequence)
 
         assert ks is not None
         values = ks.mode_values()
         assert values.text == 'line1\nline2\tindented'
 
-    def test_mouse_sgr_events(self, sgr_mouse_sequences):
-        """Test SGR mouse events using fixtures."""
-        # Test press event
-        ks_press = _match_dec_event(sgr_mouse_sequences['press'])
-        assert ks_press.event_mode == DecPrivateMode.MOUSE_EXTENDED_SGR
+    @pytest.mark.parametrize("sequence,expected", [
+        # (sequence, (button, x, y, is_release, shift, meta, ctrl, is_wheel))
+        ('\x1b[0;10;20M', (0, 10, 20, False, False, False, False, False)),
+        ('\x1b[0;15;25m', (0, 15, 25, True, False, False, False, False)),
+        ('\x1b[28;5;5M', (0, 5, 5, False, True, True, True, False)),
+        ('\x1b[64;10;10M', (64, 10, 10, False, False, False, False, True)),
+        ('\x1b[65;10;10M', (65, 10, 10, False, False, False, False, True)),
+    ])
+    def test_mouse_sgr_events(self, sequence, expected):
+        """Test SGR mouse events with various button, modifier, and wheel states."""
+        button, x, y, is_release, shift, meta, ctrl, is_wheel = expected
+        ks = _match_dec_event(sequence)
 
-        values = ks_press.mode_values()
+        assert ks is not None
+        assert ks.event_mode == Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR
+
+        values = ks.mode_values()
         assert isinstance(values, MouseSGREvent)
-        assert values.button == 0  # Left button
-        assert values.x == 10
-        assert values.y == 20
-        assert not values.is_release
+        assert values.button == button
+        assert values.x == x
+        assert values.y == y
+        assert values.is_release == is_release
+        assert values.shift == shift
+        assert values.meta == meta
+        assert values.ctrl == ctrl
+        assert values.is_wheel == is_wheel
 
-        # Test release event
-        ks_release = _match_dec_event(sgr_mouse_sequences['release'])
-        values = ks_release.mode_values()
-        assert values.x == 15
-        assert values.y == 25
-        assert values.is_release
+    @pytest.mark.parametrize("sequence,expected_release", [
+        ('\x1b[M   ', False),  # Press event
+        ('\x1b[M#@@', True),   # Release event
+    ])
+    def test_mouse_legacy_events(self, sequence, expected_release):
+        """Test legacy mouse events for press and release."""
+        ks = _match_dec_event(sequence)
+        assert ks.event_mode.value == 1000  # Default legacy mode
 
-        # Test modifiers
-        ks_mod = _match_dec_event(sgr_mouse_sequences['modifiers'])
-        values = ks_mod.mode_values()
-        assert values.shift and values.meta and values.ctrl
-        assert values.button == 0  # Base button after masking
-
-        # Test wheel events
-        ks_wheel_up = _match_dec_event(sgr_mouse_sequences['wheel_up'])
-        values_up = ks_wheel_up.mode_values()
-        assert values_up.button == 64 and values_up.is_wheel
-
-        ks_wheel_down = _match_dec_event(sgr_mouse_sequences['wheel_down'])
-        values_down = ks_wheel_down.mode_values()
-        assert values_down.button == 65 and values_down.is_wheel
-
-    def test_mouse_legacy_events(self, legacy_mouse_sequences):
-        """Test legacy mouse events using fixtures."""
-        # Test press event
-        ks_press = _match_dec_event(legacy_mouse_sequences['press'])
-        assert ks_press.event_mode.value == 1000  # Default legacy mode
-
-        values = ks_press.mode_values()
+        values = ks.mode_values()
         assert isinstance(values, MouseLegacyEvent)
-        assert values.button == 0 and values.x == 0 and values.y == 0
-        assert not values.is_release and not values.is_motion and not values.is_wheel
+        assert values.is_release == expected_release
+        assert not values.is_motion
+        assert not values.is_wheel
 
-        # Test release event
-        ks_release = _match_dec_event(legacy_mouse_sequences['release'])
-        values = ks_release.mode_values()
-        assert values.is_release and values.button == 0
+    @pytest.mark.parametrize("sequence,expected_gained", [
+        ('\x1b[I', True),   # Focus gained
+        ('\x1b[O', False),  # Focus lost
+    ])
+    def test_focus_events(self, sequence, expected_gained):
+        """Test focus events for gained and lost."""
+        ks = _match_dec_event(sequence)
+        assert ks.event_mode == Terminal.DecPrivateMode.FOCUS_IN_OUT_EVENTS
 
-    def test_focus_events(self, focus_sequences):  # pylint: disable=redefined-outer-name
-        """Test focus events using fixtures."""
-        # Test focus gained
-        ks_gained = _match_dec_event(focus_sequences['gained'])
-        assert ks_gained.event_mode == DecPrivateMode.FOCUS_IN_OUT_EVENTS
-        values = ks_gained.mode_values()
-        assert isinstance(values, FocusEvent) and values.gained is True
-
-        # Test focus lost
-        ks_lost = _match_dec_event(focus_sequences['lost'])
-        values = ks_lost.mode_values()
-        assert isinstance(values, FocusEvent) and values.gained is False
+        values = ks.mode_values()
+        assert isinstance(values, FocusEvent)
+        assert values.gained is expected_gained
 
 
 @pytest.mark.parametrize("mode,expected_error", [
@@ -177,8 +128,8 @@ def test_keystroke_with_dec_mode():
     """Test keystroke with DEC mode - minimal test."""
     match = re.match(r'\x1b\[200~(?P<text>.*?)\x1b\[201~', '\x1b[200~test\x1b[201~')
     ks = Keystroke('\x1b[200~test\x1b[201~', mode=2004, match=match)
-    assert ks.event_mode == DecPrivateMode.BRACKETED_PASTE
-    assert ks.mode == DecPrivateMode.BRACKETED_PASTE
+    assert ks.event_mode == Terminal.DecPrivateMode.BRACKETED_PASTE
+    assert ks.mode == Terminal.DecPrivateMode.BRACKETED_PASTE
     assert ks.is_sequence
 
 
@@ -186,9 +137,9 @@ def test_terminal_dec_mode_context_no_styling():
     """Test DEC mode context managers with force_styling=False"""
     stream = io.StringIO()
     term = TestTerminal(stream=stream, force_styling=False)
-    with term.dec_modes_enabled(DecPrivateMode.BRACKETED_PASTE):
+    with term.dec_modes_enabled(Terminal.DecPrivateMode.BRACKETED_PASTE):
         pass
-    with term.dec_modes_enabled(DecPrivateMode.MOUSE_EXTENDED_SGR):
+    with term.dec_modes_enabled(Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR):
         pass
     output = stream.getvalue()
     assert output == ''
@@ -200,7 +151,7 @@ def test_mouse_sgr_csi_lt_events():
 
     # Test press event with CSI < prefix
     ks_press = _match_dec_event('\x1b[<0;10;20M')
-    assert ks_press.event_mode == DecPrivateMode.MOUSE_EXTENDED_SGR
+    assert ks_press.event_mode == Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR
 
     values = ks_press.mode_values()
     assert isinstance(values, MouseSGREvent)
@@ -245,7 +196,7 @@ def test_mouse_sgr_pixels_format():
     ks_pixels = _match_dec_event('\x1b[<0;1234;567M')
 
     # Should parse as regular SGR event (mode 1006) since wire format is identical
-    assert ks_pixels.event_mode == DecPrivateMode.MOUSE_EXTENDED_SGR
+    assert ks_pixels.event_mode == Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR
 
     values = ks_pixels.mode_values()
     assert isinstance(values, MouseSGREvent)
@@ -279,7 +230,7 @@ def test_resolve_sequence():
     event_value = ks_dec.mode_values()
     assert isinstance(event_value, BracketedPasteEvent)
     assert event_value.text == 'test'
-    assert ks_dec.mode == DecPrivateMode.BRACKETED_PASTE
+    assert ks_dec.mode == Terminal.DecPrivateMode.BRACKETED_PASTE
 
 
 def test_mouse_event_is_motion_field():

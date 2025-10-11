@@ -12,7 +12,6 @@ import sys
 
 # local
 from blessed import Terminal
-from blessed.dec_modes import DecPrivateMode
 
 
 def display_device_attributes(term):
@@ -79,8 +78,8 @@ def display_dec_modes(term):
 
     # Get all available DEC Private Modes
     all_modes = {
-        k: getattr(DecPrivateMode, k)
-        for k in dir(DecPrivateMode)
+        k: getattr(Terminal.DecPrivateMode, k)
+        for k in dir(Terminal.DecPrivateMode)
         if k.isupper() and not k.startswith('_')
     }
 

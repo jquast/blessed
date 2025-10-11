@@ -8,8 +8,12 @@ from unittest import mock
 import pytest
 
 # local
-from blessed.dec_modes import DecPrivateMode, DecModeResponse
+from blessed import Terminal
+from blessed.dec_modes import DecModeResponse
 from .accessories import TestTerminal, as_subprocess
+
+# For backwards compatibility and convenience in tests
+DecPrivateMode = Terminal.DecPrivateMode
 
 
 # Shared format variable for common stream output expectations

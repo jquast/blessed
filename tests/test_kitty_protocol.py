@@ -15,8 +15,6 @@ from blessed.keyboard import (
     _match_legacy_csi_modifiers,
     _match_kitty_key, KittyKeyEvent, Keystroke, KittyKeyboardProtocol, resolve_sequence,
 )
-
-from blessed.dec_modes import DecPrivateMode
 from tests.accessories import (as_subprocess, SEMAPHORE, TestTerminal,
                                echo_off, read_until_eof, read_until_semaphore,
                                init_subproc_coverage)
@@ -34,7 +32,7 @@ def test_match_kitty_basic():
     """Basic Kitty protocol sequences."""
     ks = _match_kitty_key('\x1b[97u')
     assert ks is not None
-    assert ks._mode == DecPrivateMode.SpecialInternalKitty
+    assert ks._mode == Terminal.DecPrivateMode.SpecialInternalKitty
     assert isinstance(ks._match, KittyKeyEvent)
 
     event = ks._match
@@ -158,7 +156,7 @@ def test_sequence_properties():
     # Test Kitty sequence
     ks = _match_kitty_key('\x1b[97;5u')
     assert ks.is_sequence is True
-    assert ks._mode == DecPrivateMode.SpecialInternalKitty
+    assert ks._mode == Terminal.DecPrivateMode.SpecialInternalKitty
     assert ks._code is None  # No traditional keycode for these protocols
 
 
@@ -179,7 +177,7 @@ def test_terminal_inkey_kitty_protocol():
         # Should have been parsed as a Kitty protocol sequence
         assert ks is not None
         assert ks == kitty_sequence
-        assert ks._mode == DecPrivateMode.SpecialInternalKitty
+        assert ks._mode == Terminal.DecPrivateMode.SpecialInternalKitty
         assert isinstance(ks._match, KittyKeyEvent)
 
         # Verify the parsed event data
@@ -205,7 +203,7 @@ def test_terminal_inkey_kitty_precedence():
         ks = term.inkey(timeout=0)
 
         # Should be parsed as Kitty, not as legacy sequence
-        assert ks._mode == DecPrivateMode.SpecialInternalKitty
+        assert ks._mode == Terminal.DecPrivateMode.SpecialInternalKitty
         event = ks._match
         assert event.unicode_key == 65  # 'A'
         assert stream.getvalue() == ''
@@ -227,7 +225,7 @@ def test_terminal_inkey_kitty_buffer_handling():
 
         # Should parse just the Kitty sequence
         assert ks == '\x1b[97;5u'
-        assert ks._mode == DecPrivateMode.SpecialInternalKitty
+        assert ks._mode == Terminal.DecPrivateMode.SpecialInternalKitty
 
         # Extra characters should still be in buffer
         remaining = term.inkey(timeout=0)
@@ -272,7 +270,7 @@ def test_kitty_functional_keys():
     for sequence in functional_keys:
         ks = _match_kitty_key(sequence)
         assert ks is not None
-        assert ks._mode == DecPrivateMode.SpecialInternalKitty
+        assert ks._mode == Terminal.DecPrivateMode.SpecialInternalKitty
         # The unicode_key should be the private use area code
         expected_code = int(sequence.split('[')[1].split('u')[0])
         assert ks._match.unicode_key == expected_code
@@ -290,7 +288,7 @@ def test_kitty_f_keys():
     for sequence in f_keys:
         ks = _match_kitty_key(sequence)
         assert ks is not None
-        assert ks._mode == DecPrivateMode.SpecialInternalKitty
+        assert ks._mode == Terminal.DecPrivateMode.SpecialInternalKitty
         expected_code = int(sequence.split('[')[1].split('u')[0])
         assert ks._match.unicode_key == expected_code
 
@@ -307,7 +305,7 @@ def test_kitty_keypad_keys():
     for sequence, expected_key in keypad_keys.items():
         ks = _match_kitty_key(sequence)
         assert ks is not None, f"Failed to match {expected_key}"
-        assert ks._mode == DecPrivateMode.SpecialInternalKitty
+        assert ks._mode == Terminal.DecPrivateMode.SpecialInternalKitty
         expected_code = int(sequence.split('[')[1].split('u')[0])
         assert ks._match.unicode_key == expected_code
 
@@ -1026,7 +1024,7 @@ def test_kitty_digit_name_synthesis():
     digit_test_cases = [
         ('\x1b[49;3u', 'KEY_ALT_1'),       # ASCII '1' = 49
         ('\x1b[49;5u', 'KEY_CTRL_1'),
-        ('\x1b[49;4u', 'KEY_ALT_SHIFT_1'), # Alt(2) + Shift(1) + base(1) = 4
+        ('\x1b[49;4u', 'KEY_ALT_SHIFT_1'),  # Alt(2) + Shift(1) + base(1) = 4
         ('\x1b[50;3u', 'KEY_ALT_2'),       # ASCII '2' = 50
         ('\x1b[57;5u', 'KEY_CTRL_9'),      # ASCII '9' = 57
         ('\x1b[48;7u', 'KEY_CTRL_ALT_0'),  # ASCII '0' = 48, modifiers=7 (1+2+4)
@@ -1035,7 +1033,7 @@ def test_kitty_digit_name_synthesis():
     for sequence, expected_name in digit_test_cases:
         ks = _match_kitty_key(sequence)
         assert ks is not None
-        assert ks._mode == DecPrivateMode.SpecialInternalKitty
+        assert ks._mode == Terminal.DecPrivateMode.SpecialInternalKitty
         assert ks.name == expected_name
 
     # Test that digits without modifiers don't get names (same as letters)
@@ -1066,7 +1064,7 @@ def test_kitty_letter_name_synthesis_basic_modifiers():
         ks = _match_kitty_key(sequence)
         assert ks is not None
         assert ks.name == expected_name
-        assert ks._mode == DecPrivateMode.SpecialInternalKitty
+        assert ks._mode == Terminal.DecPrivateMode.SpecialInternalKitty
 
 
 def test_kitty_letter_name_synthesis_different_letters():
@@ -1188,7 +1186,7 @@ def test_kitty_letter_name_synthesis_preserves_explicit_names():
     kitty_event = KittyKeyEvent(unicode_key=97, shifted_key=None, base_key=None,
                                 modifiers=5, event_type=1, int_codepoints=())
     ks = Keystroke('\x1b[97;5u', name='CUSTOM_NAME',
-                   mode=DecPrivateMode.SpecialInternalKitty, match=kitty_event)
+                   mode=Terminal.DecPrivateMode.SpecialInternalKitty, match=kitty_event)
 
     assert ks.name == 'CUSTOM_NAME'
 
@@ -1213,7 +1211,7 @@ def test_kitty_letter_name_synthesis_integration():
 
             assert ks == sequence
             assert ks.name == expected_name
-            assert ks._mode == DecPrivateMode.SpecialInternalKitty
+            assert ks._mode == Terminal.DecPrivateMode.SpecialInternalKitty
 
     child()
 
@@ -1392,7 +1390,7 @@ def test_kitty_pua_modifier_keys(sequence, expected_key, expected_mods):
     """Test Kitty PUA modifier key sequences."""
     ks = _match_kitty_key(sequence)
     assert ks is not None
-    assert ks._mode == DecPrivateMode.SpecialInternalKitty
+    assert ks._mode == Terminal.DecPrivateMode.SpecialInternalKitty
     assert ks._match.unicode_key == expected_key
     assert ks.modifiers == expected_mods
     assert ks.value == ''
@@ -1519,7 +1517,7 @@ def test_kitty_keypad_end():
     """Test Kitty protocol KP_END key (the original issue case)."""
     ks = _match_kitty_key('\x1b[57424u')
     assert ks is not None
-    assert ks._mode == DecPrivateMode.SpecialInternalKitty
+    assert ks._mode == Terminal.DecPrivateMode.SpecialInternalKitty
     assert ks._match.unicode_key == 57424
     assert ks.code == 57424
     assert ks.name == 'KEY_KP_END_PUA'
@@ -1561,7 +1559,7 @@ def test_kitty_all_keypad_keys(sequence, expected_code, expected_name):
     """Test all Kitty protocol keypad keys."""
     ks = _match_kitty_key(sequence)
     assert ks is not None
-    assert ks._mode == DecPrivateMode.SpecialInternalKitty
+    assert ks._mode == Terminal.DecPrivateMode.SpecialInternalKitty
     assert ks._match.unicode_key == expected_code
     assert ks.code == expected_code
     assert ks.name == expected_name
@@ -1578,7 +1576,7 @@ def test_kitty_keypad_with_modifiers(sequence, expected_code, modifier):
     """Test keypad keys with modifiers."""
     ks = _match_kitty_key(sequence)
     assert ks is not None
-    assert ks._mode == DecPrivateMode.SpecialInternalKitty
+    assert ks._mode == Terminal.DecPrivateMode.SpecialInternalKitty
     assert ks._match.unicode_key == expected_code
     assert ks._match.modifiers == modifier
     assert ks.code == expected_code

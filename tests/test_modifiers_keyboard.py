@@ -278,7 +278,7 @@ def test_legacy_spec_compliance_c0_controls():
     alt_only_cases = [
         ('\x1b\x0d', 3, 'KEY_ALT_ENTER'),     # ESC + CR
         ('\x1b\x1b', 3, 'KEY_ALT_ESCAPE'),    # ESC + ESC
-        ('\x1b\x7f', 3, 'KEY_ALT_BACKSPACE'), # ESC + DEL
+        ('\x1b\x7f', 3, 'KEY_ALT_BACKSPACE'),  # ESC + DEL
         ('\x1b\x09', 3, 'KEY_ALT_TAB'),       # ESC + TAB
     ]
 
