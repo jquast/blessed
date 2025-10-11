@@ -8,6 +8,8 @@ import codecs
 import functools
 import traceback
 import contextlib
+import time
+import signal
 from typing import Callable
 
 # local
@@ -24,7 +26,7 @@ else:
     import curses
     import termios
 
-
+MAX_SUBPROC_TIME_SECONDS = 2  # no test should ever take over 2 seconds
 test_kind = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
 TestTerminal = functools.partial(Terminal, kind=test_kind)  # type: Callable[..., Terminal]
 SEND_SEMAPHORE = SEMAPHORE = b'SEMAPHORE\n'
@@ -113,7 +115,31 @@ class as_subprocess():  # pylint: disable=too-few-public-methods
 
         # parent process asserts exit code is 0, causing test
         # to fail if child process raised an exception/assertion
-        pid, status = os.waitpid(pid, 0)
+        # Use non-blocking wait with timeout to detect hung child processes
+        timeout = MAX_SUBPROC_TIME_SECONDS
+        start_time = time.time()
+        status = None
+        while True:
+            pid_result, status = os.waitpid(pid, os.WNOHANG)
+            if pid_result != 0:
+                # Child has exited
+                break
+            if time.time() - start_time > timeout:
+                # Child hasn't exited, it's hung - kill it and report what we know
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                    os.waitpid(pid, 0)  # Clean up zombie
+                except OSError:
+                    pass
+                os.close(master_fd)
+                # Show the output we captured - this likely contains the root cause
+                exc_output_msg = (
+                    f'Child process hung and did not exit within {timeout}s.\n'
+                    f'Output captured from child:\n{"=" * 40}\n{exc_output}\n{"=" * 40}'
+                )
+                raise AssertionError(exc_output_msg)
+            time.sleep(0.05)  # Poll every 50ms
+
         os.close(master_fd)
 
         # Display any output written by child process
@@ -293,7 +319,29 @@ def pty_test(child_func, parent_func=None, test_name=None):
             parent_func(master_fd)
         output = read_until_eof(master_fd)
 
-    pid, status = os.waitpid(pid, 0)
+    # Use non-blocking wait with timeout to detect hung child processes
+    timeout = 5.0  # 5 second timeout
+    start_time = time.time()
+    status = None
+    while True:
+        pid_result, status = os.waitpid(pid, os.WNOHANG)
+        if pid_result != 0:
+            # Child has exited
+            break
+        if time.time() - start_time > timeout:
+            # Child hasn't exited, it's hung - kill it and report what we know
+            try:
+                os.kill(pid, signal.SIGKILL)
+                os.waitpid(pid, 0)  # Clean up zombie
+            except OSError:
+                pass
+            # Show the output we captured - this likely contains the root cause
+            raise AssertionError(
+                f'Child process hung and did not exit within {timeout}s.\n'
+                f'Output captured from child:\n{"=" * 40}\n{output}\n{"=" * 40}'
+            )
+        time.sleep(0.05)  # Poll every 50ms
+
     assert os.WEXITSTATUS(status) == 0, (
             f"Child process exited with status {os.WEXITSTATUS(status)}",
             f"Output from child: {output}")

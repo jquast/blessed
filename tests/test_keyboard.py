@@ -419,32 +419,42 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
 def test_kp_begin_center_key():
     """Test KP_BEGIN/center key (numpad 5) with modifiers and event types."""
     @as_subprocess
-    def child():
-        from blessed.keyboard import _match_legacy_csi_modifiers
+    def child(kind):
+        term = TestTerminal(kind=kind, force_styling=True)
+        from blessed.keyboard import resolve_sequence
+
+        resolve = functools.partial(resolve_sequence,
+                                    mapper=term._keymap,
+                                    codes=term._keycodes,
+                                    prefixes=term._keymap_prefixes,
+                                    final=True)
+
 
         # Basic sequence without modifiers
-        ks = _match_legacy_csi_modifiers('\x1b[E')
-        assert ks is None  # Doesn't match - needs modifiers for legacy CSI
+        ks = resolve('\x1b[E')
+        assert ks and str(ks) == '\x1b[E'
+        assert ks.code == curses.KEY_B2
+        assert ks.name == 'KEY_CENTER'
 
         # With modifiers - Ctrl
-        ks = _match_legacy_csi_modifiers('\x1b[1;5E')
-        assert ks is not None
+        ks = resolve('\x1b[1;5E')
+        assert ks and str(ks) == '\x1b[1;5E'
         assert ks.code == curses.KEY_B2
         assert ks.name == 'KEY_CTRL_CENTER'
 
         # With modifiers - Alt
-        ks = _match_legacy_csi_modifiers('\x1b[1;3E')
-        assert ks is not None
+        ks = resolve('\x1b[1;3E')
+        assert ks and str(ks) == '\x1b[1;3E'
         assert ks.code == curses.KEY_B2
         assert ks.name == 'KEY_ALT_CENTER'
 
         # With modifiers - Ctrl+Alt
-        ks = _match_legacy_csi_modifiers('\x1b[1;7E')
-        assert ks is not None
+        ks = resolve('\x1b[1;7E')
+        assert ks and str(ks) == '\x1b[1;7E'
         assert ks.code == curses.KEY_B2
         assert ks.name == 'KEY_CTRL_ALT_CENTER'
 
-    child()
+    child('xterm')
 
 
 def test_ESCDELAY_unset_unchanged():
