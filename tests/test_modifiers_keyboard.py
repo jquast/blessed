@@ -59,7 +59,7 @@ def test_legacy_ctrl_alt_exact_matching():
     ('\x1b\x01', 'KEY_CTRL_ALT_A', 7, True, True, False),
     ('\x1b\x06', 'KEY_CTRL_ALT_F', 7, True, True, False),
     ('\x1b\x1a', 'KEY_CTRL_ALT_Z', 7, True, True, False),
-    ('\x1b\x00', 'KEY_CTRL_ALT_@', 7, True, True, False),
+    ('\x1b\x00', 'KEY_CTRL_ALT_SPACE', 7, True, True, False),
     ('\x1b\x08', 'KEY_CTRL_ALT_H', 7, True, True, False),
     # Alt-only cases
     ('\x1b\x1b', 'KEY_ALT_ESCAPE', 3, False, True, False),
@@ -145,7 +145,7 @@ def test_keystroke_legacy_ctrl_alt_name_generation():
 
     # Test special symbol mappings for Ctrl+Alt (not C0 exceptions)
     symbol_test_cases = [
-        ('\x1b\x00', 'KEY_CTRL_ALT_@'),   # ESC + Ctrl+@ (NUL) - Ctrl+Alt
+        ('\x1b\x00', 'KEY_CTRL_ALT_SPACE'),   # ESC + Ctrl+Space (NUL) - Ctrl+Alt
         ('\x1b\x1c', 'KEY_CTRL_ALT_\\'),  # ESC + Ctrl+\ (FS) - Ctrl+Alt
         ('\x1b\x1d', 'KEY_CTRL_ALT_]'),   # ESC + Ctrl+] (GS) - Ctrl+Alt
         ('\x1b\x1e', 'KEY_CTRL_ALT_^'),   # ESC + Ctrl+^ (RS) - Ctrl+Alt
@@ -190,7 +190,7 @@ def test_keystroke_legacy_ctrl_alt_name_generation():
     # Regular Ctrl sequences (single control char)
     assert Keystroke('\x01').name == 'KEY_CTRL_A'  # Ctrl+a
     assert Keystroke('\x1a').name == 'KEY_CTRL_Z'  # Ctrl+z
-    assert Keystroke('\x00').name == 'KEY_CTRL_@'  # Ctrl+@
+    assert Keystroke('\x00').name == 'KEY_CTRL_SPACE'  # Ctrl+Space
     assert Keystroke('\x7f').name == 'KEY_CTRL_?'  # Ctrl+?
 
     # Test that explicit names are preserved
@@ -445,7 +445,7 @@ def test_modifiers_bits_edge_cases():
     ('\x01', 'a', True), ('\x01', 'A', True),  # Ctrl+A
     ('\x1a', 'z', True), ('\x1a', 'Z', True),  # Ctrl+Z
     # Special control mappings
-    ('\x00', '@', True),   # Ctrl+@
+    ('\x00', ' ', True),   # Ctrl+Space
     ('\x1b', '[', True),   # Ctrl+[
     ('\x1c', '\\', True),  # Ctrl+\
     ('\x1d', ']', True),   # Ctrl+]
@@ -505,7 +505,7 @@ def test_is_ctrl_exact_matching_legacy():
     assert ks.is_ctrl() is False
 
     # Test special control mappings
-    assert Keystroke('\x00').is_ctrl('@') is True  # Ctrl+@
+    assert Keystroke('\x00').is_ctrl(' ') is True  # Ctrl+Space
     assert Keystroke('\x1b').is_ctrl('[') is True  # Ctrl+[ (ESC)
     assert Keystroke('\x7f').is_ctrl('?') is True  # Ctrl+?
 
@@ -540,7 +540,7 @@ def test_keystroke_ctrl_alt_names():
     # Test CTRL names
     assert Keystroke('\x01').name == 'KEY_CTRL_A'
     assert Keystroke('\x1a').name == 'KEY_CTRL_Z'
-    assert Keystroke('\x00').name == 'KEY_CTRL_@'
+    assert Keystroke('\x00').name == 'KEY_CTRL_SPACE'
     assert Keystroke('\x1b').name == 'KEY_CTRL_['
     assert Keystroke('\x1c').name == 'KEY_CTRL_\\'
     assert Keystroke('\x1d').name == 'KEY_CTRL_]'
@@ -597,7 +597,7 @@ def test_alt_uppercase_sets_shift_modifier_and_name():
         ('\x1b1', 'KEY_ALT_1', 3),  # Alt+1
         ('\x1b!', 'KEY_ALT_!', 3),  # Alt+!
         ('\x1b;', 'KEY_ALT_;', 3),  # Alt+;
-        ('\x1b ', 'KEY_ALT_ ', 3),  # Alt+space (though space might not have a name)
+        ('\x1b ', 'KEY_ALT_SPACE', 3),  # Alt+space
     ]
 
     for sequence, expected_name, expected_modifiers in non_alpha_cases:
@@ -605,8 +605,6 @@ def test_alt_uppercase_sets_shift_modifier_and_name():
         assert ks.modifiers == expected_modifiers
         assert ks._alt is True
         assert ks._shift is False
-        if expected_name.endswith(' '):  # Space might not have a name
-            continue
         assert ks.name == expected_name
 
 
@@ -883,9 +881,9 @@ def test_get_value_for_comparison_all_branches():
     ks = Keystroke('\x01')  # Ctrl+A
     assert ks.value == 'a'
 
-    # Single control character in CTRL_CODE_SYMBOLS_MAP
-    ks = Keystroke('\x00')  # Ctrl+@
-    assert ks.value == '@'
+    # Single control character - Ctrl+Space
+    ks = Keystroke('\x00')  # Ctrl+Space
+    assert ks.value == ' '
 
     # ModifyOtherKeys protocol
     ks = _match_modify_other_keys('\x1b[27;5;97~')  # Ctrl+a
@@ -1058,7 +1056,7 @@ def test_legacy_csi_e_center_key():
 
 
 @pytest.mark.parametrize('sequence,expected_name', [
-    ('\x00', 'KEY_CTRL_@'),   # @
+    ('\x00', 'KEY_CTRL_SPACE'),   # Space
     ('\x1b', 'KEY_CTRL_['),   # [
     ('\x1c', 'KEY_CTRL_\\'),  # \
     ('\x1d', 'KEY_CTRL_]'),   # ]
@@ -1181,7 +1179,7 @@ def test_get_control_symbol_no_match():
     # shouldn't happen in normal flow
     ks = Keystroke('\x1b\x20')  # ESC + space (0x20, printable)
     # Space is printable, so it won't enter the control char block
-    assert ks.name == 'KEY_ALT_ '
+    assert ks.name == 'KEY_ALT_SPACE'
 
 
 def test_meta_escape_name_no_symbol():
@@ -1389,13 +1387,13 @@ def test_value_property_edge_cases():
     ks = Keystroke('\x03')  # Ctrl+C (code 3)
     assert ks.value == 'c'  # Returns lowercase letter
 
-    # Test ESC + control char in CTRL_CODE_SYMBOLS_MAP
-    ks = Keystroke('\x1b\x00')  # ESC + Ctrl+@ (code 0)
-    assert ks.value == '@'  # Returns symbol from map
+    # Test ESC + control char - Ctrl+Alt+Space
+    ks = Keystroke('\x1b\x00')  # ESC + Ctrl+Space (code 0)
+    assert ks.value == ' '  # Returns space character
 
-    # Test single control char in CTRL_CODE_SYMBOLS_MAP
-    ks = Keystroke('\x00')  # Ctrl+@ (code 0)
-    assert ks.value == '@'  # Returns symbol from map
+    # Test single control char - Ctrl+Space
+    ks = Keystroke('\x00')  # Ctrl+Space (code 0)
+    assert ks.value == ' '  # Returns space character
 
     # Test Alt+printable sequence
     ks = Keystroke('\x1ba')  # Alt+a

@@ -40,7 +40,8 @@ RE_PATTERN_LEGACY_SS3_FKEYS = re.compile(r'\x1bO(?P<mod>\d)(?P<final>[PQRS])')
 RE_PATTERN_MODIFY_OTHER = re.compile(r'\x1b\[27;(?P<modifiers>\d+);(?P<key>\d+)(?P<tilde>~?)')
 
 # Control character mappings
-SYMBOLS_MAP_CTRL_CHAR = {'@': 0, '[': 27, '\\': 28, ']': 29, '^': 30, '_': 31, '?': 127}
+# Note: Ctrl+Space (code 0) is handled specially as 'SPACE', not included here
+SYMBOLS_MAP_CTRL_CHAR = {'[': 27, '\\': 28, ']': 29, '^': 30, '_': 31, '?': 127}
 SYMBOLS_MAP_CTRL_VALUE = {v: k for k, v in SYMBOLS_MAP_CTRL_CHAR.items()}
 
 
@@ -188,12 +189,15 @@ class Keystroke(str):
         """
         Get name for single-character control sequences.
 
-        Returns name like 'KEY_CTRL_A' or 'KEY_CTRL_@'.
+        Returns name like 'KEY_CTRL_A' or 'KEY_CTRL_SPACE'.
         """
         if len(self) != 1:
             return None
 
         char_code = ord(self)
+        # Special case: Ctrl+Space sends \x00
+        if char_code == 0:
+            return 'KEY_CTRL_SPACE'
         if 1 <= char_code <= 26:
             # Ctrl+A through Ctrl+Z
             return f'KEY_CTRL_{chr(char_code + ord("A") - 1)}'
@@ -205,8 +209,11 @@ class Keystroke(str):
         """
         Get control symbol for a character code.
 
-        Returns symbol like 'A' for Ctrl+A, '@' for Ctrl+@, etc.
+        Returns symbol like 'A' for Ctrl+A, 'SPACE' for Ctrl+Space, etc.
         """
+        # Special case: Ctrl+Space sends \x00
+        if char_code == 0:
+            return 'SPACE'
         if 1 <= char_code <= 26:
             # Ctrl+A through Ctrl+Z
             return chr(char_code + ord("A") - 1)
@@ -265,6 +272,8 @@ class Keystroke(str):
                 return f'KEY_ALT_{ch.upper()}'
             if ch == '[':
                 return 'CSI'
+            if ch == ' ':
+                return 'KEY_ALT_SPACE'
             return f'KEY_ALT_{ch}'
         if self[1] == '\x7f' and self.modifiers == 3:
             return 'KEY_ALT_BACKSPACE'
@@ -626,6 +635,10 @@ class Keystroke(str):
 
         char_code = ord(self[1])
 
+        # Special case: Ctrl+Alt+Space sends ESC + \x00
+        if char_code == 0:
+            return ' '
+
         # Ctrl+A through Ctrl+Z (codes 1-26)
         if 1 <= char_code <= 26:
             return chr(char_code + ord('a') - 1)  # lowercase
@@ -646,6 +659,10 @@ class Keystroke(str):
             return None
 
         char_code = ord(self)
+
+        # Special case: Ctrl+Space sends \x00
+        if char_code == 0:
+            return ' '
 
         # Ctrl+A through Ctrl+Z (codes 1-26)
         if 1 <= char_code <= 26:
