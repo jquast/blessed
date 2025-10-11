@@ -9,6 +9,7 @@ import time
 import signal
 import platform
 from io import StringIO
+from unittest import mock
 
 # 3rd party
 import pytest
@@ -24,11 +25,6 @@ from .accessories import (SEMAPHORE,
                           read_until_semaphore,
                           init_subproc_coverage)
 from .conftest import IS_WINDOWS, TEST_KEYBOARD, TEST_QUICK, TEST_RAW
-
-try:
-    from unittest import mock
-except ImportError:
-    import mock
 
 got_sigwinch = False
 
@@ -134,9 +130,6 @@ def test_kbhit_interrupted_nonetype():
     assert output == 'complete'
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0
-
-
-
 
 
 def test_kbhit_no_kb():
@@ -888,6 +881,3 @@ def test_get_device_attributes_no_response():
     stime = time.time()
     pid, status = os.waitpid(pid, 0)
     assert os.WEXITSTATUS(status) == 0
-
-
-

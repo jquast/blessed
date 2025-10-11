@@ -258,21 +258,6 @@ class Terminal():
         self.__init__keycodes()
         self.__init__dec_private_modes()
 
-    def __init__dec_private_modes(self) -> None:
-        """Initialize DEC Private Mode caching and state tracking."""
-        # Cache for queried DEC private modes to avoid repeated queries
-        self._dec_mode_cache: Dict[int, int] = {}
-        # Global timeout tracking state
-        self._dec_any_query_succeeded = False
-        self._dec_first_query_failed = False
-
-        # Kitty keyboard protocol timeout tracking (no caching)
-        self._kitty_kb_first_query_failed = False
-        self._kitty_kb_first_query_attempted = False
-
-        # Device Attributes (DA1) cache
-        self._device_attributes_cache: Optional[DeviceAttribute] = None
-
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
         if os.getenv('NO_COLOR'):
@@ -335,7 +320,7 @@ class Terminal():
         self._init_descriptor = stream_fd
         if stream_fd is None:
             try:
-                self._init_descriptor = sys.__stdout__.fileno()
+                self._init_descriptor = sys.__stdout__.fileno()  # type: ignore[union-attr]
             except ValueError as err:
                 self.errors.append(f'Unable to determine __stdout__ file descriptor: {err}')
 
@@ -438,6 +423,21 @@ class Terminal():
             # This is used for sequences starting with '\x1b[M' that may contain high bytes (≥0x80)
             # which are not valid UTF-8 but are valid in latin-1 encoding
             self._keyboard_decoder_latin1 = codecs.getincrementaldecoder('latin-1')()
+
+    def __init__dec_private_modes(self) -> None:
+        """Initialize DEC Private Mode caching and state tracking."""
+        # Cache for queried DEC private modes to avoid repeated queries
+        self._dec_mode_cache: Dict[int, int] = {}
+        # Global timeout tracking state
+        self._dec_any_query_succeeded = False
+        self._dec_first_query_failed = False
+
+        # Kitty keyboard protocol timeout tracking (no caching)
+        self._kitty_kb_first_query_failed = False
+        self._kitty_kb_first_query_attempted = False
+
+        # Device Attributes (DA1) cache
+        self._device_attributes_cache: Optional[DeviceAttribute] = None
 
     def __getattr__(self, attr: str) -> Union[
             NullCallableString, ParameterizingString, FormattingString]:
@@ -960,7 +960,7 @@ class Terminal():
         query = f'\x1b[?{int(mode):d}$p'
         response_pattern = re.compile(f'\x1b\\[\\?{int(mode):d};([0-4])\\$y')
 
-        match = self._query_response(query, response_pattern, timeout)  # type: ignore
+        match = self._query_response(query, response_pattern, timeout)
 
         # invalid or no response (timeout)
         if match is None:
@@ -968,6 +968,7 @@ class Terminal():
                 # This is the first-ever query and it failed! This query returns
                 # NO_RESPONSE to indicate the timeout, subsequent queries will
                 # return NOT_QUERIED.
+                # pylint: disable=attribute-defined-outside-init
                 self._dec_first_query_failed = True
                 return DecModeResponse(mode, DecModeResponse.NO_RESPONSE)
             # Rather unusual, we've previously had success with get_dec_mode,

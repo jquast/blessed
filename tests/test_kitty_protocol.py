@@ -475,14 +475,14 @@ def test_get_kitty_keyboard_state_pty_success():
         stime = time.time()
         # Send both Kitty protocol flags response and DA1 response for boundary detection
         # flags=27: all basic flags set, and a DA1 response indicating VT terminal
-        os.write(master_fd, u'\x1b[?27u\x1b[?64c'.encode('ascii'))
+        os.write(master_fd, b'\x1b[?27u\x1b[?64c')
         output = read_until_eof(master_fd)
 
     pid, status = os.waitpid(pid, 0)
     # first call to get_kitty_keyboard_state causes both kitty and dec
     # parameters query to output, we faked a "response" that by writing to our
     # master pty side
-    assert output == u'\x1b[?u\x1b[c' + '27'  # Should have parsed flags value 27
+    assert output == '\x1b[?u\x1b[c' + '27'  # Should have parsed flags value 27
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
 
@@ -525,7 +525,7 @@ def test_enable_kitty_keyboard_pty_success():
 
         # Send initial state response when child queries current flags (9 =
         # disambiguate + report_all_keys)
-        os.write(master_fd, u'\x1b[?9u'.encode('ascii'))
+        os.write(master_fd, b'\x1b[?9u')
 
         # Read all output from child
         output = read_until_eof(master_fd)
@@ -550,7 +550,7 @@ def test_kitty_state_0s_reply_via_ungetch():
         stime = time.time()
         # Simulate Kitty keyboard state response - flags value 9 (disambiguate + report_all_keys)
         # Need both Kitty and DA response for boundary approach on first call
-        term.ungetch(u'\x1b[?9u\x1b[?64c')
+        term.ungetch('\x1b[?9u\x1b[?64c')
 
         flags = term.get_kitty_keyboard_state(timeout=0.01)
         assert math.floor(time.time() - stime) == 0.0
@@ -570,7 +570,7 @@ def test_kitty_state_styling_indifferent():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._is_a_tty = True  # Force TTY behavior for testing
         # Need both Kitty and DA response for boundary approach on first call
-        term.ungetch(u'\x1b[?15u\x1b[?64c')  # flags value 15 (multiple flags)
+        term.ungetch('\x1b[?15u\x1b[?64c')  # flags value 15 (multiple flags)
         flags = term.get_kitty_keyboard_state(timeout=0.01)
         assert flags is not None
         assert flags.value == 15
@@ -583,7 +583,7 @@ def test_kitty_state_styling_indifferent():
         # Test with styling disabled - should return None (not query)
         term = TestTerminal(stream=io.StringIO(), force_styling=False)
         term._is_a_tty = True
-        term.ungetch(u'\x1b[?15u')
+        term.ungetch('\x1b[?15u')
         flags = term.get_kitty_keyboard_state(timeout=0.01)
         assert flags is None
     child()
@@ -621,7 +621,7 @@ def test_kitty_state_excludes_response_from_buffer():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._is_a_tty = True  # Force TTY behavior for testing
         # Buffer unrelated data before and after the kitty state response
-        term.ungetch(u'abc' + u'\x1b[?13u' + u'xyz')
+        term.ungetch('abc' + '\x1b[?13u' + 'xyz')
 
         # get_kitty_keyboard_state should parse and consume only the response
         # Use force=True to bypass boundary approach for this buffer management test
@@ -630,13 +630,13 @@ def test_kitty_state_excludes_response_from_buffer():
         assert flags.value == 13
 
         # Remaining data should still be available for subsequent input
-        remaining = u''
+        remaining = ''
         while True:
             ks = term.inkey(timeout=0)
-            if ks == u'':
+            if ks == '':
                 break
             remaining += ks
-        assert remaining == u'abcxyz'
+        assert remaining == 'abcxyz'
     child()
 
 
@@ -871,7 +871,7 @@ def test_get_kitty_keyboard_state_first_call_boundary_kitty_then_da():
         term._is_a_tty = True  # Force TTY behavior for testing
 
         # Buffer Kitty response followed by DA response (successful boundary case)
-        term.ungetch(u'\x1b[?9u\x1b[?64;1;2;4c')  # Kitty flags 9, then DA with sixel
+        term.ungetch('\x1b[?9u\x1b[?64;1;2;4c')  # Kitty flags 9, then DA with sixel
 
         flags = term.get_kitty_keyboard_state(timeout=0.01)
 
@@ -897,7 +897,7 @@ def test_get_kitty_keyboard_state_first_call_boundary_da_only():
         term._is_a_tty = True  # Force TTY behavior for testing
 
         # Buffer only DA response (no Kitty support)
-        term.ungetch(u'\x1b[?64;1;2c')  # DA without sixel, no Kitty response
+        term.ungetch('\x1b[?64;1;2c')  # DA without sixel, no Kitty response
 
         flags = term.get_kitty_keyboard_state(timeout=0.01)
 
@@ -948,7 +948,7 @@ def test_get_kitty_keyboard_state_subsequent_call_uses_normal_query():
         term._is_a_tty = True  # Force TTY behavior for testing
 
         # First call with successful boundary
-        term.ungetch(u'\x1b[?15u\x1b[?64c')  # Kitty flags 15, then DA
+        term.ungetch('\x1b[?15u\x1b[?64c')  # Kitty flags 15, then DA
         flags1 = term.get_kitty_keyboard_state(timeout=0.01)
         assert flags1 is not None
         assert flags1.value == 15
@@ -956,7 +956,7 @@ def test_get_kitty_keyboard_state_subsequent_call_uses_normal_query():
         assert term._kitty_kb_first_query_failed is False
 
         # Second call should use normal single-query approach
-        term.ungetch(u'\x1b[?7u')  # Just Kitty response (no DA needed)
+        term.ungetch('\x1b[?7u')  # Just Kitty response (no DA needed)
         flags2 = term.get_kitty_keyboard_state(timeout=0.01)
         assert flags2 is not None
         assert flags2.value == 7
@@ -972,7 +972,7 @@ def test_get_kitty_keyboard_state_force_bypasses_boundary():
         term._is_a_tty = True  # Force TTY behavior for testing
 
         # Buffer only Kitty response (no DA)
-        term.ungetch(u'\x1b[?13u')  # Just Kitty flags, no DA
+        term.ungetch('\x1b[?13u')  # Just Kitty flags, no DA
 
         # First call with force=True should bypass boundary approach
         flags = term.get_kitty_keyboard_state(timeout=0.01, force=True)
@@ -1024,15 +1024,15 @@ def test_kitty_digit_name_synthesis():
     """Test Kitty keyboard protocol digit name synthesis with modifiers."""
     # Test digit name synthesis for Kitty sequences
     digit_test_cases = [
-        ('\x1b[49;3u', 'KEY_ALT_1', 'Alt+1'),       # ASCII '1' = 49
-        ('\x1b[49;5u', 'KEY_CTRL_1', 'Ctrl+1'),
-        ('\x1b[49;4u', 'KEY_ALT_SHIFT_1', 'Alt+Shift+1'),  # Alt(2) + Shift(1) + base(1) = 4
-        ('\x1b[50;3u', 'KEY_ALT_2', 'Alt+2'),       # ASCII '2' = 50
-        ('\x1b[57;5u', 'KEY_CTRL_9', 'Ctrl+9'),     # ASCII '9' = 57
-        ('\x1b[48;7u', 'KEY_CTRL_ALT_0', 'Ctrl+Alt+0'),  # ASCII '0' = 48, modifiers=7 (1+2+4)
+        ('\x1b[49;3u', 'KEY_ALT_1'),       # ASCII '1' = 49
+        ('\x1b[49;5u', 'KEY_CTRL_1'),
+        ('\x1b[49;4u', 'KEY_ALT_SHIFT_1'), # Alt(2) + Shift(1) + base(1) = 4
+        ('\x1b[50;3u', 'KEY_ALT_2'),       # ASCII '2' = 50
+        ('\x1b[57;5u', 'KEY_CTRL_9'),      # ASCII '9' = 57
+        ('\x1b[48;7u', 'KEY_CTRL_ALT_0'),  # ASCII '0' = 48, modifiers=7 (1+2+4)
     ]
 
-    for sequence, expected_name, description in digit_test_cases:
+    for sequence, expected_name in digit_test_cases:
         ks = _match_kitty_key(sequence)
         assert ks is not None
         assert ks._mode == DecPrivateMode.SpecialInternalKitty
@@ -1053,16 +1053,16 @@ def test_kitty_letter_name_synthesis_basic_modifiers():
     """Test Kitty protocol letter name synthesis for basic modifier combinations."""
     # Test basic modifier combinations for letter 'a' (unicode_key=97)
     test_cases = [
-        ('\x1b[97;5u', 'KEY_CTRL_A', 'Ctrl+a'),
-        ('\x1b[97;3u', 'KEY_ALT_A', 'Alt+a'),
-        ('\x1b[97;7u', 'KEY_CTRL_ALT_A', 'Ctrl+Alt+a'),
-        ('\x1b[97;2u', 'KEY_SHIFT_A', 'Shift+a'),
-        ('\x1b[97;6u', 'KEY_CTRL_SHIFT_A', 'Ctrl+Shift+a'),
-        ('\x1b[97;4u', 'KEY_ALT_SHIFT_A', 'Alt+Shift+a'),
-        ('\x1b[97;8u', 'KEY_CTRL_ALT_SHIFT_A', 'Ctrl+Alt+Shift+a'),
+        ('\x1b[97;5u', 'KEY_CTRL_A'),
+        ('\x1b[97;3u', 'KEY_ALT_A'),
+        ('\x1b[97;7u', 'KEY_CTRL_ALT_A'),
+        ('\x1b[97;2u', 'KEY_SHIFT_A'),
+        ('\x1b[97;6u', 'KEY_CTRL_SHIFT_A'),
+        ('\x1b[97;4u', 'KEY_ALT_SHIFT_A'),
+        ('\x1b[97;8u', 'KEY_CTRL_ALT_SHIFT_A'),
     ]
 
-    for sequence, expected_name, description in test_cases:
+    for sequence, expected_name in test_cases:
         ks = _match_kitty_key(sequence)
         assert ks is not None
         assert ks.name == expected_name
@@ -1085,6 +1085,7 @@ def test_kitty_letter_name_synthesis_different_letters():
         ks = _match_kitty_key(sequence)
         assert ks is not None
         assert ks.name == expected_name
+        assert ks.value == letter
 
 
 def test_kitty_letter_name_synthesis_base_key_preference():
@@ -1130,15 +1131,15 @@ def test_kitty_letter_name_synthesis_non_letters_no_name():
     # (digits now DO get names with modifiers, so they're excluded from this test)
     # Special case: '[' always gets 'CSI' name
     non_letter_non_digit_cases = [
-        ('\x1b[32;5u', 'Ctrl+Space', None),     # space
-        ('\x1b[33;3u', 'Alt+!', None),          # exclamation
-        ('\x1b[59;5u', 'Ctrl+;', None),         # semicolon
-        ('\x1b[46;3u', 'Alt+.', None),          # period
-        ('\x1b[64;5u', 'Ctrl+@', None),         # @ symbol
-        ('\x1b[91;3u', 'Alt+[', 'CSI'),         # bracket - special case
+        ('\x1b[32;5u', None),     # space
+        ('\x1b[33;3u', None),     # exclamation
+        ('\x1b[59;5u', None),     # semicolon
+        ('\x1b[46;3u', None),     # period
+        ('\x1b[64;5u', None),     # @ symbol
+        ('\x1b[91;3u', 'CSI'),    # bracket - special case
     ]
 
-    for sequence, description, expected_name in non_letter_non_digit_cases:
+    for sequence, expected_name in non_letter_non_digit_cases:
         ks = _match_kitty_key(sequence)
         assert ks is not None
         if expected_name is None:
@@ -1158,10 +1159,11 @@ def test_kitty_letter_name_synthesis_no_modifiers_no_name():
         ('\x1b[97u', 'a'),     # plain 'a' (default modifiers=1)
     ]
 
-    for sequence, description in plain_letter_cases:
+    for sequence, value in plain_letter_cases:
         ks = _match_kitty_key(sequence)
         assert ks is not None
         assert ks.name is None
+        assert ks.value == value
 
 
 def test_kitty_letter_name_synthesis_supports_advanced_modifiers():
@@ -1259,13 +1261,13 @@ def test_disambiguate_f1_f4_csi_sequences():
 
         # Test F1-F4 in disambiguate CSI format (not SS3)
         test_cases = [
-            ('\x1b[P', 'KEY_F1', 'F1'),
-            ('\x1b[Q', 'KEY_F2', 'F2'),
-            ('\x1b[13~', 'KEY_F3', 'F3'),  # F3 uses tilde format
-            ('\x1b[S', 'KEY_F4', 'F4'),
+            ('\x1b[P', 'KEY_F1'),
+            ('\x1b[Q', 'KEY_F2'),
+            ('\x1b[13~', 'KEY_F3'),  # F3 uses tilde format
+            ('\x1b[S', 'KEY_F4'),
         ]
 
-        for sequence, expected_name, description in test_cases:
+        for sequence, expected_name in test_cases:
             ks = resolve_sequence(sequence, mapper, codes, prefixes, final=True)
             assert ks is not None
             assert ks.name == expected_name
@@ -1324,16 +1326,16 @@ def test_kitty_letter_name_synthesis_boundary_conditions():
     """Test boundary conditions for letter detection."""
     # Test edge cases around ASCII letter ranges
     boundary_cases = [
-        ('\x1b[91;5u', 'CSI', '['),          # ASCII 91, just after 'Z' (90) - SPECIAL CASE
-        ('\x1b[64;5u', None, '@'),           # ASCII 64, just before 'A' (65)
-        ('\x1b[96;5u', None, '`'),           # ASCII 96, just before 'a' (97)
-        ('\x1b[123;5u', None, '{'),          # ASCII 123, just after 'z' (122)
-        ('\x1b[65;5u', 'KEY_CTRL_A', 'A'),   # ASCII 65, 'A'
-        ('\x1b[90;5u', 'KEY_CTRL_Z', 'Z'),   # ASCII 90, 'Z'
-        ('\x1b[97;5u', 'KEY_CTRL_A', 'a'),   # ASCII 97, 'a'
-        ('\x1b[122;5u', 'KEY_CTRL_Z', 'z'),  # ASCII 122, 'z
+        ('\x1b[91;5u', 'CSI'),          # ASCII 91, just after 'Z' (90) - SPECIAL CASE
+        ('\x1b[64;5u', None),           # ASCII 64, just before 'A' (65)
+        ('\x1b[96;5u', None),           # ASCII 96, just before 'a' (97)
+        ('\x1b[123;5u', None),          # ASCII 123, just after 'z' (122)
+        ('\x1b[65;5u', 'KEY_CTRL_A'),   # ASCII 65, 'A'
+        ('\x1b[90;5u', 'KEY_CTRL_Z'),   # ASCII 90, 'Z'
+        ('\x1b[97;5u', 'KEY_CTRL_A'),   # ASCII 97, 'a'
+        ('\x1b[122;5u', 'KEY_CTRL_Z'),  # ASCII 122, 'z
     ]
-    for sequence, expected_name, description in boundary_cases:
+    for sequence, expected_name in boundary_cases:
         ks = _match_kitty_key(sequence)
         assert ks.name == expected_name
 

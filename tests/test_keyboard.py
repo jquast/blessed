@@ -5,6 +5,7 @@ import os
 import platform
 import tempfile
 import functools
+from unittest import mock
 
 # 3rd party
 import pytest
@@ -12,13 +13,6 @@ import pytest
 # local
 from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, as_subprocess
-
-try:
-    # std imports
-    from unittest import mock
-except ImportError:
-    # 3rd party
-    import mock
 
 if platform.system() != 'Windows':
     # std imports
@@ -234,7 +228,7 @@ def test_resolve_sequence_order():
     assert ks.name is None
     assert ks.code is None
     assert not ks.is_sequence
-    assert repr(ks) in {"'n'", "'n'"}
+    assert repr(ks) == "'n'"
 
     ks = resolve_sequence('SEQ1', mapper, codes, prefixes, final=True)
     assert ks == 'SEQ1'
@@ -274,7 +268,7 @@ def test_keyboard_prefixes():
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no multiprocess")
-def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
+def test_keypad_mixins_and_aliases():
     """Test PC-Style function key translations when in ``keypad`` mode."""
     # Key     plain   app     modified
     # Up      ^[[A    ^[OA    ^[[1;mA
@@ -284,7 +278,7 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
     # End     ^[[F    ^[OF    ^[[1;mF
     # Home    ^[[H    ^[OH    ^[[1;mH
     @as_subprocess
-    def child(kind):  # pylint: disable=too-many-statements
+    def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
         from blessed.keyboard import resolve_sequence
 
@@ -346,50 +340,50 @@ def test_kp_begin_center_key():
     @as_subprocess
     def child():
         from blessed.keyboard import _match_legacy_csi_modifiers
-        
+
         # Basic sequence without modifiers
         ks = _match_legacy_csi_modifiers('\x1b[E')
         assert ks is None  # Doesn't match - needs modifiers for legacy CSI
-        
+
         # With modifiers - Ctrl
         ks = _match_legacy_csi_modifiers('\x1b[1;5E')
         assert ks is not None
         assert ks.code == curses.KEY_B2
         assert ks.name == 'KEY_CTRL_CENTER'
-        
+
         # With modifiers - Alt
         ks = _match_legacy_csi_modifiers('\x1b[1;3E')
         assert ks is not None
         assert ks.code == curses.KEY_B2
         assert ks.name == 'KEY_ALT_CENTER'
-        
+
         # With modifiers - Ctrl+Alt
         ks = _match_legacy_csi_modifiers('\x1b[1;7E')
         assert ks is not None
         assert ks.code == curses.KEY_B2
         assert ks.name == 'KEY_CTRL_ALT_CENTER'
-        
+
         # With event type - release (the original issue case)
         ks = _match_legacy_csi_modifiers('\x1b[1;1:3E')
         assert ks is not None
         assert ks.code == curses.KEY_B2
         assert ks.released
         assert ks.name == 'KEY_CENTER_RELEASED'
-        
+
         # With event type - repeat
         ks = _match_legacy_csi_modifiers('\x1b[1;1:2E')
         assert ks is not None
         assert ks.code == curses.KEY_B2
         assert ks.repeated
         assert ks.name == 'KEY_CENTER_REPEATED'
-        
+
         # With modifiers and event type
         ks = _match_legacy_csi_modifiers('\x1b[1;5:3E')
         assert ks is not None
         assert ks.code == curses.KEY_B2
         assert ks.released
         assert ks.name == 'KEY_CTRL_CENTER_RELEASED'
-        
+
     child()
 
 

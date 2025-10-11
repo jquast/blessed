@@ -143,7 +143,7 @@ class TestDECEventMatching:
         values = ks_release.mode_values()
         assert values.is_release and values.button == 0
 
-    def test_focus_events(self, focus_sequences):
+    def test_focus_events(self, focus_sequences):  # pylint: disable=redefined-outer-name
         """Test focus events using fixtures."""
         # Test focus gained
         ks_gained = _match_dec_event(focus_sequences['gained'])

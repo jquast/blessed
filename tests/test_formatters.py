@@ -4,19 +4,13 @@
 import pickle
 import platform
 import multiprocessing
+from unittest import mock
 
 # 3rd party
 import pytest
 
 # local
 from .accessories import TestTerminal, as_subprocess
-
-try:
-    # std imports
-    from unittest import mock
-except ImportError:
-    # 3rd party
-    import mock
 
 if platform.system() != 'Windows':
     # std imports

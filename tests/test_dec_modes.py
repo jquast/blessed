@@ -2,6 +2,7 @@
 """Tests for DEC Private Modes functionality."""
 # std imports
 import io
+from unittest import mock
 
 # 3rd party
 import pytest
@@ -9,11 +10,6 @@ import pytest
 # local
 from blessed.dec_modes import DecPrivateMode, DecModeResponse
 from .accessories import TestTerminal, as_subprocess
-
-try:
-    from unittest import mock
-except ImportError:
-    import mock
 
 
 # Shared format variable for common stream output expectations

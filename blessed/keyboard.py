@@ -195,7 +195,8 @@ class Keystroke(str):
 
             # Special C0 controls that should be Alt-only per legacy spec
             # These represent common Alt+key combinations that are unambiguous
-            if char_code in (0x0d, 0x1b, 0x7f, 0x09):  # Enter, Escape, DEL, Tab
+            # (Enter, Escape, DEL, Tab)
+            if char_code in {0x0d, 0x1b, 0x7f, 0x09}:
                 return 1 + KittyModifierBits.alt  # 1 + alt flag = 3
 
             # Other control characters represent Ctrl+Alt combinations
@@ -264,10 +265,9 @@ class Keystroke(str):
             return None
 
         # Build base result with modifiers (if any)
-        if mod_parts:
-            base_result = f"KEY_{'_'.join(mod_parts)}_{base_name}"
-        else:
-            base_result = f"KEY_{base_name}"
+        base_result = (f"KEY_{'_'.join(mod_parts)}_{base_name}"
+                       if mod_parts
+                       else f"KEY_{base_name}")
 
         # Append event type suffix if not a press event
         if self.repeated:
@@ -308,10 +308,9 @@ class Keystroke(str):
 
         # For letters: convert to uppercase for consistent naming
         # For digits: use as-is
-        if 65 <= base_codepoint <= 90 or 97 <= base_codepoint <= 122:  # letter
-            char = chr(base_codepoint).upper()  # Convert to uppercase
-        else:  # digit
-            char = chr(base_codepoint)  # Keep as-is
+        char = (chr(base_codepoint).upper()
+                if (65 <= base_codepoint <= 90 or 97 <= base_codepoint <= 122)
+                else chr(base_codepoint))
 
         # Build modifier prefix list in order: CTRL, ALT, SHIFT, SUPER, HYPER, META
         mod_parts = []
@@ -570,11 +569,11 @@ class Keystroke(str):
             # Check if this is a PUA modifier key (which don't produce text)
             if KEY_LEFT_SHIFT <= self._match.unicode_key <= KEY_RIGHT_META:
                 return ''  # Modifier keys don't produce text
-            
+
             # Check if this is a PUA keypad key (which don't produce text in disambiguate mode)
             if KEY_KP_0_PUA <= self._match.unicode_key <= KEY_KP_BEGIN_PUA:
                 return ''  # Keypad keys in PUA range don't produce text
-            
+
             return chr(self._match.unicode_key)
 
         # ModifyOtherKeys protocol - extract character from key
@@ -847,7 +846,7 @@ class Keystroke(str):
 
         # Extract motion/drag flags
         is_motion = bool(b & 32)
-        is_wheel = b in (64, 65)  # wheel up/down
+        is_wheel = b in {64, 65}  # wheel up/down
 
         # Get base button (0-2 for left/middle/right, or 64-65 for wheel)
         button = b & 3 if not is_wheel else b
@@ -868,23 +867,6 @@ class Keystroke(str):
         """Parse bracketed paste event from stored regex match."""
         return BracketedPasteEvent(text=self._match.group('text'))
 
-    def _check_name_match(self, expected_name: str, expected_name_without_event: str) -> bool:
-        """
-        Check if keystroke name matches expected name patterns.
-
-        Used by event predicates to determine if the name matches.
-        """
-        if self.name == expected_name:
-            # Exact match with event type suffix
-            return True
-        if self.name == expected_name_without_event:
-            # Match without event type suffix (for press events mainly)
-            return True
-        if self.name and self.name.startswith(expected_name_without_event + '_'):
-            # Name starts with expected prefix
-            return True
-        return False
-
     def _build_event_predicate(self,
                                event_type: str,
                                expected_name: str,
@@ -896,10 +878,23 @@ class Keystroke(str):
 
         Returns a callable that checks if keystroke matches the expected event type.
         """
-        def event_predicate(char: Optional[str] = None, ignore_case: bool = True) -> bool:
-            """Check if keystroke matches the expected event type."""
-            # Parameters are accepted but not used for event predicates
-            if not self._check_name_match(expected_name, expected_name_without_event):
+        def event_predicate(
+                # pylint: disable=unused-argument
+                char: Optional[str] = None,
+                ignore_case: bool = True) -> bool:
+            # Check if keystroke name matches expected name patterns
+            name_matches = False
+            if self.name == expected_name:
+                # Exact match with event type suffix
+                name_matches = True
+            elif self.name == expected_name_without_event:
+                # Match without event type suffix (for press events mainly)
+                name_matches = True
+            elif self.name and self.name.startswith(expected_name_without_event + '_'):
+                # Name starts with expected prefix
+                name_matches = True
+
+            if not name_matches:
                 return False
 
             # Check event type
@@ -916,15 +911,13 @@ class Keystroke(str):
         return expected_bits
 
     def _make_effective_bits(self) -> int:
-        """
-        Returns modifier bits stripped of caps_lock and num_lock for "magic" predicate functions
-        """
+        """Returns modifier bits stripped of caps_lock and num_lock."""
         return self.modifiers_bits & ~(KittyModifierBits.caps_lock | KittyModifierBits.num_lock)
- 
+
     def _build_appkeys_predicate(self, tokens_modifiers: typing.List[str],
                                  key_name: str) -> typing.Callable[[Optional[str], bool], bool]:
         """
-        Build a predicate function for checking modifiers of application keys
+        Build a predicate function for checking modifiers of application keys.
 
         Returns a callable that checks only 'token_modifiers'
         """
@@ -941,39 +934,36 @@ class Keystroke(str):
             # Get expected keycode from key name
             keycodes = get_keyboard_codes()
             expected_key_constant = f'KEY_{key_name.upper()}'
- 
+
             # Find the keycode value
             expected_code = None
             for code, name in keycodes.items():
                 if name == expected_key_constant:
                     expected_code = code
                     break
- 
+
             if expected_code is None or self._code != expected_code:
                 return False
 
             # validate only the modifier tokens
             return self._make_expected_bits(tokens_modifiers) == self._make_effective_bits()
 
-
         return keycode_predicate
 
-
-    def _build_alphanum_predicate(
-            self, tokens_modifiers: typing.List[str]) -> typing.Callable[[Optional[str], bool], bool]:
+    def _build_alphanum_predicate(self, tokens_modifiers: typing.List[str]
+                                  ) -> typing.Callable[[Optional[str], bool], bool]:
         """
         Build a predicate function for modifier checking of alphanumeric input.
 
-        Returns a callable that checks if keystroke matches the predicate
-        'tokens_modifiers', as well as the alphanumeric checks of optional
-        'char' and 'ignore_case'.
+        Returns a callable that checks if keystroke matches the predicate 'tokens_modifiers', as
+        well as the alphanumeric checks of optional 'char' and 'ignore_case'.
         """
+        # pylint: disable=too-many-return-statements
         def modifier_predicate(char: Optional[str] = None, ignore_case: bool = True) -> bool:
             # Build expected modifier bits from tokens,
             # Stripped to ignore caps_lock and num_lock
             expected_bits = self._make_expected_bits(tokens_modifiers)
-            effective_bits = self.modifiers_bits & ~(
-                KittyModifierBits.caps_lock | KittyModifierBits.num_lock)
+            effective_bits = self._make_effective_bits()
 
             # When matching with a character and it's alphabetic, be lenient
             # about Shift because it is implicit in the case of the letter
@@ -1030,6 +1020,7 @@ class Keystroke(str):
             For event predicates and application key predicates, these
             parameters are accepted but not used.
         """
+        # pylint: disable=too-many-locals,too-complex
         if not attr.startswith('is_'):
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}'")
 
@@ -1049,7 +1040,7 @@ class Keystroke(str):
         event_type = None
         for match_name in ('pressed', 'released', 'repeated'):
             if tokens_str.endswith(f'_{match_name}'):
-                # Mutate 'tokens_str', remove '_pressed', etc. 
+                # Mutate 'tokens_str', remove '_pressed', etc.
                 event_type = match_name
                 tokens_str = tokens_str[:-len(match_name) - 1]
                 break
@@ -1098,8 +1089,6 @@ class Keystroke(str):
 
         # Return modifier predicate for alphanumeric keys
         return self._build_alphanum_predicate(tokens_modifiers)
-
-# Device Attributes (DA1) response representation
 
 
 class DeviceAttribute():

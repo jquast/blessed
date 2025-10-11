@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """Class definitions for DEC Private Modes and their Response values."""
 
+# std imports
+from typing import Any, Union
+
 
 class DecModeResponse:
     """
@@ -21,7 +24,7 @@ class DecModeResponse:
     PERMANENTLY_SET = 3
     PERMANENTLY_RESET = 4
 
-    def __init__(self, mode, value: int):
+    def __init__(self, mode: Union[int, "DecPrivateMode"], value: int):
         """
         Initialize response for a DEC private mode query.
 
@@ -40,7 +43,7 @@ class DecModeResponse:
         self._value = value
 
     @property
-    def mode(self):
+    def mode(self) -> "DecPrivateMode":
         """
         The :class:`DecPrivateMode` instance for this response.
 
@@ -611,7 +614,7 @@ class DecPrivateMode:
         """
         return self.value
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: Any) -> bool:
         """
         Compare with another :class:`DecPrivateMode` or int.
 
