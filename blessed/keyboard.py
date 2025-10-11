@@ -161,7 +161,7 @@ class Keystroke(str):
 
     For DEC private mode events (such as bracketed paste, mouse tracking,
     focus events), the :attr:`event_mode` property returns the associated
-    :class:`DecPrivateMode` enum value, and :meth:`mode_values` returns
+    :class:`~.DecPrivateMode` value, and :meth:`mode_values` returns
     a structured namedtuple with parsed event data.
     """
 
