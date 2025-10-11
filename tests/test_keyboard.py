@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """Tests for keyboard support."""
 # std imports
+import functools
+import io
 import os
 import platform
+import sys
 import tempfile
 import functools
 from unittest import mock
@@ -63,17 +66,56 @@ def test_raw_input_with_kb():
     child()
 
 
-def test_notty_kb_is_None():
-    """term._keyboard_fd should be None when os.isatty returns False."""
-    # in this scenario, stream is sys.__stdout__,
-    # but os.isatty(0) is False,
+def test_stdout_notty_kb_is_None():
+    """term._keyboard_fd should be None when os.isatty returns False for output."""
+    # In this scenario, stream is sys.__stdout__, but os.isatty(1) is False
     # such as when piping output to less(1)
     @as_subprocess
     def child():
-        with mock.patch("os.isatty") as mock_isatty:
-            mock_isatty.return_value = False
+        isatty = os.isatty
+        with mock.patch('os.isatty') as mock_isatty:
+            mock_isatty.side_effect = (
+                lambda fd: False if fd == sys.__stdout__.fileno() else isatty(fd)
+            )
             term = TestTerminal()
             assert term._keyboard_fd is None
+            assert 'Output stream is not a TTY' in term.errors
+    child()
+
+
+def test_stdin_notty_kb_is_None():
+    """term._keyboard_fd should be None when os.isatty returns False for input."""
+    # In this scenario, stream is sys.__stdout__, but os.isatty(0) is False,
+    # such as when piping from another program
+    @as_subprocess
+    def child():
+        isatty = os.isatty
+        with mock.patch('os.isatty') as mock_isatty:
+            mock_isatty.side_effect = (
+                lambda fd:
+                    True if fd == sys.__stdout__.fileno()
+                    else False if fd == sys.__stdin__.fileno()
+                    else isatty(fd)
+            )
+            term = TestTerminal()
+            assert term._keyboard_fd is None
+            assert 'Input stream is not a TTY' in term.errors
+    child()
+
+
+def test_stdin_redirect():
+    """term._keyboard_fd should be None when oys.__stdin__.fileno() raises exception."""
+    # In this scenario, stream is sys.__stdout__, but sys.__stdin__ is BytesIO
+    # This may happen in a test scenario or when the program is wrapped in another interface
+    @as_subprocess
+    def child():
+        with mock.patch('sys.__stdin__', new=io.BytesIO()):
+            term = TestTerminal()
+            assert term._keyboard_fd is None
+            assert any(
+                entry.startswith('Unable to determine input stream file descriptor')
+                for entry in term.errors
+            )
     child()
 
 

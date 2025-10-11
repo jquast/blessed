@@ -13,7 +13,7 @@ from wcwidth import wcwidth
 # local
 from blessed._capabilities import CAPABILITIES_CAUSE_MOVEMENT, CAPABILITIES_HORIZONTAL_DISTANCE
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from blessed.terminal import Terminal
 
 # std imports
@@ -78,6 +78,7 @@ class Termcap():
         :arg str text: for capabilities *parm_left_cursor*, *parm_right_cursor*, provide the
             matching sequence text, its interpreted distance is returned.
         :returns: 0 except for matching '
+        :raises ValueError: ``text`` does not match regex for capability
         """
         value = CAPABILITIES_HORIZONTAL_DISTANCE.get(self.name)
         if value is None:
@@ -87,6 +88,7 @@ class Termcap():
             match = self.re_compiled.match(text)
             if match:
                 return value * int(match.group(1))
+            raise ValueError(f'Invalid parameters for termccap {self.name}: {text!r}')
 
         return value
 

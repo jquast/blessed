@@ -17,7 +17,7 @@ _T = TypeVar('_T', bound='Keystroke')
 
 
 # isort: off
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     # local
     from blessed.terminal import Terminal
 
