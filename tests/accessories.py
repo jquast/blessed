@@ -316,10 +316,6 @@ class MockTigetstr():  # pylint: disable=too-few-public-methods
         return self.kwargs.get(capname, self.callable(capname))
 
 
-# ============================================================================
-# Keystroke assertion helpers
-# ============================================================================
-
 def assert_modifiers(ks, ctrl=False, alt=False, shift=False, super=False):
     """Assert keystroke modifier flags match expected values."""
     assert ks._ctrl is ctrl

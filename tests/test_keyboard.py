@@ -16,12 +16,11 @@ import pytest
 from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, as_subprocess
 
+# isort: off
 if platform.system() != 'Windows':
-    # std imports
     import tty  # pylint: disable=unused-import  # NOQA
     import curses
 else:
-    # 3rd party
     import jinxed as curses  # pylint: disable=import-error
 
 
@@ -132,7 +131,6 @@ def test_stdin_notty_kb_is_None():
 
 def test_keystroke_default_args():
     """Test keyboard.Keystroke constructor with default arguments."""
-    # local
     from blessed.keyboard import Keystroke
     ks = Keystroke()
     assert ks._name is None
@@ -146,7 +144,6 @@ def test_keystroke_default_args():
 
 def test_a_keystroke():
     """Test keyboard.Keystroke constructor with set arguments."""
-    # local
     from blessed.keyboard import Keystroke
     ks = Keystroke(ucs='x', code=1, name='the X')
     assert ks._name == 'the X'
@@ -160,7 +157,6 @@ def test_a_keystroke():
 
 def test_get_keyboard_codes():
     """Test all values returned by get_keyboard_codes are from curses."""
-    # local
     import blessed.keyboard
     exemptions = dict(blessed.keyboard.CURSES_KEYCODE_OVERRIDE_MIXIN)
     # List of homemade keycodes that are not in curses
@@ -183,7 +179,6 @@ def test_get_keyboard_codes():
 
 def test_alternative_left_right():
     """Test _alternative_left_right behavior for space/backspace."""
-    # local
     from blessed.keyboard import _alternative_left_right
     term = mock.Mock()
     term._cuf1 = ''
@@ -201,7 +196,6 @@ def test_alternative_left_right():
 
 def test_cuf1_and_cub1_as_RIGHT_LEFT(all_terms):
     """Test that cuf1 and cub1 are assigned KEY_RIGHT and KEY_LEFT."""
-    # local
     from blessed.keyboard import get_keyboard_sequences
 
     @as_subprocess
@@ -238,7 +232,6 @@ def test_get_keyboard_sequences_sort_order():
 
 def test_get_keyboard_sequence(monkeypatch):
     """Test keyboard.get_keyboard_sequence."""
-    # local
     import blessed.keyboard
 
     (KEY_SMALL, KEY_LARGE, KEY_MIXIN) = range(3)
@@ -340,7 +333,6 @@ def test_resolve_sequence_order():
 
 def test_keyboard_prefixes():
     """Test keyboard.prefixes."""
-    # local
     from blessed.keyboard import get_leading_prefixes
     keys = ['abc', 'abdf', 'e', 'jkl']
     pfs = get_leading_prefixes(keys)
@@ -360,7 +352,6 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
     @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
-        # local
         from blessed.keyboard import resolve_sequence
 
         resolve = functools.partial(resolve_sequence,
@@ -460,7 +451,6 @@ def test_ESCDELAY_unset_unchanged():
     """Unset ESCDELAY leaves DEFAULT_ESCDELAY unchanged in _reinit_escdelay()."""
     if 'ESCDELAY' in os.environ:
         del os.environ['ESCDELAY']
-    # local
     import blessed.keyboard
     prev_value = blessed.keyboard.DEFAULT_ESCDELAY
     blessed.keyboard._reinit_escdelay()
@@ -470,7 +460,6 @@ def test_ESCDELAY_unset_unchanged():
 def test_ESCDELAY_bad_value_unchanged():
     """Invalid ESCDELAY leaves DEFAULT_ESCDELAY unchanged in _reinit_escdelay()."""
     os.environ['ESCDELAY'] = 'XYZ123!'
-    # local
     import blessed.keyboard
     prev_value = blessed.keyboard.DEFAULT_ESCDELAY
     blessed.keyboard._reinit_escdelay()
@@ -481,33 +470,21 @@ def test_ESCDELAY_bad_value_unchanged():
 def test_ESCDELAY_10ms():
     """Verify ESCDELAY modifies DEFAULT_ESCDELAY in _reinit_escdelay()."""
     os.environ['ESCDELAY'] = '1234'
-    # local
     import blessed.keyboard
     blessed.keyboard._reinit_escdelay()
     assert blessed.keyboard.DEFAULT_ESCDELAY == 1.234
     del os.environ['ESCDELAY']
 
 
-# ============================================================================
-# Superfluous tests - targeting internal implementation details or unrealistic
-# edge cases not reachable through normal public API usage
-# ============================================================================
-
-
-def test_superfluous_keystroke_high_byte_metasendsescape():
-    """Test ESC + high-byte character (> 126) defaults to no modifiers.
-
-    Superfluous: Tests specific internal branch for chars >126 to reach
-    default modifiers return path. Not typical terminal usage.
-    """
+def test_unsupported_high_byte_metasendsescape():
+    """Test ESC + high-byte character (> 126) defaults to no modifiers."""
+    # this library does not support the (very legacy) alt sends 8th bit high
     from blessed.keyboard import Keystroke
 
-    # ESC + character with code > 126 (not printable ASCII)
-    # This doesn't fit into any of the special cases, so returns modifiers=1
     ks = Keystroke('\x1b\x80')  # ESC + char with code 128
-    assert ks.modifiers == 1  # No modifiers detected (default)
+    assert ks.modifiers == 1    # No modifiers detected
     assert len(ks) == 2
 
     # Another high byte
     ks = Keystroke('\x1b\xff')  # ESC + char with code 255
-    assert ks.modifiers == 1  # No modifiers detected (default)
+    assert ks.modifiers == 1    # No modifiers detected

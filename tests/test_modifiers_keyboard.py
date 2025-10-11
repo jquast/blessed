@@ -17,18 +17,10 @@ else:
     import jinxed as curses  # pylint: disable=import-error
 
 
-# ============================================================================
-# Wrapper functions for common modifier assertions
-# ============================================================================
-
 def assert_ctrl_alt_modifiers(ks):
     """Assert keystroke has Ctrl+Alt modifiers (modifiers=7)."""
     assert_only_modifiers(ks, 'ctrl', 'alt')
 
-
-# ============================================================================
-# Legacy Ctrl+Alt modifiers (metaSendsEscape + control char)
-# ============================================================================
 
 def test_legacy_ctrl_alt_modifiers():
     """Infer modifiers from legacy Ctrl+Alt."""
@@ -206,10 +198,6 @@ def test_keystroke_legacy_ctrl_alt_name_generation():
     assert ks_with_name.name == 'CUSTOM_NAME'
 
 
-# ============================================================================
-# Legacy CSI modifiers (ESC [ 1 ; modifiers [ABCDEFHPQRS] and tilde forms)
-# ============================================================================
-
 @pytest.mark.parametrize('sequence,final_char,expected_mod,expected_key_name', [
     ('\x1b[1;3A', 'A', 3, 'KEY_ALT_UP'),
     ('\x1b[1;5B', 'B', 5, 'KEY_CTRL_DOWN'),
@@ -348,10 +336,6 @@ def test_terminal_inkey_legacy_csi_modifiers():
     child()
 
 
-# ============================================================================
-# ModifyOtherKeys protocol (ESC [ 27 ; modifiers ; key)
-# ============================================================================
-
 @pytest.mark.parametrize('sequence,expected_key,expected_modifiers,description', [
     # Basic with tilde
     ('\x1b[27;5;44~', 44, 5, 'Ctrl+, (comma)'),
@@ -415,10 +399,6 @@ def test_terminal_inkey_modify_other_keys():
     child()
 
 
-# ============================================================================
-# Modifier inference (_infer_modifiers)
-# ============================================================================
-
 def test_modifiers_inference_legacy_ctrl():
     """Test modifier inference from legacy control characters."""
     from blessed.keyboard import Keystroke
@@ -446,10 +426,6 @@ def test_modifiers_inference_no_modifiers():
     assert_modifiers(ks, ctrl=False, alt=False, shift=False)
 
 
-# ============================================================================
-# Modifier properties (modifiers, modifiers_bits, _ctrl, _alt, _shift, etc.)
-# ============================================================================
-
 def test_modifiers_bits_edge_cases():
     """Test edge cases for modifiers_bits property."""
     from blessed.keyboard import Keystroke
@@ -463,10 +439,6 @@ def test_modifiers_bits_edge_cases():
     ks._modifiers = 0  # Force set to 0
     assert ks.modifiers_bits == 0  # max(0, 0 - 1) = 0
 
-
-# ============================================================================
-# Helper methods (is_ctrl, is_alt, is_shift)
-# ============================================================================
 
 @pytest.mark.parametrize('sequence,char,expected', [
     # Positive cases - basic control characters
@@ -1471,9 +1443,8 @@ def test_value_property_all_helper_methods():
     # Test _get_ascii_value (for KEY_ENTER, KEY_TAB, KEY_BACKSPACE, KEY_EXIT)
     # _get_ascii_value returns the ASCII value for certain keycodes
     # To reach this method, we need a keystroke where earlier methods return None
-    # Empty string with KEY_ENTER code will skip earlier checks
-    ks = Keystroke('', code=curses.KEY_ENTER)
-    assert ks.value == '\n'  # Returns '\n' from _get_ascii_value mapping
+    ks = Keystroke('', code=curses.KEY_ENTER)  # not valid
+    assert ks.value == '\n'
 
     # Test empty string return (application key)
     ks = Keystroke('\x1b[A', code=curses.KEY_UP, name='KEY_UP')
@@ -1488,90 +1459,21 @@ def test_value_property_all_helper_methods():
 
 
 def test_superfluous_control_symbol_invalid_char_code():
-    """Test _get_control_symbol with char_code outside valid ranges.
-
-    Superfluous: Directly calls internal _get_control_symbol() method with
-    invalid char code to test defensive return None branch.
-    """
+    """Test _get_control_symbol with char_code outside valid ranges."""
     from blessed.keyboard import Keystroke
-
-    # The branch where _get_control_symbol returns None happens for char codes
-    # not in 1-26 and not in CTRL_CODE_SYMBOLS_MAP. Test by calling directly.
-    ks_test = Keystroke('\x1b\x02')  # Any keystroke for method access
+    ks_test = Keystroke('\x1b\x02')
     result = ks_test._get_control_symbol(50)  # Char code 50 (not in valid ranges)
     assert result is None
 
 
-def test_superfluous_meta_escape_name_symbol_none_path():
-    """Test _get_meta_escape_name internal edge case paths.
-
-    Superfluous: Tests internal _get_meta_escape_name method paths that are
-    difficult or impossible to reach through normal terminal sequences.
-    """
-    from blessed.keyboard import Keystroke
-
-    # Test ESC + Ctrl+char that results in Ctrl+Alt (modifiers=7)
-    # This tests the elif branch in _get_meta_escape_name
-    ks = Keystroke('\x1b\x02')  # ESC + Ctrl+B
-    # This will be Ctrl+Alt (modifiers=7), so name should be KEY_CTRL_ALT_B
-    assert ks.modifiers == 7
-    assert ks.name == 'KEY_CTRL_ALT_B'
-
-
-def test_superfluous_appkeys_predicate_expected_code_none():
-    """Test _build_appkeys_predicate when expected_code is not found.
-
-    Superfluous: Tests internal predicate building edge case where keycode
-    lookup fails. Not reachable through normal __getattr__ usage which
-    validates key names first.
-    """
-    from blessed.keyboard import Keystroke, _match_legacy_csi_modifiers
-
-    # Create a keystroke with application key
-    ks = _match_legacy_csi_modifiers('\x1b[1;2A')  # Shift+Up
-
-    # Verify with a keystroke that doesn't match
-    ks_plain = Keystroke('a')
-    # Calling is_shift_up on plain 'a' should return False
-    assert ks_plain.is_shift_up() is False
-
-
 def test_superfluous_legacy_csi_invalid_sequences():
-    """Test _match_legacy_csi_modifiers with invalid/malformed sequences.
-
-    Superfluous: Directly calls internal _match_legacy_csi_modifiers() with
-    invalid terminal sequences that wouldn't occur in real terminal usage.
-    """
+    """Test _match_legacy_csi_modifiers with invalid/malformed sequences."""
     from blessed.keyboard import _match_legacy_csi_modifiers
 
     # Test sequence with invalid letter final character
     ks = _match_legacy_csi_modifiers('\x1b[1;5X')  # Invalid letter final 'X'
-    assert ks is None  # Doesn't match letter form
-
-    # Test valid SS3 sequence (for contrast)
-    ks = _match_legacy_csi_modifiers('\x1bO2P')  # Valid SS3
-    assert ks is not None  # Matches SS3 form
+    assert ks is None
 
     # Test SS3 with invalid final character
     ks = _match_legacy_csi_modifiers('\x1bO2X')  # SS3 with invalid final 'X'
-    assert ks is None  # keycode_match is None, returns None
-
-
-def test_superfluous_meta_escape_name_complex_internal_paths():
-    """Test complex internal paths in _get_meta_escape_name.
-
-    Superfluous: Tests internal method branches that are difficult to trigger
-    through normal terminal input. Tests defensive code paths.
-    """
-    from blessed.keyboard import Keystroke
-
-    # Test ESC + control char where modifiers will be 7 (Ctrl+Alt)
-    # This exercises the elif branch in _get_meta_escape_name
-    ks = Keystroke('\x1b\x01')  # ESC + Ctrl+A
-    assert ks.modifiers == 7  # Ctrl+Alt
-    assert ks.name == 'KEY_CTRL_ALT_A'
-
-    # The remaining branches in _get_meta_escape_name are either:
-    # - Already covered by normal test cases
-    # - Unreachable due to how _infer_modifiers works (ESC + control is always 3 or 7)
-    # - Defensive code for impossible states
+    assert ks is None
