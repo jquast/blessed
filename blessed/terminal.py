@@ -1488,14 +1488,16 @@ class Terminal(object):
             ucs += self.getch()
 
         # decode keystroke, if any
-        ks = resolve_sequence(ucs, self._keymap, self._keycodes)
+        ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                              final=False)
 
         # so long as the most immediately received or buffered keystroke is
         # incomplete, (which may be a multibyte encoding), block until until
         # one is received.
         while not ks and self.kbhit(timeout=_time_left(stime, timeout)):
             ucs += self.getch()
-            ks = resolve_sequence(ucs, self._keymap, self._keycodes)
+            ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                                  final=False)
 
         # handle escape key (KEY_ESCAPE) vs. escape sequence (like those
         # that begin with \x1b[ or \x1bO) up to esc_delay when
@@ -1513,7 +1515,10 @@ class Terminal(object):
                    ucs in self._keymap_prefixes and  # pylint: disable=unsupported-membership-test
                    self.kbhit(timeout=_time_left(esctime, esc_delay))):
                 ucs += self.getch()
-                ks = resolve_sequence(ucs, self._keymap, self._keycodes)
+                # re-check 'final' after reading more bytes
+                final = bool(ucs) and ucs not in self._keymap_prefixes
+                ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                                      final=final)
 
         # buffer any remaining text received
         self.ungetch(ucs[len(ks):])

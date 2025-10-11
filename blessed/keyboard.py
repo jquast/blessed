@@ -4,11 +4,17 @@
 import os
 import re
 import time
+import typing
 import platform
-from collections import OrderedDict
+import functools
+from typing import Set, Dict, Match, Tuple, TypeVar, Optional
+from collections import OrderedDict, namedtuple
 
 # local
 from blessed._compat import TextType, unicode_chr
+
+_T = TypeVar('_T', bound='Keystroke')
+
 
 # isort: off
 # curses
@@ -21,7 +27,44 @@ else:
     from curses.has_key import _capability_names as capability_names
 
 
-class Keystroke(TextType):
+# Modifier support for advanced keyboard protocols
+ModifyOtherKeysEvent = namedtuple('ModifyOtherKeysEvent', 'key modifiers')
+LegacyCSIKeyEvent = namedtuple('LegacyCSIKeyEvent', 'kind key_id modifiers event_type')
+
+# Regex patterns for modifier sequences
+LEGACY_CSI_MODIFIERS_PATTERN = re.compile(
+    r'\x1b\[1;(?P<mod>\d+)(?::(?P<event>\d+))?(?P<final>[ABCDEFHPQRS])~?')
+LEGACY_CSI_TILDE_PATTERN = re.compile(r'\x1b\[(?P<key_num>\d+);(?P<mod>\d+)(?::(?P<event>\d+))?~')
+LEGACY_SS3_FKEYS_PATTERN = re.compile(r'\x1bO(?P<mod>\d)(?P<final>[PQRS])')
+MODIFY_PATTERN = re.compile(r'\x1b\[27;(?P<modifiers>\d+);(?P<key>\d+)(?P<tilde>~?)')
+
+# Control character mappings
+CTRL_CHAR_SYMBOLS_MAP = {'@': 0, '[': 27, '\\': 28, ']': 29, '^': 30, '_': 31, '?': 127}
+CTRL_CODE_SYMBOLS_MAP = {v: k for k, v in CTRL_CHAR_SYMBOLS_MAP.items()}
+
+
+class KittyModifierBits:
+    """Standard modifier bit flags (compatible with Kitty keyboard protocol)."""
+    # pylint: disable=too-few-public-methods
+
+    shift = 0b1
+    alt = 0b10
+    ctrl = 0b100
+    super = 0b1000
+    hyper = 0b10000
+    meta = 0b100000
+    caps_lock = 0b1000000
+    num_lock = 0b10000000
+
+    #: Names of bitwise flags attached to this class
+    names = ('shift', 'alt', 'ctrl', 'super', 'hyper', 'meta',
+             'caps_lock', 'num_lock')
+
+    #: Modifiers only, in the generally preferred order in phrasing
+    names_modifiers_only = ('ctrl', 'alt', 'shift', 'super', 'hyper', 'meta')
+
+
+class Keystroke(str):
     """
     A unicode-derived class for describing a single keystroke.
 
@@ -33,43 +76,623 @@ class Keystroke(TextType):
     When the string is a known sequence, :attr:`code` matches terminal
     class attributes for comparison, such as ``term.KEY_LEFT``.
 
-    The string-name of the sequence, such as ``u'KEY_LEFT'`` is accessed
+    The string-name of the sequence, such as ``'KEY_LEFT'`` is accessed
     by property :attr:`name`, and is used by the :meth:`__repr__` method
     to display a human-readable form of the Keystroke this class
     instance represents. It may otherwise by joined, split, or evaluated
     just as as any other unicode string.
+
+    This class supports advanced keyboard features including modifier key
+    detection (Ctrl, Alt, Shift, Super, Hyper, Meta) through the
+    :attr:`modifiers` property and helper methods like :meth:`is_ctrl`,
+    :meth:`is_alt`, etc.
     """
 
-    def __new__(cls, ucs='', code=None, name=None):
+    def __new__(cls: typing.Type[_T], ucs: str = '', code: Optional[int] = None,
+                name: Optional[str] = None, mode: Optional[int] = None,
+                match: typing.Any = None) -> _T:
         """Class constructor."""
-        new = TextType.__new__(cls, ucs)
+        new = str.__new__(cls, ucs)
         new._name = name
         new._code = code
+        new._mode = mode  # Internal mode indicator for different protocols
+        new._match = match  # regex match object for protocol-specific data
+        new._modifiers = cls._infer_modifiers(ucs, mode, match)
         return new
 
+    @staticmethod
+    def _infer_modifiers(ucs: str, mode: Optional[int], match: typing.Any) -> int:
+        """
+        Infer modifiers from keystroke data.
+
+        Returns modifiers in standard format: 1 + bitwise OR of modifier flags.
+        """
+        # ModifyOtherKeys or Legacy CSI modifiers
+        if mode is not None and mode < 0 and match is not None:
+            return match.modifiers
+
+        # Legacy sequences starting with ESC (metaSendsEscape)
+        if len(ucs) == 2 and ucs[0] == '\x1b':
+            char_code = ord(ucs[1])
+
+            # Special C0 controls that should be Alt-only per legacy spec
+            # These represent common Alt+key combinations that are unambiguous
+            # (Enter, Escape, DEL, Tab)
+            if char_code in {0x0d, 0x1b, 0x7f, 0x09}:
+                return 1 + KittyModifierBits.alt  # 1 + alt flag = 3
+
+            # Other control characters represent Ctrl+Alt combinations
+            # (ESC prefix for Alt + control char from Ctrl+letter mapping)
+            if 0 <= char_code <= 31 or char_code == 127:
+                # 1 + alt flag + ctrl flag = 7
+                return 1 + KittyModifierBits.alt + KittyModifierBits.ctrl
+
+            # Printable characters - Alt-only unless uppercase letter (which adds Shift)
+            if 32 <= char_code <= 126:
+                ch = ucs[1]
+                shift = KittyModifierBits.shift if ch.isalpha() and ch.isupper() else 0
+                return 1 + KittyModifierBits.alt + shift  # add shift for Alt+uppercase
+
+        # Legacy Ctrl: single control character
+        if len(ucs) == 1:
+            char_code = ord(ucs)
+            if 0 <= char_code <= 31 or char_code == 127:
+                return 1 + KittyModifierBits.ctrl  # 1 + ctrl flag = 5
+
+        # No modifiers detected
+        return 1
+
     @property
-    def is_sequence(self):
+    def is_sequence(self) -> bool:
         """Whether the value represents a multibyte sequence (bool)."""
-        return self._code is not None
+        return self._code is not None or self._mode is not None or len(self) > 1
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Docstring overwritten."""
-        return (TextType.__repr__(self) if self._name is None else
+        return (str.__repr__(self) if self._name is None else
                 self._name)
-    __repr__.__doc__ = TextType.__doc__
+    __repr__.__doc__ = str.__doc__
+
+    def _get_modified_keycode_name(self) -> Optional[str]:
+        """
+        Get name for modern/legacy CSI sequence with modifiers.
+
+        Returns name like 'KEY_CTRL_ALT_F1' or 'KEY_SHIFT_UP_RELEASED'. Also handles release/repeat
+        events for keys without modifiers.
+        """
+        if not (self._mode is not None and self._mode < 0 and self._code is not None):
+            return None
+
+        # turn keycode value into 'base name', eg.
+        # self._code of 265 -> 'KEY_F1' -> 'F1' base_name
+        keycodes = get_keyboard_codes()
+        base_name = keycodes.get(self._code)
+        if not base_name or not base_name.startswith('KEY_'):
+            return None
+
+        # get "base name" name by, 'KEY_F1' -> 'F1'
+        base_name = base_name[4:]
+
+        # Build possible modifier prefix series (excludes num/capslock)
+        # "Ctrl + Alt + Shift + Super / Meta"
+        mod_parts = []
+        for mod_name in KittyModifierBits.names_modifiers_only:
+            if getattr(self, f'_{mod_name}'):        # 'if self._shift'
+                mod_parts.append(mod_name.upper())   # -> 'SHIFT'
+
+        # For press events with no modifiers, return None (use existing name)
+        if not mod_parts and not (self.released or self.repeated):
+            return None
+
+        # Build base result with modifiers (if any)
+        base_result = (f"KEY_{'_'.join(mod_parts)}_{base_name}"
+                       if mod_parts
+                       else f"KEY_{base_name}")
+
+        # Append event type suffix if not a press event
+        if self.repeated:
+            return f"{base_result}_REPEATED"
+        if self.released:
+            return f"{base_result}_RELEASED"
+        return base_result
+
+    def _get_control_char_name(self) -> Optional[str]:
+        """
+        Get name for single-character control sequences.
+
+        Returns name like 'KEY_CTRL_A' or 'KEY_CTRL_@'.
+        """
+        if len(self) != 1:
+            return None
+
+        char_code = ord(self)
+        if 1 <= char_code <= 26:
+            # Ctrl+A through Ctrl+Z
+            return f'KEY_CTRL_{chr(char_code + ord("A") - 1)}'
+        if char_code in CTRL_CODE_SYMBOLS_MAP:
+            return f'KEY_CTRL_{CTRL_CODE_SYMBOLS_MAP[char_code]}'
+        return None
+
+    def _get_control_symbol(self, char_code: int) -> Optional[str]:
+        """
+        Get control symbol for a character code.
+
+        Returns symbol like 'A' for Ctrl+A, '@' for Ctrl+@, etc.
+        """
+        if 1 <= char_code <= 26:
+            # Ctrl+A through Ctrl+Z
+            return chr(char_code + ord("A") - 1)
+        if char_code in CTRL_CODE_SYMBOLS_MAP:
+            # Ctrl+symbol
+            return CTRL_CODE_SYMBOLS_MAP[char_code]
+        return None
+
+    def _get_alt_only_control_name(self, char_code: int) -> Optional[str]:
+        """
+        Get name for Alt-only special control characters.
+
+        Returns names like 'KEY_ALT_ESCAPE', 'KEY_ALT_BACKSPACE', etc.
+        """
+        control_names = {
+            0x1b: 'KEY_ALT_ESCAPE',     # ESC
+            0x7f: 'KEY_ALT_BACKSPACE',  # DEL
+            0x0d: 'KEY_ALT_ENTER',      # CR
+            0x09: 'KEY_ALT_TAB',        # TAB
+            0x5b: 'CSI'                 # CSI '['
+        }
+        return control_names.get(char_code)
+
+    def _get_meta_escape_name(self) -> Optional[str]:
+        """
+        Get name for metaSendsEscape sequences (ESC + char).
+
+        Returns name like 'KEY_ALT_A', 'KEY_ALT_SHIFT_Z', 'KEY_CTRL_ALT_C', or 'KEY_ALT_ESCAPE'.
+        """
+        # pylint: disable=too-many-return-statements
+        if len(self) != 2 or self[0] != '\x1b':
+            return None
+
+        char_code = ord(self[1])
+
+        # Check for ESC + control char
+        if 0 <= char_code <= 31 or char_code == 127:
+            symbol = self._get_control_symbol(char_code)
+
+            if symbol:
+                # Check if this is Alt-only or Ctrl+Alt based on modifiers
+                if self.modifiers == 3:  # Alt-only (1 + 2)
+                    # Special C0 controls that are Alt-only
+                    alt_name = self._get_alt_only_control_name(char_code)
+                    if alt_name:
+                        return alt_name
+                elif self.modifiers == 7:  # Ctrl+Alt (1 + 2 + 4)
+                    return f'KEY_CTRL_ALT_{symbol}'
+
+        # Check for and return KEY_ALT_ for "metaSendsEscape"
+        if self[1].isprintable():
+            ch = self[1]
+            if ch.isalpha():
+                if ch.isupper():
+                    return f'KEY_ALT_SHIFT_{ch}'
+                return f'KEY_ALT_{ch.upper()}'
+            if ch == '[':
+                return 'CSI'
+            return f'KEY_ALT_{ch}'
+        if self[1] == '\x7f' and self.modifiers == 3:
+            return 'KEY_ALT_BACKSPACE'
+        return None
 
     @property
-    def name(self):
-        """String-name of key sequence, such as ``u'KEY_LEFT'`` (str)."""
+    def name(self) -> Optional[str]:
+        """
+        Special application key name.
+
+        This is the best equality attribute to use for special keys, as raw string value of 'F1' key
+        can be received in many different values, the 'name' property will return a reliable
+        constant, 'KEY_F1'. This also supports "modifiers", such as 'KEY_CTRL_F1',
+        'KEY_CTRL_ALT_F1', 'KEY_CTRL_ALT_SHIFT_F1'.
+
+        This also supports alphanumerics and symbols when combined with a modifier, such as
+        KEY_ALT_z and KEY_ALT_SHIFT_Z
+
+        When non-None, all phrases begin with 'KEY' with one exception, 'CSI' is returned for
+        '\\x1b[' to indicate the beginning of an unsupported input sequence, the phrase 'KEY_ALT_['
+        is never returned.
+
+        If this value is None, then it can probably be assumed that the value is an unsurprising
+        textual character without any modifiers.
+        """
+        if self._name is not None:
+            return self._name
+
+        # Try each helper method in sequence
+        result = self._get_modified_keycode_name()
+        if result is not None:
+            return result
+
+        result = self._get_control_char_name()
+        if result is not None:
+            return result
+
+        result = self._get_meta_escape_name()
+        if result is not None:
+            return result
+
         return self._name
 
     @property
-    def code(self):
-        """Integer keycode value of multibyte sequence (int)."""
+    def code(self) -> Optional[int]:
+        """Legacy curses-alike keycode value (int)."""
         return self._code
 
+    @property
+    def modifiers(self) -> int:
+        """
+        Modifier flags in standard keyboard protocol format.
 
-def get_curses_keycodes():
+        :rtype: int
+        :returns: Standard-style modifiers value (1 means no modifiers)
+
+        The value is 1 + bitwise OR of modifier flags:
+
+        - shift: 0b1 (1)
+        - alt: 0b10 (2)
+        - ctrl: 0b100 (4)
+        - super: 0b1000 (8)
+        - hyper: 0b10000 (16)
+        - meta: 0b100000 (32)
+        - caps_lock: 0b1000000 (64)
+        - num_lock: 0b10000000 (128)
+        """
+        return self._modifiers
+
+    @property
+    def modifiers_bits(self) -> int:
+        """
+        Raw modifier bit flags without the +1 offset.
+
+        :rtype: int
+        :returns: Raw bitwise OR of modifier flags (0 means no modifiers)
+        """
+        return max(0, self._modifiers - 1)
+
+    # Private modifier flag properties (internal use)
+    @property
+    def _shift(self) -> bool:
+        """Whether the shift modifier is active."""
+        return bool(self.modifiers_bits & KittyModifierBits.shift)
+
+    @property
+    def _alt(self) -> bool:
+        """Whether the alt modifier is active."""
+        return bool(self.modifiers_bits & KittyModifierBits.alt)
+
+    @property
+    def _ctrl(self) -> bool:
+        """Whether the ctrl modifier is active."""
+        return bool(self.modifiers_bits & KittyModifierBits.ctrl)
+
+    @property
+    def _super(self) -> bool:
+        """Whether the super (Windows/Cmd) modifier is active."""
+        return bool(self.modifiers_bits & KittyModifierBits.super)
+
+    @property
+    def _hyper(self) -> bool:
+        """Whether the hyper modifier is active."""
+        return bool(self.modifiers_bits & KittyModifierBits.hyper)
+
+    @property
+    def _meta(self) -> bool:
+        """Whether the meta modifier is active."""
+        return bool(self.modifiers_bits & KittyModifierBits.meta)
+
+    @property
+    def _caps_lock(self) -> bool:
+        """Whether caps lock was known to be active during this sequence."""
+        return bool(self.modifiers_bits & KittyModifierBits.caps_lock)
+
+    @property
+    def _num_lock(self) -> bool:
+        """Whether num lock was known to be active during this sequence."""
+        return bool(self.modifiers_bits & KittyModifierBits.num_lock)
+
+    @property
+    def pressed(self) -> bool:
+        """
+        Whether this is a key press event.
+
+        :rtype: bool
+        :returns: True if this is a key press event (event_type=1 or not specified), False for
+            repeat or release events
+        """
+        if self._mode is not None and self._mode < 0:
+            return self._match.event_type == 1
+        # Default: always a 'pressed' event
+        return True
+
+    @property
+    def repeated(self) -> bool:
+        """
+        Whether this is a key repeat event.
+
+        :rtype: bool
+        :returns: True if this is a key repeat event (event_type=2), False otherwise
+        """
+        if self._mode is not None and self._mode < 0:
+            return self._match.event_type == 2
+        # Default: not a repeat event
+        return False
+
+    @property
+    def released(self) -> bool:
+        """
+        Whether this is a key release event.
+
+        :rtype: bool
+        :returns: True if this is a key release event (event_type=3), False otherwise
+        """
+        if self._mode is not None and self._mode < 0:
+            return self._match.event_type == 3
+        # Default: not a release event
+        return False
+
+    def _build_event_predicate(self, event_type: str, expected_name: str,
+                               expected_name_without_event: str
+                               ) -> typing.Callable[[Optional[str], bool], bool]:
+        """
+        Build a predicate function for event-type checking.
+
+        Returns a callable that checks if keystroke matches the expected event type.
+        """
+        def event_predicate(char: Optional[str] = None, ignore_case: bool = True) -> bool:
+            # pylint: disable=unused-argument
+            # Check if keystroke name matches expected name patterns
+            name_matches = False
+            if self.name == expected_name:
+                # Exact match with event type suffix
+                name_matches = True
+            elif self.name == expected_name_without_event:
+                # Match without event type suffix (for press events mainly)
+                name_matches = True
+            elif self.name and self.name.startswith(expected_name_without_event + '_'):
+                # Name starts with expected prefix
+                name_matches = True
+
+            if not name_matches:
+                return False
+
+            # Check event type
+            return {'pressed': self.pressed,
+                    'released': self.released,
+                    'repeated': self.repeated}.get(event_type, False)
+        return event_predicate
+
+    @staticmethod
+    def _make_expected_bits(tokens_modifiers: typing.List[str]) -> int:
+        """Build expected modifier bits from token list."""
+        expected_bits = 0
+        for token in tokens_modifiers:
+            expected_bits |= getattr(KittyModifierBits, token)
+        return expected_bits
+
+    def _make_effective_bits(self) -> int:
+        """Returns modifier bits stripped of caps_lock and num_lock."""
+        return self.modifiers_bits & ~(KittyModifierBits.caps_lock | KittyModifierBits.num_lock)
+
+    def _build_appkeys_predicate(self, tokens_modifiers: typing.List[str], key_name: str
+                                 ) -> typing.Callable[[Optional[str], bool], bool]:
+        """
+        Build a predicate function for checking modifiers of application keys.
+
+        Returns a callable that checks only 'token_modifiers'
+        """
+        def keycode_predicate(char: Optional[str] = None, ignore_case: bool = True) -> bool:
+            # pylint: disable=unused-argument
+            # ignore_case parameter is accepted but not used for application keys
+
+            # Application keys never match when 'char' is non-None/non-Empty
+            if char:
+                return False
+
+            # Get expected keycode from key name
+            keycodes = get_keyboard_codes()
+            expected_key_constant = f'KEY_{key_name.upper()}'
+
+            # Find the keycode value
+            expected_code = None
+            for code, name in keycodes.items():
+                if name == expected_key_constant:
+                    expected_code = code
+                    break
+
+            if expected_code is None or self._code != expected_code:
+                return False
+
+            # validate only the modifier tokens
+            return self._make_expected_bits(tokens_modifiers) == self._make_effective_bits()
+
+        return keycode_predicate
+
+    def _build_alphanum_predicate(self, tokens_modifiers: typing.List[str]
+                                  ) -> typing.Callable[[Optional[str], bool], bool]:
+        """
+        Build a predicate function for modifier checking of alphanumeric input.
+
+        Returns a callable that checks if keystroke matches the predicate 'tokens_modifiers', as
+        well as the alphanumeric checks of optional 'char' and 'ignore_case'.
+        """
+        # pylint: disable=too-many-return-statements
+        def modifier_predicate(char: Optional[str] = None, ignore_case: bool = True) -> bool:
+            # Build expected modifier bits from tokens,
+            # Stripped to ignore caps_lock and num_lock
+            expected_bits = self._make_expected_bits(tokens_modifiers)
+            effective_bits = self._make_effective_bits()
+
+            # When matching with a character and it's alphabetic, be lenient
+            # about Shift because it is implicit in the case of the letter
+            if char and len(char) == 1 and char.isalpha():
+                # Strip shift from both sides for letter matching
+                effective_bits_no_shift = effective_bits & ~KittyModifierBits.shift
+                expected_bits_no_shift = expected_bits & ~KittyModifierBits.shift
+                if effective_bits_no_shift != expected_bits_no_shift:
+                    return False
+            elif effective_bits != expected_bits:
+                # Exact matching (no char, or non-alpha char)
+                return False
+
+            # If no character specified
+            if char is None:
+                # Text keys (with printable character values) require char argument
+                keystroke_char = self._get_value_for_comparison()
+                if keystroke_char and len(keystroke_char) == 1 and keystroke_char.isprintable():
+                    return False
+                return True
+
+            # Check character match using _get_value_for_comparison
+            keystroke_char = self._get_value_for_comparison()
+
+            # If value is empty or not a single printable character, can't match
+            if not keystroke_char or len(keystroke_char) > 1 or not keystroke_char.isprintable():
+                return False
+
+            # Compare characters
+            if ignore_case:
+                return keystroke_char.lower() == char.lower()
+            return keystroke_char == char
+
+        return modifier_predicate
+
+    def __getattr__(self, attr: str) -> typing.Callable[[Optional[str], bool], bool]:
+        """
+        Dynamic compound modifier and application key predicates via __getattr__.
+
+        Recognizes attributes starting with "is_" and parses underscore-separated
+        tokens to create dynamic predicate functions.
+
+        :arg str attr: Attribute name being accessed
+        :rtype: callable or raises AttributeError
+        :returns: Callable predicate function with signature
+            ``Callable[[Optional[str], bool], bool]``.
+
+            All predicates accept the same parameters:
+
+            - ``char`` (Optional[str]): Character to match against keystroke value
+            - ``ignore_case`` (bool): Whether to ignore case when matching characters
+
+            For event predicates and application key predicates, these
+            parameters are accepted but not used.
+        """
+        # pylint: disable=too-many-locals,too-complex
+        if not attr.startswith('is_'):
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}'")
+
+        # Extract tokens after 'is_'
+        tokens_str = attr[3:]  # Remove 'is_' prefix
+        if not tokens_str:
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}'")
+
+        # Check if this matches the keystroke name directly (for key names with event types)
+        # e.g., is_key_shift_f2_released() should match name='KEY_SHIFT_F2_RELEASED', this
+        # is the preferred and most exact match, but possible only for application keys.
+        expected_name = tokens_str.upper()
+        if self.name == expected_name:
+            return lambda: True
+
+        # Try extracting event type suffix, only one may be used
+        event_type = None
+        for match_name in ('pressed', 'released', 'repeated'):
+            if tokens_str.endswith(f'_{match_name}'):
+                # Mutate 'tokens_str', remove '_pressed', etc.
+                event_type = match_name
+                tokens_str = tokens_str[:-len(match_name) - 1]
+                break
+
+        # If event type was found, return event predicate
+        if event_type:
+            expected_name_without_event = tokens_str.upper()
+            return self._build_event_predicate(event_type, expected_name,
+                                               expected_name_without_event)
+
+        # Parse tokens to separate modifiers from potential key name
+        tokens = tokens_str.split('_')
+
+        # Separate modifiers from potential key name
+        tokens_modifiers = []
+        tokens_key_names = []
+
+        # a mini 'getopt' for breaking modifiers_key_names -> [modifiers], [key_name_tokens]
+        for i, token in enumerate(tokens):
+            if token in KittyModifierBits.names_modifiers_only:
+                tokens_modifiers.append(token)
+            else:
+                # Remaining tokens could be a key name
+                tokens_key_names = tokens[i:]
+                break
+
+        # If we have any non-modifier tokens,
+        if tokens_key_names:
+            # check if they form a valid application key,
+            key_name = '_'.join(tokens_key_names)
+            keycodes = get_keyboard_codes()
+            expected_key_constant = f'KEY_{key_name.upper()}'
+            if expected_key_constant in keycodes.values():
+                # and return as predicate function
+                return self._build_appkeys_predicate(tokens_modifiers, key_name)
+
+        # No valid key name was found by 'tokens_key_names', this could just as
+        # easily be asking for an attribute that doesn't exist, or a spelling
+        # error of application key or modifier, report as 'invalid' token
+        invalid_tokens = [token for token in tokens
+                          if token not in KittyModifierBits.names_modifiers_only]
+        if invalid_tokens:
+            raise AttributeError(
+                f"'{self.__class__.__name__}' object has no attribute '{attr}' "
+                f"(invalid modifier or application key tokens: {invalid_tokens})")
+
+        # Return modifier predicate for alphanumeric keys
+        return self._build_alphanum_predicate(tokens_modifiers)
+
+    def _get_value_for_comparison(self) -> Optional[str]:
+        """
+        Get the character value for modifier comparison.
+
+        For ESC + char sequences (metaSendsEscape), returns the second character. For control
+        characters, maps them back to their base character. For single printable characters, returns
+        as-is.
+        """
+        # ESC + printable char (metaSendsEscape)
+        if len(self) == 2 and self[0] == '\x1b' and self[1].isprintable():
+            return self[1]
+
+        # ESC + control char (Ctrl+Alt combination)
+        if len(self) == 2 and self[0] == '\x1b':
+            char_code = ord(self[1])
+            if 1 <= char_code <= 26:
+                return chr(char_code + ord('a') - 1)  # lowercase
+            if char_code in CTRL_CODE_SYMBOLS_MAP:
+                return CTRL_CODE_SYMBOLS_MAP[char_code]
+
+        # Single control character (Ctrl+key)
+        if len(self) == 1:
+            char_code = ord(self)
+            if 1 <= char_code <= 26:
+                return chr(char_code + ord('a') - 1)  # lowercase
+            if char_code in CTRL_CODE_SYMBOLS_MAP:
+                return CTRL_CODE_SYMBOLS_MAP[char_code]
+
+        # ModifyOtherKeys protocol
+        if self._mode == -2 and self._match:  # ModifyOtherKeys
+            return chr(self._match.key)
+
+        # Single printable character
+        if len(self) == 1 and self[0].isprintable():
+            return self[0]
+
+        return None
+
+
+def get_curses_keycodes() -> Dict[str, int]:
     """
     Return mapping of curses key-names paired by their keycode integer value.
 
@@ -83,7 +706,7 @@ def get_curses_keycodes():
     return {keyname: getattr(curses, keyname) for keyname in _keynames}
 
 
-def get_keyboard_codes():
+def get_keyboard_codes() -> Dict[int, str]:
     """
     Return mapping of keycode integer values paired by their curses key-name.
 
@@ -121,7 +744,7 @@ def get_keyboard_codes():
     return dict(zip(keycodes.values(), keycodes.keys()))
 
 
-def _alternative_left_right(term):
+def _alternative_left_right(term) -> Dict[str, int]:
     r"""
     Determine and return mapping of left and right arrow keys sequences.
 
@@ -146,7 +769,7 @@ def _alternative_left_right(term):
     return keymap
 
 
-def get_keyboard_sequences(term):
+def get_keyboard_sequences(term) -> 'OrderedDict[str, int]':
     r"""
     Return mapping of keyboard sequences paired by keycodes.
 
@@ -195,7 +818,7 @@ def get_keyboard_sequences(term):
             sequence_map.keys(), key=len, reverse=True)))
 
 
-def get_leading_prefixes(sequences):
+def get_leading_prefixes(sequences: typing.Iterable[str]) -> Set[str]:
     """
     Return a set of proper prefixes for given sequence of strings.
 
@@ -214,7 +837,8 @@ def get_leading_prefixes(sequences):
     return {seq[:i] for seq in sequences for i in range(1, len(seq))}
 
 
-def resolve_sequence(text, mapper, codes):
+def resolve_sequence(text: str, mapper: 'OrderedDict[str, int]', codes: Dict[int, str],
+                     prefixes: Optional[Set[str]] = None, final: bool = False) -> 'Keystroke':
     r"""
     Return a single :class:`Keystroke` instance for given sequence ``text``.
 
@@ -223,6 +847,8 @@ def resolve_sequence(text, mapper, codes):
         paired by their integer value (260)
     :arg dict codes: a :type:`dict` of integer values (such as 260) paired
         by their mnemonic name, such as ``'KEY_LEFT'``.
+    :arg set prefixes: Set of all valid sequence prefixes for quick matching
+    :arg bool final: Whether this is the final resolution attempt (no more input expected)
     :rtype: Keystroke
     :returns: Keystroke instance for the given sequence
 
@@ -230,14 +856,43 @@ def resolve_sequence(text, mapper, codes):
     ``u\x1b[Dxxx`` returns a :class:`Keystroke` instance of attribute
     :attr:`Keystroke.sequence` valued only ``u\x1b[D``.  It is up to
     calls to determine that ``xxx`` remains unresolved.
+
+    In an ideal world, we could detect and resolve only for key sequences
+    expected in the current terminal mode. For example, only the enablement
+    of mode 1036 (META_SENDS_ESC) would match 2-character ESC+char sequences.
     """
-    for sequence, code in mapper.items():
-        if text.startswith(sequence):
-            return Keystroke(ucs=sequence, code=code, name=codes[code])
-    return Keystroke(ucs=text and text[0] or u'')
+    # First try advanced keyboard protocol matchers
+    ks = None
+    for match_fn in (_match_modify_other_keys,
+                     _match_legacy_csi_modifiers):
+        ks = match_fn(text)
+        if ks:
+            break
+
+    # Then try static sequence lookups from terminal capabilities
+    if ks is None:
+        for sequence, code in mapper.items():
+            if text.startswith(sequence):
+                ks = Keystroke(ucs=sequence, code=code, name=codes[code])
+                break
+
+    # Resolve for alt+backspace and metaSendsEscape, KEY_ALT_[..],
+    # when the sequence so far is not a 'known prefix', or, when
+    # final is True, we return the ambiguously matched KEY_ALT_[...]
+    if prefixes is not None:
+        maybe_alt = (ks is not None and ks.code == curses.KEY_EXIT and len(text) > 1)
+        final_or_not_keystroke = (
+            final or (len(text) > 1 and text[1] == '\x7f') or text[:2] not in prefixes)
+        if (maybe_alt and final_or_not_keystroke):
+            ks = Keystroke(ucs=text[:2])
+
+    # final match is just simple resolution of the first codepoint of text
+    if ks is None:
+        ks = Keystroke(ucs=text and text[0] or '')
+    return ks
 
 
-def _time_left(stime, timeout):
+def _time_left(stime: float, timeout: Optional[float]) -> Optional[float]:
     """
     Return time remaining since ``stime`` before given ``timeout``.
 
@@ -254,7 +909,7 @@ def _time_left(stime, timeout):
     return max(0, timeout - (time.time() - stime)) if timeout else timeout
 
 
-def _read_until(term, pattern, timeout):
+def _read_until(term, pattern: str, timeout: Optional[float]) -> Tuple[Optional[Match[str]], str]:
     """
     Convenience read-until-pattern function, supporting :meth:`~.get_location`.
 
@@ -308,6 +963,158 @@ def _read_until(term, pattern, timeout):
             break
 
     return match, buf
+
+
+def _match_modify_other_keys(text: str) -> Optional['Keystroke']:
+    """
+    Attempt to match text against xterm ModifyOtherKeys patterns.
+
+    :arg str text: Input text to match against ModifyOtherKeys patterns
+    :rtype: Keystroke or None
+    :returns: :class:`Keystroke` with ModifyOtherKeys data if matched, ``None`` otherwise
+
+    Supports xterm ModifyOtherKeys sequences of the form:
+    ESC [ 27 ; modifiers ; key ~     # Standard form
+    ESC [ 27 ; modifiers ; key       # Alternative form without trailing ~
+    """
+    match = MODIFY_PATTERN.match(text)
+    if match:
+        # Create ModifyOtherKeysEvent namedtuple
+        modify_event = ModifyOtherKeysEvent(
+            key=int(match.group('key')),
+            modifiers=int(match.group('modifiers')))
+        # Create Keystroke with mode=-2 to indicate ModifyOtherKeys protocol
+        return Keystroke(ucs=match.group(0),
+                         mode=-2,
+                         match=modify_event)
+
+    return None
+
+
+def _match_legacy_csi_modifiers(text: str) -> Optional['Keystroke']:
+    """
+    Attempt to match text against legacy CSI modifier patterns.
+
+    :arg str text: Input text to match against legacy CSI modifier patterns
+    :rtype: Keystroke or None
+    :returns: :class:`Keystroke` with legacy CSI modifier data if matched, ``None`` otherwise
+
+    Supports legacy CSI modifier sequences of the form:
+    ESC [ 1 ; modifiers [ABCDEFHPQS]  # Arrow keys, Home/End, F1-F4 (letter form)
+    ESC [ number ; modifiers ~        # Function keys and others (tilde form)
+
+    These sequences may be sent by many terminals even when advanced keyboard
+    protocols are not enabled, as it is the only way to transmit modifier
+    + application keys in a common legacy-compatible form.
+    """
+    # Try letter form: ESC [ 1 ; modifiers [ABCDEFHPQS] with optional '~'
+    legacy_event = None
+    match = LEGACY_CSI_MODIFIERS_PATTERN.match(text)
+    match_tilde = LEGACY_CSI_TILDE_PATTERN.match(text)
+    if match:
+        kind = 'letter'
+        modifiers = int(match.group('mod'))
+        key_id = match.group('final')
+        matched_text = match.group(0)
+
+        keycode_match = {
+            'A': curses.KEY_UP,
+            'B': curses.KEY_DOWN,
+            'C': curses.KEY_RIGHT,
+            'D': curses.KEY_LEFT,
+            'E': curses.KEY_B2,
+            'F': curses.KEY_END,
+            'H': curses.KEY_HOME,
+            'P': curses.KEY_F1,
+            'Q': curses.KEY_F2,
+            'R': curses.KEY_F3,   # this 'f3' is rarely (ever?) transmitted
+            'S': curses.KEY_F4,
+        }.get(key_id)
+        # Extract event_type, default to 1 if not present
+        event_type = int(match.group('event')) if match.group('event') else 1
+
+        if keycode_match is not None:
+            legacy_event = LegacyCSIKeyEvent(
+                kind=kind,
+                key_id=key_id,
+                modifiers=modifiers,
+                event_type=event_type)
+            return Keystroke(ucs=matched_text,
+                             code=keycode_match,
+                             mode=-3,  # mode=-3 for LegacyCSIModifier
+                             match=legacy_event)
+
+    # Try tilde form: ESC [ number ; modifiers ~
+    elif match_tilde:
+        kind = 'tilde'
+        modifiers = int(match_tilde.group('mod'))
+        key_id = int(match_tilde.group('key_num'))
+        matched_text = match_tilde.group(0)
+        # Extract event_type, default to 1 if not present
+        event_type = int(match_tilde.group('event')) if match_tilde.group('event') else 1
+
+        # Map tilde key numbers to curses key codes
+        keycode_match = {
+            2: curses.KEY_IC,       # Insert
+            3: curses.KEY_DC,       # Delete
+            5: curses.KEY_PPAGE,    # Page Up
+            6: curses.KEY_NPAGE,    # Page Down
+            7: curses.KEY_HOME,     # Home
+            8: curses.KEY_END,      # End
+            11: curses.KEY_F1,      # F1
+            12: curses.KEY_F2,      # ..
+            13: curses.KEY_F3,
+            14: curses.KEY_F4,
+            15: curses.KEY_F5,
+            17: curses.KEY_F6,
+            18: curses.KEY_F7,
+            19: curses.KEY_F8,
+            20: curses.KEY_F9,
+            21: curses.KEY_F10,
+            23: curses.KEY_F11,
+            24: curses.KEY_F12,
+        }.get(key_id)
+
+        if keycode_match is not None:
+            legacy_event = LegacyCSIKeyEvent(
+                kind=kind,
+                key_id=key_id,
+                modifiers=modifiers,
+                event_type=event_type)
+            return Keystroke(ucs=matched_text,
+                             code=keycode_match,
+                             mode=-3,  # mode=-3 for LegacyCSIModifier
+                             match=legacy_event)
+
+    # Try SS3 F-key form: ESC O modifier [PQRS] (Konsole)
+    match = LEGACY_SS3_FKEYS_PATTERN.match(text)
+    if match:
+        matched_text = match.group(0)
+        modifiers = int(match.group('mod'))
+        final_char = match.group('final')
+
+        # Modifier 0 is invalid - modifiers start from 1 (no modifiers)
+        if modifiers == 0:
+            return None
+
+        # Map SS3 F-key final characters to curses key codes
+        keycode_match = {
+            'P': curses.KEY_F1,     # F1
+            'Q': curses.KEY_F2,     # F2
+            'R': curses.KEY_F3,     # F3
+            'S': curses.KEY_F4,     # F4
+        }.get(final_char)
+
+        if keycode_match is not None:
+            # SS3 form doesn't support event_type, default to 1 (press)
+            legacy_event = LegacyCSIKeyEvent(
+                kind='ss3-fkey',
+                key_id=final_char,
+                modifiers=modifiers,
+                event_type=1)
+            return Keystroke(ucs=matched_text, code=keycode_match, mode=-3, match=legacy_event)
+
+    return None
 
 
 #: Though we may determine *keynames* and codes for keyboard input that

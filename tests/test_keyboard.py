@@ -3,8 +3,10 @@
 # std imports
 import os
 import platform
+import sys
 import tempfile
 import functools
+from unittest import mock
 
 # 3rd party
 import pytest
@@ -13,11 +15,6 @@ import pytest
 from blessed._compat import unicode_chr
 from .accessories import TestTerminal, as_subprocess
 from .conftest import IS_WINDOWS
-
-try:
-    from unittest import mock
-except ImportError:
-    import mock
 
 if platform.system() != 'Windows':
     import curses
@@ -67,15 +64,41 @@ def test_raw_input_with_kb():
     child()
 
 
-def test_notty_kb_is_None():
-    """term._keyboard_fd should be None when os.isatty returns False."""
-    # in this scenario, stream is sys.__stdout__,
-    # but os.isatty(0) is False,
-    # such as when piping output to less(1)
+def test_stdout_notty_kb_is_None():
+    """term._keyboard_fd should be None when os.isatty returns False for output."""
     @as_subprocess
     def child():
-        with mock.patch("os.isatty") as mock_isatty:
-            mock_isatty.return_value = False
+        isatty = os.isatty
+        with mock.patch('os.isatty') as mock_isatty:
+            mock_isatty.side_effect = (
+                lambda fd: False if fd == sys.__stdout__.fileno() else isatty(fd)
+            )
+            term = TestTerminal()
+            assert term._keyboard_fd is None
+            assert 'Output stream is not a TTY' in term.errors
+    child()
+
+
+def test_stdin_notty_kb_is_None():
+    """term._keyboard_fd should be None when os.isatty returns False for stdin."""
+    @as_subprocess
+    def child():
+        isatty = os.isatty
+        with mock.patch('os.isatty') as mock_isatty:
+            mock_isatty.side_effect = (
+                lambda fd: False if fd == sys.__stdin__.fileno() else isatty(fd)
+            )
+            term = TestTerminal()
+            assert term._keyboard_fd is None
+    child()
+
+
+def test_stdin_redirect():
+    """term._keyboard_fd should be None when stdin.fileno() raises an exception."""
+    @as_subprocess
+    def child():
+        with mock.patch.object(sys.__stdin__, 'fileno') as mock_fileno:
+            mock_fileno.side_effect = ValueError('fileno is not implemented on this stream')
             term = TestTerminal()
             assert term._keyboard_fd is None
     child()
@@ -219,66 +242,64 @@ def test_get_keyboard_sequence(monkeypatch):
         (SEQ_MIXIN.decode('latin1'), KEY_MIXIN)]
 
 
-def test_resolve_sequence():
+def test_resolve_sequence_order():
     """Test resolve_sequence for order-dependent mapping."""
-    from blessed.keyboard import resolve_sequence, OrderedDict
-    mapper = OrderedDict(((u'SEQ1', 1),
-                          (u'SEQ2', 2),
+    from blessed.keyboard import resolve_sequence, OrderedDict, get_leading_prefixes
+    mapper = OrderedDict((('SEQ1', 1),
+                          ('SEQ2', 2),
                           # takes precedence over LONGSEQ, first-match
-                          (u'KEY_LONGSEQ_longest', 3),
-                          (u'LONGSEQ', 4),
+                          ('LONGSEQ', 4),
                           # won't match, LONGSEQ is first-match in this order
-                          (u'LONGSEQ_longer', 5),
+                          ('LONGSEQ_longer', 5),
                           # falls through for L{anything_else}
-                          (u'L', 6)))
-    codes = {1: u'KEY_SEQ1',
-             2: u'KEY_SEQ2',
-             3: u'KEY_LONGSEQ_longest',
-             4: u'KEY_LONGSEQ',
-             5: u'KEY_LONGSEQ_longer',
-             6: u'KEY_L'}
-    ks = resolve_sequence(u'', mapper, codes)
-    assert ks == u''
+                          ('L', 6)))
+    codes = {1: 'KEY_SEQ1',
+             2: 'KEY_SEQ2',
+             4: 'KEY_LONGSEQ',
+             5: 'KEY_LONGSEQ_longer',
+             6: 'KEY_L'}
+    prefixes = get_leading_prefixes(mapper)
+    ks = resolve_sequence('', mapper, codes, prefixes, final=True)
+    assert ks == ''
     assert ks.name is None
     assert ks.code is None
     assert not ks.is_sequence
-    assert repr(ks) in {"u''",  # py26, 27
-                        "''"}  # py33
+    assert repr(ks) == "''"
 
-    ks = resolve_sequence(u'notfound', mapper=mapper, codes=codes)
-    assert ks == u'n'
+    ks = resolve_sequence('notfound', mapper, codes, prefixes, final=True)
+    assert ks == 'n'
     assert ks.name is None
     assert ks.code is None
     assert not ks.is_sequence
-    assert repr(ks) in {u"u'n'", "'n'"}
+    assert repr(ks) == "'n'"
 
-    ks = resolve_sequence(u'SEQ1', mapper, codes)
-    assert ks == u'SEQ1'
-    assert ks.name == u'KEY_SEQ1'
+    ks = resolve_sequence('SEQ1', mapper, codes, prefixes, final=True)
+    assert ks == 'SEQ1'
+    assert ks.name == 'KEY_SEQ1'
     assert ks.code == 1
     assert ks.is_sequence
-    assert repr(ks) == u"KEY_SEQ1"
+    assert repr(ks) == "KEY_SEQ1"
 
-    ks = resolve_sequence(u'LONGSEQ_longer', mapper, codes)
-    assert ks == u'LONGSEQ'
-    assert ks.name == u'KEY_LONGSEQ'
+    ks = resolve_sequence('LONGSEQ_longer', mapper, codes, prefixes, final=True)
+    assert ks == 'LONGSEQ'
+    assert ks.name == 'KEY_LONGSEQ'
     assert ks.code == 4
     assert ks.is_sequence
-    assert repr(ks) == u"KEY_LONGSEQ"
+    assert repr(ks) == "KEY_LONGSEQ"
 
-    ks = resolve_sequence(u'LONGSEQ', mapper, codes)
-    assert ks == u'LONGSEQ'
-    assert ks.name == u'KEY_LONGSEQ'
+    ks = resolve_sequence('LONGSEQ', mapper, codes, prefixes, final=True)
+    assert ks == 'LONGSEQ'
+    assert ks.name == 'KEY_LONGSEQ'
     assert ks.code == 4
     assert ks.is_sequence
-    assert repr(ks) == u"KEY_LONGSEQ"
+    assert repr(ks) == "KEY_LONGSEQ"
 
-    ks = resolve_sequence(u'Lxxxxx', mapper, codes)
-    assert ks == u'L'
-    assert ks.name == u'KEY_L'
+    ks = resolve_sequence('Lxxxxx', mapper, codes, prefixes, final=True)
+    assert ks == 'L'
+    assert ks.name == 'KEY_L'
     assert ks.code == 6
     assert ks.is_sequence
-    assert repr(ks) == u"KEY_L"
+    assert repr(ks) == "KEY_L"
 
 
 def test_keyboard_prefixes():
@@ -300,13 +321,15 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
     # End     ^[[F    ^[OF    ^[[1;mF
     # Home    ^[[H    ^[OH    ^[[1;mH
     @as_subprocess
-    def child(kind):  # pylint: disable=too-many-statements
+    def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
         from blessed.keyboard import resolve_sequence
 
         resolve = functools.partial(resolve_sequence,
                                     mapper=term._keymap,
-                                    codes=term._keycodes)
+                                    codes=term._keycodes,
+                                    prefixes=term._keymap_prefixes,
+                                    final=True)
 
         assert resolve(unicode_chr(10)).name == "KEY_ENTER"
         assert resolve(unicode_chr(13)).name == "KEY_ENTER"
@@ -361,6 +384,59 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
         assert resolve(u"\x1bOS").name == "KEY_F4"
 
     child('xterm')
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="no multiprocess")
+def test_kp_begin_center_key():
+    """Test KP_BEGIN/center key (numpad 5) with modifiers and event types."""
+    @as_subprocess
+    def child():
+        from blessed.keyboard import _match_legacy_csi_modifiers
+
+        # Basic sequence without modifiers
+        ks = _match_legacy_csi_modifiers('\x1b[E')
+        assert ks is None  # Doesn't match - needs modifiers for legacy CSI
+
+        # With modifiers - Ctrl
+        ks = _match_legacy_csi_modifiers('\x1b[1;5E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.name == 'KEY_CTRL_CENTER'
+
+        # With modifiers - Alt
+        ks = _match_legacy_csi_modifiers('\x1b[1;3E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.name == 'KEY_ALT_CENTER'
+
+        # With modifiers - Ctrl+Alt
+        ks = _match_legacy_csi_modifiers('\x1b[1;7E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.name == 'KEY_CTRL_ALT_CENTER'
+
+        # With event type - release (the original issue case)
+        ks = _match_legacy_csi_modifiers('\x1b[1;1:3E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.released
+        assert ks.name == 'KEY_CENTER_RELEASED'
+
+        # With event type - repeat
+        ks = _match_legacy_csi_modifiers('\x1b[1;1:2E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.repeated
+        assert ks.name == 'KEY_CENTER_REPEATED'
+
+        # With modifiers and event type
+        ks = _match_legacy_csi_modifiers('\x1b[1;5:3E')
+        assert ks is not None
+        assert ks.code == curses.KEY_B2
+        assert ks.released
+        assert ks.name == 'KEY_CTRL_CENTER_RELEASED'
+
+    child()
 
 
 def test_ESCDELAY_unset_unchanged():
