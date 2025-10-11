@@ -478,12 +478,12 @@ def test_keystroke_alt():
     assert Keystroke('\x1ba').is_alt('A', ignore_case=False) is False
 
     # Test without character argument (any Alt+char)
-    assert Keystroke('\x1ba').is_alt() is False    # Alt+a
-    assert Keystroke('\x1b1').is_alt() is False    # Alt+1
-    assert Keystroke('\x1b ').is_alt() is False    # Alt+space
+    assert Keystroke('\x1ba').is_alt() is False    # Alt+a (has printable value)
+    assert Keystroke('\x1b1').is_alt() is False    # Alt+1 (has printable value)
+    assert Keystroke('\x1b ').is_alt() is True     # Alt+space (empty value, like appkey)
     assert Keystroke('\x1ba').is_alt('A') is True  # Alt+a
     assert Keystroke('\x1b1').is_alt('1') is True  # Alt+1
-    assert Keystroke('\x1b ').is_alt(' ') is True  # Alt+space
+    assert Keystroke('\x1b ').is_alt(' ') is False # Alt+space value is empty, can't match
 
     # Test negative cases
     assert Keystroke('a').is_alt('a') is False       # Regular 'a'

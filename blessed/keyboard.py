@@ -596,10 +596,12 @@ class Keystroke(str):
         """
         Get value for Alt+printable sequences (ESC + char).
 
-        Returns the printable character from Alt sequences.
+        Returns the printable character from Alt sequences, except for space.
+        Alt+Space returns empty string to distinguish it from plain space.
         """
         if (len(self) == 2 and self[0] == '\x1b' and
-                self._alt and not self._ctrl and self[1].isprintable()):
+                self._alt and not self._ctrl and self[1].isprintable() and
+                self[1] != ' '):  # Exclude space - Alt+Space returns empty string
             return self[1]  # Return as-is (preserves case and supports Unicode)
         return None
 
