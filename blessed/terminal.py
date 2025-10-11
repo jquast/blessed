@@ -14,7 +14,7 @@ import platform
 import warnings
 import contextlib
 import collections
-from typing import IO, List, Match, Tuple, Union, Optional, Generator
+from typing import IO, List, Tuple, Union, Optional, Generator
 
 # SupportsIndex was added in Python 3.8
 if sys.version_info >= (3, 8):
@@ -1457,7 +1457,7 @@ class Terminal():
     def flushinp(self, timeout: float = 0) -> str:
         r"""
         Unbuffer and return all input available within ``timeout``.
- 
+
         When CSI ``'\x1b['`` is detected in input stream, all remaining bytes
         are decoded as latin1.
         """

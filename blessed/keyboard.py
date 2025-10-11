@@ -34,10 +34,12 @@ LegacyCSIKeyEvent = namedtuple('LegacyCSIKeyEvent', 'kind key_id modifiers event
 
 # Regex patterns for modifier sequences
 RE_PATTERN_LEGACY_CSI_MODIFIERS = re.compile(
-    r'\x1b\[1;(?P<mod>\d+)(?::(?P<event>\d+))?(?P<final>[ABCDEFHPQRS])~?')
-RE_PATTERN_LEGACY_CSI_TILDE = re.compile(r'\x1b\[(?P<key_num>\d+);(?P<mod>\d+)(?::(?P<event>\d+))?~')
+    r'\x1b\[1;(?P<mod>\d+)(?::(?P<event>\d+))?(?P<final>[ABCDEFHPQRS])')
+RE_PATTERN_LEGACY_CSI_TILDE = re.compile(
+        r'\x1b\[(?P<key_num>\d+);(?P<mod>\d+)(?::(?P<event>\d+))?~')
 RE_PATTERN_LEGACY_SS3_FKEYS = re.compile(r'\x1bO(?P<mod>\d)(?P<final>[PQRS])')
-RE_PATTERN_MODIFY_OTHER = re.compile(r'\x1b\[27;(?P<modifiers>\d+);(?P<key>\d+)(?P<tilde>~?)')
+RE_PATTERN_MODIFY_OTHER = re.compile(
+        r'\x1b\[27;(?P<modifiers>\d+);(?P<key>\d+)(?P<tilde>~?)')
 
 # Control character mappings
 # Note: Ctrl+Space (code 0) is handled specially as 'SPACE', not included here
@@ -130,7 +132,7 @@ class Keystroke(str):
             if 32 <= char_code <= 126:
                 ch = ucs[1]
                 shift = KittyModifierBits.shift if ch.isalpha() and ch.isupper() else 0
-                return 1 + KittyModifierBits.alt + shift  # add shift for Alt+uppercase
+                return 1 + KittyModifierBits.alt + shift
 
         # Legacy Ctrl: single control character
         if len(ucs) == 1:
@@ -284,17 +286,20 @@ class Keystroke(str):
         """
         Special application key name.
 
-        This is the best equality attribute to use for special keys, as raw string value of 'F1' key
-        can be received in many different values, the 'name' property will return a reliable
-        constant, 'KEY_F1'. This also supports "modifiers", such as 'KEY_CTRL_F1',
-        'KEY_CTRL_ALT_F1', 'KEY_CTRL_ALT_SHIFT_F1'.
+        This is the best equality attribute to use for special keys, as raw string value of the 'F1'
+        key can be received in many different values.
 
-        This also supports alphanumerics and symbols when combined with a modifier, such as
-        KEY_ALT_z and KEY_ALT_SHIFT_Z
+        The 'name' property will return a reliable constant, 'KEY_F1'.
 
-        When non-None, all phrases begin with 'KEY' with one exception, 'CSI' is returned for
-        '\\x1b[' to indicate the beginning of an unsupported input sequence, the phrase 'KEY_ALT_['
-        is never returned.
+        The name supports "modifiers", such as 'KEY_CTRL_F1', 'KEY_CTRL_ALT_F1',
+        'KEY_CTRL_ALT_SHIFT_F1'.
+
+        This also supports alphanumerics when combined with a modifier, such as KEY_ALT_z and
+        KEY_ALT_SHIFT_Z
+
+        When non-None, all phrases begin with 'KEY' except one exception, 'CSI' is returned for
+        '\\x1b[' to indicate the beginning of a presumed unsupported input sequence. The phrase
+        'KEY_ALT_[' is never returned and unsupported.
 
         If this value is None, then it can probably be assumed that the value is an unsurprising
         textual character without any modifiers.
@@ -405,6 +410,7 @@ class Keystroke(str):
         """
         if self._mode is not None and self._mode < 0:
             # Check if _match has event_type (LegacyCSIKeyEvent),
+            # defaulting to 1 (pressed) if not present.
             return getattr(self._match, 'event_type', 1) == 1
         # Default: always a 'pressed' event
         return True
@@ -419,7 +425,8 @@ class Keystroke(str):
 
     def _make_effective_bits(self) -> int:
         """Returns modifier bits stripped of caps_lock and num_lock."""
-        return self.modifiers_bits & ~(KittyModifierBits.caps_lock | KittyModifierBits.num_lock)
+        stripped_bits = KittyModifierBits.caps_lock | KittyModifierBits.num_lock
+        return self.modifiers_bits & ~(stripped_bits)
 
     def _build_appkeys_predicate(self, tokens_modifiers: typing.List[str], key_name: str
                                  ) -> typing.Callable[[Optional[str], bool], bool]:
@@ -596,8 +603,8 @@ class Keystroke(str):
         """
         Get value for Alt+printable sequences (ESC + char).
 
-        Returns the printable character from Alt sequences, except for space.
-        Alt+Space returns empty string to distinguish it from plain space.
+        Returns the printable character from Alt sequences, except for space. Alt+Space returns
+        empty string to distinguish it from plain space.
         """
         if (len(self) == 2 and self[0] == '\x1b' and
                 self._alt and not self._ctrl and self[1].isprintable() and
@@ -901,7 +908,9 @@ def resolve_sequence(text: str,
     # First try advanced keyboard protocol matchers
     ks = None
     for match_fn in (_match_modify_other_keys,
-                     _match_legacy_csi_modifiers):
+                     _match_legacy_csi_letter_form,
+                     _match_legacy_csi_tilde_form,
+                     _match_legacy_ss3_fkey_form):
         ks = match_fn(text)
         if ks:
             break
@@ -1011,7 +1020,7 @@ def _match_modify_other_keys(text: str) -> Optional['Keystroke']:
 
     :arg str text: Input text to match against ModifyOtherKeys patterns
     :rtype: Keystroke or None
-    :returns: :class:`Keystroke` with ModifyOtherKeys data if matched, ``None`` otherwise
+    :returns: :class:`Keystroke` when matched, otherwise ``None``.
 
     Supports xterm ModifyOtherKeys sequences of the form:
     ESC [ 27 ; modifiers ; key ~     # Standard form
@@ -1031,140 +1040,106 @@ def _match_modify_other_keys(text: str) -> Optional['Keystroke']:
     return None
 
 
-def _match_legacy_csi_modifiers(text: str) -> Optional[Keystroke]:
+def _match_legacy_csi_letter_form(text: str) -> Optional[Keystroke]:
     """
-    Attempt to match text against legacy CSI modifier patterns.
+    Match legacy CSI letter form: ESC [ 1 ; modifiers [ABCDEFHPQRS].
 
-    :arg str text: Input text to match against legacy CSI modifier patterns
+    :arg str text: Input text to match
     :rtype: Keystroke or None
-    :returns: :class:`Keystroke` with legacy CSI modifier data if matched, ``None`` otherwise
+    :returns: :class:`Keystroke` if matched, ``None`` otherwise
 
-    Supports legacy CSI modifier sequences of the form:
-    ESC [ 1 ; modifiers [ABCDEFHPQS]  # Arrow keys, Home/End, F1-F4 (letter form)
-    ESC [ number ; modifiers ~        # Function keys and others (tilde form)
-
-    These sequences may be sent by many terminals even when advanced keyboard
-    protocols are not enabled, as it is the only way to transmit about modifier
-    + application keys in a common legacy-compatible form.
+    Handles arrow keys, Home/End, F1-F4 with modifiers.
     """
-    # Try letter form: ESC [ 1 ; modifiers [ABCDEFHPQS] with optional '~'
-    legacy_event = None
     match = RE_PATTERN_LEGACY_CSI_MODIFIERS.match(text)
-    match_tilde = RE_PATTERN_LEGACY_CSI_TILDE.match(text)
-    if match:
-        kind = 'letter'
-        modifiers = int(match.group('mod'))
-        key_id = match.group('final')
-        matched_text = match.group(0)
+    if not match:
+        return None
 
-        keycode_match = {
-            'A': curses.KEY_UP,
-            'B': curses.KEY_DOWN,
-            'C': curses.KEY_RIGHT,
-            'D': curses.KEY_LEFT,
-            'E': curses.KEY_B2,
-            'F': curses.KEY_END,
-            'H': curses.KEY_HOME,
-            'P': curses.KEY_F1,
-            'Q': curses.KEY_F2,
-            'R': curses.KEY_F3,   # this 'f3' is rarely (ever?) transmitted
-            'S': curses.KEY_F4,
-        }.get(key_id)
-        # Extract event_type, default to 1 if not present
-        event_type = int(match.group('event')) if match.group('event') else 1
+    modifiers = int(match.group('mod'))
+    key_id = match.group('final')
+    matched_text = match.group(0)
+    event_type = int(match.group('event')) if match.group('event') else 1
 
-        if keycode_match is not None:
-            legacy_event = LegacyCSIKeyEvent(
-                kind=kind,
-                key_id=key_id,
-                modifiers=modifiers,
-                event_type=event_type)
-            return Keystroke(ucs=matched_text,
-                             code=keycode_match,
-                             mode=-3,  # mode=-3 for LegacyCSIModifier
-                             match=legacy_event)
+    keycode = CSI_FINAL_CHAR_TO_KEYCODE.get(key_id)
+    if keycode is None:
+        return None
 
-    # Try tilde form: ESC [ number ; modifiers ~
-    elif match_tilde:
-        kind = 'tilde'
-        modifiers = int(match_tilde.group('mod'))
-        key_id = int(match_tilde.group('key_num'))
-        matched_text = match_tilde.group(0)
-        # Extract event_type, default to 1 if not present
-        event_type = int(match_tilde.group('event')) if match_tilde.group('event') else 1
+    legacy_event = LegacyCSIKeyEvent(
+        kind='letter',
+        key_id=key_id,
+        modifiers=modifiers,
+        event_type=event_type)
 
-        # Map tilde key numbers to curses key codes, you can find a table of these here,
-        # https://tomscii.sig7.se/zutty/doc/KEYS.html and somewhat more completely, here:
-        # https://invisible-island.net/xterm/xterm-function-keys.html
-        keycode_match = {
-            2: curses.KEY_IC,       # Insert
-            3: curses.KEY_DC,       # Delete
-            5: curses.KEY_PPAGE,    # Page Up
-            6: curses.KEY_NPAGE,    # Page Down
-            7: curses.KEY_HOME,     # Home
-            8: curses.KEY_END,      # End
-            11: curses.KEY_F1,      # F1
-            12: curses.KEY_F2,      # ..
-            13: curses.KEY_F3,
-            14: curses.KEY_F4,
-            15: curses.KEY_F5,
-            17: curses.KEY_F6,
-            18: curses.KEY_F7,
-            19: curses.KEY_F8,
-            20: curses.KEY_F9,
-            21: curses.KEY_F10,
-            23: curses.KEY_F11,
-            24: curses.KEY_F12,
-            25: curses.KEY_F13,
-            26: curses.KEY_F14,
-            28: curses.KEY_F15,
-            29: KEY_MENU,
-            31: curses.KEY_F17,
-            32: curses.KEY_F18,
-            33: curses.KEY_F19,
-            34: curses.KEY_F20,
-        }.get(key_id)
+    return Keystroke(ucs=matched_text, code=keycode, mode=-3, match=legacy_event)
 
-        if keycode_match is not None:
-            legacy_event = LegacyCSIKeyEvent(
-                kind=kind,
-                key_id=key_id,
-                modifiers=modifiers,
-                event_type=event_type)
-            return Keystroke(ucs=matched_text,
-                             code=keycode_match,
-                             mode=-3,  # mode=-3 for LegacyCSIModifier
-                             match=legacy_event)
 
-    # Try SS3 F-key form: ESC O modifier [PQRS] (Konsole)
+def _match_legacy_csi_tilde_form(text: str) -> Optional[Keystroke]:
+    """
+    Match legacy CSI tilde form: ESC [ number ; modifiers ~.
+
+    :arg str text: Input text to match
+    :rtype: Keystroke or None
+    :returns: :class:`Keystroke` if matched, ``None`` otherwise
+
+    Handles function keys and navigation keys (Insert, Delete, Page Up/Down, etc.)
+    with modifiers. See https://tomscii.sig7.se/zutty/doc/KEYS.html and
+    https://invisible-island.net/xterm/xterm-function-keys.html for reference.
+    """
+    match = RE_PATTERN_LEGACY_CSI_TILDE.match(text)
+    if not match:
+        return None
+
+    modifiers = int(match.group('mod'))
+    key_id = int(match.group('key_num'))
+    matched_text = match.group(0)
+    event_type = int(match.group('event')) if match.group('event') else 1
+
+    keycode = CSI_TILDE_NUM_TO_KEYCODE.get(key_id)
+    if keycode is None:
+        return None
+
+    legacy_event = LegacyCSIKeyEvent(
+        kind='tilde',
+        key_id=key_id,
+        modifiers=modifiers,
+        event_type=event_type)
+
+    return Keystroke(ucs=matched_text, code=keycode, mode=-3, match=legacy_event)
+
+
+def _match_legacy_ss3_fkey_form(text: str) -> Optional[Keystroke]:
+    """
+    Match legacy SS3 F-key form: ESC O modifier [PQRS].
+
+    :arg str text: Input text to match
+    :rtype: Keystroke or None
+    :returns: :class:`Keystroke` if matched, ``None`` otherwise
+
+    Handles F1-F4 with modifiers in SS3 format (used by Konsole and others).
+    """
     match = RE_PATTERN_LEGACY_SS3_FKEYS.match(text)
-    if match:
-        matched_text = match.group(0)
-        modifiers = int(match.group('mod'))
-        final_char = match.group('final')
+    if not match:
+        return None
 
-        # Modifier 0 is invalid - modifiers start from 1 (no modifiers)
-        if modifiers == 0:
-            return None
+    modifiers = int(match.group('mod'))
+    final_char = match.group('final')
+    matched_text = match.group(0)
 
-        # Map SS3 F-key final characters to curses key codes
-        keycode_match = {
-            'P': curses.KEY_F1,     # F1
-            'Q': curses.KEY_F2,     # F2
-            'R': curses.KEY_F3,     # F3
-            'S': curses.KEY_F4,     # F4
-        }.get(final_char)
+    # Modifier 0 is invalid - modifiers start from 1 (no modifiers)
+    if modifiers == 0:
+        return None
 
-        if keycode_match is not None:
-            # SS3 form doesn't support event_type, default to 1 (press)
-            legacy_event = LegacyCSIKeyEvent(
-                kind='ss3-fkey',
-                key_id=final_char,
-                modifiers=modifiers,
-                event_type=1)
-            return Keystroke(ucs=matched_text, code=keycode_match, mode=-3, match=legacy_event)
+    keycode = SS3_FKEY_TO_KEYCODE.get(final_char)
+    if keycode is None:
+        return None
 
-    return None
+    # SS3 form doesn't support event_type, default to 1 (press)
+    legacy_event = LegacyCSIKeyEvent(
+        kind='ss3-fkey',
+        key_id=final_char,
+        modifiers=modifiers,
+        event_type=1)
+
+    return Keystroke(ucs=matched_text, code=keycode, mode=-3, match=legacy_event)
 
 
 # We invent a few to fixup for missing keys in curses, these aren't especially
@@ -1190,6 +1165,63 @@ KEY_KP_7 = 527
 KEY_KP_8 = 528
 KEY_KP_9 = 529
 KEY_MENU = 530
+
+#: Legacy CSI modifier sequence mappings
+#: Maps CSI final characters to curses keycodes for sequences
+#: like ESC [ 1 ; mod [ABCDEFHPQRS]
+CSI_FINAL_CHAR_TO_KEYCODE = {
+    'A': curses.KEY_UP,
+    'B': curses.KEY_DOWN,
+    'C': curses.KEY_RIGHT,
+    'D': curses.KEY_LEFT,
+    'E': curses.KEY_B2,      # Center/Begin
+    'F': curses.KEY_END,
+    'H': curses.KEY_HOME,
+    'P': curses.KEY_F1,
+    'Q': curses.KEY_F2,
+    'R': curses.KEY_F3,
+    'S': curses.KEY_F4,
+}
+
+#: Maps CSI tilde numbers to curses keycodes for sequences
+#: like ESC [ num ; mod ~
+CSI_TILDE_NUM_TO_KEYCODE = {
+    2: curses.KEY_IC,        # Insert
+    3: curses.KEY_DC,        # Delete
+    5: curses.KEY_PPAGE,     # Page Up
+    6: curses.KEY_NPAGE,     # Page Down
+    7: curses.KEY_HOME,      # Home
+    8: curses.KEY_END,       # End
+    11: curses.KEY_F1,       # F1
+    12: curses.KEY_F2,       # F2
+    13: curses.KEY_F3,       # F3
+    14: curses.KEY_F4,       # F4
+    15: curses.KEY_F5,       # F5
+    17: curses.KEY_F6,       # F6
+    18: curses.KEY_F7,       # F7
+    19: curses.KEY_F8,       # F8
+    20: curses.KEY_F9,       # F9
+    21: curses.KEY_F10,      # F10
+    23: curses.KEY_F11,      # F11
+    24: curses.KEY_F12,      # F12
+    25: curses.KEY_F13,      # F13
+    26: curses.KEY_F14,      # F14
+    28: curses.KEY_F15,      # F15
+    29: KEY_MENU,            # Menu
+    31: curses.KEY_F17,      # F17
+    32: curses.KEY_F18,      # F18
+    33: curses.KEY_F19,      # F19
+    34: curses.KEY_F20,      # F20
+}
+
+#: Maps SS3 final characters to curses keycodes for sequences
+#: like ESC O mod [PQRS]
+SS3_FKEY_TO_KEYCODE = {
+    'P': curses.KEY_F1,      # F1
+    'Q': curses.KEY_F2,      # F2
+    'R': curses.KEY_F3,      # F3
+    'S': curses.KEY_F4,      # F4
+}
 
 #: In a perfect world, terminal emulators would always send exactly what
 #: the terminfo(5) capability database plans for them, accordingly by the
@@ -1237,24 +1269,24 @@ DEFAULT_SEQUENCE_MIXIN = (
     # http://fossies.org/linux/rxvt/doc/rxvtRef.html#KeyCodes
     #
     # keypad, numlock on
-    ("\x1bOM", curses.KEY_ENTER),  # noqa return
-    ("\x1bOj", KEY_KP_MULTIPLY),   # noqa *  # pylint: disable=undefined-variable
-    ("\x1bOk", KEY_KP_ADD),        # noqa +  # pylint: disable=undefined-variable
-    ("\x1bOl", KEY_KP_SEPARATOR),  # noqa ,  # pylint: disable=undefined-variable
-    ("\x1bOm", KEY_KP_SUBTRACT),   # noqa -  # pylint: disable=undefined-variable
-    ("\x1bOn", KEY_KP_DECIMAL),    # noqa .  # pylint: disable=undefined-variable
-    ("\x1bOo", KEY_KP_DIVIDE),     # noqa /  # pylint: disable=undefined-variable
-    ("\x1bOX", KEY_KP_EQUAL),      # noqa =  # pylint: disable=undefined-variable
-    ("\x1bOp", KEY_KP_0),          # noqa 0  # pylint: disable=undefined-variable
-    ("\x1bOq", KEY_KP_1),          # noqa 1  # pylint: disable=undefined-variable
-    ("\x1bOr", KEY_KP_2),          # noqa 2  # pylint: disable=undefined-variable
-    ("\x1bOs", KEY_KP_3),          # noqa 3  # pylint: disable=undefined-variable
-    ("\x1bOt", KEY_KP_4),          # noqa 4  # pylint: disable=undefined-variable
-    ("\x1bOu", KEY_KP_5),          # noqa 5  # pylint: disable=undefined-variable
-    ("\x1bOv", KEY_KP_6),          # noqa 6  # pylint: disable=undefined-variable
-    ("\x1bOw", KEY_KP_7),          # noqa 7  # pylint: disable=undefined-variable
-    ("\x1bOx", KEY_KP_8),          # noqa 8  # pylint: disable=undefined-variable
-    ("\x1bOy", KEY_KP_9),          # noqa 9  # pylint: disable=undefined-variable
+    ("\x1bOM", curses.KEY_ENTER),
+    ("\x1bOj", KEY_KP_MULTIPLY),
+    ("\x1bOk", KEY_KP_ADD),
+    ("\x1bOl", KEY_KP_SEPARATOR),
+    ("\x1bOm", KEY_KP_SUBTRACT),
+    ("\x1bOn", KEY_KP_DECIMAL),
+    ("\x1bOo", KEY_KP_DIVIDE),
+    ("\x1bOX", KEY_KP_EQUAL),
+    ("\x1bOp", KEY_KP_0),
+    ("\x1bOq", KEY_KP_1),
+    ("\x1bOr", KEY_KP_2),
+    ("\x1bOs", KEY_KP_3),
+    ("\x1bOt", KEY_KP_4),
+    ("\x1bOu", KEY_KP_5),
+    ("\x1bOv", KEY_KP_6),
+    ("\x1bOw", KEY_KP_7),
+    ("\x1bOx", KEY_KP_8),
+    ("\x1bOy", KEY_KP_9),
 
     # keypad, numlock off
     ("\x1b[1~", curses.KEY_FIND),         # find
