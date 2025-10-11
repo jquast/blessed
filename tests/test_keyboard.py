@@ -389,6 +389,7 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
         assert resolve("\x1b[B").name == "KEY_DOWN"
         assert resolve("\x1b[C").name == "KEY_RIGHT"
         assert resolve("\x1b[D").name == "KEY_LEFT"
+        assert resolve("\x1b[E").name == "KEY_CENTER"
         assert resolve("\x1b[U").name == "KEY_PGDOWN"
         assert resolve("\x1b[V").name == "KEY_PGUP"
         assert resolve("\x1b[H").name == "KEY_HOME"

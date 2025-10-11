@@ -6,7 +6,7 @@ import re
 import time
 import typing
 import platform
-from typing import Set, Dict, Match, Tuple, TypeVar, Optional
+from typing import TYPE_CHECKING, Set, Dict, Match, Tuple, TypeVar, Optional
 from collections import OrderedDict, namedtuple
 
 if TYPE_CHECKING:  # pragma: no cover

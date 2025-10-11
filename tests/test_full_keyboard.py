@@ -201,7 +201,7 @@ def test_keystroke_0s_cbreak_with_input():
 
     with echo_off(master_fd):
         os.write(master_fd, SEND_SEMAPHORE)
-        os.write(master_fd, 'x'.encode('ascii'))
+        os.write(master_fd, b'x')
         read_until_semaphore(master_fd)
         stime = time.time()
         output = read_until_eof(master_fd)
@@ -236,13 +236,13 @@ def test_keystroke_cbreak_with_input_slowly():
 
     with echo_off(master_fd):
         os.write(master_fd, SEND_SEMAPHORE)
-        os.write(master_fd, 'a'.encode('ascii'))
+        os.write(master_fd, b'a')
         time.sleep(0.1)
-        os.write(master_fd, 'b'.encode('ascii'))
+        os.write(master_fd, b'b')
         time.sleep(0.1)
-        os.write(master_fd, 'cdefgh'.encode('ascii'))
+        os.write(master_fd, b'cdefgh')
         time.sleep(0.1)
-        os.write(master_fd, 'X'.encode('ascii'))
+        os.write(master_fd, b'X')
         read_until_semaphore(master_fd)
         stime = time.time()
         output = read_until_eof(master_fd)
@@ -472,7 +472,7 @@ def test_esc_delay_cbreak_nonprefix_sequence():
     with echo_off(master_fd):
         read_until_semaphore(master_fd)
         stime = time.time()
-        os.write(master_fd, '\x1ba'.encode('ascii'))
+        os.write(master_fd, b'\x1b[a')
         key_name, duration_ms = read_until_eof(master_fd).split()
 
     pid, status = os.waitpid(pid, 0)

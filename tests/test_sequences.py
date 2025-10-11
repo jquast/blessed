@@ -4,6 +4,7 @@
 import sys
 import platform
 from io import StringIO
+from unittest import mock
 
 # 3rd party
 import pytest
@@ -11,13 +12,6 @@ import pytest
 # local
 from .conftest import IS_WINDOWS
 from .accessories import MockTigetstr, TestTerminal, unicode_cap, unicode_parm, as_subprocess
-
-try:
-    # std imports
-    from unittest import mock
-except ImportError:
-    # 3rd party
-    import mock
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="requires real tty")
