@@ -7,7 +7,6 @@ import os
 import platform
 import sys
 import tempfile
-import functools
 from unittest import mock
 
 # 3rd party
@@ -79,25 +78,12 @@ def test_stdout_notty_kb_is_None():
                 lambda fd: False if fd == sys.__stdout__.fileno() else isatty(fd))
             term = TestTerminal()
             assert term._keyboard_fd is None
-            assert 'Output stream is not a TTY' in term.errors
+            assert any(['stream not a TTY' in err
+                        for err in term.errors]), term.errors
     child()
 
 
-def test_stdin_notty_kb_is_None():
-    """term._keyboard_fd should be None when os.isatty returns False for stdin."""
-    @as_subprocess
-    def child():
-        isatty = os.isatty
-        with mock.patch('os.isatty') as mock_isatty:
-            mock_isatty.side_effect = (
-                lambda fd: False if fd == sys.__stdin__.fileno() else isatty(fd)
-            )
-            term = TestTerminal()
-            assert term._keyboard_fd is None
-    child()
-
-
-def test_stdin_redirect():
+def test_stdin_fileno_is_None():
     """term._keyboard_fd should be None when stdin.fileno() raises an exception."""
     @as_subprocess
     def child():
@@ -105,7 +91,22 @@ def test_stdin_redirect():
             mock_fileno.side_effect = ValueError('fileno is not implemented on this stream')
             term = TestTerminal()
             assert term._keyboard_fd is None
-            assert 'Output stream is not a TTY' in term.errors
+            assert any(['fileno is not implemented on this stream' in err
+                        for err in term.errors])
+    child()
+
+
+def test_stdin_as_bytesio_is_None():
+    """term._keyboard_fd should be None when sys.__stdin__.fileno() raises exception."""
+    # In this scenario, stream is sys.__stdout__, but sys.__stdin__ is BytesIO
+    # This may happen in a test scenario or when the program is wrapped in another interface
+    @as_subprocess
+    def child():
+        with mock.patch('sys.__stdin__', new=io.BytesIO()):
+            term = TestTerminal()
+            assert term._keyboard_fd is None
+            assert any([err.startswith('Unable to determine input stream file descriptor')
+                        for err in term.errors])
     child()
 
 
@@ -126,22 +127,6 @@ def test_stdin_notty_kb_is_None():
             term = TestTerminal()
             assert term._keyboard_fd is None
             assert 'Input stream is not a TTY' in term.errors
-    child()
-
-
-def test_stdin_redirect():
-    """term._keyboard_fd should be None when oys.__stdin__.fileno() raises exception."""
-    # In this scenario, stream is sys.__stdout__, but sys.__stdin__ is BytesIO
-    # This may happen in a test scenario or when the program is wrapped in another interface
-    @as_subprocess
-    def child():
-        with mock.patch('sys.__stdin__', new=io.BytesIO()):
-            term = TestTerminal()
-            assert term._keyboard_fd is None
-            assert any(
-                entry.startswith('Unable to determine input stream file descriptor')
-                for entry in term.errors
-            )
     child()
 
 
@@ -178,11 +163,16 @@ def test_get_keyboard_codes():
     # local
     import blessed.keyboard
     exemptions = dict(blessed.keyboard.CURSES_KEYCODE_OVERRIDE_MIXIN)
+    # List of homemade keycodes that are not in curses
+    homemade_keycodes = ('TAB', 'KP_MULTIPLY', 'KP_ADD', 'KP_SEPARATOR',
+                         'KP_SUBTRACT', 'KP_DECIMAL', 'KP_DIVIDE', 'KP_EQUAL',
+                         'KP_0', 'KP_1', 'KP_2', 'KP_3', 'KP_4', 'KP_5',
+                         'KP_6', 'KP_7', 'KP_8', 'KP_9', 'MENU')
     for value, keycode in blessed.keyboard.get_keyboard_codes().items():
         if keycode in exemptions:
             assert value == exemptions[keycode]
             continue
-        if keycode[4:] in blessed.keyboard._CURSES_KEYCODE_ADDINS:
+        if keycode[4:] in homemade_keycodes:
             assert not hasattr(curses, keycode)
             assert hasattr(blessed.keyboard, keycode)
             assert getattr(blessed.keyboard, keycode) == value
@@ -435,7 +425,6 @@ def test_keypad_mixins_and_aliases():  # pylint: disable=too-many-statements
     child('xterm')
 
 
-@pytest.mark.skipif(IS_WINDOWS, reason="no multiprocess")
 def test_kp_begin_center_key():
     """Test KP_BEGIN/center key (numpad 5) with modifiers and event types."""
     @as_subprocess
@@ -463,27 +452,6 @@ def test_kp_begin_center_key():
         assert ks is not None
         assert ks.code == curses.KEY_B2
         assert ks.name == 'KEY_CTRL_ALT_CENTER'
-
-        # With event type - release (the original issue case)
-        ks = _match_legacy_csi_modifiers('\x1b[1;1:3E')
-        assert ks is not None
-        assert ks.code == curses.KEY_B2
-        assert ks.released
-        assert ks.name == 'KEY_CENTER_RELEASED'
-
-        # With event type - repeat
-        ks = _match_legacy_csi_modifiers('\x1b[1;1:2E')
-        assert ks is not None
-        assert ks.code == curses.KEY_B2
-        assert ks.repeated
-        assert ks.name == 'KEY_CENTER_REPEATED'
-
-        # With modifiers and event type
-        ks = _match_legacy_csi_modifiers('\x1b[1;5:3E')
-        assert ks is not None
-        assert ks.code == curses.KEY_B2
-        assert ks.released
-        assert ks.name == 'KEY_CTRL_CENTER_RELEASED'
 
     child()
 
@@ -518,3 +486,28 @@ def test_ESCDELAY_10ms():
     blessed.keyboard._reinit_escdelay()
     assert blessed.keyboard.DEFAULT_ESCDELAY == 1.234
     del os.environ['ESCDELAY']
+
+
+# ============================================================================
+# Superfluous tests - targeting internal implementation details or unrealistic
+# edge cases not reachable through normal public API usage
+# ============================================================================
+
+
+def test_superfluous_keystroke_high_byte_metasendsescape():
+    """Test ESC + high-byte character (> 126) defaults to no modifiers.
+
+    Superfluous: Tests specific internal branch for chars >126 to reach
+    default modifiers return path. Not typical terminal usage.
+    """
+    from blessed.keyboard import Keystroke
+
+    # ESC + character with code > 126 (not printable ASCII)
+    # This doesn't fit into any of the special cases, so returns modifiers=1
+    ks = Keystroke('\x1b\x80')  # ESC + char with code 128
+    assert ks.modifiers == 1  # No modifiers detected (default)
+    assert len(ks) == 2
+
+    # Another high byte
+    ks = Keystroke('\x1b\xff')  # ESC + char with code 255
+    assert ks.modifiers == 1  # No modifiers detected (default)

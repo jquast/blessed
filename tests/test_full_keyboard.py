@@ -24,7 +24,8 @@ from .accessories import (SEMAPHORE,
                           as_subprocess,
                           read_until_eof,
                           read_until_semaphore,
-                          init_subproc_coverage)
+                          init_subproc_coverage,
+                          pty_test)
 
 got_sigwinch = False
 
@@ -36,7 +37,7 @@ pytestmark = pytest.mark.skipif(
 def assert_elapsed_range(start_time, min_ms, max_ms):
     """Assert that elapsed time in milliseconds is within range."""
     elapsed_ms = (time.time() - start_time) * 100
-    assert min_ms <= int(elapsed_ms) <= max_ms, f"elapsed: {int(elapsed_ms)}ms"
+    assert min_ms <= int(elapsed_ms) <= max_ms
 
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
@@ -182,33 +183,21 @@ def test_keystroke_cbreak_noinput(use_stream, timeout, expected_cs_range):
 
 def test_keystroke_0s_cbreak_with_input():
     """0-second keystroke with input; Keypress should be immediately returned."""
-    # std imports
-    import pty
-    pid, master_fd = pty.fork()
-    if pid == 0:
-        cov = init_subproc_coverage('test_keystroke_0s_cbreak_with_input')
-        # child pauses, writes semaphore and begins awaiting input
-        term = TestTerminal()
+    def child(term):
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             inp = term.inkey(timeout=0)
-            os.write(sys.__stdout__.fileno(), inp.encode('utf-8'))
-        if cov is not None:
-            cov.stop()
-            cov.save()
-        os._exit(0)
+            return inp.encode('utf-8')
 
-    with echo_off(master_fd):
+    def parent(master_fd):
         os.write(master_fd, SEND_SEMAPHORE)
         os.write(master_fd, b'x')
         read_until_semaphore(master_fd)
-        stime = time.time()
-        output = read_until_eof(master_fd)
 
-    pid, status = os.waitpid(pid, 0)
+    stime = time.time()
+    output = pty_test(child, parent, 'test_keystroke_0s_cbreak_with_input')
     assert output == 'x'
-    assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
 
 
@@ -256,31 +245,21 @@ def test_keystroke_cbreak_with_input_slowly():
 def test_keystroke_0s_cbreak_multibyte_utf8():
     """0-second keystroke with multibyte utf-8 input; should decode immediately."""
     # utf-8 bytes represent "latin capital letter upsilon".
-    # std imports
-    import pty
-    pid, master_fd = pty.fork()
-    if pid == 0:  # child
-        cov = init_subproc_coverage('test_keystroke_0s_cbreak_multibyte_utf8')
-        term = TestTerminal()
+    def child(term):
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             inp = term.inkey(timeout=0)
-            os.write(sys.__stdout__.fileno(), inp.encode('utf-8'))
-        if cov is not None:
-            cov.stop()
-            cov.save()
-        os._exit(0)
+            return inp.encode('utf-8')
 
-    with echo_off(master_fd):
+    def parent(master_fd):
         os.write(master_fd, SEND_SEMAPHORE)
         os.write(master_fd, '\u01b1'.encode('utf-8'))
         read_until_semaphore(master_fd)
-        stime = time.time()
-        output = read_until_eof(master_fd)
-    pid, status = os.waitpid(pid, 0)
+
+    stime = time.time()
+    output = pty_test(child, parent, 'test_keystroke_0s_cbreak_multibyte_utf8')
     assert output == 'Ʊ'
-    assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
 
 
@@ -324,30 +303,19 @@ def test_keystroke_0s_raw_input_ctrl_c():
 
 def test_keystroke_0s_cbreak_sequence():
     """0-second keystroke with multibyte sequence; should decode immediately."""
-    # std imports
-    import pty
-    pid, master_fd = pty.fork()
-    if pid == 0:  # child
-        cov = init_subproc_coverage('test_keystroke_0s_cbreak_sequence')
-        term = TestTerminal()
+    def child(term):
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             inp = term.inkey(timeout=0)
-            os.write(sys.__stdout__.fileno(), inp.name.encode('ascii'))
-            sys.stdout.flush()
-        if cov is not None:
-            cov.stop()
-            cov.save()
-        os._exit(0)
+            return inp.name.encode('ascii')
 
-    with echo_off(master_fd):
+    def parent(master_fd):
         os.write(master_fd, '\x1b[D'.encode('ascii'))
         read_until_semaphore(master_fd)
-        stime = time.time()
-        output = read_until_eof(master_fd)
-    pid, status = os.waitpid(pid, 0)
+
+    stime = time.time()
+    output = pty_test(child, parent, 'test_keystroke_0s_cbreak_sequence')
     assert output == 'KEY_LEFT'
-    assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
 
 
@@ -472,7 +440,7 @@ def test_esc_delay_cbreak_nonprefix_sequence():
     with echo_off(master_fd):
         read_until_semaphore(master_fd)
         stime = time.time()
-        os.write(master_fd, b'\x1b[a')
+        os.write(master_fd, b'\x1ba')
         key_name, duration_ms = read_until_eof(master_fd).split()
 
     pid, status = os.waitpid(pid, 0)
@@ -724,3 +692,147 @@ def test_detached_stdout():
     pid, status = os.waitpid(pid, 0)
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
+
+
+def test_read_until_pattern_found():
+    """Test _read_until when pattern is found in input stream."""
+    def child(term):
+        from blessed.keyboard import _read_until
+        with term.cbreak():
+            # This will test the match found branch (959->961)
+            match, buf = _read_until(term, r'\d+;\d+R', timeout=1.0)
+            # Verify we got a match
+            assert match is not None
+            return b'MATCH_FOUND'
+
+    def parent(master_fd):
+        # Write a pattern that will match
+        time.sleep(0.05)
+        os.write(master_fd, b'\x1b[10;20R')
+
+    output = pty_test(child, parent, 'test_read_until_pattern_found')
+    assert output == 'MATCH_FOUND'
+
+
+def test_read_until_timeout_no_match():
+    """Test _read_until when timeout occurs without pattern match."""
+    def child(term):
+        from blessed.keyboard import _read_until
+        with term.cbreak():
+            # This will test the timeout branch (963->965)
+            stime = time.time()
+            match, buf = _read_until(term, r'\d+;\d+R', timeout=0.1)
+            elapsed = time.time() - stime
+            # Verify timeout occurred
+            assert match is None
+            assert 0.08 <= elapsed <= 0.15
+            return b'TIMEOUT'
+
+    # Parent doesn't write any matching pattern - let it timeout
+    output = pty_test(child, parent_func=None, test_name='test_read_until_timeout_no_match')
+    assert output == 'TIMEOUT'
+
+
+def test_read_until_buffer_aggregation():
+    """Test _read_until buffer aggregation with hot keyboard input."""
+    import pty
+    pid, master_fd = pty.fork()
+    if pid == 0:
+        cov = init_subproc_coverage('test_read_until_buffer_aggregation')
+        from blessed.keyboard import _read_until
+        term = TestTerminal()
+
+        with term.cbreak():
+            # This will test the buffer aggregation loop (954->958)
+            match, buf = _read_until(term, r'END', timeout=1.0)
+
+            # Verify we got the full buffered content
+            assert match is not None
+            assert 'END' in buf
+            os.write(sys.__stdout__.fileno(), b'AGGREGATED')
+
+        if cov is not None:
+            cov.stop()
+            cov.save()
+        os._exit(0)
+
+    with echo_off(master_fd):
+        # Write data in rapid succession to trigger buffer aggregation
+        os.write(master_fd, b'abc')
+        os.write(master_fd, b'def')
+        os.write(master_fd, b'ghi')
+        os.write(master_fd, b'END')
+        time.sleep(0.05)
+        output = read_until_eof(master_fd)
+
+    pid, status = os.waitpid(pid, 0)
+    assert output == 'AGGREGATED'
+    assert os.WEXITSTATUS(status) == 0
+
+
+def test_read_until_with_none_timeout():
+    """Test _read_until with None timeout (blocks indefinitely until match)."""
+    import pty
+    pid, master_fd = pty.fork()
+    if pid == 0:
+        cov = init_subproc_coverage('test_read_until_with_none_timeout')
+        from blessed.keyboard import _read_until
+        term = TestTerminal()
+
+        with term.cbreak():
+            # This tests the timeout=None path
+            match, buf = _read_until(term, r'DONE', timeout=None)
+
+            assert match is not None
+            os.write(sys.__stdout__.fileno(), b'NONE_TIMEOUT')
+
+        if cov is not None:
+            cov.stop()
+            cov.save()
+        os._exit(0)
+
+    with echo_off(master_fd):
+        # Write matching pattern after short delay
+        time.sleep(0.05)
+        os.write(master_fd, b'DONE')
+        time.sleep(0.05)
+        output = read_until_eof(master_fd)
+
+    pid, status = os.waitpid(pid, 0)
+    assert output == 'NONE_TIMEOUT'
+    assert os.WEXITSTATUS(status) == 0
+
+
+def test_read_until_loop_continuation():
+    """Test _read_until loop continuation when pattern not yet matched."""
+    import pty
+    pid, master_fd = pty.fork()
+    if pid == 0:
+        cov = init_subproc_coverage('test_read_until_loop_continuation')
+        from blessed.keyboard import _read_until
+        term = TestTerminal()
+
+        with term.cbreak():
+            # Send partial data first, then complete pattern
+            # This tests the loop continuation (963->946)
+            match, buf = _read_until(term, r'COMPLETE', timeout=1.0)
+
+            assert match is not None
+            os.write(sys.__stdout__.fileno(), b'LOOP_CONTINUED')
+
+        if cov is not None:
+            cov.stop()
+            cov.save()
+        os._exit(0)
+
+    with echo_off(master_fd):
+        # Write partial data, then rest after delay
+        os.write(master_fd, b'COM')
+        time.sleep(0.05)
+        os.write(master_fd, b'PLETE')
+        time.sleep(0.05)
+        output = read_until_eof(master_fd)
+
+    pid, status = os.waitpid(pid, 0)
+    assert output == 'LOOP_CONTINUED'
+    assert os.WEXITSTATUS(status) == 0

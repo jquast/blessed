@@ -216,6 +216,91 @@ def unicode_parm(cap, *parms):
     return ''
 
 
+def pty_test(child_func, parent_func=None, test_name=None):
+    """
+    Wrapper for PTY-based tests to reduce boilerplate.
+
+    Handles the common pattern of forking a PTY, running test code in the child
+    process with coverage tracking, and optionally running parent-side code.
+
+    Args:
+        child_func: Function to run in child process. Receives a TestTerminal instance.
+                   Should return bytes/str to write to stdout, or None.
+        parent_func: Optional function to run in parent. Receives master_fd.
+        test_name: Optional name for coverage tracking. Auto-derived from child_func if None.
+
+    Returns:
+        str: Output from child process (everything written to stdout)
+
+    Example:
+        def test_something():
+            def child(term):
+                with term.cbreak():
+                    inp = term.inkey(timeout=0)
+                    return inp.encode('utf-8')
+
+            def parent(master_fd):
+                os.write(master_fd, b'x')
+
+            output = pty_test(child, parent)
+            assert output == 'x'
+    """
+    if IS_WINDOWS:
+        # On Windows, just run child_func directly without PTY
+        term = TestTerminal()
+        result = child_func(term)
+        return result.decode('utf-8') if isinstance(result, bytes) else (result or '')
+
+    import pty as pty_module  # pylint: disable=import-outside-toplevel
+
+    if test_name is None:
+        test_name = getattr(child_func, '__name__', 'pty_test')
+
+    pid, master_fd = pty_module.fork()
+
+    if pid == 0:  # Child process
+        cov = init_subproc_coverage(test_name)
+        try:
+            term = TestTerminal()
+            result = child_func(term)
+
+            # Write result to stdout if provided
+            if result is not None:
+                if isinstance(result, str):
+                    result = result.encode('utf-8')
+                os.write(sys.__stdout__.fileno(), result)
+        except Exception:  # pylint: disable=broad-except
+            # Write exception to stdout for debugging
+            e_type, e_value, e_tb = sys.exc_info()
+            o_err = [line.rstrip().encode('utf-8') for line in traceback.format_tb(e_tb)]
+            o_err.append(('-=' * 20).encode('ascii'))
+            o_err.extend([_exc.rstrip().encode('utf-8') for _exc in
+                          traceback.format_exception_only(e_type, e_value)])
+            os.write(sys.__stdout__.fileno(), b'\n'.join(o_err))
+            if cov is not None:
+                cov.stop()
+                cov.save()
+            os._exit(1)
+
+        if cov is not None:
+            cov.stop()
+            cov.save()
+        os._exit(0)
+
+    # Parent process
+    with echo_off(master_fd):
+        if parent_func is not None:
+            parent_func(master_fd)
+        output = read_until_eof(master_fd)
+
+    pid, status = os.waitpid(pid, 0)
+    assert os.WEXITSTATUS(status) == 0, (
+            f"Child process exited with status {os.WEXITSTATUS(status)}",
+            f"Output from child: {output}")
+
+    return output
+
+
 class MockTigetstr():  # pylint: disable=too-few-public-methods
     """
     Wraps curses.tigetstr() to override specific capnames
@@ -229,3 +314,57 @@ class MockTigetstr():  # pylint: disable=too-few-public-methods
 
     def __call__(self, capname):
         return self.kwargs.get(capname, self.callable(capname))
+
+
+# ============================================================================
+# Keystroke assertion helpers
+# ============================================================================
+
+def assert_modifiers(ks, ctrl=False, alt=False, shift=False, super=False):
+    """Assert keystroke modifier flags match expected values."""
+    assert ks._ctrl is ctrl
+    assert ks._alt is alt
+    assert ks._shift is shift
+    if super is not None:
+        assert ks._super is super
+
+
+def assert_modifiers_value(ks, modifiers):
+    """Assert keystroke modifier integer values (modifiers_bits is auto-calculated)."""
+    assert ks.modifiers == modifiers
+    expected_bits = max(0, modifiers - 1)
+    assert ks.modifiers_bits == expected_bits
+
+
+def assert_only_modifiers(ks, *modifiers):
+    """Assert keystroke has only the specified modifiers.
+
+    Args:
+        ks: The keystroke to check
+        *modifiers: Variable number of modifier names ('ctrl', 'alt', 'shift')
+
+    Examples:
+        assert_only_modifiers(ks, 'alt')           # Alt only
+        assert_only_modifiers(ks, 'ctrl')          # Ctrl only
+        assert_only_modifiers(ks, 'shift')         # Shift only
+        assert_only_modifiers(ks, 'ctrl', 'alt')   # Ctrl+Alt
+    """
+    # Import KittyModifierBits to avoid magic numbers
+    from blessed.keyboard import KittyModifierBits
+
+    # Convert modifiers to a set for easy lookup
+    modifier_set = set(mod.lower() for mod in modifiers)
+
+    # Calculate expected bits using getattr - naturally validates modifier names
+    expected_bits = 0
+    for modifier in modifier_set:
+        expected_bits |= getattr(KittyModifierBits, modifier)
+
+    expected_modifiers = expected_bits + 1
+
+    # Build modifier flags for assert_modifiers using getattr
+    modifier_flags = {mod: mod in modifier_set for mod in ('ctrl', 'alt', 'shift')}
+
+    # Assert using existing helper functions
+    assert_modifiers_value(ks, modifiers=expected_modifiers)
+    assert_modifiers(ks, **modifier_flags)
