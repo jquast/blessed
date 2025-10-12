@@ -383,16 +383,6 @@ class Keystroke(str):
         return bool(self.modifiers_bits & KittyModifierBits.meta)
 
     @property
-    def _caps_lock(self) -> bool:
-        """Whether caps lock was known to be active during this sequence."""
-        return bool(self.modifiers_bits & KittyModifierBits.caps_lock)
-
-    @property
-    def _num_lock(self) -> bool:
-        """Whether num lock was known to be active during this sequence."""
-        return bool(self.modifiers_bits & KittyModifierBits.num_lock)
-
-    @property
     def pressed(self) -> bool:
         """
         Whether this is a key press event.
