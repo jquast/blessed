@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Accessories for automated py.test runner."""
 
 # std imports
@@ -271,6 +270,7 @@ def pty_test(child_func, parent_func=None, test_name=None):
             output = pty_test(child, parent)
             assert output == 'x'
     """
+    # pylint: disable=too-complex
     if IS_WINDOWS:
         # On Windows, just run child_func directly without PTY
         term = TestTerminal()
@@ -343,8 +343,8 @@ def pty_test(child_func, parent_func=None, test_name=None):
         time.sleep(0.05)  # Poll every 50ms
 
     assert os.WEXITSTATUS(status) == 0, (
-            f"Child process exited with status {os.WEXITSTATUS(status)}",
-            f"Output from child: {output}")
+        f"Child process exited with status {os.WEXITSTATUS(status)}",
+        f"Output from child: {output}")
 
     return output
 
@@ -393,6 +393,7 @@ def assert_only_modifiers(ks, *modifiers):
         assert_only_modifiers(ks, 'shift')         # Shift only
         assert_only_modifiers(ks, 'ctrl', 'alt')   # Ctrl+Alt
     """
+    # pylint: disable=missing-type-doc
     # Import KittyModifierBits to avoid magic numbers
     from blessed.keyboard import KittyModifierBits
 

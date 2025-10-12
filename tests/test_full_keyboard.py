@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """More advanced tests for capturing keyboard input, sometimes using pty"""
 
 # std imports
@@ -700,7 +699,7 @@ def test_read_until_pattern_found():
         from blessed.keyboard import _read_until
         with term.cbreak():
             # This will test the match found branch (959->961)
-            match, buf = _read_until(term, r'\d+;\d+R', timeout=1.0)
+            match, _ = _read_until(term, r'\d+;\d+R', timeout=1.0)
             # Verify we got a match
             assert match is not None
             return b'MATCH_FOUND'
@@ -721,7 +720,7 @@ def test_read_until_timeout_no_match():
         with term.cbreak():
             # This will test the timeout branch (963->965)
             stime = time.time()
-            match, buf = _read_until(term, r'\d+;\d+R', timeout=0.1)
+            match, _ = _read_until(term, r'\d+;\d+R', timeout=0.1)
             elapsed = time.time() - stime
             # Verify timeout occurred
             assert match is None
@@ -781,7 +780,7 @@ def test_read_until_with_none_timeout():
 
         with term.cbreak():
             # This tests the timeout=None path
-            match, buf = _read_until(term, r'DONE', timeout=None)
+            match, _ = _read_until(term, r'DONE', timeout=None)
 
             assert match is not None
             os.write(sys.__stdout__.fileno(), b'NONE_TIMEOUT')
@@ -815,7 +814,7 @@ def test_read_until_loop_continuation():
         with term.cbreak():
             # Send partial data first, then complete pattern
             # This tests the loop continuation (963->946)
-            match, buf = _read_until(term, r'COMPLETE', timeout=1.0)
+            match, _ = _read_until(term, r'COMPLETE', timeout=1.0)
 
             assert match is not None
             os.write(sys.__stdout__.fileno(), b'LOOP_CONTINUED')

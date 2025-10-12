@@ -36,10 +36,10 @@ LegacyCSIKeyEvent = namedtuple('LegacyCSIKeyEvent', 'kind key_id modifiers event
 RE_PATTERN_LEGACY_CSI_MODIFIERS = re.compile(
     r'\x1b\[1;(?P<mod>\d+)(?::(?P<event>\d+))?(?P<final>[ABCDEFHPQRS])')
 RE_PATTERN_LEGACY_CSI_TILDE = re.compile(
-        r'\x1b\[(?P<key_num>\d+);(?P<mod>\d+)(?::(?P<event>\d+))?~')
+    r'\x1b\[(?P<key_num>\d+);(?P<mod>\d+)(?::(?P<event>\d+))?~')
 RE_PATTERN_LEGACY_SS3_FKEYS = re.compile(r'\x1bO(?P<mod>\d)(?P<final>[PQRS])')
 RE_PATTERN_MODIFY_OTHER = re.compile(
-        r'\x1b\[27;(?P<modifiers>\d+);(?P<key>\d+)(?P<tilde>~?)')
+    r'\x1b\[27;(?P<modifiers>\d+);(?P<key>\d+)(?P<tilde>~?)')
 
 # Control character mappings
 # Note: Ctrl+Space (code 0) is handled specially as 'SPACE', not included here
@@ -283,7 +283,7 @@ class Keystroke(str):
 
     @property
     def name(self) -> Optional[str]:
-        """
+        r"""
         Special application key name.
 
         This is the best equality attribute to use for special keys, as raw string value of the 'F1'
@@ -531,7 +531,6 @@ class Keystroke(str):
             For event predicates and application key predicates, these
             parameters are accepted but not used.
         """
-        # pylint: disable=too-many-locals,too-complex
         # Check if this is a property in the class (str subclasses have special lookup behavior)
         for klass in type(self).__mro__:
             if attr in klass.__dict__:
@@ -603,12 +602,10 @@ class Keystroke(str):
         """
         Get value for Alt+printable sequences (ESC + char).
 
-        Returns the printable character from Alt sequences, except for space. Alt+Space returns
-        empty string to distinguish it from plain space.
+        Returns the printable character from Alt sequences.
         """
         if (len(self) == 2 and self[0] == '\x1b' and
-                self._alt and not self._ctrl and self[1].isprintable() and
-                self[1] != ' '):  # Exclude space - Alt+Space returns empty string
+                self._alt and not self._ctrl and self[1].isprintable()):
             return self[1]  # Return as-is (preserves case and supports Unicode)
         return None
 
@@ -616,7 +613,7 @@ class Keystroke(str):
         """
         Get value for Alt-only control sequences (ESC + control char, Alt-only).
 
-        Returns the base character from Alt-only control combinations like Alt+Escape.
+        Returns empty string for special application keys with Alt modifier.
         """
         if not (len(self) == 2 and self[0] == '\x1b' and
                 self._alt and not self._ctrl):
@@ -624,9 +621,13 @@ class Keystroke(str):
 
         char_code = ord(self[1])
 
-        # Alt+Ctrl combinations would have been caught by _infer_modifiers as Ctrl+Alt
-        # So this is just Alt-only special control chars (Escape, Enter, DEL, Tab)
-        # These need to map to their control symbols for value purposes
+        # Special application keys with Alt modifier should return empty string
+        # These are: Escape (0x1b), Backspace/DEL (0x7f), Enter (0x0d), Tab (0x09)
+        # They are application keys, not text keys, so they have no text value
+        if char_code in {0x1b, 0x7f, 0x0d, 0x09}:
+            return ''
+
+        # Other Alt+control combinations map to their control symbols
         if char_code in SYMBOLS_MAP_CTRL_VALUE:
             return SYMBOLS_MAP_CTRL_VALUE[char_code]
 
@@ -1244,7 +1245,7 @@ DEFAULT_SEQUENCE_MIXIN = (
     (chr(10), curses.KEY_ENTER),
     (chr(13), curses.KEY_ENTER),
     (chr(8), curses.KEY_BACKSPACE),
-    (chr(9), KEY_TAB),  # noqa  # pylint: disable=undefined-variable
+    (chr(9), KEY_TAB),  # noqa
     (chr(27), curses.KEY_EXIT),
     (chr(127), curses.KEY_BACKSPACE),
 

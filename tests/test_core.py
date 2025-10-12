@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Core blessed Terminal() tests."""
 
 # std imports

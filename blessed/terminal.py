@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # pylint: disable=too-many-lines
 """Module containing :class:`Terminal`, the primary API entry point."""
 # std imports
