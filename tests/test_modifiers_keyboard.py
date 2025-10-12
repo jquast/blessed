@@ -187,6 +187,7 @@ def test_keystroke_modifiers_comprehensive(sequence, expected_modifiers, ctrl, a
     ('\x1b\x09', '', 'KEY_ALT_TAB', 3, False, True, False),
 ])
 def test_legacy_ctrl_alt_edge_cases(
+        # pylint: disable=too-many-positional-arguments
         sequence, expected_value, expected_name, modifiers, ctrl, alt, shift):
     """Test ctrl+alt combinations with special control characters."""
     ks = Keystroke(sequence)
@@ -562,7 +563,7 @@ def test_keystroke_is_alt_comprehensive(sequence, char, ignore_case, expected):
 def test_keystroke_predicates_without_char(sequence, expected):
     """Test modifier predicates without character argument."""
     ks = Keystroke(sequence)
-    if sequence in ('\x01', '\x05', 'a'):
+    if sequence in {'\x01', '\x05', 'a'}:
         assert ks.is_ctrl() is expected
     else:
         assert ks.is_alt() is expected
@@ -580,10 +581,8 @@ def test_keystroke_predicates_without_char(sequence, expected):
 def test_keystroke_properties_comprehensive(sequence, property_name, expected_value):
     """Test various keystroke properties."""
     ks = Keystroke(sequence)
-    if property_name == '__repr__':
-        actual = repr(ks)
-    else:
-        actual = getattr(ks, property_name)
+    actual = (repr(ks) if property_name == '__repr__'
+              else getattr(ks, property_name))
     assert actual == expected_value
 
 
@@ -754,7 +753,7 @@ def test_legacy_csi_modifiers_event_type_edge_cases():
         for invalid_seq in invalid_cases:
             term.ungetch(invalid_seq)
             ks = term.inkey(timeout=0)
-            assert ks in ('\x1b', '\x1b[') or ks.name is None
+            assert ks in {'\x1b', '\x1b['} or ks.name is None
 
     child()
 

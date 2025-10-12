@@ -56,7 +56,8 @@ class as_subprocess():  # pylint: disable=too-few-public-methods
     def __init__(self, func):
         self.func = func
 
-    def __call__(self, *args, **kwargs):  # pylint: disable=too-many-locals,too-complex
+    def __call__(self, *args, **kwargs):
+        # pylint: disable=too-many-locals,too-complex,too-many-branches,too-many-statements
         if IS_WINDOWS:
             self.func(*args, **kwargs)
             return
@@ -270,7 +271,8 @@ def pty_test(child_func, parent_func=None, test_name=None):
             output = pty_test(child, parent)
             assert output == 'x'
     """
-    # pylint: disable=too-complex
+    # pylint: disable=too-complex,too-many-branches,too-many-locals
+    # pylint: disable=missing-raises-doc,missing-type-doc
     if IS_WINDOWS:
         # On Windows, just run child_func directly without PTY
         term = TestTerminal()
@@ -364,13 +366,13 @@ class MockTigetstr():  # pylint: disable=too-few-public-methods
         return self.kwargs.get(capname, self.callable(capname))
 
 
-def assert_modifiers(ks, ctrl=False, alt=False, shift=False, super=False):
+def assert_modifiers(ks, ctrl=False, alt=False, shift=False, _super=False):
     """Assert keystroke modifier flags match expected values."""
     assert ks._ctrl is ctrl
     assert ks._alt is alt
     assert ks._shift is shift
-    if super is not None:
-        assert ks._super is super
+    if _super is not None:
+        assert ks._super is _super
 
 
 def assert_modifiers_value(ks, modifiers):

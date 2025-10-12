@@ -92,6 +92,7 @@ class Keystroke(str):
     def __new__(cls: typing.Type[_T], ucs: str = '', code: Optional[int] = None,
                 name: Optional[str] = None, mode: Optional[int] = None,
                 match: typing.Any = None) -> _T:
+        # pylint: disable=too-many-positional-arguments
         """Class constructor."""
         new = str.__new__(cls, ucs)
         new._name = name
@@ -245,7 +246,7 @@ class Keystroke(str):
 
         Returns name like 'KEY_ALT_A', 'KEY_ALT_SHIFT_Z', 'KEY_CTRL_ALT_C', or 'KEY_ALT_ESCAPE'.
         """
-        # pylint: disable=too-many-return-statements
+        # pylint: disable=too-many-return-statements,too-complex
         if len(self) != 2 or self[0] != '\x1b':
             return None
 
