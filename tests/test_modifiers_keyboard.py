@@ -1229,12 +1229,14 @@ def test_getattr_non_is_attribute():
     """Test __getattr__ raises AttributeError for attributes not starting with is_."""
     ks = Keystroke('a')
     try:
+        # pylint: disable=pointless-statement
         ks.some_random_attr
         assert False
     except AttributeError as e:
         assert 'some_random_attr' in str(e)
 
     try:
+        # pylint: disable=pointless-statement
         ks.name_of_key
         assert False
     except AttributeError as e:
