@@ -51,7 +51,7 @@ from ._capabilities import (CAPABILITY_DATABASE,
 
 # isort: off
 
-HAS_TTY = True
+HAS_TTY = True  # pylint: disable=invalid-name
 if platform.system() == 'Windows':
     IS_WINDOWS = True
     import jinxed as curses  # pylint: disable=import-error
@@ -73,9 +73,9 @@ else:
             f"unless a deriving class overrides them: {', '.join(_TTY_METHODS)}."
         )
         warnings.warn(_MSG_NOSUPPORT)
-        HAS_TTY = False
+        HAS_TTY = False  # pylint: disable=invalid-name
 
-_CUR_TERM = None  # See comments at end of file
+_CUR_TERM = None  # See comments at end of file pylint: disable=invalid-name
 _RE_GET_FGCOLOR_RESPONSE = re.compile(
     '\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
 _RE_GET_BGCOLOR_RESPONSE = re.compile(
