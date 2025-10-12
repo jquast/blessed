@@ -256,9 +256,7 @@ class Keystroke(str):
             # Check if this is Alt-only or Ctrl+Alt based on modifiers
             if self.modifiers == 3:  # Alt-only (1 + 2)
                 # Special C0 controls that are Alt-only
-                alt_name = self._get_alt_only_control_name(char_code)
-                if alt_name:
-                    return alt_name
+                return self._get_alt_only_control_name(char_code)
             elif self.modifiers == 7:  # Ctrl+Alt (1 + 2 + 4)
                 return f'KEY_CTRL_ALT_{symbol}'
 
