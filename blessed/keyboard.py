@@ -257,7 +257,7 @@ class Keystroke(str):
             if self.modifiers == 3:  # Alt-only (1 + 2)
                 # Special C0 controls that are Alt-only
                 return self._get_alt_only_control_name(char_code)
-            elif self.modifiers == 7:  # Ctrl+Alt (1 + 2 + 4)
+            if self.modifiers == 7:  # Ctrl+Alt (1 + 2 + 4)
                 return f'KEY_CTRL_ALT_{symbol}'
 
         # return KEY_ALT_ for "metaSendsEscape"
