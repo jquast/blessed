@@ -244,7 +244,7 @@ class Keystroke(str):
 
         Returns name like 'KEY_ALT_A', 'KEY_ALT_SHIFT_Z', 'KEY_CTRL_ALT_C', or 'KEY_ALT_ESCAPE'.
         """
-        # pylint: disable=too-many-return-statements,too-complex
+        # pylint: disable=too-many-return-statements
         if len(self) != 2 or self[0] != '\x1b':
             return None
 
@@ -453,7 +453,6 @@ class Keystroke(str):
         Returns a callable that checks if keystroke matches the predicate 'tokens_modifiers', as
         well as the alphanumeric checks of optional 'char' and 'ignore_case'.
         """
-        # pylint: disable=too-many-return-statements
         def modifier_predicate(char: Optional[str] = None, ignore_case: bool = True) -> bool:
             # Build expected modifier bits from tokens,
             # Stripped to ignore caps_lock and num_lock

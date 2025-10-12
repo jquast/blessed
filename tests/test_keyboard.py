@@ -342,7 +342,7 @@ def test_keyboard_prefixes():
 
 @pytest.mark.skipif(IS_WINDOWS, reason="not applicable")
 def test_keypad_mixins_and_aliases():
-    """Test PC-Style function key translations when in ``keypad`` mode."""
+    """Test PC-Style function key translations, including ``keypad`` mode."""
     # Key     plain   app     modified
     # Up      ^[[A    ^[OA    ^[[1;mA
     # Down    ^[[B    ^[OB    ^[[1;mB

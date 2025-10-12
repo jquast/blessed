@@ -1254,3 +1254,42 @@ def test_getattr_empty_is():
         assert False
     except AttributeError as e:
         assert 'is_' in str(e)
+
+
+def test_get_meta_escape_name_invalid_inputs():
+    """Test _get_meta_escape_name early returns for invalid inputs."""
+    assert Keystroke('a')._get_meta_escape_name() is None
+    assert Keystroke('abc')._get_meta_escape_name() is None
+    assert Keystroke('\x1b')._get_meta_escape_name() is None
+    assert Keystroke('ab')._get_meta_escape_name() is None
+
+
+def test_get_meta_escape_name_branch_coverage():
+    """Test branch coverage for modifiers==3 and modifiers==7 paths."""
+    test_cases = [
+        ('\x1b\x03', 7, 'KEY_CTRL_ALT_C'),
+        ('\x1b\x04', 7, 'KEY_CTRL_ALT_D'),
+        ('\x1b\x07', 7, 'KEY_CTRL_ALT_G'),
+        ('\x1b\x0a', 7, 'KEY_CTRL_ALT_J'),
+        ('\x1b\x0b', 7, 'KEY_CTRL_ALT_K'),
+        ('\x1b\x0c', 7, 'KEY_CTRL_ALT_L'),
+        ('\x1b\x0e', 7, 'KEY_CTRL_ALT_N'),
+        ('\x1b\x0f', 7, 'KEY_CTRL_ALT_O'),
+        ('\x1b\x10', 7, 'KEY_CTRL_ALT_P'),
+        ('\x1b\x11', 7, 'KEY_CTRL_ALT_Q'),
+        ('\x1b\x12', 7, 'KEY_CTRL_ALT_R'),
+        ('\x1b\x13', 7, 'KEY_CTRL_ALT_S'),
+        ('\x1b\x14', 7, 'KEY_CTRL_ALT_T'),
+        ('\x1b\x15', 7, 'KEY_CTRL_ALT_U'),
+        ('\x1b\x16', 7, 'KEY_CTRL_ALT_V'),
+        ('\x1b\x18', 7, 'KEY_CTRL_ALT_X'),
+        ('\x1b\x19', 7, 'KEY_CTRL_ALT_Y'),
+        ('\x1b\x0d', 3, 'KEY_ALT_ENTER'),
+        ('\x1b\x09', 3, 'KEY_ALT_TAB'),
+    ]
+
+    for sequence, expected_modifiers, expected_name in test_cases:
+        ks = Keystroke(sequence)
+        assert ks.modifiers == expected_modifiers
+        result = ks._get_meta_escape_name()
+        assert result == expected_name
