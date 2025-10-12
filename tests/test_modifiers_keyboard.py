@@ -1110,11 +1110,14 @@ def test_get_modified_keycode_name_no_modifiers():
 
 
 def test_get_control_symbol_unknown_char_code():
-    """Test _get_control_symbol with unknown character codes returns None."""
+    """Test _get_control_symbol with unknown character codes raises KeyError."""
     ks = Keystroke('x')
-    assert ks._get_control_symbol(32) is None
-    assert ks._get_control_symbol(50) is None
-    assert ks._get_control_symbol(100) is None
+    with pytest.raises(KeyError):
+        ks._get_control_symbol(32)
+    with pytest.raises(KeyError):
+        ks._get_control_symbol(50)
+    with pytest.raises(KeyError):
+        ks._get_control_symbol(100)
 
 
 def test_get_meta_escape_name_unprintable_without_match():
