@@ -12,7 +12,7 @@ import platform
 import warnings
 import contextlib
 import collections
-from typing import IO, List, Tuple, Union, Optional, Generator
+from typing import IO, List, Tuple, Union, Optional, Generator, Match
 
 # SupportsIndex was added in Python 3.8
 if sys.version_info >= (3, 8):
@@ -552,8 +552,8 @@ class Terminal():
                      ws_xpixel=None,
                      ws_ypixel=None)
 
-    def _query_response(self, query_str: str, response_re: Union[str, re.Match[str]],
-                        timeout: Optional[float]) -> Optional[re.Match[str]]:
+    def _query_response(self, query_str: str, response_re: Union[str, Match[str]],
+                        timeout: Optional[float]) -> Optional[Match[str]]:
         """
         Sends a query string to the terminal and waits for a response.
 
