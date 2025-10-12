@@ -490,13 +490,11 @@ class Keystroke(str):
                 # Exact matching (no char, or non-alpha char)
                 return False
 
-            # If no character specified
+            # If no character specified, always return False
+            # Text keys need char argument: is_ctrl('a')
+            # Application keys need specific predicate: is_ctrl_up()
             if char is None:
-                # Text keys (with printable character values) require char argument
-                keystroke_char = self.value
-                if keystroke_char and len(keystroke_char) == 1 and keystroke_char.isprintable():
-                    return False
-                return True
+                return False
 
             # Check character match using value property
             keystroke_char = self.value
@@ -617,10 +615,6 @@ class Keystroke(str):
         # They are application keys, not text keys, so they have no text value
         if char_code in {0x1b, 0x7f, 0x0d, 0x09}:
             return ''
-
-        # Other Alt+control combinations map to their control symbols
-        if char_code in SYMBOLS_MAP_CTRL_VALUE:
-            return SYMBOLS_MAP_CTRL_VALUE[char_code]
 
         return None
 
@@ -1051,9 +1045,8 @@ def _match_legacy_csi_letter_form(text: str) -> Optional[Keystroke]:
     matched_text = match.group(0)
     event_type = int(match.group('event')) if match.group('event') else 1
 
-    keycode = CSI_FINAL_CHAR_TO_KEYCODE.get(key_id)
-    if keycode is None:
-        return None
+    # guaranteed not to raise KeyError by regex (ABCDEFHPQRS)
+    keycode = CSI_FINAL_CHAR_TO_KEYCODE[key_id]
 
     legacy_event = LegacyCSIKeyEvent(
         kind='letter',
@@ -1120,9 +1113,8 @@ def _match_legacy_ss3_fkey_form(text: str) -> Optional[Keystroke]:
     if modifiers == 0:
         return None
 
-    keycode = SS3_FKEY_TO_KEYCODE.get(final_char)
-    if keycode is None:
-        return None
+    # guaranteed not to raise KeyError by regex (PQRS)
+    keycode = SS3_FKEY_TO_KEYCODE[final_char]
 
     # SS3 form doesn't support event_type, default to 1 (press)
     legacy_event = LegacyCSIKeyEvent(

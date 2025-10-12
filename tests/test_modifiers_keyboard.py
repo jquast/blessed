@@ -985,6 +985,29 @@ def test_alphanum_predicate_no_char_non_printable_return():
     assert ks.is_ctrl() is False
 
 
+def test_alphanum_predicate_no_char_application_key():
+    """Test alphanumeric predicate without char argument for application keys."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+
+        # Ctrl+Up arrow: is_ctrl() without char should return False
+        # Use is_ctrl_up() for application keys instead
+        term.ungetch('\x1b[1;5A')
+        ks = term.inkey(timeout=0)
+        assert ks.is_ctrl() is False
+        assert ks.is_ctrl_up() is True
+
+        # Alt+Down arrow: is_alt() without char should return False
+        # Use is_alt_down() for application keys instead
+        term.ungetch('\x1b[1;3B')
+        ks = term.inkey(timeout=0)
+        assert ks.is_alt() is False
+        assert ks.is_alt_down() is True
+
+    child()
+
+
 def test_repr_with_name():
     """Test repr() with explicit name parameter."""
     ks = Keystroke('\x1b[A', code=259, name='KEY_UP')
@@ -1038,9 +1061,165 @@ def test_pressed_property_default_return():
     assert ks.pressed is True
 
 
+def test_pressed_property_with_event_types():
+    """Test pressed property returns correct value based on event_type."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+
+        # event_type=1 (press) should return True
+        term.ungetch('\x1b[1;2:1Q')
+        ks = term.inkey(timeout=0)
+        assert ks.pressed is True
+
+        # event_type=2 (repeat) should return False
+        term.ungetch('\x1b[1;2:2Q')
+        ks = term.inkey(timeout=0)
+        assert ks.pressed is False
+
+        # event_type=3 (release) should return False
+        term.ungetch('\x1b[1;2:3Q')
+        ks = term.inkey(timeout=0)
+        assert ks.pressed is False
+
+    child()
+
+
 def test_getattr_property_getter():
     """Test __getattr__ correctly accesses property getters."""
     ks = Keystroke('\x01')
     assert hasattr(ks, 'code')
     assert hasattr(ks, 'name')
     assert hasattr(ks, 'modifiers')
+
+
+def test_get_modified_keycode_name_no_modifiers():
+    """Test modified keycode name returns None when no modifiers present."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        term.ungetch('\x1b[1;1A')
+        ks = term.inkey(timeout=0)
+        assert ks is not None
+        assert ks._mode == -3
+        assert ks.modifiers == 1
+        result = ks._get_modified_keycode_name()
+        assert result is None
+
+    child()
+
+
+def test_get_control_symbol_unknown_char_code():
+    """Test _get_control_symbol with unknown character codes returns None."""
+    ks = Keystroke('x')
+    assert ks._get_control_symbol(32) is None
+    assert ks._get_control_symbol(50) is None
+    assert ks._get_control_symbol(100) is None
+
+
+def test_get_meta_escape_name_unprintable_without_match():
+    """Test _get_meta_escape_name with unprintable chars that don't match alt-only."""
+    ks = Keystroke('\x1b\x02')
+    result = ks._get_meta_escape_name()
+    assert result == 'KEY_CTRL_ALT_B'
+
+
+def test_get_meta_escape_name_symbol_branch_without_alt_name():
+    """Test _get_meta_escape_name where symbol check passes but alt_only check fails."""
+    ks = Keystroke('\x1b\x08')
+    assert ks.modifiers == 7
+    result = ks._get_meta_escape_name()
+    assert result == 'KEY_CTRL_ALT_H'
+
+
+def test_get_meta_escape_name_not_printable_edge_case():
+    """Test _get_meta_escape_name with control char that has no symbol mapping."""
+    ks = Keystroke('\x1b\x04')
+    result = ks._get_meta_escape_name()
+    assert result == 'KEY_CTRL_ALT_D'
+
+
+def test_build_appkeys_predicate_expected_code_none():
+    """Test application key predicate when expected_code lookup fails."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        term.ungetch('\x1b[1;2A')
+        ks = term.inkey(timeout=0)
+        predicate = ks._build_appkeys_predicate([], 'nonexistent_key')
+        assert predicate() is False
+
+    child()
+
+
+def test_build_appkeys_predicate_code_mismatch():
+    """Test application key predicate when keystroke code doesn't match expected."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        term.ungetch('\x1b[1;2A')
+        ks = term.inkey(timeout=0)
+        predicate = ks._build_appkeys_predicate([], 'down')
+        assert predicate() is False
+
+    child()
+
+
+def test_alphanum_predicate_exact_matching_non_alpha():
+    """Test alphanumeric predicate with exact modifier matching for non-alpha chars."""
+    ks = Keystroke('\x1b1')
+    assert ks.is_alt('1') is True
+    assert ks.is_ctrl('1') is False
+
+
+def test_alphanum_predicate_value_empty():
+    """Test alphanumeric predicate when keystroke value is empty."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        term.ungetch('\x1b[A')
+        ks = term.inkey(timeout=0)
+        assert ks.value == ''
+        assert ks.is_alt('x') is False
+
+    child()
+
+
+def test_alphanum_predicate_value_multi_char():
+    """Test alphanumeric predicate when keystroke is multi-character."""
+    ks = Keystroke('abc')
+    assert ks.is_alt('a') is False
+
+
+def test_get_alt_only_control_name_csi():
+    """Test _get_alt_only_control_name returns CSI for bracket."""
+    ks = Keystroke('\x1b[')
+    result = ks._get_alt_only_control_name(0x5b)
+    assert result == 'CSI'
+
+
+def test_meta_escape_name_csi_special_case():
+    """Test metaSendsEscape correctly identifies CSI sequence."""
+    ks = Keystroke('\x1b[')
+    result = ks._get_meta_escape_name()
+    assert result == 'CSI'
+
+
+def test_legacy_csi_modifiers_no_modifiers_integration():
+    """Test legacy CSI sequence with modifier=1 (no actual modifiers)."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        term.ungetch('\x1b[1;1P')
+        ks = term.inkey(timeout=0)
+        assert ks is not None
+        assert ks._mode == -3
+        assert ks.modifiers == 1
+        assert ks.code == curses.KEY_F1
+        result = ks._get_modified_keycode_name()
+        assert result is None
+        assert ks._ctrl is False
+        assert ks._alt is False
+        assert ks._shift is False
+
+    child()
