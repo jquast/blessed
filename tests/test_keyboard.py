@@ -22,7 +22,7 @@ else:
     import jinxed as curses  # pylint: disable=import-error
 
 
-@pytest.mark.skipif(IS_WINDOWS, reason="?")
+@pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_break_input_no_kb():
     """cbreak() should not call tty.setcbreak() without keyboard."""
     @as_subprocess
@@ -36,7 +36,7 @@ def test_break_input_no_kb():
     child()
 
 
-@pytest.mark.skipif(IS_WINDOWS, reason="?")
+@pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_raw_input_no_kb():
     """raw should not call tty.setraw() without keyboard."""
     @as_subprocess
@@ -50,7 +50,7 @@ def test_raw_input_no_kb():
     child()
 
 
-@pytest.mark.skipif(IS_WINDOWS, reason="?")
+@pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_raw_input_with_kb():
     """raw should call tty.setraw() when with keyboard."""
     @as_subprocess
@@ -340,7 +340,7 @@ def test_keyboard_prefixes():
     assert pfs == {'a', 'ab', 'abd', 'j', 'jk'}
 
 
-@pytest.mark.skipif(IS_WINDOWS, reason="no multiprocess")
+@pytest.mark.skipif(IS_WINDOWS, reason="not applicable")
 def test_keypad_mixins_and_aliases():
     """Test PC-Style function key translations when in ``keypad`` mode."""
     # Key     plain   app     modified
@@ -463,6 +463,7 @@ def test_keypad_mixins_and_aliases():
     child('xterm')
 
 
+@pytest.mark.skipif(IS_WINDOWS, reason="not applicable")
 def test_kp_begin_center_key():
     """Test KP_BEGIN/center key (numpad 5) with modifiers and event types."""
     @as_subprocess
