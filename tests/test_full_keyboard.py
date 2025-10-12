@@ -835,3 +835,38 @@ def test_read_until_loop_continuation():
     pid, status = os.waitpid(pid, 0)
     assert output == 'LOOP_CONTINUED'
     assert os.WEXITSTATUS(status) == 0
+
+
+def test_esc_delay_while_loop_with_continued_input():
+    """Test ESC key delay while loop when receiving a complete escape sequence incrementally."""
+    import pty
+    pid, master_fd = pty.fork()
+    if pid == 0:
+        cov = init_subproc_coverage('test_esc_delay_while_loop_with_continued_input')
+        term = TestTerminal()
+        os.write(sys.__stdout__.fileno(), SEMAPHORE)
+        with term.cbreak():
+            ks = term.inkey(timeout=1.0, esc_delay=0.2)
+            os.write(sys.__stdout__.fileno(), ks.name.encode('ascii'))
+            sys.stdout.flush()
+        if cov is not None:
+            cov.stop()
+            cov.save()
+        os._exit(0)
+
+    with echo_off(master_fd):
+        read_until_semaphore(master_fd)
+        # Send ESC first
+        os.write(master_fd, b'\x1b')
+        # Then send '[' after a tiny delay but before esc_delay expires
+        # This should cause the while loop body (lines 1545-1548) to execute
+        time.sleep(0.05)
+        os.write(master_fd, b'[')
+        # Then complete with 'D' to form KEY_LEFT
+        time.sleep(0.05)
+        os.write(master_fd, b'D')
+        output = read_until_eof(master_fd)
+
+    pid, status = os.waitpid(pid, 0)
+    assert output == 'KEY_LEFT'
+    assert os.WEXITSTATUS(status) == 0

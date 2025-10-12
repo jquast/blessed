@@ -1223,3 +1223,29 @@ def test_legacy_csi_modifiers_no_modifiers_integration():
         assert ks._shift is False
 
     child()
+
+
+def test_getattr_non_is_attribute():
+    """Test __getattr__ raises AttributeError for attributes not starting with is_."""
+    ks = Keystroke('a')
+    try:
+        ks.some_random_attr
+        assert False
+    except AttributeError as e:
+        assert 'some_random_attr' in str(e)
+
+    try:
+        ks.name_of_key
+        assert False
+    except AttributeError as e:
+        assert 'name_of_key' in str(e)
+
+
+def test_getattr_empty_is():
+    """Test __getattr__ raises AttributeError for bare is_ attribute."""
+    ks = Keystroke('a')
+    try:
+        ks.is_()
+        assert False
+    except AttributeError as e:
+        assert 'is_' in str(e)
