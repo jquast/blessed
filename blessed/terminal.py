@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-# pylint: disable=too-many-lines
 """Module containing :class:`Terminal`, the primary API entry point."""
 # std imports
 import os
@@ -354,7 +352,10 @@ class Terminal():
         # Build database of int code <=> KEY_NAME.
         self._keycodes = get_keyboard_codes()
 
-        # Store attributes as: self.KEY_NAME = code.
+        # Store attributes as: self.KEY_NAME = code. These only work for porting
+        # legacy curses applications that used key codes, and are not really
+        # suggested, and they do not support modifier keys, eg. 'KEY_SHIFT_F1'
+        # does not exist and has no code.
         for key_code, key_name in self._keycodes.items():
             setattr(self, key_name, key_code)
 
@@ -514,7 +515,7 @@ class Terminal():
             return WINSZ(*struct.unpack(WINSZ._FMT, data))
         return WINSZ(ws_row=25, ws_col=80, ws_xpixel=0, ws_ypixel=0)
 
-    def _height_and_width(self):    # type: ignore[no-untyped-def]
+    def _height_and_width(self) -> "WINSZ":
         """
         Return a tuple of (terminal height, terminal width).
 
@@ -551,7 +552,7 @@ class Terminal():
                      ws_xpixel=None,
                      ws_ypixel=None)
 
-    def _query_response(self, query_str: str, response_re: str,
+    def _query_response(self, query_str: str, response_re: Union[str, Match[str]],
                         timeout: Optional[float]) -> Optional[Match[str]]:
         """
         Sends a query string to the terminal and waits for a response.
@@ -698,8 +699,7 @@ class Terminal():
 
         response_str = getattr(self, self.caps['cursor_report'].attribute) or '\x1b[%i%d;%dR'
         match = self._query_response(
-            self.u7 or '\x1b[6n', self.caps['cursor_report'].re_compiled.pattern, timeout
-        )
+            self.u7 or '\x1b[6n', self.caps['cursor_report'].re_compiled, timeout)
 
         if match:
             # return matching sequence response, the cursor location.
@@ -1077,7 +1077,7 @@ class Terminal():
         self.__clear_color_capabilities()
 
     @property
-    def _foreground_color(self):  # type: ignore[no-untyped-def]
+    def _foreground_color(self) -> Union[NullCallableString, ParameterizingString]:
         """
         Convenience capability to support :attr:`~.on_color`.
 
@@ -1088,7 +1088,7 @@ class Terminal():
         return self.setaf or self.setf
 
     @property
-    def _background_color(self):  # type: ignore[no-untyped-def]
+    def _background_color(self) -> Union[NullCallableString, ParameterizingString]:
         """
         Convenience capability to support :attr:`~.on_color`.
 
@@ -1452,6 +1452,22 @@ class Terminal():
             self.stream.write(self.rmkx)
             self.stream.flush()
 
+    def flushinp(self, timeout: float = 0) -> str:
+        r"""
+        Unbuffer and return all input available within ``timeout``.
+
+        When CSI ``'\x1b['`` is detected in input stream, all remaining bytes
+        are decoded as latin1.
+        """
+        ucs = ''
+        while self._keyboard_buf:
+            ucs += self._keyboard_buf.pop()
+
+        # and receive all immediately available bytes
+        while self.kbhit(timeout=timeout):
+            ucs += self.getch()
+        return ucs
+
     def inkey(self, timeout: Optional[float] = None,
               esc_delay: float = DEFAULT_ESCDELAY) -> Keystroke:
         r"""
@@ -1490,25 +1506,26 @@ class Terminal():
         _`ncurses(3)`: https://www.man7.org/linux/man-pages/man3/ncurses.3x.html
         """
         stime = time.time()
+        ucs = self.flushinp()
 
-        # re-buffer previously received keystrokes,
-        ucs = ''
-        while self._keyboard_buf:
-            ucs += self._keyboard_buf.pop()
-
-        # receive all immediately available bytes
-        while self.kbhit(timeout=0):
-            ucs += self.getch()
-
-        # decode keystroke, if any
-        ks = resolve_sequence(ucs, self._keymap, self._keycodes)
+        # decode buffered keystroke, if any
+        ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                              final=False)
 
         # so long as the most immediately received or buffered keystroke is
         # incomplete, (which may be a multibyte encoding), block until until
-        # one is received.
+        # a sequence is completed.
         while not ks and self.kbhit(timeout=_time_left(stime, timeout)):
+            # receive any next byte
             ucs += self.getch()
-            ks = resolve_sequence(ucs, self._keymap, self._keycodes)
+
+            # and all other immediately available bytes
+            while self.kbhit(timeout=0):
+                ucs += self.getch()
+
+            # and then resolve for sequence
+            ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                                  final=False)
 
         # handle escape key (KEY_ESCAPE) vs. escape sequence (like those
         # that begin with \x1b[ or \x1bO) up to esc_delay when
@@ -1526,7 +1543,10 @@ class Terminal():
                    and ucs in self._keymap_prefixes
                    and self.kbhit(timeout=_time_left(esctime, esc_delay))):
                 ucs += self.getch()
-                ks = resolve_sequence(ucs, self._keymap, self._keycodes)
+                # re-check 'final' after reading more bytes
+                final = bool(ucs) and ucs not in self._keymap_prefixes
+                ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                                      final=final)
 
         # buffer any remaining text received
         self.ungetch(ucs[len(ks):])
