@@ -12,7 +12,7 @@ import platform
 import warnings
 import contextlib
 import collections
-from typing import IO, List, Tuple, Union, Optional, Generator, Match
+from typing import IO, List, Match, Tuple, Union, Optional, Generator
 
 # SupportsIndex was added in Python 3.8
 if sys.version_info >= (3, 8):

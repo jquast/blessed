@@ -24,7 +24,7 @@ Here's a simple example that reads a single keystroke:
 
 .. literalinclude:: ../bin/keyboard_simple.py
    :language: python
-   :linenos: 1-
+   :linenos:
 
 The :meth:`~.Terminal.inkey` method also accepts a ``timeout`` parameter (in
 seconds). When timeout is exceeded without input, an empty :class:`~.Keystroke`
@@ -35,7 +35,7 @@ by pressing any key:
 
 .. literalinclude:: ../bin/keyboard_animation.py
    :language: python
-   :linenos: 1-
+   :linenos:
 
 Keystroke
 ---------
@@ -61,7 +61,7 @@ function keys, and any character key combined with modifiers (Ctrl, Alt, Shift).
 
 .. literalinclude:: ../bin/keyboard_special_keys.py
    :language: python
-   :linenos: 1-
+   :linenos:
 
 The ``str(key)`` value for :class:`~.Keystroke` should not be directly printed
 when :attr:`~.Keystroke.is_sequence` is True as done in this and other examples.
@@ -71,7 +71,7 @@ and can be used for basic equality tests, like in this "paint by arrow key" exam
 
 .. literalinclude:: ../bin/keyboard_arrow_paint.py
    :language: python
-   :linenos: 1-
+   :linenos:
 
 Common key names include:
 
@@ -137,7 +137,7 @@ keys with modifiers. These methods all start with ``is_``:
 
 .. literalinclude:: ../bin/keyboard_magic_methods.py
    :language: python
-   :linenos: 1-
+   :linenos:
 
 Some examples, given *key* object of :class:`~.Keystroke`:
 
