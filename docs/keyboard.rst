@@ -50,8 +50,8 @@ sequences.
 * Or, by using magic methods like ``keystroke.is_f1()`` or ``keystroke.is_key_ctrl('q')``.
 
 Be careful to print it directly, though, our examples uses format string,
-``f'{ks!r}'`` for ``repr()``, because the input may contain input that begins
-with the escape key, (``KEY_ESCAPE``) and are generally unprintable.
+``f'{ks!r}'`` for ``repr()``, because ``str(ks)`` may contain escape sequences
+beginning with (``KEY_ESCAPE``) and are generally unprintable.
 
 Special Keys
 ~~~~~~~~~~~~
