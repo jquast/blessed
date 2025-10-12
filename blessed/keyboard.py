@@ -208,7 +208,7 @@ class Keystroke(str):
             return f'KEY_CTRL_{SYMBOLS_MAP_CTRL_VALUE[char_code]}'
         return None
 
-    def _get_control_symbol(self, char_code: int) -> Optional[str]:
+    def _get_control_symbol(self, char_code: int) -> str:
         """
         Get control symbol for a character code.
 
@@ -220,10 +220,8 @@ class Keystroke(str):
         if 1 <= char_code <= 26:
             # Ctrl+A through Ctrl+Z
             return chr(char_code + ord("A") - 1)
-        if char_code in SYMBOLS_MAP_CTRL_VALUE:
-            # Ctrl+symbol
-            return SYMBOLS_MAP_CTRL_VALUE[char_code]
-        return None
+        # Ctrl+symbol
+        return SYMBOLS_MAP_CTRL_VALUE[char_code]
 
     def _get_alt_only_control_name(self, char_code: int) -> Optional[str]:
         """
@@ -255,16 +253,14 @@ class Keystroke(str):
         # Check for ESC + control char
         if 0 <= char_code <= 31 or char_code == 127:
             symbol = self._get_control_symbol(char_code)
-
-            if symbol:
-                # Check if this is Alt-only or Ctrl+Alt based on modifiers
-                if self.modifiers == 3:  # Alt-only (1 + 2)
-                    # Special C0 controls that are Alt-only
-                    alt_name = self._get_alt_only_control_name(char_code)
-                    if alt_name:
-                        return alt_name
-                elif self.modifiers == 7:  # Ctrl+Alt (1 + 2 + 4)
-                    return f'KEY_CTRL_ALT_{symbol}'
+            # Check if this is Alt-only or Ctrl+Alt based on modifiers
+            if self.modifiers == 3:  # Alt-only (1 + 2)
+                # Special C0 controls that are Alt-only
+                alt_name = self._get_alt_only_control_name(char_code)
+                if alt_name:
+                    return alt_name
+            elif self.modifiers == 7:  # Ctrl+Alt (1 + 2 + 4)
+                return f'KEY_CTRL_ALT_{symbol}'
 
         # return KEY_ALT_ for "metaSendsEscape"
         ch = self[1]
@@ -629,11 +625,6 @@ class Keystroke(str):
         # Ctrl+A through Ctrl+Z (codes 1-26)
         if 1 <= char_code <= 26:
             return chr(char_code + ord('a') - 1)  # lowercase
-
-        # Ctrl+symbol mappings
-        if char_code in SYMBOLS_MAP_CTRL_VALUE:
-            return SYMBOLS_MAP_CTRL_VALUE[char_code]
-
         return None
 
     def _get_ctrl_sequence_value(self) -> Optional[str]:
