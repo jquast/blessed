@@ -266,21 +266,17 @@ class Keystroke(str):
                 elif self.modifiers == 7:  # Ctrl+Alt (1 + 2 + 4)
                     return f'KEY_CTRL_ALT_{symbol}'
 
-        # Check for and return KEY_ALT_ for "metaSendsEscape"
-        if self[1].isprintable():
-            ch = self[1]
-            if ch.isalpha():
-                if ch.isupper():
-                    return f'KEY_ALT_SHIFT_{ch}'
-                return f'KEY_ALT_{ch.upper()}'
-            if ch == '[':
-                return 'CSI'
-            if ch == ' ':
-                return 'KEY_ALT_SPACE'
-            return f'KEY_ALT_{ch}'
-        if self[1] == '\x7f' and self.modifiers == 3:
-            return 'KEY_ALT_BACKSPACE'
-        return None
+        # return KEY_ALT_ for "metaSendsEscape"
+        ch = self[1]
+        if ch.isalpha():
+            if ch.isupper():
+                return f'KEY_ALT_SHIFT_{ch}'
+            return f'KEY_ALT_{ch.upper()}'
+        if ch == '[':
+            return 'CSI'
+        if ch == ' ':
+            return 'KEY_ALT_SPACE'
+        return f'KEY_ALT_{ch}'
 
     @property
     def name(self) -> Optional[str]:
@@ -498,10 +494,6 @@ class Keystroke(str):
 
             # Check character match using value property
             keystroke_char = self.value
-
-            # If value is empty or not a single printable character, can't match
-            if not keystroke_char or len(keystroke_char) > 1 or not keystroke_char.isprintable():
-                return False
 
             # Compare characters
             if ignore_case:
