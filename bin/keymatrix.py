@@ -96,10 +96,10 @@ def format_key_event(term, keystroke) -> str:
 
     modifiers = []
     for modifier_name in (
-        # possible with most terminals
-        'shift', 'alt', 'ctrl',
-        # kitty, only
-        'super', 'hyper', 'meta'):
+            # possible with most terminals
+            'shift', 'alt', 'ctrl',
+            # kitty, only
+            'super', 'hyper', 'meta'):
         if getattr(keystroke, f'_{modifier_name}'):
             modifiers.append(modifier_name.upper())
     extra = f'{"+".join(modifiers)}'
