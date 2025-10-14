@@ -777,6 +777,10 @@ class Terminal():
         specified. Unlike other query methods, there is no sticky failure mechanism -
         each failed query can be retried.
 
+        .. note:: A ``timeout`` value should be set to avoid blocking when the
+            terminal does not respond to DA1 queries, which may happen with some
+            kinds of "dumb" terminals.
+
         :arg float timeout: Timeout in seconds to await terminal response
         :arg bool force: Force active terminal inquiry even if cached result exists
         :rtype: DeviceAttribute or None
@@ -811,6 +815,43 @@ class Terminal():
         self._device_attributes_cache = DeviceAttribute.from_match(match)
         return self._device_attributes_cache
 
+    def does_sixel(self, timeout: Optional[float] = None) -> bool:
+        """
+        Query whether the terminal supports sixel graphics.
+
+        Sixel is a bitmap graphics format supported by some modern terminal
+        emulators, allowing applications to display inline images.
+
+        This method calls :meth:`get_device_attributes` to query the terminal's
+        capabilities and checks for sixel support (extension 4 in the DA1 response).
+        Results are cached, so subsequent calls are fast.
+
+        :arg float timeout: Timeout in seconds to await terminal response. When
+            ``None`` (default), the query may block indefinitely. It is recommended
+            to specify a timeout value (e.g., ``1.0`` seconds) to avoid blocking,
+            especially in CI/build environments or non-interactive contexts.
+        :rtype: bool
+        :returns: ``True`` if terminal supports sixel graphics, ``False`` otherwise
+
+        .. note:: A ``timeout`` value should be set to avoid blocking when the
+            terminal does not respond to DA1 queries, which may happen with some
+            kinds of "dumb" terminals.
+
+        .. code-block:: python
+
+            term = Terminal()
+
+            # Check sixel support with timeout
+            if term.does_sixel(timeout=1.0):
+                # Terminal supports sixel graphics
+                display_sixel_image()
+            else:
+                # Fall back to ASCII art or text
+                display_text_fallback()
+        """
+        da = self.get_device_attributes(timeout=timeout, force=False)
+        return da.supports_sixel if da is not None else False
+
     def get_kitty_keyboard_state(self, timeout: Optional[float] = None,
                                  force: bool = False) -> Optional[KittyKeyboardProtocol]:
         """
@@ -825,36 +866,20 @@ class Terminal():
         When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
         transmitted or response awaited, and ``None`` is returned.
 
-        In many cases a ``timeout`` value of about ``1.0`` should be set, as it
-        is possible for a terminal that succeeds :attr:`does_styling` and
-        :attr:`is_a_tty` to fail to respond to either of the Kitty keyboard
-        protocol or device attribute request query, such as in a CI Build
-        Service, "dumb", even modern terminals like Konsole. The timeout value
-        should approximate the value of the maximum round-trip time, maybe 1 second.
+        In many cases a ``timeout`` value (in seconds) should be set, as it is
+        possible for a terminal that succeeds :attr:`does_styling` and
+        :attr:`is_a_tty` to fail to respond to either Kitty keyboard protocol
+        state request, or the simple device attribute request query carried with
+        it! And not just "dumb" terminals fail to respond, even some fairly
+        modern terminals like Konsole.
 
-        If a Kitty keyboard protocol query fails to respond within the ``timeout``
-        specified, ``None`` is returned. If this was the first Kitty keyboard
-        protocol query, all subsequent queries return ``None`` unless ``force=True`` is
-        set.
+        If a Kitty keyboard protocol query fails to respond within the
+        ``timeout`` specified, ``None`` is returned. If this was the first Kitty
+        keyboard protocol query, all subsequent queries return ``None`` unless
+        ``force=True`` is set.
 
         **No state caching is performed** - each call re-queries the terminal unless
         the first query previously failed (sticky failure) and ``force=False``.
-
-        This method uses a boundary detection approach on the first query to quickly
-        determine terminal capabilities by sending both Kitty keyboard and Device
-        Attributes (DA1) queries simultaneously, as suggested by Kitty,
-        https://sw.kovidgoyal.net/kitty/keyboard-protocol/#detection-of-support-for-this-protocol
-        By sending both queries together and checking which responses are
-        received, we can quickly infer support without multiple round trips.
-        Note that Kitty *does not answer* to primary device attributes request
-        despite making this very recommendation!
-
-        > An application can query the terminal for support of this protocol by
-        > sending the escape code querying for the current progressive
-        > enhancement status followed by request for the primary device
-        > attributes. If an answer for the device attributes is received without
-        > getting back an answer for the progressive enhancement the terminal
-        > does not support this protocol.
 
         :arg float timeout: Timeout in seconds to await terminal response
         :arg bool force: Force active terminal inquiry in all cases
@@ -862,6 +887,23 @@ class Terminal():
         :returns: KittyKeyboardProtocol instance with current flags, or None if unsupported/timeout
         """
         # pylint: disable=too-many-return-statements
+        # This method uses a boundary detection approach on the first query to quickly
+        # determine terminal capabilities by sending both Kitty keyboard and Device
+        # Attributes (DA1) queries simultaneously, as suggested by Kitty,
+        # https://sw.kovidgoyal.net/kitty/keyboard-protocol/#detection-of-support-for-this-protocol
+        # By sending both queries together and checking which responses are
+        # received, we can quickly infer support without multiple round trips.
+        #
+        # > An application can query the terminal for support of this protocol by
+        # > sending the escape code querying for the current progressive
+        # > enhancement status followed by request for the primary device
+        # > attributes. If an answer for the device attributes is received without
+        # > getting back an answer for the progressive enhancement the terminal
+        # > does not support this protocol.
+        #
+        # Note that Kitty **does not answer** to DA1 despite making this very
+        # recommendation! So we must handle all possible 2x2 match combinations:
+        # DA1 + Kitty, !DA1 + Kitty, DA1 + !Kitty, and !DA1 and !Kitty (timeout)
         if not self.does_styling or not self.is_a_tty:
             # no query is ever done for terminals where does_styling or is_a_tty is False
             return None
@@ -965,6 +1007,11 @@ class Terminal():
                 key = term.inkey()
                 if key.alt and key.is_alt('c'):
                     print("Alt+C pressed")
+
+        .. note:: A ``timeout`` value should be set to avoid blocking when the
+            terminal does not respond to DA1 or kitty protocol queries, which
+            may happen with some kinds of "dumb" terminals, even some modern
+            terminals like Konsole.
         """
         if not self.does_styling:
             yield

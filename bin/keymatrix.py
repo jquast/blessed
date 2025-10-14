@@ -170,9 +170,9 @@ def format_key_event(term, keystroke) -> str:
     assert len(events) == 1, events
     modifiers = []
     for modifier_name in (
-        # possible with most terminals
-        'shift', 'alt', 'ctrl',
-        # kitty, only
+            # possible with most terminals
+            'shift', 'alt', 'ctrl',
+            # kitty, only
             'super', 'hyper', 'meta', 'caps_lock', 'num_lock'):
         if getattr(keystroke, f'_{modifier_name}'):
             modifiers.append(modifier_name.upper())

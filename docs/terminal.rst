@@ -100,6 +100,26 @@ Hover your cursor over ``documentation``, and it should highlight as a clickable
 .. figure:: https://dxtz6bzwq9sxx.cloudfront.net/demo_basic_hyperlink.gif
    :alt: Animation of running code example and clicking a hyperlink
 
+Sixel Graphics Support
+----------------------
+
+Sixel is a bitmap graphics format supported by some modern terminal emulators
+(including xterm with ``-ti vt340``, mlterm, WezTerm, and others), allowing
+applications to display inline images directly in the terminal.
+
+You can check whether your terminal supports sixel graphics using the
+:meth:`~.Terminal.does_sixel` method:
+
+    >>> if term.does_sixel(timeout=1.0):
+    ...     display_sixel_image()
+    ... else:
+    ...     display_text_fallback()
+
+.. note:: Always specify a ``timeout`` argument (e.g., ``1.0`` seconds) when calling
+    :meth:`~.Terminal.does_sixel` to avoid blocking indefinitely. This is especially
+    important in CI/build environments or non-interactive contexts where the terminal
+    may not respond to capability queries.
+
 Styles
 ------
 
