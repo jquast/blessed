@@ -532,16 +532,6 @@ class Keystroke(str):
             For event predicates and application key predicates, these
             parameters are accepted but not used.
         """
-        # Check if this is a property in the class (str subclasses have special lookup behavior)
-        for klass in type(self).__mro__:
-            if attr in klass.__dict__:
-                class_attr = klass.__dict__[attr]
-                if isinstance(class_attr, property):
-                    # Call the property getter explicitly
-                    return class_attr.fget(self)
-                # Found a non-property class attribute, let normal lookup continue
-                break
-
         if not attr.startswith('is_'):
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}'")
 
