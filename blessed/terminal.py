@@ -1,4 +1,5 @@
 """Module containing :class:`Terminal`, the primary API entry point."""
+# pylint: disable=too-many-lines
 # std imports
 import os
 import re
@@ -12,7 +13,7 @@ import platform
 import warnings
 import contextlib
 import collections
-from typing import IO, List, Match, Tuple, Union, Optional, Generator
+from typing import IO, Dict, List, Match, Tuple, Union, Optional, Generator
 
 # SupportsIndex was added in Python 3.8
 if sys.version_info >= (3, 8):
@@ -33,6 +34,8 @@ from .keyboard import (DEFAULT_ESCDELAY,
                        get_keyboard_codes,
                        get_leading_prefixes,
                        get_keyboard_sequences)
+from .dec_modes import DecPrivateMode as _DecPrivateMode
+from .dec_modes import DecModeResponse
 from .sequences import Termcap, Sequence, SequenceTextWrapper
 from .colorspace import RGB_256TABLE
 from .formatters import (COLORS,
@@ -132,10 +135,13 @@ class Terminal():
         'terminal_enquire': 'u9',
     }
 
+    #: DEC Private Mode constants accessible via Terminal.DecPrivateMode or term.DecPrivateMode
+    DecPrivateMode = _DecPrivateMode
+
     def __init__(self,
                  kind: Optional[str] = None,
                  stream: Optional[IO[str]] = None,
-                 force_styling: bool = False) -> None:
+                 force_styling: Union[bool, None] = False) -> None:
         """
         Initialize the terminal.
 
@@ -226,11 +232,7 @@ class Terminal():
         self.__init__color_capabilities()
         self.__init__capabilities()
         self.__init__keycodes()
-
-        # Initialize Kitty keyboard protocol tracking
-        self._kitty_kb_first_query_failed = False
-        self._kitty_kb_first_query_attempted = False
-        self._device_attributes_cache: Optional[DeviceAttribute] = None
+        self.__init__dec_private_modes()
 
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
@@ -393,6 +395,26 @@ class Terminal():
                 warnings.warn(f'LookupError: {err}, defaulting to UTF-8 for keyboard.')
                 self._encoding = 'UTF-8'
                 self._keyboard_decoder = codecs.getincrementaldecoder(self._encoding)()
+
+            # Initialize latin-1 decoder for legacy mouse sequences
+            # This is used for sequences starting with '\x1b[M' that may contain high bytes (≥0x80)
+            # which are not valid UTF-8 but are valid in latin-1 encoding
+            self._keyboard_decoder_latin1 = codecs.getincrementaldecoder('latin-1')()
+
+    def __init__dec_private_modes(self) -> None:
+        """Initialize DEC Private Mode caching and state tracking."""
+        # Cache for queried DEC private modes to avoid repeated queries
+        self._dec_mode_cache: Dict[int, int] = {}
+        # Global timeout tracking state
+        self._dec_any_query_succeeded = False
+        self._dec_first_query_failed = False
+
+        # Kitty keyboard protocol timeout tracking (no caching)
+        self._kitty_kb_first_query_failed = False
+        self._kitty_kb_first_query_attempted = False
+
+        # Device Attributes (DA1) cache
+        self._device_attributes_cache: Optional[DeviceAttribute] = None
 
     def __getattr__(self,
                     attr: str) -> Union[NullCallableString,
@@ -812,6 +834,7 @@ class Terminal():
             return None
 
         # parse, cache, and return the response
+        # pylint: disable=attribute-defined-outside-init
         self._device_attributes_cache = DeviceAttribute.from_match(match)
         return self._device_attributes_cache
 
@@ -851,6 +874,268 @@ class Terminal():
         """
         da = self.get_device_attributes(timeout=timeout, force=False)
         return da.supports_sixel if da is not None else False
+
+    def get_dec_mode(self, mode: Union[int, _DecPrivateMode],
+                     timeout: Optional[float] = None, force: bool = False) -> DecModeResponse:
+        """
+        Query the state of a DEC Private Mode (DECRQM).
+
+        Sends a DECRQM query to the terminal and returns a
+        :class:`DecModeResponse` instance. Use the helper methods,
+        :meth:`DecModeResponse.is_supported`,
+        :meth:`DecModeResponse.is_enabled`, etc. to interpret the result.
+
+        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
+        transmitted or response awaited, and the :class:`DecModeResponse` value
+        returned is always :attr:`DecModeResponse.NOT_QUERIED`.
+
+        In some cases a ``timeout`` value should be set, as it is possible for a
+        terminal that succeeds :attr:`does_styling` and :attr:`is_a_tty` to fail
+        to respond to DEC Private Modes, such as in a CI Build Service or other
+        "dumb" terminal, even a few popular modern ones such as Konsole.
+
+        If a DEC Private mode query fails to respond within the ``timeout``
+        specified, the :class:`DecModeResponse` value returned is
+        :attr:`DecModeResponse.NO_RESPONSE`. If this was the first DEC Private
+        mode query, all subsequent queries return a :class:`DecModeResponse`
+        value of :attr:`DecModeResponse.NOT_QUERIED` unless ``force=True`` is
+        set.
+
+        **Repeat queries return the (cached) known state immediately** without
+        re-inquiry unless ``force=True``.  Although there are special cases
+        where a user may re-configure their terminal settings after the state
+        was requested by an application, the application is generally restarted
+        to recognize the new settings rather than to repeatidly re-inquire about
+        their latest value!
+
+        :arg mode: DEC Private Mode to query
+        :type mode: DecPrivateMode | int
+        :arg float timeout: Timeout in seconds to await terminal response
+        :arg bool force: Force active terminal inquery in all cases
+        :rtype: DecModeResponse
+        :returns: DecModeResponse instance
+        :raises TypeError: If mode is not DecPrivateMode or int
+
+        .. code-block:: python
+
+            term = Terminal()
+
+            # Query synchronized output support
+            response = term.get_dec_mode(DecPrivateMode.SYNCHRONIZED_OUTPUT)
+            if response.is_supported():
+                print("Synchronized output is available")
+        """
+        if not isinstance(mode, (int, _DecPrivateMode)):
+            raise TypeError(f"Invalid mode argument, got {mode!r}, "
+                            "DecPrivateMode or int expected")
+
+        if not self.does_styling or not self.is_a_tty:
+            # no query is ever done for terminals where does_styling is False
+            return DecModeResponse(mode, DecModeResponse.NOT_QUERIED)
+
+        if self._dec_first_query_failed and not force:
+            # When the first query is not responded, we can safely assume all
+            # subsequent inqueries will be ignored
+            return DecModeResponse(mode, DecModeResponse.NOT_QUERIED)
+
+        # Always return the cached response when available unless force=True
+        if int(mode) in self._dec_mode_cache and not force:
+            cached_value = self._dec_mode_cache[int(mode)]
+            return DecModeResponse(mode, cached_value)
+
+        # Build and send query sequence and expected response pattern
+        query = f'\x1b[?{int(mode):d}$p'
+        response_pattern = re.compile(f'\x1b\\[\\?{int(mode):d};([0-4])\\$y')
+
+        match = self._query_response(query, response_pattern, timeout)
+
+        # invalid or no response (timeout)
+        if match is None:
+            if not self._dec_any_query_succeeded:
+                # This is the first-ever query and it failed! This query returns
+                # NO_RESPONSE to indicate the timeout, subsequent queries will
+                # return NOT_QUERIED.
+                # pylint: disable=attribute-defined-outside-init
+                self._dec_first_query_failed = True
+                return DecModeResponse(mode, DecModeResponse.NO_RESPONSE)
+            # Rather unusual, we've previously had success with get_dec_mode,
+            # but no response was found in this instance -- presumably the
+            # remote end is disconnected or stalled, indicated by NO_RESPONSE,
+            # or otherwise had some corruption in this specific response string.
+            return DecModeResponse(mode, DecModeResponse.NO_RESPONSE)
+
+        # parse, cache, and return the response value
+        response_value = int(match.group(1))
+        # pylint: disable=attribute-defined-outside-init
+        self._dec_mode_cache[int(mode)] = response_value
+        self._dec_any_query_succeeded = True
+        return DecModeResponse(mode, response_value)
+
+    @contextlib.contextmanager
+    def dec_modes_enabled(self, *modes: Union[int, _DecPrivateMode],
+                          timeout: Optional[float] = None) -> Generator[None, None, None]:
+        """
+        Context manager for temporarily enabling DEC Private Modes.
+
+        On entry, queries each mode's current state using get_dec_mode().
+        For modes that are supported but currently disabled, enables them
+        and tracks them for restoration. On exit, disables all modes that
+        were enabled by this context manager, restoring original state.
+        Unsupported modes are silently ignored.
+
+        :arg modes: One or more DEC Private Mode numbers or enum members
+        :arg float timeout: Timeout in seconds for get_dec_mode calls
+        :raises TypeError: If mode is not DecPrivateMode or int
+
+        .. code-block:: python
+
+            term = Terminal()
+
+            # Enable synchronized output temporarily
+            with term.dec_modes_enabled(DecPrivateMode.SYNCHRONIZED_OUTPUT):
+                # All output will be atomic
+                print("Frame 1")
+                print("Frame 2")
+        """
+        # Track modes enabled ('SET") to be re-enabled ('RESET') after the yield
+        enabled_modes = []
+
+        # Query current state of each mode and build enable list
+        for arg_pos, mode in enumerate(modes):
+            if isinstance(mode, _DecPrivateMode):
+                mode_num = mode.value
+            elif isinstance(mode, int):
+                mode_num = mode
+            else:
+                raise TypeError(f"Invalid mode argument number {arg_pos}, got {mode!r}, "
+                                "DecPrivateMode or int expected")
+
+            response = self.get_dec_mode(mode_num, timeout=timeout)
+            if response.is_supported() and not response.is_enabled():
+                enabled_modes.append(mode_num)
+
+        self._dec_mode_set_enabled(*enabled_modes)
+        try:
+            yield
+        finally:
+            self._dec_mode_set_disabled(*enabled_modes)
+
+    @contextlib.contextmanager
+    def dec_modes_disabled(self, *modes: Union[int, _DecPrivateMode],
+                           timeout: Optional[float] = None) -> Generator[None, None, None]:
+        """
+        Context manager for temporarily disabling DEC Private Modes.
+
+        Uses the same logic as dec_modes_enabled but inverted: disables
+        supported modes that are currently enabled on entry, then restores
+        them on exit.
+
+        :arg modes: One or more DEC Private Mode numbers or enum members
+        :arg float timeout: Timeout in seconds for get_dec_mode calls
+        :raises TypeError: If mode is not DecPrivateMode or int
+        """
+        # Track modes disabled ('RESET") to be re-enabled ('SET') after the yield
+        disabled_modes = []
+
+        # Query current state of each mode and build disable list
+        for arg_pos, mode in enumerate(modes):
+            if isinstance(mode, _DecPrivateMode):
+                mode_num = mode.value
+            elif isinstance(mode, int):
+                mode_num = mode
+            else:
+                raise TypeError(f"Invalid mode argument number {arg_pos}, got {mode!r}, "
+                                "DecPrivateMode or int expected")
+
+            response = self.get_dec_mode(mode_num, timeout=timeout)
+            if response.is_supported() and response.is_enabled():
+                disabled_modes.append(mode_num)
+
+        self._dec_mode_set_disabled(*disabled_modes)
+        try:
+            yield
+        finally:
+            self._dec_mode_set_enabled(*disabled_modes)
+
+    def _dec_mode_set_enabled(self, *modes: Union[int, _DecPrivateMode]) -> None:
+        """
+        Enable one or more DEC Private Modes (DECSET).
+
+        :arg int | DecPrivateMode modes: One or more DEC Private Modes to enable
+
+        Emits the DECSET sequence to the attached stream as a side-effect, to
+        enable the specified modes, and cache their known state as 'SET'
+        (enabled) for subsequent :meth:`get_dec_mode` queries.
+
+        It is suggested to use the context manager, :meth:`dec_modes_enabled`.
+        Otherwise, an application should also evaluate the :meth:`get_dec_mode`
+        response to conditionally only call this method when
+        :meth:`DecModeResponse.is_supported` is True for the given mode, and to
+        conditionally call :meth:`_dec_mode_set_disabled` to return terminal to
+        its prior state in a try/finally clause.
+        """
+        # Extract mode numbers
+        mode_numbers = []
+        for arg_pos, mode in enumerate(modes):
+            if isinstance(mode, _DecPrivateMode):
+                mode_num = mode.value
+            elif isinstance(mode, int):
+                mode_num = mode
+            else:
+                raise TypeError(f"Invalid mode argument number {arg_pos}, got {mode!r}, "
+                                "DecPrivateMode or int expected")
+            mode_numbers.append(mode_num)
+
+        if not self.does_styling or not mode_numbers:
+            return
+
+        sequence = f'\x1b[?{";".join(str(val) for val in mode_numbers)}h'
+        self.stream.write(sequence)
+        self.stream.flush()
+
+        # Update cache for set (enabled) modes
+        for mode_num in mode_numbers:
+            self._dec_mode_cache[mode_num] = DecModeResponse.SET
+
+    def _dec_mode_set_disabled(self, *modes: Union[int, _DecPrivateMode]) -> None:
+        """
+        Disable one or more DEC Private Modes (DECRST).
+
+        :arg int | DecPrivateMode modes: One or more DEC Private Modes to disable
+
+        Emits the DECRST sequence to the attached stream as a side-effect, to
+        enable the specified modes, and cache their known state as 'RESET'
+        (disabled) for subsequent :meth:`get_dec_mode` queries.
+
+        It is suggested to use the context manager, :meth:`dec_modes_disabled`.
+        Otherwise, an application should also evaluate the :meth:`get_dec_mode`
+        response to conditionally only call this method when
+        :meth:`DecModeResponse.is_supported` is True for the given mode, and to
+        conditionally call :meth:`_dec_mode_set_enabled` to return terminal to
+        its prior state in a try/finally clause.
+        """
+        # Extract mode numbers
+        mode_numbers = []
+        for arg_pos, mode in enumerate(modes):
+            if isinstance(mode, _DecPrivateMode):
+                mode_num = mode.value
+            elif isinstance(mode, int):
+                mode_num = mode
+            else:
+                raise TypeError(f"Invalid mode argument number {arg_pos}, got {mode!r}, "
+                                "DecPrivateMode or int expected")
+            mode_numbers.append(mode_num)
+
+        if not self.does_styling or not mode_numbers:
+            return
+
+        sequence = f'\x1b[?{";".join(str(val) for val in mode_numbers)}l'
+        self.stream.write(sequence)
+        self.stream.flush()
+
+        # Update cache for reset (disabled) modes
+        for mode_num in mode_numbers:
+            self._dec_mode_cache[mode_num] = DecModeResponse.RESET
 
     def get_kitty_keyboard_state(self, timeout: Optional[float] = None,
                                  force: bool = False) -> Optional[KittyKeyboardProtocol]:
@@ -917,6 +1202,7 @@ class Terminal():
         # attempted and not forced)
         if not self._kitty_kb_first_query_attempted and not force:
             # Mark that we've attempted the first query
+            # pylint: disable=attribute-defined-outside-init
             self._kitty_kb_first_query_attempted = True
 
             # Send both Kitty and DA queries together for boundary detection
@@ -935,6 +1221,7 @@ class Terminal():
             # invalid or no response (timeout)
             if match is None:
                 # Set sticky failure flag on first timeout
+                # pylint: disable=attribute-defined-outside-init
                 self._kitty_kb_first_query_failed = True
                 return None
 
@@ -956,10 +1243,12 @@ class Terminal():
 
             if da1_match:
                 # Only DA1 response found, no Kitty support
+                # pylint: disable=attribute-defined-outside-init
                 self._kitty_kb_first_query_failed = True
                 return None
 
             # Neither response found - no support
+            # pylint: disable=attribute-defined-outside-init
             self._kitty_kb_first_query_failed = True
             return None
 
@@ -972,6 +1261,7 @@ class Terminal():
         # invalid or no response (timeout)
         if match is None:
             # Set sticky failure flag on timeout (though this should be rare for subsequent calls)
+            # pylint: disable=attribute-defined-outside-init
             self._kitty_kb_first_query_failed = True
             return None
 
@@ -1812,7 +2102,7 @@ class Terminal():
 
         # decode buffered keystroke, if any
         ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
-                              final=False)
+                              final=False, dec_mode_cache=self._dec_mode_cache)
 
         # so long as the most immediately received or buffered keystroke is
         # incomplete, (which may be a multibyte encoding), block until until
@@ -1827,7 +2117,7 @@ class Terminal():
 
             # and then resolve for sequence
             ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
-                                  final=False)
+                                  final=False, dec_mode_cache=self._dec_mode_cache)
 
         # handle escape key (KEY_ESCAPE) vs. escape sequence (like those
         # that begin with \x1b[ or \x1bO) up to esc_delay when
@@ -1848,7 +2138,7 @@ class Terminal():
                 # re-check 'final' after reading more bytes
                 final = bool(ucs) and ucs not in self._keymap_prefixes
                 ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
-                                      final=final)
+                                      final=final, dec_mode_cache=self._dec_mode_cache)
 
         # buffer any remaining text received
         self.ungetch(ucs[len(ks):])

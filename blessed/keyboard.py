@@ -1,10 +1,12 @@
 """Sub-module providing 'keyboard awareness'."""
+# pylint: disable=too-many-lines
 # std imports
 import os
 import re
 import time
 import typing
 import platform
+import functools
 from typing import TYPE_CHECKING, Set, Dict, Match, TypeVar, Optional
 from collections import OrderedDict, namedtuple
 
@@ -12,6 +14,8 @@ if TYPE_CHECKING:  # pragma: no cover
     # local
     from blessed.terminal import Terminal
 
+# local
+from blessed.dec_modes import DecPrivateMode
 
 _T = TypeVar('_T', bound='Keystroke')
 
@@ -25,6 +29,39 @@ if platform.system() == 'Windows':
 else:
     import curses
     from curses.has_key import _capability_names as capability_names
+
+
+# DEC event namedtuples
+BracketedPasteEvent = namedtuple('BracketedPasteEvent', 'text')
+
+
+class MouseEvent(namedtuple('_MouseEvent',
+                            'button x y is_release shift meta ctrl is_motion is_wheel')):
+    """
+    Mouse event with button, coordinates, and modifier information.
+
+    A unified mouse event structure that supports both legacy and SGR mouse protocols. Provides a
+    custom __repr__ that only displays active (non-default) attributes for clarity.
+    """
+
+    def __repr__(self) -> str:
+        """Return succinct representation showing only active attributes."""
+        # Always show button, x, y
+        parts = [f'button={self.button}', f'x={self.x}', f'y={self.y}']
+
+        # Only show boolean flags when True
+        for bool_name in ('is_release', 'shift', 'meta', 'ctrl', 'is_motion', 'is_wheel'):
+            if getattr(self, bool_name):
+                parts.append(f'{bool_name}=True')
+        return f"MouseEvent({', '.join(parts)})"
+
+
+# Backwards compatibility aliases
+MouseSGREvent = MouseEvent
+MouseLegacyEvent = MouseEvent
+
+FocusEvent = namedtuple('FocusEvent', 'gained')
+SyncEvent = namedtuple('SyncEvent', 'begin')
 
 
 # Keyboard protocol namedtuples
@@ -54,6 +91,35 @@ RE_PATTERN_LEGACY_SS3_FKEYS = re.compile(r'\x1bO(?P<mod>\d)(?P<final>[PQRS])')
 # ModifyOtherKeys: ESC [ 27 ; modifiers ; key [~]
 RE_PATTERN_MODIFY_OTHER = re.compile(
     r'\x1b\[27;(?P<modifiers>\d+);(?P<key>\d+)(?P<tilde>~?)')
+
+# DEC event pattern container
+DECEventPattern = functools.namedtuple("DEC_EVENT_PATTERN", ["mode", "pattern"])
+
+# DEC event patterns - compiled regexes with metadata
+DEC_EVENT_PATTERNS = [
+    # Bracketed paste - must be first due to greedy nature; this is more closely
+    # married to ESC_DELAY than it first appears -- the full payload and final
+    # marker must be received under ESC_DELAY seconds.
+    DECEventPattern(mode=DecPrivateMode.BRACKETED_PASTE, pattern=(
+        re.compile(r'\x1b\[200~(?P<text>.*?)\x1b\[201~', re.DOTALL))),
+    # Mouse SGR (1006) - recommended format: CSI < b;x;y m/M
+    # Also supports legacy format without a '<' for backward compatibility,
+    DECEventPattern(mode=DecPrivateMode.MOUSE_EXTENDED_SGR, pattern=(
+        re.compile(r'\x1b\[<?(?P<b>\d+);(?P<x>\d+);(?P<y>\d+)(?P<type>[mM])'))),
+    # Mouse SGR-Pixels (1016) - identical wire format to 1006!  This helps to
+    # have a matching Keystroke.mode, determined by active enabled modes,
+    # preferring pixels if enabled, the specification would require the *order*
+    # that they were enabled and disabled in case of conflict, too much code to
+    # be practical.
+    DECEventPattern(mode=DecPrivateMode.MOUSE_EXTENDED_SGR, pattern=(
+        re.compile(r'\x1b\[<?(?P<b>\d+);(?P<x>\d+);(?P<y>\d+)(?P<type>[mM])'))),
+    # Legacy mouse (X10/1000/1002/1003) - CSI M followed by 3 bytes
+    DECEventPattern(mode=DecPrivateMode.MOUSE_REPORT_CLICK,
+                    pattern=re.compile(r'\x1b\[M(?P<cb>.)(?P<cx>.)(?P<cy>.)')),
+    # Focus tracking, is just 'I'n or 'O'ut
+    DECEventPattern(mode=DecPrivateMode.FOCUS_IN_OUT_EVENTS,
+                    pattern=re.compile(r'\x1b\[(?P<io>[IO])'))
+]
 
 # Control character mappings
 # Note: Ctrl+Space (code 0) is handled specially as 'SPACE', not '@' or ' '.
@@ -848,6 +914,148 @@ class Keystroke(str):
                 or self._get_ascii_value()
                 or '')
 
+    @property
+    def mode(self) -> Optional['DecPrivateMode']:
+        """
+        DEC Private Mode associated with this keystroke, if any.
+
+        :rtype: DecPrivateMode or None
+        :returns: The :class:`~blessed.dec_modes.DecPrivateMode` enum value
+            associated with this keystroke, or ``None`` if this is not a DEC mode event.
+
+        .. note:: Mode names beginning SpecialInternal with negative values (-1,
+            -2, -3) are used to track how some kinds of application keys are
+            matched.
+        """
+        if self._mode is not None:
+            return DecPrivateMode(self._mode)
+        return None
+
+    @property
+    def mode_values(self) -> Optional[typing.Union[BracketedPasteEvent,
+                                                   MouseSGREvent, MouseLegacyEvent, FocusEvent]]:
+        """
+        Return structured data for DEC private mode events.
+
+        Returns a namedtuple with parsed event data for supported
+        :class:`~.DecPrivateMode` modes:
+
+        - ``BRACKETED_PASTE``: :class:`BracketedPasteEvent` with ``text`` field
+        - ``MOUSE_EXTENDED_SGR``, ``MOUSE_ALL_MOTION``,  ``MOUSE_REPORT_DRAG``,
+          and ``MOUSE_REPORT_CLICK`` events: :class:`MouseEvent` with button,
+          coordinates, and modifier flags
+        - ``FOCUS_IN_OUT_EVENTS``: :class:`FocusEvent` with ``gained`` boolean field
+
+        :rtype: namedtuple or None
+        :returns: Structured event data for this DEC mode event, or ``None`` if this
+            keystroke is not a DEC mode event or the mode is not supported
+        """
+        if self._mode is None or self._match is None:
+            return None
+
+        # Call appropriate private parser method based on mode
+        fn_callback = {
+            DecPrivateMode.MOUSE_REPORT_CLICK: self._parse_mouse_legacy,
+            DecPrivateMode.MOUSE_HILITE_TRACKING: self._parse_mouse_legacy,
+            DecPrivateMode.MOUSE_REPORT_DRAG: self._parse_mouse_legacy,
+            DecPrivateMode.MOUSE_ALL_MOTION: self._parse_mouse_legacy,
+            DecPrivateMode.FOCUS_IN_OUT_EVENTS: self._parse_focus,
+            DecPrivateMode.MOUSE_EXTENDED_SGR: self._parse_mouse_sgr,
+            DecPrivateMode.MOUSE_SGR_PIXELS: self._parse_mouse_sgr,
+            DecPrivateMode.BRACKETED_PASTE: self._parse_bracketed_paste,
+        }.get(self._mode)
+        if fn_callback is not None:
+            return fn_callback()
+        # Unknown DEC mode or unsupported mode
+        return None
+
+    def _parse_mouse_legacy(self) -> MouseLegacyEvent:
+        """Parse legacy mouse event (X10/1000/1002/1003) from stored regex match."""
+        cb = ord(self._match.group('cb')) - 32
+        cx = ord(self._match.group('cx')) - 32
+        cy = ord(self._match.group('cy')) - 32
+
+        # Extract button and modifiers from cb
+        button = cb & 3
+        is_release = button == 3
+        if is_release:
+            button = 0  # Release doesn't specify which button
+
+        # Extract modifier flags
+        shift = bool(cb & 4)
+        meta = bool(cb & 8)
+        ctrl = bool(cb & 16)
+
+        # Extract motion/drag flags
+        is_motion = bool(cb & 32)
+
+        # Wheel events
+        is_wheel = cb >= 64
+        if is_wheel:
+            button = cb - 64  # 0=wheel up, 1=wheel down
+
+        return MouseLegacyEvent(
+            button=button,
+            x=cx,
+            y=cy,
+            is_release=is_release,
+            shift=shift,
+            meta=meta,
+            ctrl=ctrl,
+            is_motion=is_motion,
+            is_wheel=is_wheel
+        )
+
+    def _parse_focus(self) -> FocusEvent:
+        """Parse focus event from stored regex match."""
+        gained = bool(self._match.group('io') == 'I')
+        return FocusEvent(gained=gained)
+
+    def _parse_mouse_sgr(self) -> MouseSGREvent:
+        """
+        Parse SGR mouse event from stored regex match.
+
+        Handles both SGR (mode 1006) and SGR-Pixels (mode 1016) since they
+        use identical wire formats: CSI < b;x;y m/M. The difference is semantic:
+        - Mode 1006: coordinates represent character cell positions
+        - Mode 1016: coordinates represent pixel positions
+        Applications must interpret x,y coordinates based on which mode was enabled.
+        """
+        b = int(self._match.group('b'))
+        x = int(self._match.group('x'))
+        y = int(self._match.group('y'))
+        event_type = self._match.group('type')
+
+        is_release = event_type == 'm'
+
+        # Extract modifiers from button code
+        shift = bool(b & 4)
+        meta = bool(b & 8)
+        ctrl = bool(b & 16)
+
+        # Extract motion/drag flags
+        is_motion = bool(b & 32)
+        is_wheel = b in {64, 65}  # wheel up/down
+
+        # Get base button (0-2 for left/middle/right, or 64-65 for wheel)
+        button = b & 3 if not is_wheel else b
+
+        return MouseSGREvent(
+            button=button,
+            x=x,
+            y=y,
+            is_release=is_release,
+            shift=shift,
+            meta=meta,
+            ctrl=ctrl,
+            is_motion=is_motion,
+            is_wheel=is_wheel
+        )
+
+    def _parse_bracketed_paste(self) -> BracketedPasteEvent:
+        """Parse bracketed paste event from stored regex match."""
+        return BracketedPasteEvent(text=self._match.group('text'))
+
 
 def get_curses_keycodes() -> Dict[str, int]:
     """
@@ -998,11 +1206,13 @@ def get_leading_prefixes(sequences: typing.Iterable[str]) -> Set[str]:
     return {seq[:i] for seq in sequences for i in range(1, len(seq))}
 
 
+# pylint: disable=too-many-positional-arguments
 def resolve_sequence(text: str,
                      mapper: typing.Mapping[str, int],
                      codes: typing.Mapping[int, str],
                      prefixes: Optional[Set[str]] = None,
-                     final: bool = False) -> Keystroke:
+                     final: bool = False,
+                     dec_mode_cache: Optional[Dict[int, int]] = None) -> Keystroke:
     r"""
     Return a single :class:`Keystroke` instance for given sequence ``text``.
 
@@ -1013,6 +1223,7 @@ def resolve_sequence(text: str,
         by their mnemonic name, such as ``'KEY_LEFT'``.
     :arg set prefixes: Set of all valid sequence prefixes for quick matching
     :arg bool final: Whether this is the final resolution attempt (no more input expected)
+    :arg dict dec_mode_cache: Dictionary of DEC private mode states (mode number -> state value)
     :rtype: Keystroke
     :returns: Keystroke instance for the given sequence
 
@@ -1029,13 +1240,15 @@ def resolve_sequence(text: str,
     that does not negotiate about any DEC Private modes but transmits
     metaSendsEscape anyway, so exhaustive match is performed in all cases.
     """
-    # First try advanced keyboard protocol matchers
+    # First try advanced keyboard protocol matchers and DEC events
     ks = None
-    for match_fn in (_match_kitty_key,
-                     _match_modify_other_keys,
-                     _match_legacy_csi_letter_form,
-                     _match_legacy_csi_tilde_form,
-                     _match_legacy_ss3_fkey_form):
+    for match_fn in (
+            functools.partial(_match_dec_event, dec_mode_cache=dec_mode_cache),
+            _match_kitty_key,
+            _match_modify_other_keys,
+            _match_legacy_csi_letter_form,
+            _match_legacy_csi_tilde_form,
+            _match_legacy_ss3_fkey_form):
         ks = match_fn(text)
         if ks:
             break
@@ -1137,6 +1350,44 @@ def _read_until(term: 'Terminal',
             break
 
     return match, buf
+
+
+def _match_dec_event(text: str,
+                     dec_mode_cache: Optional[Dict[int,
+                                                   int]] = None) -> Optional[Keystroke]:
+    """
+    Attempt to match text against DEC event patterns.
+
+    Only matches patterns whose corresponding DEC modes are enabled in the cache.
+    This prevents false positives like matching focus events when focus tracking is disabled.
+
+    :arg str text: Input text to match against DEC patterns
+    :arg dict dec_mode_cache: Dictionary of DEC private mode states (mode number -> state value)
+    :rtype: Keystroke or None
+    :returns: :class:`Keystroke` with DEC event data if matched, ``None`` otherwise
+    """
+    from blessed.dec_modes import DecModeResponse  # pylint: disable=import-outside-toplevel
+
+    if dec_mode_cache is None:
+        dec_mode_cache = {}
+
+    for mode, pattern in DEC_EVENT_PATTERNS:
+        # Only match if the mode is enabled (state == SET)
+        mode_state = dec_mode_cache.get(int(mode))
+        if mode_state != DecModeResponse.SET:
+            continue
+
+        match = pattern.match(text)
+        ref_mode = mode
+        if match:
+            # Special case: mode 1016 (SGR-Pixels) has same wire format as 1006
+            # (SGR) Prefer return mode value of 1016 (SGR-Pixels) when is
+            # enabled !
+            if ref_mode == DecPrivateMode.MOUSE_EXTENDED_SGR:
+                if dec_mode_cache.get(DecPrivateMode.MOUSE_SGR_PIXELS) == DecModeResponse.SET:
+                    ref_mode = DecPrivateMode.MOUSE_SGR_PIXELS
+            return Keystroke(ucs=match.group(0), mode=ref_mode, match=match)
+    return None
 
 
 def _match_kitty_key(text: str) -> Optional[Keystroke]:
