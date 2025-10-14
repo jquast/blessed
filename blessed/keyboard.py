@@ -45,18 +45,19 @@ RE_PATTERN_KITTY_KB_PROTOCOL = re.compile(
     r'(?::(?P<event_type>\d+))?'
     r'(?:;(?P<text_codepoints>[\d:]+))?'
     r'u')
-# ModifyOtherKeys: ESC [ 27 ; modifiers ; key [~]
-RE_PATTERN_MODIFY_OTHER = re.compile(
-    r'\x1b\[27;(?P<modifiers>\d+);(?P<key>\d+)(?P<tilde>~?)')
 # Legacy CSI modifiers: ESC [ 1 ; modifiers [ABCDEFHPQRS]
 RE_PATTERN_LEGACY_CSI_MODIFIERS = re.compile(
     r'\x1b\[1;(?P<mod>\d+)(?::(?P<event>\d+))?(?P<final>[ABCDEFHPQRS])')
 RE_PATTERN_LEGACY_CSI_TILDE = re.compile(
     r'\x1b\[(?P<key_num>\d+);(?P<mod>\d+)(?::(?P<event>\d+))?~')
 RE_PATTERN_LEGACY_SS3_FKEYS = re.compile(r'\x1bO(?P<mod>\d)(?P<final>[PQRS])')
+# ModifyOtherKeys: ESC [ 27 ; modifiers ; key [~]
+RE_PATTERN_MODIFY_OTHER = re.compile(
+    r'\x1b\[27;(?P<modifiers>\d+);(?P<key>\d+)(?P<tilde>~?)')
 
 # Control character mappings
-SYMBOLS_MAP_CTRL_CHAR = {'@': 0, '[': 27, '\\': 28, ']': 29, '^': 30, '_': 31, '?': 127}
+# Note: Ctrl+Space (code 0) is handled specially as 'SPACE', not '@' or ' '.
+SYMBOLS_MAP_CTRL_CHAR = {'[': 27, '\\': 28, ']': 29, '^': 30, '_': 31, '?': 127}
 SYMBOLS_MAP_CTRL_VALUE = {v: k for k, v in SYMBOLS_MAP_CTRL_CHAR.items()}
 
 # Event type tokens for keystroke predicates
@@ -195,8 +196,7 @@ class Keystroke(str):
         keycodes = get_keyboard_codes()
         base_name = keycodes.get(self._code)
 
-        # Special handling for PUA keypad keys that aren't in get_keyboard_codes()
-        # These have legacy non-PUA versions (513-529) but we still need names for the PUA versions
+        # handle PUA keypad keys that aren't in get_keyboard_codes()
         if not base_name and 57399 <= self._code <= 57416:  # Keypad PUA range
             base_name = _PUA_KEYPAD_NAMES.get(self._code)
 
@@ -232,10 +232,9 @@ class Keystroke(str):
             return f"{base_result}_REPEATED"
         if self.released:
             return f"{base_result}_RELEASED"
-        return base_result
+        return base_result  # pressed (no suffix)
 
     def _get_kitty_protocol_name(self) -> Optional[str]:
-        # pylint: disable=too-many-return-statements
         """
         Get name for Kitty keyboard protocol letter/digit/symbol.
 
@@ -289,12 +288,11 @@ class Keystroke(str):
             return None
 
         char_code = ord(self)
+        if char_code == 0:
+            return 'KEY_CTRL_SPACE'
         if 1 <= char_code <= 26:
             # Ctrl+A through Ctrl+Z
             return f'KEY_CTRL_{chr(char_code + ord("A") - 1)}'
-        # Special case for Ctrl+Space (char_code 0)
-        if char_code == 0:
-            return 'KEY_CTRL_SPACE'
         if char_code in SYMBOLS_MAP_CTRL_VALUE:
             return f'KEY_CTRL_{SYMBOLS_MAP_CTRL_VALUE[char_code]}'
         return None
@@ -305,12 +303,11 @@ class Keystroke(str):
 
         Returns symbol like 'A' for Ctrl+A, 'SPACE' for Ctrl+Space, etc.
         """
+        if char_code == 0:
+            return 'SPACE'
         if 1 <= char_code <= 26:
             # Ctrl+A through Ctrl+Z
             return chr(char_code + ord("A") - 1)
-        # Special case for Ctrl+Space (char_code 0)
-        if char_code == 0:
-            return 'SPACE'
         # Ctrl+symbol
         return SYMBOLS_MAP_CTRL_VALUE[char_code]
 
@@ -552,13 +549,7 @@ class Keystroke(str):
 
     @staticmethod
     def _get_keycode_by_name(key_name: str) -> Optional[int]:
-        """
-        Get keycode value for a given key name.
-
-        :arg str key_name: Key name without 'KEY_' prefix (e.g., 'F1', 'UP')
-        :rtype: int or None
-        :returns: Keycode value if found, None otherwise
-        """
+        """Get keycode value for a given key name."""
         keycodes = get_keyboard_codes()
         expected_key_constant = f'KEY_{key_name.upper()}'
         for code, name in keycodes.items():
@@ -569,14 +560,7 @@ class Keystroke(str):
     def _build_appkeys_predicate(self, tokens_modifiers: typing.List[str], key_name: str,
                                  event_type: Optional[str] = None
                                  ) -> typing.Callable[[Optional[str], bool], bool]:
-        """
-        Build a predicate function for application keys.
-
-        :arg list tokens_modifiers: List of modifier names to check
-        :arg str key_name: Application key name (without 'KEY_' prefix)
-        :arg str event_type: Optional event type ('pressed', 'repeated', 'released')
-        :returns: Callable predicate function checking modifiers and optionally event type
-        """
+        """Build a predicate function for application keys."""
         def keycode_predicate(char: Optional[str] = None, ignore_case: bool = True) -> bool:
             # pylint: disable=unused-argument
             # char and ignore_case parameters are accepted but not used for application keys
@@ -609,12 +593,7 @@ class Keystroke(str):
 
     def _build_alphanum_predicate(self, tokens_modifiers: typing.List[str]
                                   ) -> typing.Callable[[Optional[str], bool], bool]:
-        """
-        Build a predicate function for modifier checking of alphanumeric input.
-
-        Returns a callable that checks if keystroke matches the predicate 'tokens_modifiers', as
-        well as the alphanumeric checks of optional 'char' and 'ignore_case'.
-        """
+        """Build a predicate function for modifier checking of alphanumeric input."""
         def modifier_predicate(char: Optional[str] = None, ignore_case: bool = True) -> bool:
             # Build expected modifier bits from tokens,
             # Stripped to ignore caps_lock and num_lock
