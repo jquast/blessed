@@ -25,6 +25,8 @@ else:
 from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
 from .keyboard import (DEFAULT_ESCDELAY,
                        Keystroke,
+                       DeviceAttribute,
+                       KittyKeyboardProtocol,
                        _time_left,
                        _read_until,
                        resolve_sequence,
@@ -78,6 +80,7 @@ _RE_GET_FGCOLOR_RESPONSE = re.compile(
     '\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
 _RE_GET_BGCOLOR_RESPONSE = re.compile(
     '\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+_RE_GET_DEVICE_ATTR_RESPONSE = re.compile('\x1b\\[\\?([0-9]+)((?:;[0-9]+)*)c')
 
 
 class Terminal():
@@ -223,6 +226,11 @@ class Terminal():
         self.__init__color_capabilities()
         self.__init__capabilities()
         self.__init__keycodes()
+
+        # Initialize Kitty keyboard protocol tracking
+        self._kitty_kb_first_query_failed = False
+        self._kitty_kb_first_query_attempted = False
+        self._device_attributes_cache: Optional[DeviceAttribute] = None
 
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
@@ -753,6 +761,253 @@ class Terminal():
         """
         match = self._query_response('\x1b]11;?\x07', _RE_GET_BGCOLOR_RESPONSE, timeout)
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
+
+    def get_device_attributes(self, timeout: Optional[float] = None,
+                              force: bool = True) -> Optional[DeviceAttribute]:
+        """
+        Query the terminal's Device Attributes (DA1).
+
+        Sends a Device Attributes query to the terminal and returns a
+        :class:`DeviceAttribute` instance with the terminal's capabilities.
+
+        If a Device Attributes query fails to respond within the ``timeout``
+        specified, ``None`` is returned.
+
+        **Successful responses are cached indefinitely** unless ``force=True`` is
+        specified. Unlike other query methods, there is no sticky failure mechanism -
+        each failed query can be retried.
+
+        :arg float timeout: Timeout in seconds to await terminal response
+        :arg bool force: Force active terminal inquiry even if cached result exists
+        :rtype: DeviceAttribute or None
+        :returns: DeviceAttribute instance with terminal capabilities, or None
+            if unsupported/timeout
+
+        .. code-block:: python
+
+            term = Terminal()
+
+            # Query device attributes
+            da = term.get_device_attributes()
+            if da is not None:
+                print(f"Service class: {da.service_class}")
+                print(f"Supports sixel: {da.supports_sixel}")
+                print(f"Extensions: {sorted(da.extensions)}")
+        """
+        # Return cached result unless force=True
+        if self._device_attributes_cache is not None and not force:
+            return self._device_attributes_cache
+
+        # Build and send query sequence and expected response pattern
+        query = '\x1b[c'
+
+        match = self._query_response(query, _RE_GET_DEVICE_ATTR_RESPONSE, timeout)
+
+        # invalid or no response (timeout)
+        if match is None:
+            return None
+
+        # parse, cache, and return the response
+        self._device_attributes_cache = DeviceAttribute.from_match(match)
+        return self._device_attributes_cache
+
+    def get_kitty_keyboard_state(self, timeout: Optional[float] = None,
+                                 force: bool = False) -> Optional[KittyKeyboardProtocol]:
+        """
+        Query the current Kitty keyboard protocol flags.
+
+        Sends a Kitty keyboard protocol query to the terminal and returns a
+        :class:`KittyKeyboardProtocol` instance with the current flags. This
+        method is not normally used directly, rather it is used by the
+        :meth:`enable_kitty_keyboard` context manager on entrance to discover
+        and restore the previous state on exit.
+
+        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
+        transmitted or response awaited, and ``None`` is returned.
+
+        In many cases a ``timeout`` value of about ``1.0`` should be set, as it
+        is possible for a terminal that succeeds :attr:`does_styling` and
+        :attr:`is_a_tty` to fail to respond to either of the Kitty keyboard
+        protocol or device attribute request query, such as in a CI Build
+        Service, "dumb", even modern terminals like Konsole. The timeout value
+        should approximate the value of the maximum round-trip time, maybe 1 second.
+
+        If a Kitty keyboard protocol query fails to respond within the ``timeout``
+        specified, ``None`` is returned. If this was the first Kitty keyboard
+        protocol query, all subsequent queries return ``None`` unless ``force=True`` is
+        set.
+
+        **No state caching is performed** - each call re-queries the terminal unless
+        the first query previously failed (sticky failure) and ``force=False``.
+
+        This method uses a boundary detection approach on the first query to quickly
+        determine terminal capabilities by sending both Kitty keyboard and Device
+        Attributes (DA1) queries simultaneously, as suggested by Kitty,
+        https://sw.kovidgoyal.net/kitty/keyboard-protocol/#detection-of-support-for-this-protocol
+        By sending both queries together and checking which responses are
+        received, we can quickly infer support without multiple round trips.
+        Note that Kitty *does not answer* to primary device attributes request
+        despite making this very recommendation!
+
+        > An application can query the terminal for support of this protocol by
+        > sending the escape code querying for the current progressive
+        > enhancement status followed by request for the primary device
+        > attributes. If an answer for the device attributes is received without
+        > getting back an answer for the progressive enhancement the terminal
+        > does not support this protocol.
+
+        :arg float timeout: Timeout in seconds to await terminal response
+        :arg bool force: Force active terminal inquiry in all cases
+        :rtype: KittyKeyboardProtocol or None
+        :returns: KittyKeyboardProtocol instance with current flags, or None if unsupported/timeout
+        """
+        # pylint: disable=too-many-return-statements
+        if not self.does_styling or not self.is_a_tty:
+            # no query is ever done for terminals where does_styling or is_a_tty is False
+            return None
+
+        if self._kitty_kb_first_query_failed and not force:
+            # When the first query is not responded, we can safely assume all
+            # subsequent inquiries will be ignored
+            return None
+
+        # Use boundary approach on first query attempt (when not previously
+        # attempted and not forced)
+        if not self._kitty_kb_first_query_attempted and not force:
+            # Mark that we've attempted the first query
+            self._kitty_kb_first_query_attempted = True
+
+            # Send both Kitty and DA queries together for boundary detection
+            # This allows us to quickly determine which protocols are supported:
+            # - Kitty terminal: responds to Kitty query but not DA1
+            # - xterm-like: responds to both Kitty and DA1
+            # - Konsole-like: responds to DA1 but not Kitty
+            # - Dumb terminals: respond to neither
+            boundary_query = '\x1b[?u\x1b[c'
+
+            # Use a simple pattern that captures the full response
+            boundary_pattern = re.compile('(.+)', re.DOTALL)
+
+            match = self._query_response(boundary_query, boundary_pattern, timeout)
+
+            # invalid or no response (timeout)
+            if match is None:
+                # Set sticky failure flag on first timeout
+                self._kitty_kb_first_query_failed = True
+                return None
+
+            response_text = match.group(1)
+
+            # Check for Kitty keyboard response first
+            kitty_pattern = re.compile(r'\x1b\[\?([0-9]+)u')
+            kitty_match = kitty_pattern.search(response_text)
+
+            if kitty_match:
+                # Kitty response found - parse and return flags
+                # (doesn't matter if DA1 also responded or not)
+                flags_value = int(kitty_match.group(1))
+                return KittyKeyboardProtocol(flags_value)
+
+            # Check for DA1 response
+            da1_pattern = re.compile(r'\x1b\[\?([0-9]+)(?:;[0-9]+)*c')
+            da1_match = da1_pattern.search(response_text)
+
+            if da1_match:
+                # Only DA1 response found, no Kitty support
+                self._kitty_kb_first_query_failed = True
+                return None
+
+            # Neither response found - no support
+            self._kitty_kb_first_query_failed = True
+            return None
+
+        # Subsequent calls or forced calls use the standard single-query approach
+        query = '\x1b[?u'
+        response_pattern = re.compile('\x1b\\[\\?([0-9]+)u')
+
+        match = self._query_response(query, response_pattern, timeout)
+
+        # invalid or no response (timeout)
+        if match is None:
+            # Set sticky failure flag on timeout (though this should be rare for subsequent calls)
+            self._kitty_kb_first_query_failed = True
+            return None
+
+        # parse and return the response value (no caching)
+        flags_value = int(match.group(1))
+        return KittyKeyboardProtocol(flags_value)
+
+    @contextlib.contextmanager
+    def enable_kitty_keyboard(self, *, disambiguate: bool = True, report_events: bool = False,
+                              report_alternates: bool = False, report_all_keys: bool = False,
+                              report_text: bool = False, mode: int = 1,
+                              timeout: Optional[float] = None,
+                              force: bool = False) -> Generator[None, None, None]:
+        """
+        Context manager that enables Kitty keyboard protocol features.
+
+        :arg bool disambiguate: Enable disambiguated escape codes (fixes issues
+            with Esc vs sequences)
+        :arg bool report_events: Report key repeat and release events
+        :arg bool report_alternates: Report shifted and base layout keys for shortcuts
+        :arg bool report_all_keys: Report all keys as escape codes (including text keys)
+        :arg bool report_text: Report associated text with key events (requires report_all_keys)
+        :arg int mode: Protocol mode (1=set/clear specified flags, 2=set only, 3=clear only)
+        :arg float timeout: Timeout for querying current flags before setting new ones
+        :arg bool force: Force sequences to be emitted even if timeout previously occurred
+
+        Always queries current state before setting new flags and restores previous state on exit.
+
+        Example::
+
+            with term.enable_kitty_keyboard(disambiguate=True):
+                # Now Alt+C won't conflict with Ctrl+C
+                key = term.inkey()
+                if key.alt and key.is_alt('c'):
+                    print("Alt+C pressed")
+        """
+        if not self.does_styling:
+            yield
+            return
+
+        # When not a real TTY (like StringIO), don't emit sequences unless force=True
+        if not self.is_a_tty and not force:
+            yield
+            return
+
+        # Check if timeout occurred before and force is not set
+        if self._kitty_kb_first_query_failed and not force:
+            yield
+            return
+
+        # Compute flags based on parameters
+        flags = 0
+        if disambiguate:
+            flags |= 1
+        if report_events:
+            flags |= 2
+        if report_alternates:
+            flags |= 4
+        if report_all_keys:
+            flags |= 8
+        if report_text:
+            flags |= 16
+
+        # Always query current flags before setting new ones
+        previous_flags = self.get_kitty_keyboard_state(timeout=timeout, force=force)
+
+        try:
+            # Set new flags
+            self.stream.write(f'\x1b[={flags};{mode}u')  # Set flags with specified mode
+            self.stream.flush()
+            yield
+
+        finally:
+            # Restore previous state
+            if previous_flags is not None:
+                # Restore to specific previous flags
+                self.stream.write(f'\x1b[={previous_flags.value};1u')  # Mode 1 = set flags exactly
+                self.stream.flush()
 
     @contextlib.contextmanager
     def fullscreen(self) -> Generator[None, None, None]:

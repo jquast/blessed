@@ -8,6 +8,7 @@ Version History
   * performance improvements in :meth:`~Terminal.rgb_downconvert` for 256-color
     terminals, :ghpull:`298`.
   * Enhanced keyboard support with Modifier keys, :ghpull:`306`.
+  * Kitty keyboard protocol support, :ghpull:`309`.
 
 1.22
   * performance improvements to :meth:`~Terminal.length` and
