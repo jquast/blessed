@@ -424,13 +424,13 @@ def test_keypad_mixins_and_aliases():
         term.ungetch("\x1bOy")
         assert term.inkey(timeout=0).name == "KEY_KP_9"
         term.ungetch("\x1b[1~")
-        assert term.inkey(timeout=0).name == "KEY_FIND"
+        assert term.inkey(timeout=0).name == "KEY_HOME"
         term.ungetch("\x1b[2~")
         assert term.inkey(timeout=0).name == "KEY_INSERT"
         term.ungetch("\x1b[3~")
         assert term.inkey(timeout=0).name == "KEY_DELETE"
         term.ungetch("\x1b[4~")
-        assert term.inkey(timeout=0).name == "KEY_SELECT"
+        assert term.inkey(timeout=0).name == "KEY_END"
         term.ungetch("\x1b[5~")
         assert term.inkey(timeout=0).name == "KEY_PGUP"
         term.ungetch("\x1b[6~")

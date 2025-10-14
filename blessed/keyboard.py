@@ -1243,10 +1243,10 @@ DEFAULT_SEQUENCE_MIXIN = (
     ("\x1bOy", KEY_KP_9),
 
     # keypad, numlock off
-    ("\x1b[1~", curses.KEY_FIND),         # find
+    ("\x1b[1~", curses.KEY_HOME),         # home
     ("\x1b[2~", curses.KEY_IC),           # insert (0)
     ("\x1b[3~", curses.KEY_DC),           # delete (.), "Execute"
-    ("\x1b[4~", curses.KEY_SELECT),       # select
+    ("\x1b[4~", curses.KEY_END),          # end
     ("\x1b[5~", curses.KEY_PPAGE),        # pgup   (9)
     ("\x1b[6~", curses.KEY_NPAGE),        # pgdown (3)
     ("\x1b[7~", curses.KEY_HOME),         # home
