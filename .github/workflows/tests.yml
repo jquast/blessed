@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version:  ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version:  ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.14']
         test_quick: [1]
 
         include:
@@ -29,11 +29,6 @@ jobs:
             toxenv: docformatter_check,flake8,flake8_tests,isort_check,mypy,sphinx,pydocstyle,pylint,pylint_tests,codespell
             os-deps:
               - enchant-2
-
-          - python-version: '3.14'
-            container: 'python:3.14-rc'
-            optional: true
-            test_quick: 0
 
           - python-version: '3.13'
             test_keyboard: 1
