@@ -116,6 +116,10 @@ Basic usage:
         # Your code here
         pass
 
+Feel free to try the demonstration program, :ref:`keymatrix.py` to experiment
+with combining any or all possible kitty protocol features using Shift+F1
+through Shift+F5.
+
 Compatibility
 -------------
 
