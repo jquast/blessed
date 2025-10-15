@@ -635,6 +635,32 @@ def test_get_dec_mode_sticky_failure():
     child()
 
 
+def test_get_dec_mode_no_response_after_success():
+    """Test get_dec_mode returns NO_RESPONSE when query fails after previous success."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+
+        mock_match_success = mock.Mock()
+        mock_match_success.group.return_value = '1'
+
+        with mock.patch.object(term, '_is_a_tty', True):
+            with mock.patch.object(term, '_query_response', return_value=mock_match_success):
+                first_response = term.get_dec_mode(DecPrivateMode.DECTCEM, timeout=0.1)
+                assert first_response.value == DecModeResponse.SET
+                assert term._dec_any_query_succeeded is True
+
+            with mock.patch.object(term, '_query_response', return_value=None):
+                second_response = term.get_dec_mode(DecPrivateMode.BRACKETED_PASTE, timeout=0.1)
+                assert second_response.value == DecModeResponse.NO_RESPONSE
+                assert second_response.failed is True
+                assert term._dec_any_query_succeeded is True
+
+        assert stream.getvalue() == ''
+    child()
+
+
 @pytest.mark.parametrize("clicks,drag,motion,pixels,expected_modes", [
     (True, False, False, False, [1006, 1000]),
     (False, True, False, False, [1006, 1002]),

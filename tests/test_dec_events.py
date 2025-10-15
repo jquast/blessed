@@ -97,11 +97,11 @@ class TestDECEventMatching:
         assert values.ctrl == ctrl
         assert values.is_wheel == is_wheel
 
-    @pytest.mark.parametrize("sequence,expected_release", [
-        ('\x1b[M   ', False),  # Press event
-        ('\x1b[M#@@', True),   # Release event
+    @pytest.mark.parametrize("sequence,expected_release,expected_button", [
+        ('\x1b[M   ', False, 0),  # Press event
+        ('\x1b[M#@@', True, 0),   # Release event (button reset to 0)
     ])
-    def test_mouse_legacy_events(self, sequence, expected_release):
+    def test_mouse_legacy_events(self, sequence, expected_release, expected_button):
         """Test legacy mouse events for press and release."""
         ks = _match_dec_event(sequence, dec_mode_cache=_make_enabled_cache())
         assert ks.mode.value == 1000  # Default legacy mode
@@ -109,6 +109,7 @@ class TestDECEventMatching:
         values = ks.mode_values
         assert isinstance(values, MouseLegacyEvent)
         assert values.is_release == expected_release
+        assert values.button == expected_button
         assert not values.is_motion
         assert not values.is_wheel
 
