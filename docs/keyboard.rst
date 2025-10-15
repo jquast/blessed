@@ -92,16 +92,21 @@ with possible keyboard inputs and combinations.
 Modifiers
 ~~~~~~~~~
 
-Standard keys with modifiers follow the pattern:
+Alphanumeric keys with modifiers follow the pattern:
 
 * ``KEY_CTRL_A``
 * ``KEY_ALT_Q``
-* ``KEY_SHIFT_X``
 * ``KEY_CTRL_ALT_Y``
-* ``KEY_ALT_SHIFT_Z``
-* ``KEY_CTRL_ALT_SHIFT_L``
 
-And application keys:
+For alphanumeric keys, ``SHIFT`` is **not** represented in the key name.
+Instead, case is handled through the character itself and the ``ignore_case``
+parameter in `Magic Methods`_. Control characters are case-insensitive at the
+protocol level (``Ctrl+A`` and ``Ctrl+Shift+A`` are identical). For Alt
+modifiers, use ``ignore_case=False`` to distinguish case: ``key.is_alt('a',
+ignore_case=False)`` matches only lowercase, while ``key.is_alt('A',
+ignore_case=False)`` matches only uppercase.
+
+Application keys (arrows, function keys, etc.) support ``SHIFT`` in their names:
 
 * ``KEY_SHIFT_LEFT``
 * ``KEY_CTRL_BACKSPACE``
@@ -109,7 +114,8 @@ And application keys:
 * ``KEY_CTRL_SHIFT_F3``
 * ``KEY_CTRL_ALT_SHIFT_F9``
 
-When multiple modifiers are specified, they are always in the following order
+When multiple modifiers are specified in application key names, they are always
+in the following order:
 
 - ``CTRL``
 - ``ALT``
