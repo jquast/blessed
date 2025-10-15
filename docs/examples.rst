@@ -28,15 +28,6 @@ https://github.com/jquast/blessed/blob/master/bin/bounce.py
 This is a very brief, basic primitive non-interactive version of a "classic tennis" video game. It
 demonstrates basic timed refresh of a bouncing terminal cell.
 
-.. _cnn.py:
-
-cnn.py
--------------------
-https://github.com/jquast/blessed/blob/master/bin/cnn.py
-
-This program uses 3rd-party BeautifulSoup and requests library to fetch the cnn website and display
-news article titles using the :meth:`~.Terminal.link` method, so that they may be clicked.
-
 .. _detect-multibyte.py:
 
 detect-multibyte.py
@@ -44,8 +35,9 @@ detect-multibyte.py
 https://github.com/jquast/blessed/blob/master/bin/detect-multibyte.py
 
 This program also demonstrates how the :meth:`~.get_location` method
-can be used to reliably test whether the terminal emulator of the connecting
-client is capable of rendering multibyte characters as a single cell.
+can be used to reliably test whether the terminal emulator supports
+utf-8 or other multibyte encoding, by rendering multibyte characters
+and measuring the change in cursor location.
 
 .. _editor.py:
 
