@@ -70,6 +70,14 @@ _PUA_KEYPAD_NAMES = {
     57407: 'KEY_KP_8', 57408: 'KEY_KP_9', 57409: 'KEY_KP_DECIMAL',
     57410: 'KEY_KP_DIVIDE', 57411: 'KEY_KP_MULTIPLY', 57412: 'KEY_KP_SUBTRACT',
     57413: 'KEY_KP_ADD', 57415: 'KEY_KP_EQUAL', 57416: 'KEY_KP_SEPARATOR',
+
+# Alt-only control character name mappings
+ALT_CONTROL_NAMES = {
+    0x1b: 'KEY_ALT_ESCAPE',     # ESC
+    0x7f: 'KEY_ALT_BACKSPACE',  # DEL
+    0x0d: 'KEY_ALT_ENTER',      # CR
+    0x09: 'KEY_ALT_TAB',        # TAB
+    0x5b: 'CSI'                 # CSI '['
 }
 
 
@@ -317,14 +325,7 @@ class Keystroke(str):
 
         Returns names like 'KEY_ALT_ESCAPE', 'KEY_ALT_BACKSPACE', etc.
         """
-        control_names = {
-            0x1b: 'KEY_ALT_ESCAPE',     # ESC
-            0x7f: 'KEY_ALT_BACKSPACE',  # DEL
-            0x0d: 'KEY_ALT_ENTER',      # CR
-            0x09: 'KEY_ALT_TAB',        # TAB
-            0x5b: 'CSI'                 # CSI '['
-        }
-        return control_names.get(char_code)
+        return ALT_CONTROL_NAMES.get(char_code)
 
     def _get_meta_escape_name(self) -> Optional[str]:
         """
@@ -1593,10 +1594,10 @@ DEFAULT_SEQUENCE_MIXIN = (
     ("\x1bOy", KEY_KP_9),
 
     # keypad, numlock off
-    ("\x1b[1~", curses.KEY_FIND),         # find
+    ("\x1b[1~", curses.KEY_HOME),         # home
     ("\x1b[2~", curses.KEY_IC),           # insert (0)
     ("\x1b[3~", curses.KEY_DC),           # delete (.), "Execute"
-    ("\x1b[4~", curses.KEY_SELECT),       # select
+    ("\x1b[4~", curses.KEY_END),          # end
     ("\x1b[5~", curses.KEY_PPAGE),        # pgup   (9)
     ("\x1b[6~", curses.KEY_NPAGE),        # pgdown (3)
     ("\x1b[7~", curses.KEY_HOME),         # home
