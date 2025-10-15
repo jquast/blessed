@@ -147,3 +147,19 @@ https://github.com/jquast/blessed/blob/master/bin/x11_colorpicker.py
 
 This program shows all of the X11 colors, demonstrates a basic keyboard-interactive program and
 color selection, but is also a useful utility to pick colors!
+
+.. _display_modes.py:
+
+display_modes.py
+----------------
+https://github.com/jquast/blessed/blob/master/bin/display_modes.py
+
+Detect and report all known DEC Private Modes supported by the Terminal and
+display a report.
+
+.. _strip.py:
+-------------
+https://github.com/jquast/blessed/blob/master/bin/strip.py
+
+This wrapper of the :meth:`~Terminal.strip_seqs` method reads text from standard
+input, "strips" away all known output sequences and writes the result to stdout.

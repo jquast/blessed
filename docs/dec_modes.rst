@@ -93,10 +93,8 @@ The :class:`~blessed.dec_modes.DecModeResponse` object provides helper propertie
 
 Query results are automatically cached. Use ``force=True`` to bypass the cache:
 
-.. code-block:: python
-
-    # Force a fresh query
-    response = term.get_dec_mode(term.DecPrivateMode.DECTCEM, force=True)
+Try the display_modes.py_ example program to detect and report all supported
+sequences for a given terminal.
 
 Context Managers
 ----------------
