@@ -46,6 +46,15 @@ RE_PATTERN_MODIFY_OTHER = re.compile(
 SYMBOLS_MAP_CTRL_CHAR = {'[': 27, '\\': 28, ']': 29, '^': 30, '_': 31, '?': 127}
 SYMBOLS_MAP_CTRL_VALUE = {v: k for k, v in SYMBOLS_MAP_CTRL_CHAR.items()}
 
+# Alt-only control character name mappings
+ALT_CONTROL_NAMES = {
+    0x1b: 'KEY_ALT_ESCAPE',     # ESC
+    0x7f: 'KEY_ALT_BACKSPACE',  # DEL
+    0x0d: 'KEY_ALT_ENTER',      # CR
+    0x09: 'KEY_ALT_TAB',        # TAB
+    0x5b: 'CSI'                 # CSI '['
+}
+
 
 class KittyModifierBits:
     """Standard modifier bit flags (compatible with Kitty keyboard protocol)."""
@@ -229,14 +238,7 @@ class Keystroke(str):
 
         Returns names like 'KEY_ALT_ESCAPE', 'KEY_ALT_BACKSPACE', etc.
         """
-        control_names = {
-            0x1b: 'KEY_ALT_ESCAPE',     # ESC
-            0x7f: 'KEY_ALT_BACKSPACE',  # DEL
-            0x0d: 'KEY_ALT_ENTER',      # CR
-            0x09: 'KEY_ALT_TAB',        # TAB
-            0x5b: 'CSI'                 # CSI '['
-        }
-        return control_names.get(char_code)
+        return ALT_CONTROL_NAMES.get(char_code)
 
     def _get_meta_escape_name(self) -> Optional[str]:
         """
