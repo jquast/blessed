@@ -302,7 +302,6 @@ def format_key_event(term, keystroke) -> str:
             if getattr(keystroke, f'_{modifier_name}'):
                 modifiers.append(modifier_name.upper())
         extra = f'{events[0]} {"+".join(modifiers)}'
-
     trim_mode = max(10, term.width - 25 - 20 - 6 - 3)
     return f"{value_repr:<6} {seq_repr:<20} {name_repr:<25} {extra[:trim_mode]}"
 
