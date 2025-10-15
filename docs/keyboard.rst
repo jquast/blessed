@@ -49,7 +49,7 @@ sequences.
 * Use :attr:`~.Keystroke.name` to identify special keys by name (e.g., ``KEY_F1``, ``KEY_CTRL_Q``)
 * Or, by using magic methods like ``keystroke.is_f1()`` or ``keystroke.is_key_ctrl('q')``.
 
-Be careful to print it directly, though, our examples uses format string,
+Be careful printing  :class:`~.Keystroke` objects directly. Our examples uses format string,
 ``f'{ks!r}'`` for ``repr()``, because ``str(ks)`` may contain escape sequences
 beginning with (``KEY_ESCAPE``) and are generally unprintable.
 
