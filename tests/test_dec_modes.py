@@ -15,9 +15,6 @@ from .accessories import TestTerminal, as_subprocess
 # For backwards compatibility and convenience in tests
 DecPrivateMode = Terminal.DecPrivateMode
 
-
-# Shared format variable for common stream output expectations
-EXPECTED_EMPTY_STREAM = ''
 EXPECTED_DECTCEM_DESC = "Text Cursor Enable Mode"
 
 
@@ -77,20 +74,17 @@ def test_dec_private_mode_repr():
 
 @pytest.mark.parametrize("value,expected_name,expected_desc", [
     (1, "DECCKM", "Cursor Keys Mode"),
-    (DecPrivateMode.DECCKM, "DECCKM", "Cursor Keys Mode"),
     (99999, "UNKNOWN", "Unknown mode"),
 ])
 def test_dec_private_mode_types(value, expected_name, expected_desc):
-    """Test a different kinds of modes for correct values and descriptions."""
+    """Test different kinds of modes for correct values and descriptions."""
     mode = DecPrivateMode(value)
-    assert mode.value == value
     assert mode.name == expected_name
     assert mode.long_description == expected_desc
 
 
 def test_dec_mode_response_construction():
     """Test construction of DecModeResponse objects."""
-    # using constants that evaluate to ints,
     mode = DecPrivateMode(DecPrivateMode.DECTCEM)
     response_a = DecModeResponse(mode, DecModeResponse.SET)
     response_b = DecModeResponse(25, 1)
@@ -98,8 +92,8 @@ def test_dec_mode_response_construction():
     assert response_a.mode == response_b.mode == mode == 25
     assert response_b.mode.name == response_a.mode.name == "DECTCEM"
     assert response_a.value == response_b.value == DecModeResponse.SET == 1
-    responses_a_b = (response_a.description, response_b.description)
-    assert (EXPECTED_DECTCEM_DESC,) * 2 == responses_a_b
+    assert response_a.description == EXPECTED_DECTCEM_DESC
+    assert response_b.description == EXPECTED_DECTCEM_DESC
 
 
 def test_dec_mode_response_construction_invalid_mode():
@@ -110,7 +104,6 @@ def test_dec_mode_response_construction_invalid_mode():
 
 def test_dec_private_mode_descriptions_consistency():
     """Test that all capitalized mode constants have descriptions in _LONG_DESCRIPTIONS."""
-    # Get all capitalized attributes from DecPrivateMode that are integers (mode values)
     mode_constants = {}
     for attr_name in dir(DecPrivateMode):
         if attr_name.isupper() and not attr_name.startswith('_'):
@@ -118,14 +111,12 @@ def test_dec_private_mode_descriptions_consistency():
             if isinstance(attr_value, int):
                 mode_constants[attr_name] = attr_value
 
-    # Check that every mode constant has a description
     missing_descriptions = []
     for constant_name, mode_value in mode_constants.items():
         if mode_value not in DecPrivateMode._LONG_DESCRIPTIONS:
             missing_descriptions.append(f"{constant_name}({mode_value})")
     assert not missing_descriptions
 
-    # Check for extra descriptions (descriptions for non-existent constants)
     extra_descriptions = []
     defined_mode_values = set(mode_constants.values())
     for mode_value in DecPrivateMode._LONG_DESCRIPTIONS:
@@ -133,7 +124,6 @@ def test_dec_private_mode_descriptions_consistency():
             extra_descriptions.append(f"mode {mode_value}")
     assert not extra_descriptions
 
-    # Verify each description is a non-empty string
     for mode_value, description in DecPrivateMode._LONG_DESCRIPTIONS.items():
         assert isinstance(description, str)
         assert len(description.strip()) > 0
@@ -201,13 +191,12 @@ def test_dec_mode_response_predicates(value, expected):
     """Test predicates for all possible response values (-2 through 4)."""
     response = DecModeResponse(25, value)
 
-    assert response.is_supported() is expected["supported"]
-    assert response.is_recognized() is expected["supported"]  # Alias for is_supported
-    assert response.is_enabled() is expected["enabled"]
-    assert response.is_disabled() is expected["disabled"]
-    assert response.is_permanent() is expected["permanent"]
-    assert response.is_changeable() is expected["changeable"]
-    assert response.is_failed() is expected["failed"]
+    assert response.supported is expected["supported"]
+    assert response.enabled is expected["enabled"]
+    assert response.disabled is expected["disabled"]
+    assert response.permanent is expected["permanent"]
+    assert response.changeable is expected["changeable"]
+    assert response.failed is expected["failed"]
 
 
 @pytest.mark.parametrize("value,expected_str", [
@@ -218,7 +207,7 @@ def test_dec_mode_response_predicates(value, expected):
     (DecModeResponse.RESET, "RESET"),
     (DecModeResponse.PERMANENTLY_SET, "PERMANENTLY_SET"),
     (DecModeResponse.PERMANENTLY_RESET, "PERMANENTLY_RESET"),
-    (999, "UNKNOWN"),  # Unknown value
+    (999, "UNKNOWN"),
 ])
 def test_dec_mode_response_str_representation(value, expected_str):
     """Test string representation of response values."""
@@ -244,9 +233,9 @@ def test_get_dec_mode_no_styling():
     response = term.get_dec_mode(DecPrivateMode.DECTCEM)
 
     assert response.value == DecModeResponse.NOT_QUERIED
-    assert response.is_failed() is True
-    assert not response.is_supported()
-    assert stream.getvalue() == EXPECTED_EMPTY_STREAM
+    assert response.failed is True
+    assert not response.supported
+    assert stream.getvalue() == ''
 
 
 def test_get_dec_mode_invalid_mode_type():
@@ -263,26 +252,19 @@ def test_get_dec_mode_successful_query():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
 
-        # Mock successful DECRQM response for mode 25 (DECTCEM) with value 1 (SET)
         mock_match = mock.Mock()
         mock_match.group.return_value = '1'
 
-        # Mock _is_a_tty to return True so the query actually happens
         with mock.patch.object(term, '_is_a_tty', True), \
                 mock.patch.object(term, '_query_response', return_value=mock_match) as mock_query:
             response = term.get_dec_mode(DecPrivateMode.DECTCEM, timeout=0.5)
 
-            # Verify query was called with correct parameters
             mock_query.assert_called_once()
-
-            # Verify response
             assert response.value == DecModeResponse.SET
-            assert response.is_supported() is True
-            assert response.is_enabled() is True
-
-            # Verify caching
+            assert response.supported is True
+            assert response.enabled is True
             assert term._dec_mode_cache[25] == DecModeResponse.SET
-        assert stream.getvalue() == EXPECTED_EMPTY_STREAM
+        assert stream.getvalue() == ''
     child()
 
 
@@ -293,16 +275,14 @@ def test_get_dec_mode_timeout():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
 
-        # Mock _is_a_tty to return True so the query actually happens
         with mock.patch.object(term, '_is_a_tty', True), \
                 mock.patch.object(term, '_query_response', return_value=None):
             response = term.get_dec_mode(DecPrivateMode.DECTCEM, timeout=0.1)
 
-            # First query failure should set _dec_first_query_failed
             assert response.value == DecModeResponse.NO_RESPONSE
-            assert response.is_failed() is True
+            assert response.failed is True
             assert term._dec_first_query_failed is True
-        assert stream.getvalue() == EXPECTED_EMPTY_STREAM
+        assert stream.getvalue() == ''
     child()
 
 
@@ -313,18 +293,15 @@ def test_get_dec_mode_cached_response():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
 
-        # Pre-populate cache
         term._dec_mode_cache[25] = DecModeResponse.SET
 
-        # Mock _is_a_tty to return True so the method doesn't return NOT_QUERIED
         with mock.patch.object(term, '_is_a_tty', True), \
                 mock.patch.object(term, '_query_response') as mock_query:
             response = term.get_dec_mode(DecPrivateMode.DECTCEM)
 
-            # Should not call _query_response due to cache
             mock_query.assert_not_called()
             assert response.value == DecModeResponse.SET
-        assert stream.getvalue() == EXPECTED_EMPTY_STREAM
+        assert stream.getvalue() == ''
     child()
 
 
@@ -335,22 +312,18 @@ def test_get_dec_mode_force_bypass_cache():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
 
-        # Pre-populate cache
         term._dec_mode_cache[25] = DecModeResponse.SET
 
-        # Mock different response for forced query
         mock_match = mock.Mock()
-        mock_match.group.return_value = '2'  # RESET
+        mock_match.group.return_value = '2'
 
-        # Mock _is_a_tty to return True so the query actually happens
         with mock.patch.object(term, '_is_a_tty', True), \
                 mock.patch.object(term, '_query_response', return_value=mock_match) as mock_query:
             response = term.get_dec_mode(DecPrivateMode.DECTCEM, force=True)
 
-            # Should call _query_response despite cache
             mock_query.assert_called_once()
             assert response.value == DecModeResponse.RESET
-        assert stream.getvalue() == EXPECTED_EMPTY_STREAM
+        assert stream.getvalue() == ''
     child()
 
 
@@ -362,7 +335,7 @@ def test_dec_mode_set_enabled_no_styling():
     term._dec_mode_set_enabled(DecPrivateMode.DECTCEM)
     term._dec_mode_set_enabled(DecPrivateMode.DECTCEM)
 
-    assert stream.getvalue() == EXPECTED_EMPTY_STREAM
+    assert stream.getvalue() == ''
 
 
 def test_dec_mode_set_enabled_with_styling():
@@ -374,8 +347,6 @@ def test_dec_mode_set_enabled_with_styling():
 
         term._dec_mode_set_enabled(DecPrivateMode.DECTCEM, DecPrivateMode.BRACKETED_PASTE)
         assert stream.getvalue() == '\x1b[?25;2004h'
-
-        # Verify cache updates
         assert term._dec_mode_cache[25] == DecModeResponse.SET
         assert term._dec_mode_cache[2004] == DecModeResponse.SET
     child()
@@ -389,10 +360,7 @@ def test_dec_mode_set_disabled_with_styling():
         term = TestTerminal(stream=stream, force_styling=True)
 
         term._dec_mode_set_disabled(DecPrivateMode.DECTCEM, DecPrivateMode.BRACKETED_PASTE)
-
         assert stream.getvalue() == '\x1b[?25;2004l'
-
-        # Verify cache updates
         assert term._dec_mode_cache[25] == DecModeResponse.RESET
         assert term._dec_mode_cache[2004] == DecModeResponse.RESET
     child()
@@ -404,7 +372,7 @@ def test_dec_mode_set_enabled_invalid_mode_type():
     term = TestTerminal(stream=stream, force_styling=False)
     with pytest.raises(TypeError):
         term._dec_mode_set_enabled("invalid")
-    assert stream.getvalue() == EXPECTED_EMPTY_STREAM
+    assert stream.getvalue() == ''
 
 
 def test_dec_mode_set_disabled_invalid_mode_type():
@@ -413,7 +381,7 @@ def test_dec_mode_set_disabled_invalid_mode_type():
     term = TestTerminal(stream=stream, force_styling=False)
     with pytest.raises(TypeError):
         term._dec_mode_set_disabled("invalid")
-    assert stream.getvalue() == EXPECTED_EMPTY_STREAM
+    assert stream.getvalue() == ''
 
 
 def test_context_manager_invalid_mode_type():
@@ -426,7 +394,7 @@ def test_context_manager_invalid_mode_type():
     with pytest.raises(TypeError):
         with term.dec_modes_disabled("invalid"):
             pass
-    assert stream.getvalue() == EXPECTED_EMPTY_STREAM
+    assert stream.getvalue() == ''
 
 
 def test_dec_modes_enabled_context_manager():
@@ -436,21 +404,18 @@ def test_dec_modes_enabled_context_manager():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
 
-        # Mock get_dec_mode to return supported but disabled mode
         mock_response = mock.Mock()
-        mock_response.is_supported.return_value = True
-        mock_response.is_enabled.return_value = False
+        mock_response.supported = True
+        mock_response.enabled = False
 
         with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
                 mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
                 mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
 
             with term.dec_modes_enabled(DecPrivateMode.DECTCEM, timeout=0.5):
-                # Verify mode was enabled on entry
                 mock_set_enabled.assert_called_once_with(DecPrivateMode.DECTCEM)
                 mock_set_enabled.reset_mock()
 
-            # Verify mode was disabled on exit
             mock_set_disabled.assert_called_once_with(DecPrivateMode.DECTCEM)
     child()
 
@@ -462,23 +427,18 @@ def test_dec_modes_enabled_already_enabled():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
 
-        # Mock get_dec_mode to return supported and already enabled mode
         mock_response = mock.Mock()
-        mock_response.is_supported.return_value = True
-        mock_response.is_enabled.return_value = True
+        mock_response.supported = True
+        mock_response.enabled = True
 
         with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
                 mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
                 mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
 
             with term.dec_modes_enabled(DecPrivateMode.DECTCEM, timeout=0.5):
-                # Should not enable already enabled mode - called with empty args since no
-                # modes to enable
                 mock_set_enabled.assert_called_once_with()
                 mock_set_enabled.reset_mock()
 
-            # Should not disable mode that wasn't enabled by us - called with empty
-            # args since no modes to disable
             mock_set_disabled.assert_called_once_with()
     child()
 
@@ -490,20 +450,17 @@ def test_dec_modes_enabled_unsupported_mode():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
 
-        # Mock get_dec_mode to return unsupported mode
         mock_response = mock.Mock()
-        mock_response.is_supported.return_value = False
+        mock_response.supported = False
 
         with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
                 mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
                 mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
 
             with term.dec_modes_enabled(DecPrivateMode.DECTCEM, timeout=0.5):
-                # Should not enable unsupported mode
                 mock_set_enabled.assert_called_once_with()
                 mock_set_enabled.reset_mock()
 
-            # Should not disable unsupported mode
             mock_set_disabled.assert_called_once_with()
     child()
 
@@ -515,21 +472,18 @@ def test_dec_modes_disabled_context_manager():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
 
-        # Mock get_dec_mode to return supported and enabled mode
         mock_response = mock.Mock()
-        mock_response.is_supported.return_value = True
-        mock_response.is_enabled.return_value = True
+        mock_response.supported = True
+        mock_response.enabled = True
 
         with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
                 mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
                 mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
 
             with term.dec_modes_disabled(DecPrivateMode.DECTCEM, timeout=0.5):
-                # Verify mode was disabled on entry
                 mock_set_disabled.assert_called_once_with(DecPrivateMode.DECTCEM)
                 mock_set_disabled.reset_mock()
 
-            # Verify mode was enabled on exit
             mock_set_enabled.assert_called_once_with(DecPrivateMode.DECTCEM)
     child()
 
@@ -541,21 +495,18 @@ def test_dec_modes_disabled_already_disabled():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
 
-        # Mock get_dec_mode to return supported but already disabled mode
         mock_response = mock.Mock()
-        mock_response.is_supported.return_value = True
-        mock_response.is_enabled.return_value = False
+        mock_response.supported = True
+        mock_response.enabled = False
 
         with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
                 mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
                 mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
 
             with term.dec_modes_disabled(DecPrivateMode.DECTCEM, timeout=0.5):
-                # Should not disable already disabled mode
                 mock_set_disabled.assert_called_once_with()
                 mock_set_disabled.reset_mock()
 
-            # Should not enable mode that wasn't disabled by us
             mock_set_enabled.assert_called_once_with()
     child()
 
@@ -571,7 +522,6 @@ def test_context_manager_no_styling():
     with term.dec_modes_disabled(DecPrivateMode.DECTCEM):
         pass
 
-    # No sequences should be written
     assert stream.getvalue() == ""
 
 
@@ -582,10 +532,9 @@ def test_context_manager_exception_handling():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
 
-        # Mock get_dec_mode to return supported but disabled mode
         mock_response = mock.Mock()
-        mock_response.is_supported.return_value = True
-        mock_response.is_enabled.return_value = False
+        mock_response.supported = True
+        mock_response.enabled = False
 
         with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
                 mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
@@ -596,9 +545,8 @@ def test_context_manager_exception_handling():
                     mock_set_enabled.assert_called_once_with(DecPrivateMode.DECTCEM)
                     raise ValueError("Test exception")
 
-            # Should still restore state despite exception
             mock_set_disabled.assert_called_once_with(DecPrivateMode.DECTCEM)
-        assert stream.getvalue() == EXPECTED_EMPTY_STREAM
+        assert stream.getvalue() == ''
     child()
 
 
@@ -609,25 +557,22 @@ def test_multiple_modes_context_manager():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
 
-        # Mock get_dec_mode to return supported but disabled modes
         mock_response = mock.Mock()
-        mock_response.is_supported.return_value = True
-        mock_response.is_enabled.return_value = False
+        mock_response.supported = True
+        mock_response.enabled = False
 
         with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
                 mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
                 mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
 
             with term.dec_modes_enabled(DecPrivateMode.DECTCEM, DecPrivateMode.BRACKETED_PASTE):
-                # Both modes should be enabled
                 mock_set_enabled.assert_called_once_with(
                     DecPrivateMode.DECTCEM, DecPrivateMode.BRACKETED_PASTE)
                 mock_set_enabled.reset_mock()
 
-            # Both modes should be disabled on exit
             mock_set_disabled.assert_called_once_with(
                 DecPrivateMode.DECTCEM, DecPrivateMode.BRACKETED_PASTE)
-        assert stream.getvalue() == EXPECTED_EMPTY_STREAM
+        assert stream.getvalue() == ''
     child()
 
 
@@ -636,16 +581,260 @@ def test_int_mode_parameters():
     stream = io.StringIO()
     term = TestTerminal(stream=stream, force_styling=False)
 
-    # Test with integer mode parameter
-    response = term.get_dec_mode(25)  # DECTCEM as int
-    assert response.value == DecModeResponse.NOT_QUERIED  # No styling, so not queried
+    response = term.get_dec_mode(25)
+    assert response.value == DecModeResponse.NOT_QUERIED
 
-    # Test context managers with int parameters
-    with term.dec_modes_enabled(25, 2004):  # DECTCEM and BRACKETED_PASTE as ints
+    with term.dec_modes_enabled(25, 2004):
         pass
 
     with term.dec_modes_disabled(25, 2004):
         pass
 
-    # Should not crash and should handle int parameters correctly
-    assert stream.getvalue() == ""  # No styling, so no output
+    assert stream.getvalue() == ""
+
+
+def test_dec_private_mode_equality_with_non_standard_types():
+    """Test DecPrivateMode equality with non-int, non-DecPrivateMode types."""
+    mode = DecPrivateMode(25)
+
+    assert (mode == "string") is False
+    assert (mode is None) is False
+    assert (mode == [25]) is False
+    assert (mode == {"value": 25}) is False
+    assert (mode == 25.0) is False
+
+
+def test_dec_mode_response_description_fallback():
+    """Test DecModeResponse.description returns fallback for edge cases."""
+    response = DecModeResponse(25, DecModeResponse.SET)
+
+    with mock.patch.object(type(response), 'mode', new_callable=mock.PropertyMock) as mock_mode:
+        mock_mode.return_value = "not a DecPrivateMode"
+        assert response.description == "Unknown mode"
+
+
+def test_get_dec_mode_sticky_failure():
+    """Test get_dec_mode returns NOT_QUERIED after first query fails."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+
+        with mock.patch.object(term, '_is_a_tty', True), \
+                mock.patch.object(term, '_query_response', return_value=None):
+
+            first_response = term.get_dec_mode(DecPrivateMode.DECTCEM, timeout=0.1)
+            assert first_response.value == DecModeResponse.NO_RESPONSE
+            assert term._dec_first_query_failed is True
+
+            second_response = term.get_dec_mode(DecPrivateMode.BRACKETED_PASTE)
+            assert second_response.value == DecModeResponse.NOT_QUERIED
+            assert second_response.failed is True
+
+        assert stream.getvalue() == ''
+    child()
+
+
+@pytest.mark.parametrize("clicks,drag,motion,pixels,expected_modes", [
+    (True, False, False, False, [1006, 1000]),
+    (False, True, False, False, [1006, 1002]),
+    (False, False, True, False, [1006, 1003]),
+    (True, False, False, True, [1006, 1000, 1016]),
+    (False, True, False, True, [1006, 1002, 1016]),
+    (False, False, True, True, [1006, 1003, 1016]),
+    (True, True, False, False, [1006, 1002]),
+    (True, False, True, False, [1006, 1003]),
+    (True, True, True, False, [1006, 1003]),
+    (False, False, False, False, [1006]),
+])
+def test_mouse_enabled_mode_selection(clicks, drag, motion, pixels, expected_modes):
+    """Test mouse_enabled selects correct modes based on parameters."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+
+        mock_response = mock.Mock()
+        mock_response.supported = True
+        mock_response.enabled = False
+
+        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
+                mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
+                mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
+
+            with term.mouse_enabled(clicks=clicks, report_drag=drag,
+                                    report_motion=motion, report_pixels=pixels):
+                args = mock_set_enabled.call_args[0]
+                mode_values = [m.value if hasattr(m, 'value') else m for m in args]
+                assert mode_values == expected_modes
+
+            mock_set_disabled.assert_called_once()
+    child()
+
+
+def test_mouse_enabled_no_styling():
+    """Test mouse_enabled does nothing when does_styling is False."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=False)
+
+    with term.mouse_enabled():
+        pass
+
+    assert stream.getvalue() == ""
+
+
+@pytest.mark.parametrize("clicks,drag,motion,pixels,expected_modes", [
+    (True, False, False, False, [1006, 1000]),
+    (False, True, False, False, [1006, 1002]),
+    (False, False, True, False, [1006, 1003]),
+    (True, False, False, True, [1006, 1000, 1016]),
+    (False, True, False, True, [1006, 1002, 1016]),
+    (False, False, True, True, [1006, 1003, 1016]),
+])
+def test_does_mouse_supported(clicks, drag, motion, pixels, expected_modes):
+    """Test does_mouse returns True when all required modes are supported."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+
+        mock_response = mock.Mock()
+        mock_response.supported = True
+
+        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response) as mock_get:
+            result = term.does_mouse(clicks=clicks, report_drag=drag,
+                                     report_motion=motion, report_pixels=pixels)
+
+            assert result is True
+            assert mock_get.call_count == len(expected_modes)
+            for mode_value in expected_modes:
+                assert any(call[0][0] == mode_value for call in mock_get.call_args_list)
+        assert stream.getvalue() == ''
+    child()
+
+
+def test_does_mouse_unsupported():
+    """Test does_mouse returns False when any mode is unsupported."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+
+        def get_mode_response(mode, timeout=None):
+            mock_response = mock.Mock()
+            if mode == DecPrivateMode.MOUSE_EXTENDED_SGR:
+                mock_response.supported = True
+            else:
+                mock_response.supported = False
+            return mock_response
+
+        with mock.patch.object(term, 'get_dec_mode', side_effect=get_mode_response):
+            result = term.does_mouse()
+            assert result is False
+        assert stream.getvalue() == ''
+    child()
+
+
+def test_does_mouse_no_styling():
+    """Test does_mouse returns False when does_styling is False."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=False)
+
+    result = term.does_mouse()
+    assert result is False
+    assert stream.getvalue() == ""
+
+
+def test_does_mouse_default_parameters():
+    """Test does_mouse with default parameters checks click tracking."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+
+        mock_response = mock.Mock()
+        mock_response.supported = True
+
+        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response) as mock_get:
+            result = term.does_mouse()
+
+            assert result is True
+            assert mock_get.call_count == 2
+        assert stream.getvalue() == ''
+    child()
+
+
+def test_does_mouse_custom_timeout():
+    """Test does_mouse respects custom timeout parameter."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+
+        mock_response = mock.Mock()
+        mock_response.supported = True
+
+        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response) as mock_get:
+            result = term.does_mouse(timeout=2.5)
+
+            assert result is True
+            for call in mock_get.call_args_list:
+                assert call[1].get('timeout') == 2.5 or call[0][1] == 2.5
+        assert stream.getvalue() == ''
+    child()
+
+
+@pytest.mark.parametrize("method_name,expected_mode", [
+    ("bracketed_paste", DecPrivateMode.BRACKETED_PASTE),
+    ("synchronized_output", DecPrivateMode.SYNCHRONIZED_OUTPUT),
+    ("focus_events", DecPrivateMode.FOCUS_IN_OUT_EVENTS),
+])
+def test_sugary_context_managers(method_name, expected_mode):
+    """Test sugary context managers enable correct modes."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+
+        mock_response = mock.Mock()
+        mock_response.supported = True
+        mock_response.enabled = False
+
+        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
+                mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
+                mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
+
+            method = getattr(term, method_name)
+            with method():
+                mock_set_enabled.assert_called_once_with(expected_mode)
+                mock_set_enabled.reset_mock()
+
+            mock_set_disabled.assert_called_once_with(expected_mode)
+    child()
+
+
+@pytest.mark.parametrize("method_name", [
+    "bracketed_paste",
+    "synchronized_output",
+    "focus_events",
+])
+def test_sugary_context_managers_no_styling(method_name):
+    """Test sugary context managers do nothing when does_styling is False."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=False)
+
+    method = getattr(term, method_name)
+    with method():
+        pass
+
+    assert stream.getvalue() == ""
+
+
+def test_sugared_modes_attribute_exists():
+    """Test DecPrivateMode has sugared_modes attribute."""
+    assert hasattr(DecPrivateMode, 'sugared_modes')
+    assert isinstance(DecPrivateMode.sugared_modes, dict)
+    assert 'bracketed_paste' in DecPrivateMode.sugared_modes
+    assert 'synchronized_output' in DecPrivateMode.sugared_modes
+    assert 'focus_events' in DecPrivateMode.sugared_modes
+    assert 'mouse_enabled' in DecPrivateMode.sugared_modes

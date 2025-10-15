@@ -33,6 +33,22 @@ examples include:
 The context managers gracefully handle unsupported modes - your code works
 normally even on terminals that don't support specific features.
 
+Timeout Behavior
+----------------
+
+All DEC mode context managers use a default timeout of 1 second when querying
+mode support. This timeout is designed to handle "dumb" terminals that don't
+support DEC mode queries and won't respond.
+
+The timeout delay only occurs on the **first** call to any mode query method,
+as subsequent calls use cached results. Unsupported modes are gracefully
+ignored - your code continues to work even when a terminal doesn't support
+a specific feature.
+
+You can verify mode support quickly using :meth:`~blessed.Terminal.get_dec_mode`
+(see :ref:`Querying Mode Support` below), which also benefits from caching after
+the first query.
+
 Getting Started
 ---------------
 
@@ -64,13 +80,16 @@ application to different terminal capabilities:
    :language: python
    :linenos:
 
-The :class:`~blessed.dec_modes.DecModeResponse` object provides helper methods:
+Here, a 1-second ``timeout`` value is used. If a Terminal fails to respond in
+this amount of time, the special property ``failed`` becomes True.
 
-* :meth:`~blessed.dec_modes.DecModeResponse.is_supported` - Mode is recognized
-* :meth:`~blessed.dec_modes.DecModeResponse.is_enabled` - Mode is currently active
-* :meth:`~blessed.dec_modes.DecModeResponse.is_disabled` - Mode is currently inactive
-* :meth:`~blessed.dec_modes.DecModeResponse.is_permanent` - Mode setting cannot be changed
-* :meth:`~blessed.dec_modes.DecModeResponse.is_failed` - Query failed or timed out
+The :class:`~blessed.dec_modes.DecModeResponse` object provides helper properties:
+
+* :attr:`~blessed.dec_modes.DecModeResponse.supported` - Mode is recognized
+* :attr:`~blessed.dec_modes.DecModeResponse.enabled` - Mode is currently active
+* :attr:`~blessed.dec_modes.DecModeResponse.disabled` - Mode is currently inactive
+* :attr:`~blessed.dec_modes.DecModeResponse.permanent` - Mode setting cannot be changed
+* :attr:`~blessed.dec_modes.DecModeResponse.failed` - Query failed or timed out
 
 Query results are automatically cached. Use ``force=True`` to bypass the cache:
 
@@ -89,22 +108,34 @@ The recommended way to work with modes is through context managers:
 
 These context managers:
 
-1. Query the mode's current state (with caching)
-2. Change the mode if needed
-3. Restore the original state on exit
+1. Query the Terminal's support for a mode with optional timeout
+2. Change the mode if allowed by negotiation
+3. Restore the original state on exit if changed
 4. Handle unsupported modes gracefully
 
-You can pass multiple modes and set a timeout for queries:
+You can pass multiple modes to enable them simultaneously:
 
 .. code-block:: python
 
     with term.dec_modes_enabled(
         term.DecPrivateMode.DECTCEM,
         term.DecPrivateMode.MOUSE_REPORT_CLICK,
-        timeout=1.0
     ):
         # Both modes enabled here
         pass
+
+For commonly-used DEC modes, blessed provides convenient context managers on the
+:class:`~.Terminal` object that make accessing them easier.
+
+These convenience wrappers all contain a default ``timeout`` argument of 1.
+Given this, for terminals that do not support DEC Mode negotiation, the first
+call will cause up to a 1 second delay while awaiting a possible terminal
+response to confirm support.
+
+All subsequent calls use a cache of the failed query result and incur no further
+delays.
+
+.. _Synchronized Output:
 
 Synchronized Output
 -------------------
@@ -120,9 +151,10 @@ a visible blink effect. With it, updates appear instantly:
    :language: python
    :linenos:
 
-On terminals that support this mode, you'll see smooth animation. On terminals
-that don't, the animation still works but may blink. The first loop iteration
-may pause briefly (up to the timeout value) while the terminal is queried.
+On terminals that support this mode, you'll just see screen of ``fill`` characters
+with a counter in the top-left corner. On terminals that do not support it,
+partial draws of ``empty`` spaces will cause the screen to occasionally blink or
+flash.
 
 Bracketed Paste
 ---------------
@@ -156,13 +188,3 @@ When :attr:`Keystroke.mode` equals
 :meth:`~.Keystroke.mode_values` method returns a
 :class:`~blessed.keyboard.FocusEvent` with a ``gained`` attribute indicating
 whether focus was gained (``True``) or lost (``False``).
-
-See Also
---------
-
-* :doc:`keyboard` - Basic keyboard input handling
-* :doc:`mouse` - Mouse event handling
-* :meth:`Terminal.get_dec_mode` - Query mode support
-* :meth:`Terminal.dec_modes_enabled` - Enable modes temporarily
-* :meth:`Terminal.dec_modes_disabled` - Disable modes temporarily
-* :attr:`Terminal.DecPrivateMode` - Available mode constants

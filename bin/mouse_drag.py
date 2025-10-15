@@ -3,13 +3,11 @@ from blessed import Terminal
 
 term = Terminal()
 
-if not term.get_dec_mode(term.DecPrivateMode.MOUSE_REPORT_DRAG, timeout=1).is_supported():
-    print("This terminal does not support MOUSE_ALL_MOTION tracking!")
+if not term.does_mouse(report_drag=True):
+    print("This terminal does not support mouse drag tracking!")
 else:
     print("Click and drag the mouse (press 'q' to quit):")
-    with term.cbreak(), term.dec_modes_enabled(
-            term.DecPrivateMode.MOUSE_REPORT_DRAG,
-            term.DecPrivateMode.MOUSE_EXTENDED_SGR):
+    with term.cbreak(), term.mouse_enabled(report_drag=True):
         while True:
             event = term.inkey()
 

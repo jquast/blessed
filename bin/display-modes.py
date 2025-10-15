@@ -90,7 +90,7 @@ def display_dec_modes(term):
     for idx, (mode_name, mode_code) in enumerate(sorted(all_modes.items(), key=lambda x: x[1])):
         print(f'  Testing {mode_name}...' + term.clear_eol, end='\r', flush=True)
         response = term.get_dec_mode(mode_code, timeout=0.1, force=force_mode)
-        if response.is_supported():
+        if response.supported:
             supported_modes[mode_name] = response
 
     # Clear the testing line
@@ -106,13 +106,13 @@ def display_dec_modes(term):
 
     for mode_name, response in sorted(supported_modes.items(), key=lambda x: x[1].mode.value):
         # Status with color coding
-        if response.is_enabled():
+        if response.enabled:
             status = term.bright_green("Enabled")
         else:
             status = term.bright_red("Disabled")
 
         # Permanence indicator
-        permanence = term.bold("permanently") if response.is_permanent() else "temporarily"
+        permanence = term.bold("permanently") if response.permanent else "temporarily"
 
         # Mode info
         mode_info = f"Mode {response.mode.value}"

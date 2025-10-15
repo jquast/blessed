@@ -9,9 +9,9 @@ class DecModeResponse:
     """
     Container for DEC Private Mode query response.
 
-    Use helper methods :meth:`~DecModeResponse.is_supported`,
-    :meth:`~DecModeResponse.is_enabled`, :meth:`~DecModeResponse.is_permanent`,
-    and :meth:`~DecModeResponse.is_failed` to interpret responses rather than
+    Use helper properties :attr:`~DecModeResponse.supported`,
+    :attr:`~DecModeResponse.enabled`, :attr:`~DecModeResponse.permanent`,
+    and :attr:`~DecModeResponse.failed` to interpret responses rather than
     checking numeric values directly.
     """
     # Response value constants. Values -1 and -2 are internal abstractions
@@ -67,14 +67,15 @@ class DecModeResponse:
         """
         Numeric response value for compatibility.
 
-        Prefer using helper methods like :meth:`~DecModeResponse.is_enabled`
+        Prefer using helper properties like :attr:`~DecModeResponse.enabled`
         instead of checking this value directly.
 
         :rtype: int
         """
         return self._value
 
-    def is_supported(self) -> bool:
+    @property
+    def supported(self) -> bool:
         """
         Check if the mode is supported by the terminal.
 
@@ -83,15 +84,8 @@ class DecModeResponse:
         """
         return self.value > 0
 
-    def is_recognized(self) -> bool:
-        """
-        Alias for :meth:`~DecModeResponse.is_supported`.
-
-        :rtype: bool
-        """
-        return self.is_supported()
-
-    def is_enabled(self) -> bool:
+    @property
+    def enabled(self) -> bool:
         """
         Check if the mode is currently enabled.
 
@@ -100,7 +94,8 @@ class DecModeResponse:
         """
         return self.value in {1, 3}
 
-    def is_disabled(self) -> bool:
+    @property
+    def disabled(self) -> bool:
         """
         Check if the mode is currently disabled.
 
@@ -109,7 +104,8 @@ class DecModeResponse:
         """
         return self.value in {2, 4}
 
-    def is_changeable(self) -> bool:
+    @property
+    def changeable(self) -> bool:
         """
         Check if the mode setting can be changed.
 
@@ -118,7 +114,8 @@ class DecModeResponse:
         """
         return self.value in {1, 2}
 
-    def is_permanent(self) -> bool:
+    @property
+    def permanent(self) -> bool:
         """
         Check if the mode setting is permanent.
 
@@ -127,7 +124,8 @@ class DecModeResponse:
         """
         return self.value in {3, 4}
 
-    def is_failed(self) -> bool:
+    @property
+    def failed(self) -> bool:
         """
         Check if the query failed.
 
@@ -579,6 +577,15 @@ class DecPrivateMode:
     _VALUE_TO_NAME = {v: k for k, v in locals().items()
                       if k.isupper() and isinstance(v, int)
                       and not k.startswith('_')}
+
+    # Mapping of convenience method names to their corresponding mode constants
+    sugared_modes = {
+        'bracketed_paste': BRACKETED_PASTE,
+        'synchronized_output': SYNCHRONIZED_OUTPUT,
+        'focus_events': FOCUS_IN_OUT_EVENTS,
+        'mouse_enabled': (MOUSE_EXTENDED_SGR, MOUSE_REPORT_CLICK,
+                          MOUSE_REPORT_DRAG, MOUSE_ALL_MOTION, MOUSE_SGR_PIXELS),
+    }
 
     def __init__(self, value: int):
         """

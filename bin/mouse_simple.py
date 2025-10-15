@@ -3,16 +3,14 @@ from blessed import Terminal
 
 term = Terminal()
 
-if not term.get_dec_mode(term.DecPrivateMode.MOUSE_EXTENDED_SGR, timeout=1).is_supported():
-    print('This example wont work on your terminal!')
+if not term.does_mouse():
+    print('This example won\'t work on your terminal!')
 else:
     print("Click anywhere! Press 'q' to quit")
-    with term.cbreak(), term.dec_modes_enabled(
-            term.DecPrivateMode.MOUSE_REPORT_CLICK,
-            term.DecPrivateMode.MOUSE_EXTENDED_SGR):
+    with term.cbreak(), term.mouse_enabled():
         while True:
             inp = term.inkey()
-            if inp .lower() == 'q':
+            if inp.lower() == 'q':
                 break
             if inp.mode == term.DecPrivateMode.MOUSE_EXTENDED_SGR:
                 mouse_event = inp.mode_values

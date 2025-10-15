@@ -922,7 +922,7 @@ class Terminal():
 
             # Query synchronized output support
             response = term.get_dec_mode(DecPrivateMode.SYNCHRONIZED_OUTPUT)
-            if response.is_supported():
+            if response.supported:
                 print("Synchronized output is available")
         """
         if not isinstance(mode, (int, _DecPrivateMode)):
@@ -1011,7 +1011,7 @@ class Terminal():
                                 "DecPrivateMode or int expected")
 
             response = self.get_dec_mode(mode_num, timeout=timeout)
-            if response.is_supported() and not response.is_enabled():
+            if response.supported and not response.enabled:
                 enabled_modes.append(mode_num)
 
         self._dec_mode_set_enabled(*enabled_modes)
@@ -1048,7 +1048,7 @@ class Terminal():
                                 "DecPrivateMode or int expected")
 
             response = self.get_dec_mode(mode_num, timeout=timeout)
-            if response.is_supported() and response.is_enabled():
+            if response.supported and response.enabled:
                 disabled_modes.append(mode_num)
 
         self._dec_mode_set_disabled(*disabled_modes)
@@ -1056,6 +1056,151 @@ class Terminal():
             yield
         finally:
             self._dec_mode_set_enabled(*disabled_modes)
+
+    def does_mouse(self, *, clicks: bool = True, report_pixels: bool = False,
+                   report_drag: bool = False, report_motion: bool = False,
+                   timeout: float = 1.0) -> bool:
+        """
+        Check if the terminal supports the specified mouse tracking features.
+
+        This method queries terminal support for the same DEC modes that
+        :meth:`mouse_enabled` would enable with the given parameters.
+
+        :arg bool clicks: Check for basic click reporting (default True)
+        :arg bool report_pixels: Check for pixel coordinate reporting
+        :arg bool report_drag: Check for drag reporting
+        :arg bool report_motion: Check for motion reporting
+        :arg float timeout: Timeout for mode queries (default 1.0s)
+        :returns: True if all required modes are supported
+        :rtype: bool
+
+        Example::
+
+            if term.does_mouse(report_drag=True, report_pixels=True):
+                with term.mouse_enabled(report_drag=True, report_pixels=True):
+                    # Use mouse tracking with drag and pixel support
+                    pass
+        """
+        modes = [_DecPrivateMode.MOUSE_EXTENDED_SGR]
+
+        # Determine tracking mode by precedence: motion > drag > clicks
+        if report_motion:
+            modes.append(_DecPrivateMode.MOUSE_ALL_MOTION)
+        elif report_drag:
+            modes.append(_DecPrivateMode.MOUSE_REPORT_DRAG)
+        elif clicks:
+            modes.append(_DecPrivateMode.MOUSE_REPORT_CLICK)
+
+        # Add pixel reporting if requested
+        if report_pixels:
+            modes.append(_DecPrivateMode.MOUSE_SGR_PIXELS)
+
+        # Check if all required modes are supported
+        for mode in modes:
+            response = self.get_dec_mode(mode, timeout=timeout)
+            if not response.supported:
+                return False
+
+        return True
+
+    @contextlib.contextmanager
+    def mouse_enabled(self, *, clicks: bool = True, report_pixels: bool = False,
+                      report_drag: bool = False, report_motion: bool = False,
+                      timeout: float = 1.0) -> Generator[None, None, None]:
+        """
+        Context manager for enabling mouse tracking with various reporting modes.
+
+        Enables mouse event reporting with sensible defaults, and always
+        enables SGR extended mouse mode (1006).
+
+        :arg bool clicks: Enable basic click reporting (default True)
+        :arg bool report_pixels: Report pixel coordinates instead of cell coordinates
+        :arg bool report_drag: Report mouse drag events (button held while moving)
+        :arg bool report_motion: Report all mouse motion events
+        :arg float timeout: Timeout for mode queries (default 1.0s)
+
+        The reporting modes have precedence: motion > drag > clicks. Enabling
+        a higher-precedence mode automatically includes lower modes.
+
+        Example::
+
+            with term.mouse_enabled():
+                # Basic click tracking
+                inp = term.inkey()
+                if inp.mode == term.DecPrivateMode.MOUSE_EXTENDED_SGR:
+                    print(f"Clicked at {inp.mode_values.x}, {inp.mode_values.y}")
+
+            with term.mouse_enabled(report_drag=True):
+                # Track clicks and drags
+                pass
+
+            with term.mouse_enabled(report_motion=True, report_pixels=True):
+                # Track all motion with pixel coordinates
+                pass
+        """
+        modes = [_DecPrivateMode.MOUSE_EXTENDED_SGR]
+
+        # Determine tracking mode by precedence: motion > drag > clicks
+        if report_motion:
+            modes.append(_DecPrivateMode.MOUSE_ALL_MOTION)
+        elif report_drag:
+            modes.append(_DecPrivateMode.MOUSE_REPORT_DRAG)
+        elif clicks:
+            modes.append(_DecPrivateMode.MOUSE_REPORT_CLICK)
+
+        # Add pixel reporting if requested
+        if report_pixels:
+            modes.append(_DecPrivateMode.MOUSE_SGR_PIXELS)
+
+        with self.dec_modes_enabled(*modes, timeout=timeout):
+            yield
+
+    @contextlib.contextmanager
+    def bracketed_paste(self, timeout: float = 1.0) -> Generator[None, None, None]:
+        """
+        Context manager for enabling bracketed paste mode.
+
+        When enabled, pasted text is wrapped with special escape sequences,
+        allowing applications to distinguish pasted content from typed input.
+
+        :arg float timeout: Timeout for mode query (default 1.0s)
+
+        Example::
+
+            with term.bracketed_paste():
+                inp = term.inkey()
+                if inp.mode == term.DecPrivateMode.BRACKETED_PASTE:
+                    pasted_text = inp.mode_values.text
+                    print(f"You pasted: {pasted_text}")
+        """
+        with self.dec_modes_enabled(_DecPrivateMode.BRACKETED_PASTE, timeout=timeout):
+            yield
+
+    @contextlib.contextmanager
+    def synchronized_output(self, timeout: float = 1.0) -> Generator[None, None, None]:
+        """
+        Context manager for enabling synchronized output mode.
+
+        Buffers all terminal output until the context exits, eliminating screen flicker during
+        redraws. Perfect for animations and full-screen updates.
+
+        :arg float timeout: Timeout for mode query (default 1.0s)
+        """
+        with self.dec_modes_enabled(_DecPrivateMode.SYNCHRONIZED_OUTPUT, timeout=timeout):
+            yield
+
+    @contextlib.contextmanager
+    def focus_events(self, timeout: float = 1.0) -> Generator[None, None, None]:
+        """
+        Context manager for enabling focus event reporting.
+
+        Reports when the terminal window gains or loses focus, useful for pausing animations or
+        updating status indicators.
+
+        :arg float timeout: Timeout for mode query (default 1.0s)
+        """
+        with self.dec_modes_enabled(_DecPrivateMode.FOCUS_IN_OUT_EVENTS, timeout=timeout):
+            yield
 
     def _dec_mode_set_enabled(self, *modes: Union[int, _DecPrivateMode]) -> None:
         """

@@ -3,17 +3,12 @@ from blessed import Terminal
 
 term = Terminal()
 
-print("Switch focus to/from this terminal window (press 'q' to quit)...")
+print("Switch focus to/from this terminal window, Ctrl+C to stop.")
 
-with term.dec_modes_enabled(term.DecPrivateMode.FOCUS_IN_OUT_EVENTS):
+with term.focus_events():
     with term.cbreak():
         while True:
-            ks = term.inkey()
-
-            if ks.mode == term.DecPrivateMode.FOCUS_IN_OUT_EVENTS:
-                event = ks.mode_values
-                status = "gained" if event.gained else "lost"
+            inp = term.inkey()
+            if inp.mode == term.DecPrivateMode.FOCUS_IN_OUT_EVENTS:
+                status = "gained" if inp.mode_values.gained else "lost"
                 print(f"Focus {status}")
-            elif ks == 'q':
-                print("Goodbye!")
-                break

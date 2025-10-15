@@ -5,7 +5,7 @@ term = Terminal()
 
 print("Paste some text (press 'q' to quit)...")
 
-with term.dec_modes_enabled(term.DecPrivateMode.BRACKETED_PASTE):
+with term.bracketed_paste():
     with term.cbreak():
         while True:
             ks = term.inkey()

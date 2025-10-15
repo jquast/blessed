@@ -12,11 +12,11 @@ print(f"Checking {mode.name} (mode {mode.value}) ...", end='', flush=True)
 response = term.get_dec_mode(mode, timeout=1)
 
 # analyze result
-if response.is_failed():
+if response.failed:
     print(" this terminal " + term.bright_red("does not"), end='')
     print(" support DEC Private Mode queries (timeout)")
-elif not response.is_supported():
+elif not response.supported:
     print(" Mouse tracking (MOUSE_EXTENDED_SGR) is " + term.bright_red("not supported"))
 else:
-    status = "enabled" if response.is_enabled() else "disabled"
+    status = "enabled" if response.enabled else "disabled"
     print(term.bright_green(f" supported and {status}"))

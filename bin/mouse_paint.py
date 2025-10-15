@@ -3,13 +3,10 @@ from blessed import Terminal
 
 term = Terminal()
 
-if not term.get_dec_mode(term.DecPrivateMode.MOUSE_ALL_MOTION, timeout=0.1).is_supported():
-    print("This terminal does not support MOUSE_ALL_MOTION tracking!")
+if not term.does_mouse(report_motion=True):
+    print("This terminal does not support mouse motion tracking!")
 else:
-    with term.cbreak(), term.fullscreen(), term.dec_modes_enabled(
-            term.DecPrivateMode.MOUSE_ALL_MOTION,
-            term.DecPrivateMode.MOUSE_EXTENDED_SGR):
-
+    with term.cbreak(), term.fullscreen(), term.mouse_enabled(report_motion=True):
         # header row displays mouse data
         quit_msg = "Press ^C to quit!"
         xoff = len(quit_msg) + 3

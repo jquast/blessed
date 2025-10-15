@@ -39,17 +39,17 @@ class DecModeManager:
             mode = DecPrivateMode(mode)
             response = self.term.get_dec_mode(mode, timeout=timeout)
 
-            if not response.is_supported():
+            if not response.supported:
                 messages.append(f'{mode}: no support')
                 continue
 
-            status = "enabled" if response.is_enabled() else "disabled"
-            if response.is_permanent():
-                messages.append(f'{mode}: permanent, enabled={response.is_enabled()}')
+            status = "enabled" if response.enabled else "disabled"
+            if response.permanent:
+                messages.append(f'{mode}: permanent, enabled={response.enabled}')
                 continue
 
             messages.append(f'{mode}: {status}')
-            self.available_modes[mode] = response.is_enabled()
+            self.available_modes[mode] = response.enabled
 
         if not self.available_modes:
             messages.append("All DEC Private Modes fail support")
