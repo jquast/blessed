@@ -1210,12 +1210,12 @@ def test_meta_escape_name_csi_special_case():
 
 
 def test_terminal_inkey_csi_sequence():
-    """Test terminal.inkey() returns single CSI keystroke for unmatched sequences."""
+    """Test term.inkey() returns single CSI keystroke for unmatched sequences."""
     @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
 
-        # When an unsupported CSI sequence arrives, it should be detected as CSI
+        # When an unsupported CSI sequence arrives, inkey should detect it as CSI
         term.ungetch('\x1b[')
         ks = term.inkey(timeout=0)
         assert ks == '\x1b['
