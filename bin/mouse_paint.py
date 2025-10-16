@@ -17,8 +17,6 @@ else:
         while True:
             print(text, end='', flush=True)
             inp = term.inkey()
-            print(inp.name)
-            term.inkey(0.01)
 
             if inp.name and inp.name.startswith('MOUSE_'):
                 # process mouse event buttons using magic methods

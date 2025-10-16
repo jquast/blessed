@@ -86,6 +86,28 @@ possibilities!
    :language: python
    :linenos:
 
+Understanding Mouse Coordinates
+-------------------------------
+
+Mouse coordinates are accessed by :attr:`~Keystroke.mouse_yx` attribute in as
+tuple ``(int, int)`` of the corresponding row and column. This matches the
+signature of :meth:`~Terminal.move_yx`. If :attr:`~Keystroke.mouse_yx` is used
+on a keystroke that is not a mouse event, values ``(-1, -1)`` are returned.
+
+There is also a :attr:`~Keystroke.mouse_xy` attribute that mirrors the signature
+of :meth:`~Terminal.move_xy`.
+
+- :attr:`~.Keystroke.mouse_yx` - position as a ``(y, x)`` tuple
+- :attr:`~.Keystroke.mouse_xy` - position as an ``(x, y)`` tuple
+
+.. code-block:: python
+
+   inp = term.inkey()
+   if inp.name and inp.name.startswith('MOUSE_'):
+       print(term.move_yx(*inp.mouse_yx) + '█')
+
+
+
 Checking Support
 ----------------
 
@@ -93,7 +115,7 @@ Not all terminals support mouse tracking or all kinds of mouse tracking.
 
 Use :meth:`~blessed.Terminal.does_mouse` to check before enabling:
 
-.. literalinclude:: ../bin/mouse_drag.py
+.. literalinclude:: ../bin/mouse_query.py
    :language: python
    :linenos:
 
@@ -164,27 +186,6 @@ When using pixel mode, mouse events still use the same :attr:`~.Keystroke.name`
 pattern (e.g., ``'MOUSE_LEFT'``) and magic method predicates (e.g.,
 ``inp.is_mouse_left()``). The :attr:`~.Keystroke.x` and :attr:`~.Keystroke.y`
 properties represent pixels instead of character cells.
-
-Accessing Mouse Coordinates
-----------------------------
-
-Mouse events provide coordinate properties for easy access to the mouse position:
-
-- :attr:`~.Keystroke.x` - horizontal position (column)
-- :attr:`~.Keystroke.y` - vertical position (row)
-- :attr:`~.Keystroke.mouse_yx` - position as a ``(y, x)`` tuple
-- :attr:`~.Keystroke.mouse_xy` - position as an ``(x, y)`` tuple
-
-The ``mouse_yx`` property is particularly useful with blessed's movement functions:
-
-.. code-block:: python
-
-   inp = term.inkey()
-   if inp.name and inp.name.startswith('MOUSE_'):
-       # Move cursor to mouse position and draw
-       print(term.move_yx(*inp.mouse_yx) + '█')
-       # Or access individual coordinates
-       print(f"Mouse at row {inp.y}, column {inp.x}")
 
 Motion Events
 -------------

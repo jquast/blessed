@@ -375,6 +375,17 @@ class Terminal():
         # build set of prefixes of sequences
         self._keymap_prefixes = get_leading_prefixes(self._keymap)
 
+        # Add DEC event prefixes (mouse, bracketed paste, focus tracking)
+        # These are not in the keymap but need to be recognized as valid prefixes
+        # so that inkey() will wait for complete sequences
+        self._keymap_prefixes.update([
+            '\x1b[M',     # Legacy mouse (needs 3 more bytes)
+            '\x1b[<',     # SGR mouse (variable length)
+            '\x1b[200',   # Bracketed paste start and its starting prefixes,
+            '\x1b[20',
+            '\x1b[2',
+        ])
+
         # keyboard stream buffer
         self._keyboard_buf: collections.deque[str] = collections.deque()
 

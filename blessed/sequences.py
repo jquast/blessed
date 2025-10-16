@@ -17,7 +17,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from blessed.terminal import Terminal
 
 # std imports
-from typing import Type, Tuple, Pattern, TypeVar, Iterator, Optional, List
+from typing import List, Type, Tuple, Pattern, TypeVar, Iterator, Optional
 
 # SupportsIndex was added in Python 3.8
 if sys.version_info >= (3, 8):

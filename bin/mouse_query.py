@@ -7,7 +7,7 @@ term = Terminal()
 if not term.does_mouse():
     print(f"mouse_enabled() {term.bright_red('not supported')} on this Terminal")
 else:
-    # check for and report all advanced features
+    # check for, enable, and report all supported advanced features
     feature_kwargs = {mouse_feature: True
                       for mouse_feature in ('report_pixels', 'report_drag', 'report_motion')
                       if term.does_mouse(**{mouse_feature: True})}

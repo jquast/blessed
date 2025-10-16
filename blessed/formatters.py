@@ -1,7 +1,7 @@
 """Sub-module providing sequence-formatting functions."""
 # std imports
 import platform
-from typing import TYPE_CHECKING, Set, List, Dict, Type, Tuple, Union, TypeVar, Callable, Optional
+from typing import TYPE_CHECKING, Set, Dict, List, Type, Tuple, Union, TypeVar, Callable, Optional
 
 # local
 from blessed.colorspace import CGA_COLORS, X11_COLORNAMES_TO_RGB
