@@ -10,9 +10,8 @@ with term.bracketed_paste():
         while True:
             ks = term.inkey()
 
-            if ks.mode == term.DecPrivateMode.BRACKETED_PASTE:
-                event = ks.mode_values
-                print(f"Pasted: {term.reverse(repr(event.text))}")
+            if ks.name == 'BRACKETED_PASTE':
+                print(f"Pasted: {term.reverse(repr(ks.text))}")
             elif ks == 'q':
                 print("Goodbye!")
                 break

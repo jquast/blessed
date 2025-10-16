@@ -11,6 +11,5 @@ else:
         while True:
             event = term.inkey()
 
-            if event.mode == term.DecPrivateMode.MOUSE_SGR_PIXELS:
-                mouse = event.mode_values
-                print(f"Pixel position: (y={mouse.y}, x={mouse.x})")
+            if event.name and event.name.startswith('MOUSE_'):
+                print(f"Pixel position: (y={event.y}, x={event.x})")

@@ -10,6 +10,5 @@ else:
     with term.cbreak(), term.mouse_enabled():
         while True:
             inp = term.inkey()
-            if inp.mode == term.DecPrivateMode.MOUSE_EXTENDED_SGR:
-                mouse = inp.mode_values
-                print(f"button {mouse.button} at (y={mouse.y}, x={mouse.x})")
+            if inp.name and inp.name.startswith('MOUSE_'):
+                print(f"button {inp.name} at (y={inp.y}, x={inp.x})")

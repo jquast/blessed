@@ -286,7 +286,7 @@ def format_key_event(term, keystroke) -> str:
     name_repr = repr(keystroke.name)[:25]
 
     if keystroke.mode and int(keystroke.mode) > 0:
-        extra = f'{keystroke.mode}:{keystroke.mode_values!r}'
+        extra = f'{keystroke.mode}:{keystroke._mode_values!r}'
     else:
         events = []
         for event_name in ('pressed', 'released', 'repeated'):

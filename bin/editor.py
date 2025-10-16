@@ -242,12 +242,10 @@ def main():
                 # ^l refreshes
                 redraw(term=term, screen=screen)
 
-            elif inp.mode == term.DecPrivateMode.MOUSE_EXTENDED_SGR:
-                # Handle mouse events - filter out release events
-                mouse_event = inp.mode_values
-                if mouse_event.name == "LEFT":
-                    csr = Cursor(mouse_event.y - 1, mouse_event.x - 1, term)
-                    continue
+            elif inp.is_mouse_left():
+                # Handle left mouse button press
+                csr = Cursor(inp.y - 1, inp.x - 1, term)
+                continue
 
             else:
                 n_csr = lookup_move(inp.code, csr)

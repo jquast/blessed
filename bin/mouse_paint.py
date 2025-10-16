@@ -17,14 +17,20 @@ else:
         while True:
             print(text, end='', flush=True)
             inp = term.inkey()
+            print(inp.name)
+            term.inkey(0.01)
 
-            if inp.mode == term.DecPrivateMode.MOUSE_EXTENDED_SGR:
-                # process mouse event buttons
-                mouse = inp.mode_values
-                color_offset = {'SCROLL_UP': 1, 'SCROLL_DOWN': -1}.get(mouse.button, 0)
-                color_idx = (color_idx + color_offset) % num_colors
+            if inp.name and inp.name.startswith('MOUSE_'):
+                # process mouse event buttons using magic methods
+                if inp.is_mouse_scroll_up():
+                    color_idx = (color_idx + 1) % num_colors
+                elif inp.is_mouse_scroll_down():
+                    color_idx = (color_idx - 1) % num_colors
+
                 block_fill = term.color(color_idx)('█')
-                char = {'LEFT': block_fill, 'RIGHT': ' '}.get(mouse.button, '')
+                char = (block_fill if inp.name.startswith('MOUSE_LEFT')
+                        else ' ' if inp.name.startswith('MOUSE_RIGHT')
+                        else '')
 
-                # update draw text
-                text = make_header() + term.move_yx(mouse.y, mouse.x) + char
+                # update draw text using mouse_yx
+                text = make_header() + term.move_yx(*inp.mouse_yx) + char

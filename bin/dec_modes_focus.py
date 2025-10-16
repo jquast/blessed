@@ -9,6 +9,7 @@ with term.focus_events():
     with term.cbreak():
         while True:
             inp = term.inkey()
-            if inp.mode == term.DecPrivateMode.FOCUS_IN_OUT_EVENTS:
-                status = "gained" if inp.mode_values.gained else "lost"
-                print(f"Focus {status}")
+            if inp.name == 'FOCUS_IN':
+                print("Focus gained")
+            elif inp.name == 'FOCUS_OUT':
+                print("Focus lost")
