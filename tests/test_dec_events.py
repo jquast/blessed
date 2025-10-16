@@ -598,16 +598,19 @@ def test_mouse_motion_event_naming():
     """Test that motion events are named correctly."""
     cache = _make_enabled_cache()
 
-    # Pure motion without button (button=0, motion bit set)
-    ks_motion = _match_dec_event('\x1b[<32;10;20M', dec_mode_cache=cache)
+    # Pure motion without button (button=3 "no button", motion bit set = 35)
+    # SGR protocol: button bits 11 (value 3) means "no button" during motion
+    ks_motion = _match_dec_event('\x1b[<35;10;20M', dec_mode_cache=cache)
     assert ks_motion.name == "MOUSE_MOTION"
     assert ks_motion.is_mouse_motion()
 
-    # Drag with left button (button=0, motion bit set)
+    # Drag with left button (button=0 "LEFT", motion bit set = 32)
     ks_left_motion = _match_dec_event('\x1b[<32;10;20M', dec_mode_cache=cache)
     values = ks_left_motion._mode_values
     assert values.button_value == 0
     assert values.is_motion
+    assert ks_left_motion.name == "MOUSE_LEFT_MOTION"
+    assert ks_left_motion.is_mouse_left_motion()
 
     # Drag with middle button (button=1, motion bit set = 33)
     ks_middle_motion = _match_dec_event('\x1b[<33;10;20M', dec_mode_cache=cache)
@@ -619,8 +622,8 @@ def test_mouse_motion_event_naming():
     assert ks_right_motion.name == "MOUSE_RIGHT_MOTION"
     assert ks_right_motion.is_mouse_right_motion()
 
-    # Motion with modifiers
-    ks_ctrl_motion = _match_dec_event('\x1b[<48;10;20M', dec_mode_cache=cache)
+    # Pure motion with modifiers (button=3, ctrl=16, motion=32 = 51)
+    ks_ctrl_motion = _match_dec_event('\x1b[<51;10;20M', dec_mode_cache=cache)
     assert ks_ctrl_motion.name == "MOUSE_CTRL_MOTION"
 
     # Left drag with modifiers (button=0, ctrl=16, motion=32 = 48)
@@ -629,6 +632,8 @@ def test_mouse_motion_event_naming():
     assert values.button_value == 0
     assert values.ctrl
     assert values.is_motion
+    assert ks_ctrl_left_motion.name == "MOUSE_CTRL_LEFT_MOTION"
+    assert ks_ctrl_left_motion.is_mouse_ctrl_left_motion()
 
     # Motion events should NOT have _RELEASED suffix
     ks_motion_not_released = _match_dec_event('\x1b[<32;10;20m', dec_mode_cache=cache)

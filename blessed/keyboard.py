@@ -107,13 +107,14 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
 
         # Handle motion events specially
         if self.is_motion:
-            # Motion with no button pressed (button_value=0 means no button in motion context)
-            if self.button_value == 0:
+            # Motion with no button pressed (button_value=3 means no button in SGR motion)
+            if self.button_value == 3:
                 button_name += "MOTION"
             else:
                 # Dragging with a specific button
                 if self.button_value < 66:
                     base_button = {
+                        0: "LEFT",
                         1: "MIDDLE",
                         2: "RIGHT",
                         64: "SCROLL_UP",
