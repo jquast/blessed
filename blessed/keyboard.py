@@ -1031,6 +1031,10 @@ def resolve_sequence(text: str,
     that does not negotiate about any DEC Private modes but transmits
     metaSendsEscape anyway, so exhaustive match is performed in all cases.
     """
+    # Handle None prefixes (convert to empty set for compatibility)
+    if prefixes is None:
+        prefixes = set()
+
     # First try advanced keyboard protocol matchers
     ks = None
     for match_fn in (_match_kitty_key,
@@ -1044,20 +1048,23 @@ def resolve_sequence(text: str,
 
     # Then try static sequence lookups from terminal capabilities
     if ks is None:
+        # Note: mapper is sorted longest-first, so '\x1b[A' matches KEY_UP, not KEY_EXIT.
         for sequence, code in mapper.items():
             if text.startswith(sequence):
                 ks = Keystroke(ucs=sequence, code=code, name=codes[code])
                 break
 
-    # Resolve for alt+backspace and metaSendsEscape, KEY_ALT_[..],
-    # when the sequence so far is not a 'known prefix', or, when
-    # final is True, we return the ambiguously matched KEY_ALT_[...]
-    if prefixes is not None:
-        maybe_alt = (ks is not None and ks.code == curses.KEY_EXIT and len(text) > 1)
-        final_or_not_keystroke = (
-            final or (len(text) > 1 and text[1] == '\x7f') or text[:2] not in prefixes)
-        if (maybe_alt and final_or_not_keystroke):
-            ks = Keystroke(ucs=text[:2])
+    is_meta_escape = (
+        # Looks like 'Esc + char', for metaSendsEscape (Alt sequences) and CSI
+        text.startswith('\x1b')
+        and len(text) >= 2
+        # Final input, or not a known prefix,
+        and (final or text[:2] not in prefixes)
+        # And no match, or matched KEY_EXIT only chr(27)
+        and (ks is None or ks.code == curses.KEY_EXIT)
+    )
+    if is_meta_escape:
+        ks = Keystroke(ucs=text[:2])
 
     # final match is just simple resolution of the first codepoint of text
     if ks is None:
