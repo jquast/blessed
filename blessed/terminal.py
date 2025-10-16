@@ -1761,12 +1761,16 @@ class Terminal():
         When CSI ``'\x1b['`` is detected in input stream, all remaining bytes
         are decoded as latin1.
         """
+        stime = time.time()
         ucs = ''
         while self._keyboard_buf:
             ucs += self._keyboard_buf.pop()
 
         # and receive all immediately available bytes
-        while self.kbhit(timeout=timeout):
+        while self.kbhit(timeout=_time_left(stime, timeout)):
+            # Use latin-1 decoding for CSI sequences (legacy mouse, etc.)
+            # pylint: disable=attribute-defined-outside-init
+            self._use_latin1_decoding = '\x1b[' in ucs
             ucs += self.getch()
         return ucs
 
