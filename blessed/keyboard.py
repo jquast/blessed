@@ -7,7 +7,7 @@ import time
 import typing
 import platform
 import functools
-from typing import TYPE_CHECKING, Set, Dict, Match, TypeVar, Optional
+from typing import TYPE_CHECKING, Set, Dict, Match, TypeVar, Optional, Tuple
 from collections import OrderedDict, namedtuple
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -1241,7 +1241,7 @@ class Keystroke(str):
         return None
 
     @property
-    def mouse_yx(self) -> tuple[int, int]:
+    def mouse_yx(self) -> Tuple[int, int]:
         """
         Mouse position as (y, x) tuple for mouse events.
 
@@ -1258,7 +1258,7 @@ class Keystroke(str):
         return (-1, -1)
 
     @property
-    def mouse_xy(self) -> tuple[int, int]:
+    def mouse_xy(self) -> Tuple[int, int]:
         """
         Mouse position as (x, y) tuple for mouse events.
 
