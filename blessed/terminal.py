@@ -378,6 +378,9 @@ class Terminal():
         # keyboard stream buffer
         self._keyboard_buf: collections.deque[str] = collections.deque()
 
+        # Flag to control which decoder to use for next byte
+        self._use_latin1_decoding = False
+
         if self._keyboard_fd is not None:
             # set input encoding and initialize incremental decoder
 
@@ -2042,7 +2045,11 @@ class Terminal():
         """
         assert self._keyboard_fd is not None
         byte = os.read(self._keyboard_fd, 1)
-        return self._keyboard_decoder.decode(byte, final=False)
+        # Select decoder based on whether we're in a CSI sequence
+        decoder = (self._keyboard_decoder_latin1
+                   if self._use_latin1_decoding
+                   else self._keyboard_decoder)
+        return decoder.decode(byte, final=False)
 
     def ungetch(self, text: str) -> None:
         """
@@ -2202,6 +2209,9 @@ class Terminal():
 
         # and receive all immediately available bytes
         while self.kbhit(timeout=timeout):
+            # Use latin-1 decoding for CSI sequences (legacy mouse, etc.)
+            # pylint: disable=attribute-defined-outside-init
+            self._use_latin1_decoding = '\x1b[' in ucs
             ucs += self.getch()
         return ucs
 
@@ -2254,10 +2264,14 @@ class Terminal():
         # a sequence is completed.
         while not ks and self.kbhit(timeout=_time_left(stime, timeout)):
             # receive any next byte
+            # pylint: disable=attribute-defined-outside-init
+            self._use_latin1_decoding = ucs.startswith('\x1b[')
             ucs += self.getch()
 
             # and all other immediately available bytes
             while self.kbhit(timeout=0):
+                # pylint: disable=attribute-defined-outside-init
+                self._use_latin1_decoding = ucs.startswith('\x1b[')
                 ucs += self.getch()
 
             # and then resolve for sequence
@@ -2279,6 +2293,8 @@ class Terminal():
             while (ks.code == self.KEY_ESCAPE
                    and ucs in self._keymap_prefixes
                    and self.kbhit(timeout=_time_left(esctime, esc_delay))):
+                # pylint: disable=attribute-defined-outside-init
+                self._use_latin1_decoding = ucs.startswith('\x1b[')
                 ucs += self.getch()
                 # re-check 'final' after reading more bytes
                 final = bool(ucs) and ucs not in self._keymap_prefixes

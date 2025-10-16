@@ -22,28 +22,15 @@ any serious editor would make liberal use of special modes.
 from __future__ import division, print_function
 
 # std imports
-import functools
 import collections
 
 # local
 from blessed import Terminal
-from blessed.keyboard import MouseSGREvent
 
-# python 2/3 compatibility, provide 'echo' function as an
-# alias for "print without newline and flush"
-try:
-    # pylint: disable=invalid-name
-    #         Invalid constant name "echo"
-    echo = functools.partial(print, end='', flush=True)
-    echo(u'')
-except TypeError:
-    # TypeError: 'flush' is an invalid keyword argument for this function
-    import sys
 
-    def echo(text):
-        """Display ``text`` and flush output."""
-        sys.stdout.write(u'{}'.format(text))
-        sys.stdout.flush()
+def echo(text):
+    """Display ``text`` and flush output."""
+    print(text, end='', flush=True)
 
 
 def input_filter(keystroke):
@@ -229,7 +216,7 @@ def main():
             term.location(), \
             term.fullscreen(), \
             term.keypad(), \
-            term.dec_modes_enabled(term.DecPrivateMode.MOUSE_EXTENDED_SGR):
+            term.mouse_enabled():
         inp = None
         while True:
             echo_yx(csr, term.reverse(screen.get((csr.y, csr.x), u' ')))
@@ -256,18 +243,11 @@ def main():
                 redraw(term=term, screen=screen)
 
             elif inp.mode == term.DecPrivateMode.MOUSE_EXTENDED_SGR:
-                # Handle mouse events
+                # Handle mouse events - filter out release events
                 mouse_event = inp.mode_values
-                if isinstance(mouse_event, MouseSGREvent) and not mouse_event.is_release:
-                    # Mouse click - move cursor to click position (convert to 0-based)
-                    new_y = max(0, min(term.height - 1, mouse_event.y - 1))
-                    new_x = max(0, min(term.width - 1, mouse_event.x - 1))
-
-                    # erase old cursor
-                    echo_yx(csr, screen.get((csr.y, csr.x), u' '))
-                    # set new cursor position
-                    csr = Cursor(new_y, new_x, term)
-                continue
+                if mouse_event.name == "LEFT":
+                    csr = Cursor(mouse_event.y - 1, mouse_event.x - 1, term)
+                    continue
 
             else:
                 n_csr = lookup_move(inp.code, csr)

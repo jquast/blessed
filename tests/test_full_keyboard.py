@@ -30,7 +30,7 @@ got_sigwinch = False
 
 pytestmark = pytest.mark.skipif(
     not TEST_KEYBOARD or IS_WINDOWS,
-    reason="Timing-sensitive tests please do not run on build farms.")
+    reason="Timing-sensitive tests excluded, or, windows incompatible")
 
 
 def assert_elapsed_range(start_time, min_ms, max_ms):

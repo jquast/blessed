@@ -6,30 +6,25 @@ term = Terminal()
 if not term.does_mouse(report_motion=True):
     print("This terminal does not support mouse motion tracking!")
 else:
+    # Track current color for painting
+    color_idx = 7
+    num_colors = min(256, term.number_of_colors)
+    header = "Scroll wheel changes color=[{0}], LMB paints, RMB erases, ^C to quit"
+    def make_header(): return term.home + term.center(header.format(term.color(color_idx)('█')))
+
     with term.cbreak(), term.fullscreen(), term.mouse_enabled(report_motion=True):
-        # header row displays mouse data
-        quit_msg = "Press ^C to quit!"
-        xoff = len(quit_msg) + 3
-        print(term.home + term.reverse(term.ljust(quit_msg)) + term.clear_eos)
-
+        text = make_header()
         while True:
-            inp = term.inkey(timeout=1)
-
-            if inp == 'q':
-                break
+            print(text, end='', flush=True)
+            inp = term.inkey()
 
             if inp.mode == term.DecPrivateMode.MOUSE_EXTENDED_SGR:
+                # process mouse event buttons
                 mouse = inp.mode_values
+                color_offset = {'SCROLL_UP': 1, 'SCROLL_DOWN': -1}.get(mouse.button, 0)
+                color_idx = (color_idx + color_offset) % num_colors
+                block_fill = term.color(color_idx)('█')
+                char = {'LEFT': block_fill, 'RIGHT': ' '}.get(mouse.button, '')
 
-                # Display mouse data in header row, move the blinking cursor
-                # position, and conditionally draw a block character when LMB is
-                # held, and erase when Middle or RMB is used.
-                maybe_char = ('█' if mouse.button == 0 and not mouse.is_release else
-                              ' ' if mouse.button < 3 and not mouse.is_release else
-                              '')
-                text = (term.move_yx(0, xoff) +
-                        term.reverse(term.ljust(repr(mouse), term.width - xoff)) +
-                        term.move_yx(mouse.y, mouse.x) +
-                        maybe_char)
-
-                print(text, end='', flush=True)
+                # update draw text
+                text = make_header() + term.move_yx(mouse.y, mouse.x) + char

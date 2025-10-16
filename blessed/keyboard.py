@@ -35,25 +35,204 @@ else:
 BracketedPasteEvent = namedtuple('BracketedPasteEvent', 'text')
 
 
-class MouseEvent(namedtuple('_MouseEvent',
-                            'button x y is_release shift meta ctrl is_motion is_wheel')):
+class MouseEvent:  # pylint: disable=too-many-instance-attributes
     """
     Mouse event with button, coordinates, and modifier information.
 
     A unified mouse event structure that supports both legacy and SGR mouse protocols. Provides a
-    custom __repr__ that only displays active (non-default) attributes for clarity.
+    dynamic button property that returns human-readable button names like "LEFT", "SCROLL_UP",
+    "CTRL_LEFT", etc.
+
+    :ivar int button_value: Raw button number (0=left, 1=middle, 2=right, 64=scroll up, 65=scroll
+        down, or higher for extended buttons).
+    :ivar int x: Horizontal position (0-indexed, in cells or pixels depending on mode).
+    :ivar int y: Vertical position (0-indexed, in cells or pixels depending on mode).
+    :ivar bool released: True if this is a button release event.
+    :ivar bool shift: True if Shift modifier is pressed.
+    :ivar bool meta: True if Meta/Alt modifier is pressed.
+    :ivar bool ctrl: True if Ctrl modifier is pressed.
+    :ivar bool is_motion: True if motion is being reported (drag or all- motion mode).
+    :ivar bool is_wheel: True if this is a scroll wheel event.
     """
+
+    def __init__(self, button_value: int, x: int, y: int, released: bool,
+                 shift: bool, meta: bool, ctrl: bool, is_motion: bool, is_wheel: bool):
+        # pylint: disable=too-many-positional-arguments
+        """
+        Initialize a MouseEvent.
+
+        :param int button_value: Raw button number.
+        :param int x: Horizontal position.
+        :param int y: Vertical position.
+        :param bool released: Whether this is a button release event.
+        :param bool shift: Whether Shift modifier is pressed.
+        :param bool meta: Whether Meta/Alt modifier is pressed.
+        :param bool ctrl: Whether Ctrl modifier is pressed.
+        :param bool is_motion: Whether motion is being reported.
+        :param bool is_wheel: Whether this is a scroll wheel event.
+        """
+        self.button_value = button_value
+        self.x = x
+        self.y = y
+        self.released = released
+        self.shift = shift
+        self.meta = meta
+        self.ctrl = ctrl
+        self.is_motion = is_motion
+        self.is_wheel = is_wheel
+
+    @property
+    def button(self) -> str:
+        """
+        Return human-readable button name.
+
+        Generates button names that include modifiers, button type, and release state, such as:
+        - "LEFT", "MIDDLE", "RIGHT" for standard mouse buttons
+        - "LEFT_RELEASED", "MIDDLE_RELEASED", "RIGHT_RELEASED" for button releases
+        - "SCROLL_UP", "SCROLL_DOWN" for wheel events
+        - "CTRL_LEFT", "SHIFT_SCROLL_UP", "CTRL_SHIFT_META_RIGHT" with modifiers
+        - "CTRL_LEFT_RELEASED" for modified button releases
+        - "BUTTON_6", "BUTTON_7", etc. for extended mouse buttons
+
+        :rtype: str
+        :returns: Button name with modifiers, button type, and release state.
+        """
+        button_name = ''
+
+        # Add modifiers in order: ctrl, shift, meta
+        for modifier in ('ctrl', 'shift', 'meta'):
+            if getattr(self, modifier):
+                button_name += f'{modifier.upper()}_'
+
+        # Map button_value to name
+        if self.button_value < 66:
+            button_name += {
+                0: "LEFT",
+                1: "MIDDLE",
+                2: "RIGHT",
+                64: "SCROLL_UP",
+                65: "SCROLL_DOWN"
+            }.get(self.button_value, '')
+        else:
+            # Extended buttons (button_value >= 66)
+            button_name += f"BUTTON_{self.button_value - 60}"
+
+        # Add release state
+        if self.released:
+            button_name += "_RELEASED"
+
+        return button_name
 
     def __repr__(self) -> str:
         """Return succinct representation showing only active attributes."""
-        # Always show button, x, y
-        parts = [f'button={self.button}', f'x={self.x}', f'y={self.y}']
+        # Always show button_value, x, y
+        parts = [f'button_value={self.button_value}', f'x={self.x}', f'y={self.y}']
 
         # Only show boolean flags when True
-        for bool_name in ('is_release', 'shift', 'meta', 'ctrl', 'is_motion', 'is_wheel'):
+        for bool_name in ('released', 'shift', 'meta', 'ctrl', 'is_motion', 'is_wheel'):
             if getattr(self, bool_name):
                 parts.append(f'{bool_name}=True')
         return f"MouseEvent({', '.join(parts)})"
+
+    @classmethod
+    def from_sgr_match(cls, match: Match[str]) -> 'MouseEvent':
+        """
+        Parse SGR mouse event from regex match.
+
+        Handles both SGR (mode 1006) and SGR-Pixels (mode 1016) since they
+        use identical wire formats: CSI < b;x;y m/M. The difference is semantic:
+        - Mode 1006: coordinates represent character cell positions
+        - Mode 1016: coordinates represent pixel positions
+        Applications must interpret x,y coordinates based on which mode was enabled.
+
+        The protocol sends 1-indexed coordinates (top-left is 1,1), but we convert
+        to 0-indexed (top-left is 0,0) to match blessed's terminal movement functions.
+
+        :param Match match: Regex match object with groups 'b', 'x', 'y', 'type'.
+        :rtype: MouseEvent
+        :returns: Parsed MouseEvent instance.
+        """
+        b = int(match.group('b'))
+        x = int(match.group('x')) - 1  # Convert from 1-indexed to 0-indexed
+        y = int(match.group('y')) - 1  # Convert from 1-indexed to 0-indexed
+        event_type = match.group('type')
+
+        released = event_type == 'm'
+
+        # Extract modifiers from button code
+        shift = bool(b & 4)
+        meta = bool(b & 8)
+        ctrl = bool(b & 16)
+
+        # Extract motion/drag flags
+        is_motion = bool(b & 32)
+
+        # Check for wheel events (button 64-65) by masking modifiers
+        # Wheel events: button & ~(shift|meta|ctrl|motion) gives base button
+        base_button = b & ~(4 | 8 | 16 | 32)
+        is_wheel = base_button in {64, 65}  # wheel up/down
+
+        # Get base button (0-2 for left/middle/right, or 64-65 for wheel)
+        button = b & 3 if not is_wheel else base_button
+
+        return cls(
+            button_value=button,
+            x=x,
+            y=y,
+            released=released,
+            shift=shift,
+            meta=meta,
+            ctrl=ctrl,
+            is_motion=is_motion,
+            is_wheel=is_wheel
+        )
+
+    @classmethod
+    def from_legacy_match(cls, match: Match[str]) -> 'MouseEvent':
+        """
+        Parse legacy mouse event (X10/1000/1002/1003) from regex match.
+
+        The protocol sends 1-indexed coordinates (top-left is 1,1), but we convert to 0-indexed
+        (top-left is 0,0) to match blessed's terminal movement functions.
+
+        :param Match match: Regex match object with groups 'cb', 'cx', 'cy'.
+        :rtype: MouseEvent
+        :returns: Parsed MouseEvent instance.
+        """
+        cb = ord(match.group('cb')) - 32
+        cx = ord(match.group('cx')) - 32 - 1  # Convert from 1-indexed to 0-indexed
+        cy = ord(match.group('cy')) - 32 - 1  # Convert from 1-indexed to 0-indexed
+
+        # Extract button and modifiers from cb
+        button = cb & 3
+        released = button == 3
+        if released:
+            button = 0  # Release doesn't specify which button
+
+        # Extract modifier flags
+        shift = bool(cb & 4)
+        meta = bool(cb & 8)
+        ctrl = bool(cb & 16)
+
+        # Extract motion/drag flags
+        is_motion = bool(cb & 32)
+
+        # Wheel events
+        is_wheel = cb >= 64
+        if is_wheel:
+            button = cb - 64  # 0=wheel up, 1=wheel down
+
+        return cls(
+            button_value=button,
+            x=cx,
+            y=cy,
+            released=released,
+            shift=shift,
+            meta=meta,
+            ctrl=ctrl,
+            is_motion=is_motion,
+            is_wheel=is_wheel
+        )
 
 
 # Backwards compatibility aliases
@@ -263,7 +442,8 @@ class Keystroke(str):
         Returns name like 'KEY_CTRL_ALT_F1' or 'KEY_SHIFT_UP_RELEASED'. Also handles release/repeat
         events for keys without modifiers.
         """
-        if not (self._mode is not None and self._mode < 0 and self._code is not None):
+        # Check if this is a special keyboard protocol mode
+        if not (self.uses_keyboard_protocol and self._code is not None):
             return None
 
         # turn keycode value into 'base name', eg.
@@ -315,7 +495,7 @@ class Keystroke(str):
 
         Returns name like 'KEY_CTRL_ALT_A' or 'KEY_ALT_SHIFT_5'.
         """
-        if self._mode != -1:
+        if self._mode != DecPrivateMode.SpecialInternalKitty:
             return None
 
         # Only synthesize for keypress events (event_type == 1), not release/repeat
@@ -551,6 +731,20 @@ class Keystroke(str):
         return bool(self.modifiers_bits & KittyModifierBits.num_lock)
 
     @property
+    def uses_keyboard_protocol(self) -> bool:
+        """
+        Whether this keystroke uses a special keyboard protocol mode.
+
+        Returns True for Kitty, ModifyOtherKeys, or LegacyCSIModifier protocols, which use negative
+        mode values (SpecialInternalKitty=-1, SpecialInternalModifyOtherKeys=-2,
+        SpecialInternalLegacyCSIModifier=-3).
+
+        :rtype: bool
+        :returns: True if using special keyboard protocol mode
+        """
+        return self._mode is not None and self._mode < 0
+
+    @property
     def pressed(self) -> bool:
         """
         Whether this is a key press event.
@@ -559,7 +753,7 @@ class Keystroke(str):
         :returns: True if this is a key press event (event_type=1 or not specified), False for
             repeat or release events
         """
-        if self._mode is not None and self._mode < 0:
+        if self.uses_keyboard_protocol:
             # Check if _match has event_type (Kitty, LegacyCSI, ModifyOtherKeys),
             # defaulting to 1 (pressed) if not present.
             return getattr(self._match, 'event_type', 1) == 1
@@ -574,7 +768,7 @@ class Keystroke(str):
         :rtype: bool
         :returns: True if this is a key repeat event (event_type=2), False otherwise
         """
-        if self._mode is not None and self._mode < 0:
+        if self.uses_keyboard_protocol:
             return getattr(self._match, 'event_type', 1) == 2
         # Default: not a repeat event
         return False
@@ -587,7 +781,7 @@ class Keystroke(str):
         :rtype: bool
         :returns: True if this is a key release event (event_type=3), False otherwise
         """
-        if self._mode is not None and self._mode < 0:
+        if self.uses_keyboard_protocol:
             return getattr(self._match, 'event_type', 1) == 3
         # Default: not a release event
         return False
@@ -851,7 +1045,7 @@ class Keystroke(str):
         Extracts the character from modern keyboard protocols.
         """
         # Kitty protocol
-        if self._mode == -1:
+        if self._mode == DecPrivateMode.SpecialInternalKitty:
             # prefer text_codepoints if available
             if self._match.int_codepoints:
                 return ''.join(chr(cp) for cp in self._match.int_codepoints)
@@ -871,7 +1065,7 @@ class Keystroke(str):
             return chr(self._match.unicode_key)
 
         # ModifyOtherKeys protocol - extract character from key
-        if self._mode == -2:
+        if self._mode == DecPrivateMode.SpecialInternalModifyOtherKeys:
             return chr(self._match.key)
 
         return None
@@ -955,104 +1149,27 @@ class Keystroke(str):
         if self._mode is None or self._match is None:
             return None
 
-        # Call appropriate private parser method based on mode
-        fn_callback = {
-            DecPrivateMode.MOUSE_REPORT_CLICK: self._parse_mouse_legacy,
-            DecPrivateMode.MOUSE_HILITE_TRACKING: self._parse_mouse_legacy,
-            DecPrivateMode.MOUSE_REPORT_DRAG: self._parse_mouse_legacy,
-            DecPrivateMode.MOUSE_ALL_MOTION: self._parse_mouse_legacy,
-            DecPrivateMode.FOCUS_IN_OUT_EVENTS: self._parse_focus,
-            DecPrivateMode.MOUSE_EXTENDED_SGR: self._parse_mouse_sgr,
-            DecPrivateMode.MOUSE_SGR_PIXELS: self._parse_mouse_sgr,
-            DecPrivateMode.BRACKETED_PASTE: self._parse_bracketed_paste,
-        }.get(self._mode)
-        if fn_callback is not None:
-            return fn_callback()
+        # Parse based on mode type
+        if self._mode in (DecPrivateMode.MOUSE_REPORT_CLICK,
+                          DecPrivateMode.MOUSE_HILITE_TRACKING,
+                          DecPrivateMode.MOUSE_REPORT_DRAG,
+                          DecPrivateMode.MOUSE_ALL_MOTION):
+            return MouseEvent.from_legacy_match(self._match)
+        if self._mode in (DecPrivateMode.MOUSE_EXTENDED_SGR,
+                          DecPrivateMode.MOUSE_SGR_PIXELS):
+            return MouseEvent.from_sgr_match(self._match)
+        if self._mode == DecPrivateMode.FOCUS_IN_OUT_EVENTS:
+            return self._parse_focus()
+        if self._mode == DecPrivateMode.BRACKETED_PASTE:
+            return self._parse_bracketed_paste()
+
         # Unknown DEC mode or unsupported mode
         return None
-
-    def _parse_mouse_legacy(self) -> MouseLegacyEvent:
-        """Parse legacy mouse event (X10/1000/1002/1003) from stored regex match."""
-        cb = ord(self._match.group('cb')) - 32
-        cx = ord(self._match.group('cx')) - 32
-        cy = ord(self._match.group('cy')) - 32
-
-        # Extract button and modifiers from cb
-        button = cb & 3
-        is_release = button == 3
-        if is_release:
-            button = 0  # Release doesn't specify which button
-
-        # Extract modifier flags
-        shift = bool(cb & 4)
-        meta = bool(cb & 8)
-        ctrl = bool(cb & 16)
-
-        # Extract motion/drag flags
-        is_motion = bool(cb & 32)
-
-        # Wheel events
-        is_wheel = cb >= 64
-        if is_wheel:
-            button = cb - 64  # 0=wheel up, 1=wheel down
-
-        return MouseLegacyEvent(
-            button=button,
-            x=cx,
-            y=cy,
-            is_release=is_release,
-            shift=shift,
-            meta=meta,
-            ctrl=ctrl,
-            is_motion=is_motion,
-            is_wheel=is_wheel
-        )
 
     def _parse_focus(self) -> FocusEvent:
         """Parse focus event from stored regex match."""
         gained = bool(self._match.group('io') == 'I')
         return FocusEvent(gained=gained)
-
-    def _parse_mouse_sgr(self) -> MouseSGREvent:
-        """
-        Parse SGR mouse event from stored regex match.
-
-        Handles both SGR (mode 1006) and SGR-Pixels (mode 1016) since they
-        use identical wire formats: CSI < b;x;y m/M. The difference is semantic:
-        - Mode 1006: coordinates represent character cell positions
-        - Mode 1016: coordinates represent pixel positions
-        Applications must interpret x,y coordinates based on which mode was enabled.
-        """
-        b = int(self._match.group('b'))
-        x = int(self._match.group('x'))
-        y = int(self._match.group('y'))
-        event_type = self._match.group('type')
-
-        is_release = event_type == 'm'
-
-        # Extract modifiers from button code
-        shift = bool(b & 4)
-        meta = bool(b & 8)
-        ctrl = bool(b & 16)
-
-        # Extract motion/drag flags
-        is_motion = bool(b & 32)
-        is_wheel = b in {64, 65}  # wheel up/down
-
-        # Get base button (0-2 for left/middle/right, or 64-65 for wheel)
-        button = b & 3 if not is_wheel else b
-
-        return MouseSGREvent(
-            button=button,
-            x=x,
-            y=y,
-            is_release=is_release,
-            shift=shift,
-            meta=meta,
-            ctrl=ctrl,
-            is_motion=is_motion,
-            is_wheel=is_wheel
-        )
 
     def _parse_bracketed_paste(self) -> BracketedPasteEvent:
         """Parse bracketed paste event from stored regex match."""
@@ -1075,7 +1192,7 @@ def get_curses_keycodes() -> Dict[str, int]:
 
 def get_keyboard_codes() -> Dict[int, str]:
     """
-    Return mapping of keycode integer values paired by their curses key-name.
+    Return mapping of keycode integer values paired by their curses key- name.
 
     :rtype: dict
     :returns: Dictionary of (code, name) pairs for curses keyboard constant

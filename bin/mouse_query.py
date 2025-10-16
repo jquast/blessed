@@ -3,20 +3,13 @@ from blessed import Terminal
 
 term = Terminal()
 
-# get_dec_mode accepts DecPrivateMode object or an integer, here an object is
-# used for its descriptive .name and .value attributes.
-mode = term.DecPrivateMode(term.DecPrivateMode.MOUSE_EXTENDED_SGR)
-print(f"Checking {mode.name} (mode {mode.value}) ...", end='', flush=True)
-
-# initiate query
-response = term.get_dec_mode(mode, timeout=1)
-
-# analyze result
-if response.failed:
-    print(" this terminal " + term.bright_red("does not"), end='')
-    print(" support DEC Private Mode queries (timeout)")
-elif not response.supported:
-    print(" Mouse tracking (MOUSE_EXTENDED_SGR) is " + term.bright_red("not supported"))
+# check basic mouse support
+if not term.does_mouse():
+    print(f"mouse_enabled() {term.bright_red('not supported')} on this Terminal")
 else:
-    status = "enabled" if response.enabled else "disabled"
-    print(term.bright_green(f" supported and {status}"))
+    # check for and report all advanced features
+    feature_kwargs = {mouse_feature: True
+                      for mouse_feature in ('report_pixels', 'report_drag', 'report_motion')
+                      if term.does_mouse(**{mouse_feature: True})}
+    with term.mouse_enabled(**feature_kwargs):
+        print(f"mouse_enabled({', '.join(feature_kwargs)}) enabled")

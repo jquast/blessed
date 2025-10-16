@@ -14,5 +14,6 @@ with term.cbreak(), term.mouse_enabled():
 
         if inp.mode == term.DecPrivateMode.MOUSE_EXTENDED_SGR:
             mouse = inp.mode_values
-            if not mouse.is_release:
+            # Filter out release events by checking if button name ends with _RELEASED
+            if not mouse.button.endswith('_RELEASED'):
                 print(f"Clicked at (y={mouse.y}, x={mouse.x}) with button {mouse.button}")
