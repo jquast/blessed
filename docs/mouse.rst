@@ -27,10 +27,10 @@ The :meth:`~.Terminal.mouse_enabled` context manager enables mouse tracking
 and automatically disables it when done. Mouse events arrive through
 :meth:`~.Terminal.inkey` just like keyboard events.
 
-After confirming the :attr:`~.Keystroke.mode` value to
-:attr:`~.Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR`, indicating it is a mouse
-event, the :attr:`~.Keystroke.mode_values` object is a :class:`~.MouseEvent`
-containing field values ``button``, ``y``, and ``x``.
+Mouse events can be detected by checking if :attr:`~.Keystroke.name` starts
+with ``'MOUSE_'``. The name includes the button and any modifiers, such as
+``'MOUSE_LEFT'``, ``'MOUSE_CTRL_LEFT'``, or ``'MOUSE_SCROLL_UP'``. You can
+also use magic method predicates like ``inp.is_mouse_left()``.
 
 .. note::
 
@@ -43,22 +43,40 @@ Understanding Buttons
 
 Mouse events come through :meth:`~.Terminal.inkey` just like keyboard events.
 
-A :class:`~.Keystroke` object is a mouse event when :attr:`~.Keystroke.mode`
-matches one of the enabled mouse modes
-(:attr:`~Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR` or
-:attr:`~Terminal.DecPrivateMode.MOUSE_SGR_PIXELS`).
+You can detect mouse events using either the :attr:`~.Keystroke.name` property
+or magic method predicates:
 
-Call :meth:`~.Keystroke.mode_values` to get a :class:`~.MouseEvent` instance
-with the Human-readable :attr:`~.MouseEvent.button` name, including release
-state. Button names follow the pattern ``[MODIFIERS_]BUTTON[_RELEASED]``,
-such as:
+**Using the name property:**
 
-- Basic events: "LEFT", "MIDDLE", "RIGHT", "SCROLL_UP", "SCROLL_DOWN"
-- Release events: "LEFT_RELEASED", "MIDDLE_RELEASED", "RIGHT_RELEASED"
-- With modifiers: "CTRL_LEFT", "SHIFT_SCROLL_UP", "META_RIGHT", "CTRL_META_LEFT_RELEASED"
+The :attr:`~.Keystroke.name` returns button names with the ``MOUSE_`` prefix,
+following the pattern ``MOUSE_[MODIFIERS_]BUTTON[_RELEASED]``:
 
-Modifiers may be compounded, in order ``CTRL``, ``SHIFT``, and ``META``,
-eg. ``CTRL_SHIFT_META_MIDDLE``
+.. code-block:: python
+
+   inp = term.inkey()
+   if inp.name == 'MOUSE_LEFT':
+       print("Left button pressed")
+
+**Using magic method predicates:**
+
+.. code-block:: python
+
+   inp = term.inkey()
+   if inp.is_mouse_left():
+       print("Left button pressed")
+   elif inp.is_mouse_ctrl_left():
+       print("Ctrl+Left button pressed")
+
+**Button names include:**
+
+- Basic events: ``MOUSE_LEFT``, ``MOUSE_MIDDLE``, ``MOUSE_RIGHT``, ``MOUSE_SCROLL_UP``,
+  ``MOUSE_SCROLL_DOWN``
+- Release events: ``MOUSE_LEFT_RELEASED``, ``MOUSE_MIDDLE_RELEASED``,
+  ``MOUSE_RIGHT_RELEASED``
+- With modifiers: ``MOUSE_CTRL_LEFT``, ``MOUSE_SHIFT_SCROLL_UP``, ``MOUSE_META_RIGHT``,
+  ``MOUSE_CTRL_SHIFT_META_MIDDLE``
+
+Modifiers are included in order ``CTRL``, ``SHIFT``, and ``META``
 
 In this example, all possible combinations may be entered and recorded, see if
 you have enough fingers for ``CTRL_SHIFT_META_MIDDLE``, imagine the
@@ -142,8 +160,48 @@ This is especially useful when combined with graphics protocols like Sixel:
    :language: python
    :linenos:
 
-When using pixel mode, the :attr:`~.Keystroke.mode` value is
-:attr:`~Terminal.DecPrivateMode.MOUSE_SGR_PIXELS` instead of the usual
-:attr:`~.Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR`. The
-:attr:`~.Keystroke.mode_values` object is still a :class:`~.MouseEvent`, only
-the meaning of ``x`` and ``y`` values changes from cells to pixels.
+When using pixel mode, mouse events still use the same :attr:`~.Keystroke.name`
+pattern (e.g., ``'MOUSE_LEFT'``) and magic method predicates (e.g.,
+``inp.is_mouse_left()``). The :attr:`~.Keystroke.x` and :attr:`~.Keystroke.y`
+properties represent pixels instead of character cells.
+
+Accessing Mouse Coordinates
+----------------------------
+
+Mouse events provide coordinate properties for easy access to the mouse position:
+
+- :attr:`~.Keystroke.x` - horizontal position (column)
+- :attr:`~.Keystroke.y` - vertical position (row)
+- :attr:`~.Keystroke.mouse_yx` - position as a ``(y, x)`` tuple
+- :attr:`~.Keystroke.mouse_xy` - position as an ``(x, y)`` tuple
+
+The ``mouse_yx`` property is particularly useful with blessed's movement functions:
+
+.. code-block:: python
+
+   inp = term.inkey()
+   if inp.name and inp.name.startswith('MOUSE_'):
+       # Move cursor to mouse position and draw
+       print(term.move_yx(*inp.mouse_yx) + '█')
+       # Or access individual coordinates
+       print(f"Mouse at row {inp.y}, column {inp.x}")
+
+Motion Events
+-------------
+
+When using ``report_drag=True`` or ``report_motion=True``, you'll receive motion
+events as the mouse moves:
+
+- ``MOUSE_MOTION`` - Pure motion without any button pressed (``report_motion`` only)
+- ``MOUSE_LEFT_MOTION``, ``MOUSE_MIDDLE_MOTION``, ``MOUSE_RIGHT_MOTION`` - Dragging with
+  a button held
+
+Motion events include modifiers just like click events, for example ``MOUSE_CTRL_LEFT_MOTION``.
+
+.. code-block:: python
+
+   inp = term.inkey()
+   if inp.name == 'MOUSE_LEFT_MOTION':
+       print("Dragging with left button")
+   elif inp.name == 'MOUSE_MOTION':
+       print("Moving without buttons pressed")

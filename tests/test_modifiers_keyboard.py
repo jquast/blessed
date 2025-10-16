@@ -145,6 +145,7 @@ def test_keystroke_value_by_keycode(code, expected_value):
     ('\x1b\x7f', 'KEY_ALT_BACKSPACE', 3),
     ('\x1b\x0d', 'KEY_ALT_ENTER', 3),
     ('\x1b\x09', 'KEY_ALT_TAB', 3),
+    ('\x1b[', 'CSI', 3),
 ])
 def test_keystroke_name_generation_comprehensive(sequence, expected_name, expected_modifiers):
     """Test keystroke.name property generates correct names for control and alt sequences."""
@@ -1206,6 +1207,27 @@ def test_meta_escape_name_csi_special_case():
     ks = Keystroke('\x1b[')
     result = ks._get_meta_escape_name()
     assert result == 'CSI'
+
+
+def test_terminal_inkey_csi_sequence():
+    """Test terminal.inkey() returns single CSI keystroke for unmatched sequences."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+
+        # When an unsupported CSI sequence arrives, it should be detected as CSI
+        term.ungetch('\x1b[')
+        ks = term.inkey(timeout=0)
+        assert ks == '\x1b['
+        assert ks.name == 'CSI'
+        assert len(ks) == 2
+        assert ks.modifiers == 3
+
+        # Verify no second keystroke was created
+        ks2 = term.inkey(timeout=0)
+        assert ks2 == ''
+
+    child()
 
 
 def test_legacy_csi_modifiers_no_modifiers_integration():

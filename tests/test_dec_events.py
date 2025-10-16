@@ -55,7 +55,7 @@ class TestDECEventMatching:
         assert ks.mode == Terminal.DecPrivateMode.BRACKETED_PASTE
         assert ks._mode == 2004
 
-        values = ks.mode_values
+        values = ks._mode_values
         assert isinstance(values, BracketedPasteEvent)
         assert values.text == 'hello world'
 
@@ -65,7 +65,7 @@ class TestDECEventMatching:
         ks = _match_dec_event(sequence, dec_mode_cache=_make_enabled_cache())
 
         assert ks is not None
-        values = ks.mode_values
+        values = ks._mode_values
         assert values.text == 'line1\nline2\tindented'
 
     @pytest.mark.parametrize("sequence,expected", [
@@ -89,7 +89,7 @@ class TestDECEventMatching:
         assert ks.mode in (Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR,
                            Terminal.DecPrivateMode.MOUSE_SGR_PIXELS)
 
-        values = ks.mode_values
+        values = ks._mode_values
         assert isinstance(values, MouseSGREvent)
         assert values.button_value == button
         assert values.x == x
@@ -109,7 +109,7 @@ class TestDECEventMatching:
         ks = _match_dec_event(sequence, dec_mode_cache=_make_enabled_cache())
         assert ks.mode.value == 1000  # Default legacy mode
 
-        values = ks.mode_values
+        values = ks._mode_values
         assert isinstance(values, MouseLegacyEvent)
         assert values.released == expected_release
         assert values.button_value == expected_button
@@ -125,7 +125,7 @@ class TestDECEventMatching:
         ks = _match_dec_event(sequence, dec_mode_cache=_make_enabled_cache())
         assert ks.mode == Terminal.DecPrivateMode.FOCUS_IN_OUT_EVENTS
 
-        values = ks.mode_values
+        values = ks._mode_values
         assert isinstance(values, FocusEvent)
         assert values.gained is expected_gained
 
@@ -142,7 +142,7 @@ def test_mode_values_returns_none(mode, match_obj):
 
     ks = Keystroke('xxxxxxxxx', mode=mode, match=match)
 
-    assert ks.mode_values is None
+    assert ks._mode_values is None
 
 
 def test_keystroke_with_dec_mode():
@@ -176,7 +176,7 @@ def test_mouse_sgr_csi_lt_events():
     assert ks_press.mode in (Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR,
                              Terminal.DecPrivateMode.MOUSE_SGR_PIXELS)
 
-    values = ks_press.mode_values
+    values = ks_press._mode_values
     assert isinstance(values, MouseSGREvent)
     assert values.button_value == 0  # Left button
     assert values.x == 9  # Protocol sends 10, converted to 0-indexed
@@ -186,24 +186,24 @@ def test_mouse_sgr_csi_lt_events():
 
     # Test release event with CSI < prefix
     ks_release = _match_dec_event('\x1b[<0;15;25m', dec_mode_cache=cache)
-    values = ks_release.mode_values
+    values = ks_release._mode_values
     assert values.x == 14  # Protocol sends 15, converted to 0-indexed
     assert values.y == 24  # Protocol sends 25, converted to 0-indexed
     assert values.released
 
     # Test modifiers with CSI < prefix (shift=4, meta=8, ctrl=16, combined=28)
     ks_mod = _match_dec_event('\x1b[<28;5;5M', dec_mode_cache=cache)
-    values = ks_mod.mode_values
+    values = ks_mod._mode_values
     assert values.shift and values.meta and values.ctrl
     assert values.button_value == 0  # Base button after masking
 
     # Test wheel events with CSI < prefix
     ks_wheel_up = _match_dec_event('\x1b[<64;10;10M', dec_mode_cache=cache)
-    values_up = ks_wheel_up.mode_values
+    values_up = ks_wheel_up._mode_values
     assert values_up.button_value == 64 and values_up.is_wheel
 
     ks_wheel_down = _match_dec_event('\x1b[<65;10;10M', dec_mode_cache=cache)
-    values_down = ks_wheel_down.mode_values
+    values_down = ks_wheel_down._mode_values
     assert values_down.button_value == 65 and values_down.is_wheel
 
 
@@ -221,7 +221,7 @@ def test_mouse_sgr_pixels_format():
     # Should parse as SGR-Pixels (mode 1016) if both modes are enabled since 1016 is preferred
     assert ks_pixels.mode == Terminal.DecPrivateMode.MOUSE_SGR_PIXELS
 
-    values = ks_pixels.mode_values
+    values = ks_pixels._mode_values
     assert isinstance(values, MouseSGREvent)
     assert values.button_value == 0  # Left button
     assert values.x == 1233  # Large x coordinate (pixels), protocol sends 1234
@@ -251,7 +251,7 @@ def test_resolve_sequence():
     dec_sequence = '\x1b[200~test\x1b[201~'
     ks_dec = resolve_sequence(dec_sequence, keymap, codes, prefixes,
                               dec_mode_cache=_make_enabled_cache())
-    event_value = ks_dec.mode_values
+    event_value = ks_dec._mode_values
     assert isinstance(event_value, BracketedPasteEvent)
     assert event_value.text == 'test'
     assert ks_dec.mode == Terminal.DecPrivateMode.BRACKETED_PASTE
@@ -263,34 +263,34 @@ def test_mouse_event_is_motion_field():
 
     # Test SGR mouse event with motion (drag)
     ks_drag = _match_dec_event('\x1b[<32;10;20M', dec_mode_cache=cache)  # bit 32 set = motion
-    values = ks_drag.mode_values
+    values = ks_drag._mode_values
     assert isinstance(values, MouseEvent)
     assert values.is_motion is True
     assert not values.released
 
     # Test SGR mouse press without motion
     ks_press = _match_dec_event('\x1b[<0;10;20M', dec_mode_cache=cache)
-    values = ks_press.mode_values
+    values = ks_press._mode_values
     assert values.is_motion is False
 
     # Test SGR mouse release with motion bit set
     ks_release = _match_dec_event('\x1b[<32;10;20m',
                                   dec_mode_cache=cache)  # lowercase 'm' = release
-    values = ks_release.mode_values
+    values = ks_release._mode_values
     assert values.is_motion is True
     assert values.released is True
 
     # Test legacy mouse event with motion
     # cb byte: 32 (motion bit) + offset 32 = 64 = '@'
     ks_legacy_motion = _match_dec_event('\x1b[M@  ', dec_mode_cache=cache)
-    values = ks_legacy_motion.mode_values
+    values = ks_legacy_motion._mode_values
     assert isinstance(values, MouseEvent)
     assert values.is_motion is True
 
     # Test legacy mouse event without motion
     ks_legacy_press = _match_dec_event('\x1b[M   ',
                                        dec_mode_cache=cache)  # cb=32, button=0, no motion
-    values = ks_legacy_press.mode_values
+    values = ks_legacy_press._mode_values
     assert values.is_motion is False
 
 
@@ -300,7 +300,7 @@ def test_mouse_event_is_wheel_field():
 
     # Test wheel up event (button 64)
     ks_wheel_up = _match_dec_event('\x1b[<64;134;27M', dec_mode_cache=cache)
-    values = ks_wheel_up.mode_values
+    values = ks_wheel_up._mode_values
     assert isinstance(values, MouseEvent)
     assert values.is_wheel is True
     assert values.button_value == 64
@@ -309,20 +309,20 @@ def test_mouse_event_is_wheel_field():
 
     # Test wheel down event (button 65)
     ks_wheel_down = _match_dec_event('\x1b[<65;134;27M', dec_mode_cache=cache)
-    values = ks_wheel_down.mode_values
+    values = ks_wheel_down._mode_values
     assert values.is_wheel is True
     assert values.button_value == 65
 
     # Test regular mouse button presses (button 0-3) - should not be wheel
     for num in (0, 1, 2):
         ks_press_left = _match_dec_event(f'\x1b[<{num};10;20M', dec_mode_cache=cache)
-        values = ks_press_left.mode_values
+        values = ks_press_left._mode_values
         assert values.is_wheel is False
         assert values.button_value == num
 
     # Test legacy mouse event - should not be wheel
     ks_legacy_press = _match_dec_event('\x1b[M   ', dec_mode_cache=cache)
-    values = ks_legacy_press.mode_values
+    values = ks_legacy_press._mode_values
     assert values.is_wheel is False
 
 
@@ -332,7 +332,7 @@ def test_mouse_event_repr():
 
     # Test simple press event - should only show button_value, x, y
     ks_press = _match_dec_event('\x1b[<0;10;20M', dec_mode_cache=cache)
-    values = ks_press.mode_values
+    values = ks_press._mode_values
     repr_str = repr(values)
     assert repr_str == "MouseEvent(button_value=0, x=9, y=19)"
     assert 'released' not in repr_str
@@ -340,7 +340,7 @@ def test_mouse_event_repr():
 
     # Test release event - should show released
     ks_release = _match_dec_event('\x1b[<0;10;20m', dec_mode_cache=cache)
-    values = ks_release.mode_values
+    values = ks_release._mode_values
     repr_str = repr(values)
     assert 'released=True' in repr_str
     assert repr_str == "MouseEvent(button_value=0, x=9, y=19, released=True)"
@@ -348,7 +348,7 @@ def test_mouse_event_repr():
     # Test with modifiers - should show shift, meta, ctrl
     # 28 = 4 (shift) + 8 (meta) + 16 (ctrl)
     ks_mod = _match_dec_event('\x1b[<28;5;5M', dec_mode_cache=cache)
-    values = ks_mod.mode_values
+    values = ks_mod._mode_values
     repr_str = repr(values)
     assert 'shift=True' in repr_str
     assert 'meta=True' in repr_str
@@ -357,7 +357,7 @@ def test_mouse_event_repr():
 
     # Test wheel event - should show is_wheel
     ks_wheel = _match_dec_event('\x1b[<64;10;10M', dec_mode_cache=cache)
-    values = ks_wheel.mode_values
+    values = ks_wheel._mode_values
     repr_str = repr(values)
     assert 'is_wheel=True' in repr_str
     assert repr_str == "MouseEvent(button_value=64, x=9, y=9, is_wheel=True)"
@@ -370,40 +370,40 @@ def test_mouse_event_button_property():
 
     # Test basic buttons without modifiers
     ks_left = _match_dec_event('\x1b[<0;10;20M', dec_mode_cache=cache)
-    assert ks_left.mode_values.button == "LEFT"
+    assert ks_left._mode_values.button == "LEFT"
 
     ks_middle = _match_dec_event('\x1b[<1;10;20M', dec_mode_cache=cache)
-    assert ks_middle.mode_values.button == "MIDDLE"
+    assert ks_middle._mode_values.button == "MIDDLE"
 
     ks_right = _match_dec_event('\x1b[<2;10;20M', dec_mode_cache=cache)
-    assert ks_right.mode_values.button == "RIGHT"
+    assert ks_right._mode_values.button == "RIGHT"
 
     # Test wheel events
     ks_scroll_up = _match_dec_event('\x1b[<64;10;10M', dec_mode_cache=cache)
-    assert ks_scroll_up.mode_values.button == "SCROLL_UP"
+    assert ks_scroll_up._mode_values.button == "SCROLL_UP"
 
     ks_scroll_down = _match_dec_event('\x1b[<65;10;10M', dec_mode_cache=cache)
-    assert ks_scroll_down.mode_values.button == "SCROLL_DOWN"
+    assert ks_scroll_down._mode_values.button == "SCROLL_DOWN"
 
     # Test buttons with single modifier
     ks_ctrl_left = _match_dec_event('\x1b[<16;10;20M', dec_mode_cache=cache)  # ctrl=16
-    assert ks_ctrl_left.mode_values.button == "CTRL_LEFT"
+    assert ks_ctrl_left._mode_values.button == "CTRL_LEFT"
 
     ks_shift_middle = _match_dec_event('\x1b[<5;10;20M', dec_mode_cache=cache)  # shift=4, button=1
-    assert ks_shift_middle.mode_values.button == "SHIFT_MIDDLE"
+    assert ks_shift_middle._mode_values.button == "SHIFT_MIDDLE"
 
     ks_meta_right = _match_dec_event('\x1b[<10;10;20M', dec_mode_cache=cache)  # meta=8, button=2
-    assert ks_meta_right.mode_values.button == "META_RIGHT"
+    assert ks_meta_right._mode_values.button == "META_RIGHT"
 
     # Test wheel with modifiers
     ks_shift_scroll_up = _match_dec_event(
         '\x1b[<68;10;10M',
         dec_mode_cache=cache)  # shift=4, button=64
-    assert ks_shift_scroll_up.mode_values.button == "SHIFT_SCROLL_UP"
+    assert ks_shift_scroll_up._mode_values.button == "SHIFT_SCROLL_UP"
 
     # Test multiple modifiers (ctrl=16, shift=4, meta=8, total=28)
     ks_multi_mod = _match_dec_event('\x1b[<28;5;5M', dec_mode_cache=cache)
-    assert ks_multi_mod.mode_values.button == "CTRL_SHIFT_META_LEFT"
+    assert ks_multi_mod._mode_values.button == "CTRL_SHIFT_META_LEFT"
 
     # Test extended buttons (button >= 66)
     mouse_extended = MouseEvent(
@@ -428,19 +428,19 @@ def test_mouse_event_button_property():
     # Test release events with _RELEASED suffix
     ks_left_rel = _match_dec_event('\x1b[<0;10;20m',
                                    dec_mode_cache=cache)  # lowercase 'm' = release
-    assert ks_left_rel.mode_values.button == "LEFT_RELEASED"
+    assert ks_left_rel._mode_values.button == "LEFT_RELEASED"
 
     ks_middle_rel = _match_dec_event('\x1b[<1;10;20m', dec_mode_cache=cache)
-    assert ks_middle_rel.mode_values.button == "MIDDLE_RELEASED"
+    assert ks_middle_rel._mode_values.button == "MIDDLE_RELEASED"
 
     ks_right_rel = _match_dec_event('\x1b[<2;10;20m', dec_mode_cache=cache)
-    assert ks_right_rel.mode_values.button == "RIGHT_RELEASED"
+    assert ks_right_rel._mode_values.button == "RIGHT_RELEASED"
 
     # Test release with modifiers
     ks_ctrl_left_rel = _match_dec_event(
         '\x1b[<16;10;20m',
         dec_mode_cache=cache)  # ctrl=16, released
-    assert ks_ctrl_left_rel.mode_values.button == "CTRL_LEFT_RELEASED"
+    assert ks_ctrl_left_rel._mode_values.button == "CTRL_LEFT_RELEASED"
 
     # Test extended button release
     mouse_ext_rel = MouseEvent(
@@ -460,16 +460,247 @@ def test_mouse_event_backwards_compatibility():
 
     # Verify isinstance checks work with old names
     ks_sgr = _match_dec_event('\x1b[<0;10;20M', dec_mode_cache=cache)
-    values = ks_sgr.mode_values
+    values = ks_sgr._mode_values
     assert isinstance(values, MouseSGREvent)
     assert isinstance(values, MouseLegacyEvent)
     assert isinstance(values, MouseEvent)
 
     ks_legacy = _match_dec_event('\x1b[M   ', dec_mode_cache=cache)
-    values = ks_legacy.mode_values
+    values = ks_legacy._mode_values
     assert isinstance(values, MouseSGREvent)
     assert isinstance(values, MouseLegacyEvent)
     assert isinstance(values, MouseEvent)
+
+
+def test_mouse_event_keystroke_name():  # pylint: disable=too-many-locals
+    """Test that Keystroke.name returns correct MOUSE_* names for mouse events."""
+    cache = _make_enabled_cache()
+
+    # Test basic buttons without modifiers
+    ks_left = _match_dec_event('\x1b[<0;10;20M', dec_mode_cache=cache)
+    assert ks_left.name == "MOUSE_LEFT"
+
+    ks_middle = _match_dec_event('\x1b[<1;10;20M', dec_mode_cache=cache)
+    assert ks_middle.name == "MOUSE_MIDDLE"
+
+    ks_right = _match_dec_event('\x1b[<2;10;20M', dec_mode_cache=cache)
+    assert ks_right.name == "MOUSE_RIGHT"
+
+    # Test wheel events
+    ks_scroll_up = _match_dec_event('\x1b[<64;10;10M', dec_mode_cache=cache)
+    assert ks_scroll_up.name == "MOUSE_SCROLL_UP"
+
+    ks_scroll_down = _match_dec_event('\x1b[<65;10;10M', dec_mode_cache=cache)
+    assert ks_scroll_down.name == "MOUSE_SCROLL_DOWN"
+
+    # Test buttons with single modifier
+    ks_ctrl_left = _match_dec_event('\x1b[<16;10;20M', dec_mode_cache=cache)
+    assert ks_ctrl_left.name == "MOUSE_CTRL_LEFT"
+
+    ks_shift_middle = _match_dec_event('\x1b[<5;10;20M', dec_mode_cache=cache)
+    assert ks_shift_middle.name == "MOUSE_SHIFT_MIDDLE"
+
+    ks_meta_right = _match_dec_event('\x1b[<10;10;20M', dec_mode_cache=cache)
+    assert ks_meta_right.name == "MOUSE_META_RIGHT"
+
+    # Test wheel with modifiers
+    ks_shift_scroll_up = _match_dec_event('\x1b[<68;10;10M', dec_mode_cache=cache)
+    assert ks_shift_scroll_up.name == "MOUSE_SHIFT_SCROLL_UP"
+
+    # Test multiple modifiers (ctrl=16, shift=4, meta=8, total=28)
+    ks_multi_mod = _match_dec_event('\x1b[<28;5;5M', dec_mode_cache=cache)
+    assert ks_multi_mod.name == "MOUSE_CTRL_SHIFT_META_LEFT"
+
+    # Test release events with _RELEASED suffix
+    ks_left_rel = _match_dec_event('\x1b[<0;10;20m', dec_mode_cache=cache)
+    assert ks_left_rel.name == "MOUSE_LEFT_RELEASED"
+
+    ks_middle_rel = _match_dec_event('\x1b[<1;10;20m', dec_mode_cache=cache)
+    assert ks_middle_rel.name == "MOUSE_MIDDLE_RELEASED"
+
+    ks_right_rel = _match_dec_event('\x1b[<2;10;20m', dec_mode_cache=cache)
+    assert ks_right_rel.name == "MOUSE_RIGHT_RELEASED"
+
+    # Test release with modifiers
+    ks_ctrl_left_rel = _match_dec_event('\x1b[<16;10;20m', dec_mode_cache=cache)
+    assert ks_ctrl_left_rel.name == "MOUSE_CTRL_LEFT_RELEASED"
+
+    # Test with legacy mouse events
+    ks_legacy_left = _match_dec_event('\x1b[M   ', dec_mode_cache=cache)
+    assert ks_legacy_left.name == "MOUSE_LEFT"
+
+    # Test that regular keystrokes don't have MOUSE_ names
+    ks_regular = Keystroke('a')
+    assert ks_regular.name is None or not ks_regular.name.startswith('MOUSE_')
+
+
+def test_mouse_event_magic_methods():
+    """Test that is_mouse_* magic methods work for mouse events."""
+    cache = _make_enabled_cache()
+
+    # Test basic button predicates
+    ks_left = _match_dec_event('\x1b[<0;10;20M', dec_mode_cache=cache)
+    assert ks_left.is_mouse_left()
+    assert not ks_left.is_mouse_right()
+    assert not ks_left.is_mouse_middle()
+
+    ks_middle = _match_dec_event('\x1b[<1;10;20M', dec_mode_cache=cache)
+    assert ks_middle.is_mouse_middle()
+    assert not ks_middle.is_mouse_left()
+
+    ks_right = _match_dec_event('\x1b[<2;10;20M', dec_mode_cache=cache)
+    assert ks_right.is_mouse_right()
+    assert not ks_right.is_mouse_left()
+
+    # Test wheel events
+    ks_scroll_up = _match_dec_event('\x1b[<64;10;10M', dec_mode_cache=cache)
+    assert ks_scroll_up.is_mouse_scroll_up()
+    assert not ks_scroll_up.is_mouse_scroll_down()
+
+    ks_scroll_down = _match_dec_event('\x1b[<65;10;10M', dec_mode_cache=cache)
+    assert ks_scroll_down.is_mouse_scroll_down()
+    assert not ks_scroll_down.is_mouse_scroll_up()
+
+    # Test buttons with modifiers
+    ks_ctrl_left = _match_dec_event('\x1b[<16;10;20M', dec_mode_cache=cache)
+    assert ks_ctrl_left.is_mouse_ctrl_left()
+    assert not ks_ctrl_left.is_mouse_left()
+
+    ks_shift_middle = _match_dec_event('\x1b[<5;10;20M', dec_mode_cache=cache)
+    assert ks_shift_middle.is_mouse_shift_middle()
+    assert not ks_shift_middle.is_mouse_middle()
+
+    ks_meta_right = _match_dec_event('\x1b[<10;10;20M', dec_mode_cache=cache)
+    assert ks_meta_right.is_mouse_meta_right()
+    assert not ks_meta_right.is_mouse_right()
+
+    # Test multiple modifiers
+    ks_multi_mod = _match_dec_event('\x1b[<28;5;5M', dec_mode_cache=cache)
+    assert ks_multi_mod.is_mouse_ctrl_shift_meta_left()
+    assert not ks_multi_mod.is_mouse_left()
+
+    # Test release events
+    ks_left_rel = _match_dec_event('\x1b[<0;10;20m', dec_mode_cache=cache)
+    assert ks_left_rel.is_mouse_left_released()
+    assert not ks_left_rel.is_mouse_left()
+
+    ks_ctrl_left_rel = _match_dec_event('\x1b[<16;10;20m', dec_mode_cache=cache)
+    assert ks_ctrl_left_rel.is_mouse_ctrl_left_released()
+    assert not ks_ctrl_left_rel.is_mouse_ctrl_left()
+
+    # Test that regular keystrokes don't match mouse predicates
+    ks_regular = Keystroke('a')
+    assert not ks_regular.is_mouse_left()
+    assert not ks_regular.is_mouse_right()
+
+
+def test_mouse_motion_event_naming():
+    """Test that motion events are named correctly."""
+    cache = _make_enabled_cache()
+
+    # Pure motion without button (button=0, motion bit set)
+    ks_motion = _match_dec_event('\x1b[<32;10;20M', dec_mode_cache=cache)
+    assert ks_motion.name == "MOUSE_MOTION"
+    assert ks_motion.is_mouse_motion()
+
+    # Drag with left button (button=0, motion bit set)
+    ks_left_motion = _match_dec_event('\x1b[<32;10;20M', dec_mode_cache=cache)
+    values = ks_left_motion._mode_values
+    assert values.button_value == 0
+    assert values.is_motion
+
+    # Drag with middle button (button=1, motion bit set = 33)
+    ks_middle_motion = _match_dec_event('\x1b[<33;10;20M', dec_mode_cache=cache)
+    assert ks_middle_motion.name == "MOUSE_MIDDLE_MOTION"
+    assert ks_middle_motion.is_mouse_middle_motion()
+
+    # Drag with right button (button=2, motion bit set = 34)
+    ks_right_motion = _match_dec_event('\x1b[<34;10;20M', dec_mode_cache=cache)
+    assert ks_right_motion.name == "MOUSE_RIGHT_MOTION"
+    assert ks_right_motion.is_mouse_right_motion()
+
+    # Motion with modifiers
+    ks_ctrl_motion = _match_dec_event('\x1b[<48;10;20M', dec_mode_cache=cache)
+    assert ks_ctrl_motion.name == "MOUSE_CTRL_MOTION"
+
+    # Left drag with modifiers (button=0, ctrl=16, motion=32 = 48)
+    ks_ctrl_left_motion = _match_dec_event('\x1b[<48;10;20M', dec_mode_cache=cache)
+    values = ks_ctrl_left_motion._mode_values
+    assert values.button_value == 0
+    assert values.ctrl
+    assert values.is_motion
+
+    # Motion events should NOT have _RELEASED suffix
+    ks_motion_not_released = _match_dec_event('\x1b[<32;10;20m', dec_mode_cache=cache)
+    assert not ks_motion_not_released.name.endswith('_RELEASED')
+
+
+def test_focus_event_names():
+    """Test that focus events have correct names."""
+    cache = _make_enabled_cache()
+
+    # Focus gained
+    ks_focus_in = _match_dec_event('\x1b[I', dec_mode_cache=cache)
+    assert ks_focus_in.name == "FOCUS_IN"
+
+    # Focus lost
+    ks_focus_out = _match_dec_event('\x1b[O', dec_mode_cache=cache)
+    assert ks_focus_out.name == "FOCUS_OUT"
+
+    # Regular keystrokes shouldn't match focus names
+    ks_regular = Keystroke('I')
+    assert ks_regular.name != "FOCUS_IN"
+
+
+def test_bracketed_paste_name_and_text():
+    """Test that bracketed paste events have correct name and text property."""
+    cache = _make_enabled_cache()
+
+    # Simple paste
+    ks_paste = _match_dec_event('\x1b[200~hello world\x1b[201~', dec_mode_cache=cache)
+    assert ks_paste.name == "BRACKETED_PASTE"
+    assert ks_paste.text == "hello world"
+
+    # Multiline paste
+    ks_multiline = _match_dec_event('\x1b[200~line1\nline2\x1b[201~', dec_mode_cache=cache)
+    assert ks_multiline.name == "BRACKETED_PASTE"
+    assert ks_multiline.text == "line1\nline2"
+
+    # Empty paste
+    ks_empty = _match_dec_event('\x1b[200~\x1b[201~', dec_mode_cache=cache)
+    assert ks_empty.name == "BRACKETED_PASTE"
+    assert ks_empty.text == ""
+
+    # Regular keystrokes should not have text property
+    ks_regular = Keystroke('a')
+    assert ks_regular.text is None
+
+
+def test_mouse_coordinate_properties():
+    """Test that mouse events have mouse_yx and mouse_xy properties."""
+    cache = _make_enabled_cache()
+
+    # Test with SGR mouse event
+    ks_mouse = _match_dec_event('\x1b[<0;10;20M', dec_mode_cache=cache)
+
+    # Test tuple properties
+    assert ks_mouse.mouse_yx == (19, 9)
+    assert ks_mouse.mouse_xy == (9, 19)
+
+    # Test with different coordinates
+    ks_mouse2 = _match_dec_event('\x1b[<0;50;100M', dec_mode_cache=cache)
+    assert ks_mouse2.mouse_yx == (99, 49)
+    assert ks_mouse2.mouse_xy == (49, 99)
+
+    # Test with pixel coordinates (large values)
+    ks_pixels = _match_dec_event('\x1b[<0;1234;567M', dec_mode_cache=cache)
+    assert ks_pixels.mouse_yx == (566, 1233)
+    assert ks_pixels.mouse_xy == (1233, 566)
+
+    # Regular keystrokes should return (-1, -1) for coordinate properties
+    ks_regular = Keystroke('a')
+    assert ks_regular.mouse_yx == (-1, -1)
+    assert ks_regular.mouse_xy == (-1, -1)
 
 
 @pytest.mark.skipif(
@@ -521,8 +752,8 @@ def test_mouse_legacy_encoding_systematic():
         with term.cbreak():
             for _ in test_cases:
                 ks = term.inkey(timeout=1.0)
-                if ks and ks.mode_values:
-                    evt = ks.mode_values
+                if ks and ks._mode_values:
+                    evt = ks._mode_values
                     results.append(f'{evt.button_value},{evt.x},{evt.y},'
                                    f'{int(evt.shift)},{int(evt.meta)},{int(evt.ctrl)},'
                                    f'{int(evt.released)},{int(evt.is_motion)}')

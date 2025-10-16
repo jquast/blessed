@@ -1130,8 +1130,8 @@ class Terminal():
             with term.mouse_enabled():
                 # Basic click tracking
                 inp = term.inkey()
-                if inp.mode == term.DecPrivateMode.MOUSE_EXTENDED_SGR:
-                    print(f"Clicked at {inp.mode_values.x}, {inp.mode_values.y}")
+                if inp.name and inp.name.startswith('MOUSE_'):
+                    print(f"Clicked at {inp.x}, {inp.y}")
 
             with term.mouse_enabled(report_drag=True):
                 # Track clicks and drags
@@ -1172,8 +1172,8 @@ class Terminal():
 
             with term.bracketed_paste():
                 inp = term.inkey()
-                if inp.mode == term.DecPrivateMode.BRACKETED_PASTE:
-                    pasted_text = inp.mode_values.text
+                if inp.name == 'BRACKETED_PASTE':
+                    pasted_text = inp.text
                     print(f"You pasted: {pasted_text}")
         """
         with self.dec_modes_enabled(_DecPrivateMode.BRACKETED_PASTE, timeout=timeout):
@@ -2300,6 +2300,12 @@ class Terminal():
                 final = bool(ucs) and ucs not in self._keymap_prefixes
                 ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
                                       final=final, dec_mode_cache=self._dec_mode_cache)
+
+            # If we still have KEY_ESCAPE and ucs is a prefix, resolve with final=True
+            # to handle unmatched sequences like '\x1b[' (CSI)
+            if ks.code == self.KEY_ESCAPE and ucs in self._keymap_prefixes:
+                ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                                      final=True, dec_mode_cache=self._dec_mode_cache)
 
         # buffer any remaining text received
         self.ungetch(ucs[len(ks):])
