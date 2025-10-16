@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-"""
-Advanced keyboard and special modes interaction example.
+"""Advanced keyboard and special modes interaction example.
 
 Usage:
 - F1-F11: Toggle DEC private modes (bracketed paste, mouse, etc.)
@@ -173,17 +172,95 @@ class KittyKeyboardManager:
                 pass
 
 
+class MouseModeManager:
+    """Manages mouse mode probing and toggling."""
+
+    def __init__(self, term: Terminal):
+        self.term = term
+        self.supported: bool = False
+        self.active_context: Optional[Any] = None
+        self.report_drag: bool = False
+        self.report_motion: bool = False
+        self.report_pixels: bool = False
+        self.mode_names = ['drag', 'motion', 'pixels']
+
+    def probe(self, timeout: float = 1.0) -> List[str]:
+        """Probe terminal for mouse support and return log messages."""
+        self.supported = self.term.does_mouse(timeout=timeout)
+        if self.supported:
+            return ["Mouse support detected!"]
+        return ["Mouse support not available!"]
+
+    def toggle_by_index(self, f_idx: int) -> str:
+        """Toggle mouse mode by F-key index and return log message."""
+        if not self.supported or f_idx >= len(self.mode_names):
+            return ""
+
+        mode_name = self.mode_names[f_idx]
+
+        # Toggle the flag
+        if mode_name == 'drag':
+            self.report_drag = not self.report_drag
+        elif mode_name == 'motion':
+            self.report_motion = not self.report_motion
+        elif mode_name == 'pixels':
+            self.report_pixels = not self.report_pixels
+
+        # Clean up old context
+        if self.active_context is not None:
+            self.active_context.__exit__(None, None, None)
+            self.active_context = None
+
+        # Create new context if any mode is enabled
+        if self.report_drag or self.report_motion or self.report_pixels:
+            self.active_context = self.term.mouse_enabled(
+                report_drag=self.report_drag,
+                report_motion=self.report_motion,
+                report_pixels=self.report_pixels
+            )
+            self.active_context.__enter__()  # pylint: disable=unnecessary-dunder-call
+
+        return (
+            f'Mouse: drag={self.report_drag} '
+            f'motion={self.report_motion} pixels={self.report_pixels}'
+        )
+
+    def header_msg(self) -> str:
+        """Return header message showing current mouse modes."""
+        if not self.supported:
+            return "Mouse: not supported"
+        status = []
+        if self.report_drag:
+            status.append("drag")
+        if self.report_motion:
+            status.append("motion")
+        if self.report_pixels:
+            status.append("pixels")
+        status_str = "+".join(status) if status else "disabled"
+        return f"Mouse: {status_str} [F9=drag F10=motion F11=pixels]"
+
+    def toggle_keynames(self) -> List[str]:
+        """Return list of key names that toggle mouse modes."""
+        return ['KEY_F9', 'KEY_F10', 'KEY_F11']
+
+    def get_index_by_key(self, key_name: str) -> int:
+        """Convert key name to toggle index."""
+        f_num = int(key_name.split('_')[-1][1:])
+        return f_num - 9  # F9 -> index 0, F10 -> index 1, F11 -> index 2
+
+    def cleanup(self) -> None:
+        """Clean up active context manager."""
+        if self.active_context is not None:
+            self.active_context.__exit__(None, None, None)
+
+
 def get_test_modes() -> Tuple[DecPrivateMode, ...]:
     """Return the tuple of DEC private modes to test."""
     return (
         DecPrivateMode.DECCKM,
         DecPrivateMode.DECSCNM,
         DecPrivateMode.DECKANAM,
-        DecPrivateMode.MOUSE_REPORT_CLICK,
-        DecPrivateMode.MOUSE_ALL_MOTION,
         DecPrivateMode.FOCUS_IN_OUT_EVENTS,
-        DecPrivateMode.MOUSE_EXTENDED_SGR,
-        DecPrivateMode.MOUSE_SGR_PIXELS,
         DecPrivateMode.META_SENDS_ESC,
         DecPrivateMode.ALT_SENDS_ESC,
         DecPrivateMode.BRACKETED_PASTE
@@ -191,15 +268,17 @@ def get_test_modes() -> Tuple[DecPrivateMode, ...]:
 
 
 def render_header(term: Terminal, dec_manager: DecModeManager, kitty_manager:
-                  KittyKeyboardManager) -> int:
-    """
-    Render the header section.
+                  KittyKeyboardManager, mouse_manager: MouseModeManager) -> int:
+    """Render the header section.
 
     Returns number of rows used.
     """
     header = ["Press ^C to quit."]
     if kitty_manager.kitty_flags is not None:
         header.append(f"{kitty_manager.repr_flags()} [Shift+F1..F5] to toggle")
+
+    if mouse_manager.supported:
+        header.append(mouse_manager.header_msg())
 
     # Display DEC modes table
     if dec_manager.entries():
@@ -229,7 +308,8 @@ def render_header(term: Terminal, dec_manager: DecModeManager, kitty_manager:
 
 def render_keymatrix(term: Terminal, n_header_rows: int, raw_sequences: deque,
                      formatted_events: deque) -> None:
-    """Render the key matrix display with raw sequences bar and formatted table."""
+    """Render the key matrix display with raw sequences bar and formatted
+    table."""
     # Calculate bar width (1/3 of terminal width)
     bar_width = term.width // 3
     bar_y = n_header_rows + 3
@@ -324,6 +404,9 @@ def main():
     kitty_manager = KittyKeyboardManager(term)
     formatted_events.extend(kitty_manager.probe(timeout=1.0))
 
+    mouse_manager = MouseModeManager(term)
+    formatted_events.extend(mouse_manager.probe(timeout=1.0))
+
     # Ensure clean input state
     inp = term.flushinp(0.1)
     assert not inp, "Expected no input after automatic sequence negotiation"
@@ -336,14 +419,14 @@ def main():
         n_header_rows = 0
 
         # Initial full render
-        n_header_rows = render_header(term, dec_manager, kitty_manager)
+        n_header_rows = render_header(term, dec_manager, kitty_manager, mouse_manager)
         render_keymatrix(term, n_header_rows, raw_sequences, formatted_events)
 
         do_exit = False
         while not do_exit:
             # Handle user input
             inp = term.inkey()
-            for mgr in (dec_manager, kitty_manager):
+            for mgr in (dec_manager, kitty_manager, mouse_manager):
                 if inp.name in mgr.toggle_keynames():
                     index = mgr.get_index_by_key(inp.name)
                     message = mgr.toggle_by_index(index)
@@ -362,9 +445,9 @@ def main():
                     or oldsize != (term.height, term.width)
                     or inp.name == 'KEY_CTRL_L'):
                 if message:
-                    message = None
                     formatted_events.append(f">> {message}")
-                n_header_rows = render_header(term, dec_manager, kitty_manager)
+                    message = None
+                n_header_rows = render_header(term, dec_manager, kitty_manager, mouse_manager)
                 oldsize = (term.height, term.width)
 
             # Always render key matrix (efficient, only updates changed area)
@@ -372,6 +455,7 @@ def main():
 
         dec_manager.cleanup()
         kitty_manager.cleanup()
+        mouse_manager.cleanup()
 
 
 if __name__ == '__main__':

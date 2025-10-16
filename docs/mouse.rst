@@ -100,13 +100,9 @@ of :meth:`~Terminal.move_xy`.
 - :attr:`~.Keystroke.mouse_yx` - position as a ``(y, x)`` tuple
 - :attr:`~.Keystroke.mouse_xy` - position as an ``(x, y)`` tuple
 
-.. code-block:: python
-
-   inp = term.inkey()
-   if inp.name and inp.name.startswith('MOUSE_'):
-       print(term.move_yx(*inp.mouse_yx) + '█')
-
-
+.. literalinclude:: ../bin/mouse_coords.py
+   :language: python
+   :linenos:
 
 Checking Support
 ----------------
@@ -152,17 +148,34 @@ Reports motion only while a button is held down:
    :language: python
    :linenos:
 
+When using ``report_drag=True`` or ``report_motion=True``, you'll receive motion
+events in the :attr:`~Keystroke.name` attribute with a ``_MOTION`` suffix:
+
+- ``MOUSE_MOTION`` - Motion without any button pressed (``report_motion``)
+- ``MOUSE_LEFT_MOTION``, ``MOUSE_MIDDLE_MOTION``, ``MOUSE_RIGHT_MOTION`` -
+  Dragging with a button held, usually follows click, eg. ``MOUSE_LEFT``.
+
+Motion events include modifiers just like click events, for example ``MOUSE_CTRL_LEFT_MOTION``.
+
 report_motion
 ~~~~~~~~~~~~~
 
-Reports all mouse movement, even without buttons pressed.  In this example,
-report motion causes the terminal cursor to track with the mouse. Painting is
-done while ``LEFT`` button is held down and colors changed by ``SCROLL_UP`` and
-``SCROLL_DOWN``:
+Reports all mouse clicks movement, even without buttons pressed. The
+:attr:`~Keystroke.name` attribute of ``MOUSE_MOTION`` is given when no button or
+scroll wheel events have occurred, only an updated :attr:`~Keystroke.mouse_yx`
+position.
+
+In this example, the terminal cursor tracks with the mouse pointer because the
+:meth:`~Terminal.move_yx` sequence is displayed following any mouse event,
+especially ``MOUSE_MOTION``, tracking the :attr:`Keystroke.mouse_yx` coordinate.
 
 .. literalinclude:: ../bin/mouse_paint.py
    :language: python
    :linenos:
+
+Painting is done while the left mouse button is held down, tracking both
+``MOUSE_LEFT`` and ``MOUSE_LEFT_MOTION``, erased with ``MOUSE_RIGHT``, and color
+selection changed by ``MOUSE_SCROLL_UP`` and ``MOUSE_SCROLL_DOWN``.
 
 .. note::
 
@@ -187,22 +200,3 @@ pattern (e.g., ``'MOUSE_LEFT'``) and magic method predicates (e.g.,
 ``inp.is_mouse_left()``). The :attr:`~.Keystroke.x` and :attr:`~.Keystroke.y`
 properties represent pixels instead of character cells.
 
-Motion Events
--------------
-
-When using ``report_drag=True`` or ``report_motion=True``, you'll receive motion
-events as the mouse moves:
-
-- ``MOUSE_MOTION`` - Pure motion without any button pressed (``report_motion`` only)
-- ``MOUSE_LEFT_MOTION``, ``MOUSE_MIDDLE_MOTION``, ``MOUSE_RIGHT_MOTION`` - Dragging with
-  a button held
-
-Motion events include modifiers just like click events, for example ``MOUSE_CTRL_LEFT_MOTION``.
-
-.. code-block:: python
-
-   inp = term.inkey()
-   if inp.name == 'MOUSE_LEFT_MOTION':
-       print("Dragging with left button")
-   elif inp.name == 'MOUSE_MOTION':
-       print("Moving without buttons pressed")

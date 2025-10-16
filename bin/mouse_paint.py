@@ -9,24 +9,25 @@ else:
     # Track current color for painting
     color_idx = 7
     num_colors = min(256, term.number_of_colors)
-    header = "Scroll wheel changes color=[{0}], LMB paints, RMB erases, ^C to quit"
-    def make_header(): return term.home + term.center(header.format(term.color(color_idx)('█')))
+    header = "Mouse wheel sets color=[{0}], LEFT button paints, RIGHT erases, ^C:quit"
+    def make_header():
+        return term.home + term.center(header.format(term.color(color_idx)('█')))
+    text = make_header()
 
     with term.cbreak(), term.fullscreen(), term.mouse_enabled(report_motion=True):
-        text = make_header()
         while True:
             print(text, end='', flush=True)
             inp = term.inkey()
 
             if inp.name and inp.name.startswith('MOUSE_'):
-                # process mouse event buttons using magic methods
-                if inp.is_mouse_scroll_up():
-                    color_idx = (color_idx + 1) % num_colors
-                elif inp.is_mouse_scroll_down():
-                    color_idx = (color_idx - 1) % num_colors
+                # process scroll wheel changes color
+                _offset = (1 if inp.name == 'MOUSE_SCROLL_UP' else
+                           -1 if inp.name == 'MOUSE_SCROLL_DOWN' else 0)
+                color_idx = (color_idx + _offset) % num_colors
 
-                block_fill = term.color(color_idx)('█')
-                char = (block_fill if inp.name.startswith('MOUSE_LEFT')
+                # and left mouse paints, right erases
+                char = (term.color(color_idx)('█')
+                        if inp.name.startswith('MOUSE_LEFT')
                         else ' ' if inp.name.startswith('MOUSE_RIGHT')
                         else '')
 

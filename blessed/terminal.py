@@ -992,9 +992,11 @@ class Terminal():
         Context manager for temporarily enabling DEC Private Modes.
 
         On entry, queries each mode's current state using get_dec_mode().
+
         For modes that are supported but currently disabled, enables them
         and tracks them for restoration. On exit, disables all modes that
         were enabled by this context manager, restoring original state.
+
         Unsupported modes are silently ignored.
 
         :arg modes: One or more DEC Private Mode numbers or enum members
