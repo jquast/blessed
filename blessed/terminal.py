@@ -241,7 +241,6 @@ class Terminal():
         # Device Attributes (DA1) cache
         self._device_attributes_cache: Optional[DeviceAttribute] = None
 
-
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
         if os.getenv('NO_COLOR'):
@@ -850,7 +849,6 @@ class Terminal():
             return None
 
         # parse, cache, and return the response
-        # pylint: disable=attribute-defined-outside-init
         self._device_attributes_cache = DeviceAttribute.from_match(match)
         return self._device_attributes_cache
 
@@ -1363,7 +1361,6 @@ class Terminal():
         # attempted and not forced)
         if not self._kitty_kb_first_query_attempted and not force:
             # Mark that we've attempted the first query
-            # pylint: disable=attribute-defined-outside-init
             self._kitty_kb_first_query_attempted = True
 
             # Send both Kitty and DA queries together for boundary detection
@@ -1382,7 +1379,6 @@ class Terminal():
             # invalid or no response (timeout)
             if match is None:
                 # Set sticky failure flag on first timeout
-                # pylint: disable=attribute-defined-outside-init
                 self._kitty_kb_first_query_failed = True
                 return None
 
@@ -1404,12 +1400,10 @@ class Terminal():
 
             if da1_match:
                 # Only DA1 response found, no Kitty support
-                # pylint: disable=attribute-defined-outside-init
                 self._kitty_kb_first_query_failed = True
                 return None
 
             # Neither response found - no support
-            # pylint: disable=attribute-defined-outside-init
             self._kitty_kb_first_query_failed = True
             return None
 
@@ -1422,7 +1416,6 @@ class Terminal():
         # invalid or no response (timeout)
         if match is None:
             # Set sticky failure flag on timeout (though this should be rare for subsequent calls)
-            # pylint: disable=attribute-defined-outside-init
             self._kitty_kb_first_query_failed = True
             return None
 
