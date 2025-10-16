@@ -1548,6 +1548,12 @@ class Terminal():
                 ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
                                       final=final)
 
+            # If we still have a prefix after the loop exits (e.g., '\x1b[' with no more input),
+            # resolve it with final=True to properly handle CSI and other Alt sequences
+            if ks.code == self.KEY_ESCAPE and ucs in self._keymap_prefixes:
+                ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                                      final=True)
+
         # buffer any remaining text received
         self.ungetch(ucs[len(ks):])
         return ks
