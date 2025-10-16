@@ -234,6 +234,14 @@ class Terminal():
         self.__init__keycodes()
         self.__init__dec_private_modes()
 
+        # Initialize Kitty keyboard protocol tracking
+        self._kitty_kb_first_query_failed = False
+        self._kitty_kb_first_query_attempted = False
+
+        # Device Attributes (DA1) cache
+        self._device_attributes_cache: Optional[DeviceAttribute] = None
+
+
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
         if os.getenv('NO_COLOR'):
@@ -375,9 +383,10 @@ class Terminal():
         # build set of prefixes of sequences
         self._keymap_prefixes = get_leading_prefixes(self._keymap)
 
-        # Add DEC event prefixes (mouse, bracketed paste, focus tracking)
-        # These are not in the keymap but need to be recognized as valid prefixes
-        # so that inkey() will wait for complete sequences
+        # Add DEC event prefixes (mouse, bracketed paste, focus tracking) These
+        # are not in the keymap but need to be recognized as valid "prefixes",
+        # so that they are not detected early as metaSendsEscape sequence until
+        # after esc_delay has elapsed.
         self._keymap_prefixes.update([
             '\x1b[M',     # Legacy mouse (needs 3 more bytes)
             '\x1b[<',     # SGR mouse (variable length)
@@ -422,13 +431,6 @@ class Terminal():
         # Global timeout tracking state
         self._dec_any_query_succeeded = False
         self._dec_first_query_failed = False
-
-        # Kitty keyboard protocol timeout tracking (no caching)
-        self._kitty_kb_first_query_failed = False
-        self._kitty_kb_first_query_attempted = False
-
-        # Device Attributes (DA1) cache
-        self._device_attributes_cache: Optional[DeviceAttribute] = None
 
     def __getattr__(self,
                     attr: str) -> Union[NullCallableString,

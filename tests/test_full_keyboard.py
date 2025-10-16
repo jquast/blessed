@@ -870,3 +870,63 @@ def test_esc_delay_while_loop_with_continued_input():
     pid, status = os.waitpid(pid, 0)
     assert output == 'KEY_LEFT'
     assert os.WEXITSTATUS(status) == 0
+
+
+@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
+def test_esc_delay_bracketed_paste_prefix_slow_complete():
+    """Bracketed paste CSI + 200~ sent slowly should be received completely."""
+    interval = 0.02
+    sequence = b'\x1b[200~x x x x -complete paste- x x\x1b[201~'
+    esc_delay = (interval * len(sequence)) * 1.1
+
+    def child(term):
+        os.write(sys.__stdout__.fileno(), SEMAPHORE)
+        with term.cbreak():
+            stime = time.time()
+            keystroke = term.inkey(timeout=1.0, esc_delay=esc_delay)
+            keystroke2 = term.flushinp(timeout=0.1)
+            measured_time = (time.time() - stime) * 100
+            return f'{keystroke.name} {measured_time:.0f}'.encode('ascii')
+
+    def parent(master_fd):
+        read_until_semaphore(master_fd)
+        for byte in sequence:
+            os.write(master_fd, bytes([byte]))
+            time.sleep(interval)
+
+    stime = time.time()
+    output = pty_test(child, parent, 'test_esc_delay_bracketed_paste_prefix_slow_complete')
+    key_name, duration_ms = output.split()
+
+    assert False, key_name, duration_ms
+    # Should NOT break into Alt+key (KEY_ALT_xxx) or lone KEY_ESCAPE
+    #assert not key_name.startswith('KEY_ALT')
+    #assert key_name != 'KEY_ESCAPE'
+    # Should take about len(sequence) * interval seconds
+    #assert 100 * esc_delay * 0.9 <= int(duration_ms) <= esc_delay * 120
+    #assert_elapsed_range(stime, int((interval * len(sequence)) * 80),
+                         int((interval * len(sequence)) * 120))
+
+
+@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
+def test_esc_delay_bracketed_paste_prefix_incomplete():
+    """Incomplete bracketed paste prefix should timeout and be flushed."""
+    def child(term):
+        os.write(sys.__stdout__.fileno(), SEMAPHORE)
+        with term.cbreak():
+            stime = time.time()
+            keystroke = term.inkey(timeout=0.5, esc_delay=0.15)
+            measured_time = (time.time() - stime) * 100
+            keystroke2 = term.flushinp()
+            return f'{keystroke.name} {keystroke2!r} {measured_time:.0f}'.encode('ascii')
+
+    def parent(master_fd):
+        read_until_semaphore(master_fd)
+        os.write(master_fd, b'\x1b[200')
+
+    stime = time.time()
+    output = pty_test(child, parent, 'test_esc_delay_bracketed_paste_prefix_incomplete')
+    keystroke, keystroke2, measured_time = output.split()
+
+    # Should have waited for esc_delay
+    assert_elapsed_range(stime, 13, 25)
