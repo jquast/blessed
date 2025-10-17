@@ -1313,14 +1313,14 @@ def resolve_sequence(text: str,
                 ks = Keystroke(ucs=sequence, code=code, name=codes[code])
                 break
 
+    # Check for metaSendsEscape (Alt+key) or CSI fallback
+    # Only fallback when no modern protocol has matched
     is_meta_escape = (
-        # Looks like 'Esc + char', for metaSendsEscape (Alt sequences) and CSI
         text.startswith('\x1b')
         and len(text) >= 2
-        # Final input, or not a known prefix,
         and (final or text[:2] not in prefixes)
-        # And no match, or matched KEY_EXIT only chr(27)
-        and (ks is None or ks.code == curses.KEY_EXIT)
+        # pylint:disable=protected-access
+        and (ks is None or (ks.code == curses.KEY_EXIT and ks._mode is None))
     )
     if is_meta_escape:
         ks = Keystroke(ucs=text[:2])

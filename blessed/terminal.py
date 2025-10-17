@@ -2183,7 +2183,7 @@ class Terminal():
         r"""
         Context manager that enables directional keypad input.
 
-        On entrying, this puts the terminal into "keyboard_transmit" mode by
+        On entry, this puts the terminal into "keyboard_transmit" mode by
         emitting the keypad_xmit (smkx) capability. On exit, it emits
         keypad_local (rmkx).
 
