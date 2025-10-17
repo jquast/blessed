@@ -772,3 +772,42 @@ def test_does_mouse_custom_timeout():
                 assert call[1].get('timeout') == 2.5 or call[0][1] == 2.5
         assert stream.getvalue() == ''
     child()
+
+
+def test_mouse_extended_button_motion():
+    """Test extended mouse button motion events (button >= 66)."""
+    # Test SGR format with extended button in motion
+    mouse_ext_motion = MouseEvent(
+        button_value=66, x=10, y=20, released=False,
+        shift=False, meta=False, ctrl=False, is_motion=True, is_wheel=False
+    )
+    assert mouse_ext_motion.button == "BUTTON_6_MOTION"
+    assert mouse_ext_motion.is_motion
+
+    # Test with button 67
+    mouse_ext_motion_7 = MouseEvent(
+        button_value=67, x=10, y=20, released=False,
+        shift=False, meta=False, ctrl=False, is_motion=True, is_wheel=False
+    )
+    assert mouse_ext_motion_7.button == "BUTTON_7_MOTION"
+
+
+def test_mouse_legacy_wheel_events():
+    """Test legacy mouse wheel event parsing."""
+    cache = make_enabled_dec_cache()
+
+    # Wheel up: cb=64 → chr(64+32)='`'
+    wheel_up_seq = '\x1b[M`@@'
+    ks_wheel_up = _match_dec_event(wheel_up_seq, dec_mode_cache=cache)
+
+    values = ks_wheel_up._mode_values
+    assert values.is_wheel
+    assert values.button_value == 0
+
+    # Wheel down: cb=65 → chr(65+32)='a'
+    wheel_down_seq = '\x1b[Ma@@'
+    ks_wheel_down = _match_dec_event(wheel_down_seq, dec_mode_cache=cache)
+
+    values_down = ks_wheel_down._mode_values
+    assert values_down.is_wheel
+    assert values_down.button_value == 1
