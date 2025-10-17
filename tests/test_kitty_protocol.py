@@ -67,13 +67,16 @@ def test_match_kitty_complex():
     assert event.int_codepoints == (65, 66)
 
 
-def test_match_kitty_non_matching():
+@pytest.mark.parametrize("sequence", [
+    'a',
+    '\x1b[A',
+    '\x1b[97',
+    '\x1b]97u',
+    '\x1b[97v',
+])
+def test_match_kitty_non_matching(sequence):
     """Test non-Kitty sequences return None."""
-    assert _match_kitty_key('a') is None
-    assert _match_kitty_key('\x1b[A') is None
-    assert _match_kitty_key('\x1b[97') is None
-    assert _match_kitty_key('\x1b]97u') is None
-    assert _match_kitty_key('\x1b[97v') is None
+    assert _match_kitty_key(sequence) is None
 
 
 def test_kitty_modifier_encoding():
@@ -448,6 +451,82 @@ def test_enable_kitty_keyboard(force_styling, force, flags, mode, expected_outpu
     child()
 
 
+def test_enable_kitty_keyboard_all_flag_operations():
+    """Test all flag bit operations in enable_kitty_keyboard."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        given_flags_response = '\x1b[?0u'  # flags 0 (no flags currently set)
+        expected_enable_seq = '\x1b[=31;1u'  # flags 31 (1+2+4+8+16: all 5 flags), mode 1 (push)
+        term.ungetch(given_flags_response)
+        with term.enable_kitty_keyboard(
+            disambiguate=True,
+            report_events=True,
+            report_alternates=True,
+            report_all_keys=True,
+            report_text=True,
+            timeout=0.01,
+            force=True
+        ):
+            pass
+        output = stream.getvalue()
+        assert expected_enable_seq in output
+    child()
+
+
+def test_enable_kitty_keyboard_sequence_emission():
+    """Test sequence emission and flush in enable_kitty_keyboard."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        given_flags_response = '\x1b[?5u'  # flags 5 (1+4: disambiguate+report_alternates)
+        expected_enable_seq = '\x1b[=1;1u'  # flags 1 (disambiguate), mode 1 (push)
+        expected_restore_seq = '\x1b[=5;1u'  # flags 5 (restore previous), mode 1
+        term.ungetch(given_flags_response)
+        with term.enable_kitty_keyboard(disambiguate=True, timeout=0.01, force=True):
+            output_during = stream.getvalue()
+            assert expected_enable_seq in output_during
+        output_after = stream.getvalue()
+        assert expected_restore_seq in output_after
+    child()
+
+
+def test_enable_kitty_keyboard_restoration_with_previous_flags():
+    """Test restoration logic when previous flags exist."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        given_flags_response = '\x1b[?9u'  # flags 9 (1+8: disambiguate+report_all_keys)
+        expected_restore_seq = '\x1b[=9;1u'  # flags 9 (restore previous), mode 1
+        term.ungetch(given_flags_response)
+        with term.enable_kitty_keyboard(disambiguate=True, report_all_keys=True,
+                                        timeout=0.01, force=True):
+            pass
+        output = stream.getvalue()
+        assert expected_restore_seq in output
+    child()
+
+
+def test_enable_kitty_keyboard_sticky_failure():
+    """Test enable_kitty_keyboard skips when first query failed."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._kitty_kb_first_query_failed = True
+        with term.enable_kitty_keyboard(disambiguate=True, timeout=0.01):
+            pass
+        assert stream.getvalue() == ''
+    child()
+
+
 @pytest.mark.parametrize("flags,expected_value", [
     ({'disambiguate': True}, 1),
     ({'report_events': True}, 2),
@@ -469,6 +548,25 @@ def test_kitty_keyboard_protocol_setters(flags, expected_value):
     assert protocol.value == expected_value
     for flag_name, expected_flag_value in flags.items():
         assert getattr(protocol, flag_name) == expected_flag_value
+
+
+def test_get_kitty_state_boundary_no_response():
+    """Test boundary approach when neither Kitty nor DA1 response found."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term.ungetch('garbage response')
+        expected_kitty_query = '\x1b[?u'  # query current flags
+        expected_da1_query = '\x1b[c'  # device attributes query
+        flags = term.get_kitty_keyboard_state(timeout=0.01)
+        assert flags is None
+        assert term._kitty_kb_first_query_failed is True
+        output = stream.getvalue()
+        assert expected_kitty_query in output
+        assert expected_da1_query in output
+    child()
 
 
 def test_get_kitty_keyboard_state_boundary_approach():
@@ -584,42 +682,60 @@ def test_kitty_name_synthesis_edge_cases(sequence, expected_name, expected_value
     assert ks.value == expected_value
 
 
-def test_kitty_name_synthesis_special_cases():
-    """Test special cases in name synthesis."""
-    ks = _match_kitty_key('\x1b[1089::99;5u')
-    assert ks.name == 'KEY_CTRL_C'
+@pytest.mark.parametrize("sequence,expected_name", [
+    # Base key usage: unicode_key=1089, base_key=99 ('c'), modifiers=5 (Ctrl)
+    # Tests that name synthesis uses base_key (99) instead of unicode_key (1089)
+    ('\x1b[1089::99;5u', 'KEY_CTRL_C'),
 
-    ks = _match_kitty_key('\x1b[97;5:1u')
-    assert ks.name == 'KEY_CTRL_A'
+    # Press event: unicode_key=97 ('a'), modifiers=5 (Ctrl), event_type=1 (press)
+    # Tests that press events (event_type=1) get names synthesized
+    ('\x1b[97;5:1u', 'KEY_CTRL_A'),
 
-    ks = _match_kitty_key('\x1b[97;5:3u')
-    assert ks.name is None
+    # Release event: unicode_key=97 ('a'), modifiers=5 (Ctrl), event_type=3 (release)
+    # Tests that release events (event_type=3) return None for name
+    ('\x1b[97;5:3u', None),
 
-    ks = _match_kitty_key('\x1b[97;5:2u')
-    assert ks.name is None
+    # Repeat event: unicode_key=97 ('a'), modifiers=5 (Ctrl), event_type=2 (repeat)
+    # Tests that repeat events (event_type=2) return None for name
+    ('\x1b[97;5:2u', None),
+])
+def test_kitty_name_synthesis_special_cases(sequence, expected_name):
+    """
+    Test special cases in Kitty protocol name synthesis.
 
+    This test covers critical edge cases in _get_kitty_protocol_name():
+    1. Alternate/base key handling (prefers base_key over unicode_key)
+    2. Event type filtering (only press events get synthesized names)
+    3. Release event handling (event_type=3 returns None)
+    4. Repeat event handling (event_type=2 returns None)
+    """
+    ks = _match_kitty_key(sequence)
+    assert ks.name == expected_name
+
+
+def test_kitty_name_synthesis_custom_name():
+    """Test custom name override in name synthesis."""
     kitty_event = KittyKeyEvent(unicode_key=97, shifted_key=None, base_key=None,
                                 modifiers=5, event_type=1, int_codepoints=())
     ks = Keystroke('\x1b[97;5u', name='CUSTOM_NAME', mode=-1, match=kitty_event)
     assert ks.name == 'CUSTOM_NAME'
 
 
-def test_kitty_letter_name_synthesis_integration():
+@pytest.mark.parametrize("sequence,expected_name", [
+    ('\x1b[97;5u', 'KEY_CTRL_A'),
+    ('\x1b[122;3u', 'KEY_ALT_Z'),
+    ('\x1b[77;7u', 'KEY_CTRL_ALT_M'),
+    ('\x1b[98;6u', 'KEY_CTRL_SHIFT_B'),
+])
+def test_kitty_letter_name_synthesis_integration(sequence, expected_name):
     """Test letter name synthesis with Terminal.inkey()."""
     @as_subprocess
     def child():
         term = Terminal(force_styling=True)
-        test_sequences = [
-            ('\x1b[97;5u', 'KEY_CTRL_A'),
-            ('\x1b[122;3u', 'KEY_ALT_Z'),
-            ('\x1b[77;7u', 'KEY_CTRL_ALT_M'),
-            ('\x1b[98;6u', 'KEY_CTRL_SHIFT_B'),
-        ]
-        for sequence, expected_name in test_sequences:
-            term.ungetch(sequence)
-            ks = term.inkey(timeout=0)
-            assert ks == sequence
-            assert ks.name == expected_name
+        term.ungetch(sequence)
+        ks = term.inkey(timeout=0)
+        assert ks == sequence
+        assert ks.name == expected_name
     child()
 
 
@@ -1201,20 +1317,26 @@ def test_kitty_control_chars_event_types(sequence, event_type):
     assert ks.released == (event_type == 3)
 
 
-def test_kitty_escape_key_with_protocol_enabled():
+@pytest.mark.parametrize(
+    "sequence,expected_name,expected_code,expected_value,is_ctrl,is_released",
+    [
+        ('\x1b[27u', 'KEY_ESCAPE', KEY_EXIT, '\x1b', False, False),
+        ('\x1b[27;5u', 'KEY_CTRL_ESCAPE', KEY_EXIT, None, True, False),
+        ('\x1b[27;1:3u', 'KEY_ESCAPE_RELEASED', KEY_EXIT, None, False, True),
+    ])
+def test_kitty_escape_key_with_protocol_enabled(
+        # pylint: disable=too-many-positional-arguments
+        sequence, expected_name, expected_code, expected_value, is_ctrl, is_released):
     """Test Escape key with Kitty protocol explicitly enabled."""
-    ks = _match_kitty_key('\x1b[27u')
-    assert ks.name == 'KEY_ESCAPE'
-    assert ks.code == KEY_EXIT
-    assert ks.value == '\x1b'
-
-    ks = _match_kitty_key('\x1b[27;5u')
-    assert ks.name == 'KEY_CTRL_ESCAPE'
-    assert ks._ctrl is True
-
-    ks = _match_kitty_key('\x1b[27;1:3u')
-    assert ks.released is True
-    assert ks.name == 'KEY_ESCAPE_RELEASED'
+    ks = _match_kitty_key(sequence)
+    assert ks.name == expected_name
+    assert ks.code == expected_code
+    if expected_value is not None:
+        assert ks.value == expected_value
+    if is_ctrl:
+        assert ks._ctrl is True
+    if is_released:
+        assert ks.released is True
 
 
 @pytest.mark.parametrize("sequence,expected_name,expected_code,ctrl,alt,released,repeated", [
