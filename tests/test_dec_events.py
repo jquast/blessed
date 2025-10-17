@@ -15,23 +15,7 @@ from blessed.keyboard import (
     BracketedPasteEvent,
     FocusEvent,
 )
-from blessed.dec_modes import DecModeResponse
-from .accessories import TestTerminal
-
-
-# Helper to create a dec_mode_cache with all DEC event modes enabled
-def _make_enabled_cache():
-    """Create a dec_mode_cache with all DEC event modes enabled."""
-    return {
-        2004: DecModeResponse.SET,  # BRACKETED_PASTE
-        1000: DecModeResponse.SET,  # MOUSE_REPORT_CLICK
-        1002: DecModeResponse.SET,  # MOUSE_REPORT_DRAG
-        1003: DecModeResponse.SET,  # MOUSE_ALL_MOTION
-        1001: DecModeResponse.SET,  # MOUSE_HILITE_TRACKING
-        1004: DecModeResponse.SET,  # FOCUS_IN_OUT_EVENTS
-        1006: DecModeResponse.SET,  # MOUSE_EXTENDED_SGR
-        1016: DecModeResponse.SET,  # MOUSE_SGR_PIXELS
-    }
+from .accessories import TestTerminal, make_enabled_dec_cache
 
 
 class TestDECEventMatching:
@@ -45,7 +29,7 @@ class TestDECEventMatching:
     def test_bracketed_paste_detection(self):
         """Test bracketed paste sequence detection."""
         sequence = '\x1b[200~hello world\x1b[201~'
-        ks = _match_dec_event(sequence, dec_mode_cache=_make_enabled_cache())
+        ks = _match_dec_event(sequence, dec_mode_cache=make_enabled_dec_cache())
 
         assert ks is not None
         assert ks == sequence
@@ -59,7 +43,7 @@ class TestDECEventMatching:
     def test_bracketed_paste_multiline(self):
         """Test bracketed paste with multiline content."""
         sequence = '\x1b[200~line1\nline2\tindented\x1b[201~'
-        ks = _match_dec_event(sequence, dec_mode_cache=_make_enabled_cache())
+        ks = _match_dec_event(sequence, dec_mode_cache=make_enabled_dec_cache())
 
         assert ks is not None
         values = ks._mode_values
@@ -71,7 +55,7 @@ class TestDECEventMatching:
     ])
     def test_focus_events(self, sequence, expected_gained):
         """Test focus events for gained and lost."""
-        ks = _match_dec_event(sequence, dec_mode_cache=_make_enabled_cache())
+        ks = _match_dec_event(sequence, dec_mode_cache=make_enabled_dec_cache())
         assert ks.mode == Terminal.DecPrivateMode.FOCUS_IN_OUT_EVENTS
 
         values = ks._mode_values
@@ -131,7 +115,7 @@ def test_resolve_sequence():
     # DEC event sequence should match when modes are enabled
     dec_sequence = '\x1b[200~test\x1b[201~'
     ks_dec = resolve_sequence(dec_sequence, keymap, codes, prefixes,
-                              dec_mode_cache=_make_enabled_cache())
+                              dec_mode_cache=make_enabled_dec_cache())
     event_value = ks_dec._mode_values
     assert isinstance(event_value, BracketedPasteEvent)
     assert event_value.text == 'test'
@@ -140,7 +124,7 @@ def test_resolve_sequence():
 
 def test_focus_event_names():
     """Test that focus events have correct names."""
-    cache = _make_enabled_cache()
+    cache = make_enabled_dec_cache()
 
     # Focus gained
     ks_focus_in = _match_dec_event('\x1b[I', dec_mode_cache=cache)
@@ -157,7 +141,7 @@ def test_focus_event_names():
 
 def test_bracketed_paste_name_and_text():
     """Test that bracketed paste events have correct name and text property."""
-    cache = _make_enabled_cache()
+    cache = make_enabled_dec_cache()
 
     # Simple paste
     ks_paste = _match_dec_event('\x1b[200~hello world\x1b[201~', dec_mode_cache=cache)

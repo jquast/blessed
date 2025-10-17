@@ -10,6 +10,7 @@ else:
     color_idx = 7
     num_colors = min(256, term.number_of_colors)
     header = "Mouse wheel sets color=[{0}], LEFT button paints, RIGHT erases, ^C:quit"
+
     def make_header():
         return term.home + term.center(header.format(term.color(color_idx)('█')))
     text = make_header()

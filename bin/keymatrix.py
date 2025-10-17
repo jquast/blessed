@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-"""Advanced keyboard and special modes interaction example.
+"""
+Advanced keyboard and special modes interaction example.
 
 Usage:
 - F1-F11: Toggle DEC private modes (bracketed paste, mouse, etc.)
@@ -269,7 +270,8 @@ def get_test_modes() -> Tuple[DecPrivateMode, ...]:
 
 def render_header(term: Terminal, dec_manager: DecModeManager, kitty_manager:
                   KittyKeyboardManager, mouse_manager: MouseModeManager) -> int:
-    """Render the header section.
+    """
+    Render the header section.
 
     Returns number of rows used.
     """
@@ -308,8 +310,7 @@ def render_header(term: Terminal, dec_manager: DecModeManager, kitty_manager:
 
 def render_keymatrix(term: Terminal, n_header_rows: int, raw_sequences: deque,
                      formatted_events: deque) -> None:
-    """Render the key matrix display with raw sequences bar and formatted
-    table."""
+    """Render the key matrix display with raw sequences bar and formatted table."""
     # Calculate bar width (1/3 of terminal width)
     bar_width = term.width // 3
     bar_y = n_header_rows + 3
