@@ -538,3 +538,32 @@ def test_unsupported_high_byte_metasendsescape():
     # Another high byte
     ks = Keystroke('\x1b\xff')  # ESC + char with code 255
     assert ks.modifiers == 1    # No modifiers detected
+
+
+def test_is_incomplete_keystroke():
+    """Test _is_incomplete_keystroke private method."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+
+        # Case 1: Exact match - text is a known prefix
+        assert term._is_incomplete_keystroke('\x1b[')
+        assert term._is_incomplete_keystroke('\x1b[1')
+        assert term._is_incomplete_keystroke('\x1b[15')
+
+        # Case 2: Building toward - text is a partial match for a longer prefix
+        # '\x1b' is building toward '\x1b[', '\x1b[1', '\x1b[15', etc.
+        assert term._is_incomplete_keystroke('\x1b')
+
+        # Case 3: Extending beyond - text starts with a known prefix but continues
+        # '\x1b[15~' completes to F5, but '\x1b[15~x' extends beyond the prefix '\x1b[15'
+        # this is for 'bracketed paste' and really really long sequences
+        assert term._is_incomplete_keystroke('\x1b[15~xxx')
+        assert term._is_incomplete_keystroke('\x1b[200~data')
+
+        # Case 4: No match - text doesn't relate to any known prefix
+        assert not term._is_incomplete_keystroke('')
+        assert not term._is_incomplete_keystroke('x')
+        assert not term._is_incomplete_keystroke('xyz')
+
+    child()
