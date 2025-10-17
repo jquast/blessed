@@ -6,7 +6,6 @@ Window size changes are caught by the 'on_resize' function using a traditional s
 Meanwhile, blocking keyboard input is displayed to stdout. If a resize event is discovered, an empty
 string is returned by term.inkey().
 """
-from __future__ import print_function
 
 # std imports
 import signal
@@ -30,7 +29,7 @@ def main():
         # In most programs, you'll want to set some kind of 'dirty' flag,
         # perhaps by a Semaphore like threading.Event or (thanks to the GIL)
         # a simple global variable will suffice.
-        print('height={t.height}, width={t.width}\r'.format(t=term))
+        print(f'height={term.height}, width={term.width}\r')
 
     signal.signal(signal.SIGWINCH, on_resize)
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # pylint: disable=too-many-lines
 """Module containing :class:`Terminal`, the primary API entry point."""
 # std imports
@@ -543,7 +542,7 @@ class Terminal():
             try:
                 if fd is not None:
                     return self._winsize(fd)
-            except (IOError, OSError, ValueError, TypeError):  # pylint: disable=overlapping-except
+            except (OSError, ValueError, TypeError):
                 pass
 
         return WINSZ(ws_row=int(os.getenv('LINES', '25')),

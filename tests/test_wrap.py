@@ -1,5 +1,4 @@
 """Tests for Terminal.wrap()"""
-# coding: utf-8
 
 # std imports
 import textwrap
