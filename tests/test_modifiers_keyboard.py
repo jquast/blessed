@@ -1311,3 +1311,29 @@ def test_get_meta_escape_name_branch_coverage():
         assert ks.modifiers == expected_modifiers
         result = ks._get_meta_escape_name()
         assert result == expected_name
+
+
+def test_build_appkeys_predicate_modifier_validation():
+    """Test application key predicate when modifiers don't match."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        term.ungetch('\x1b[1;2A')
+        ks = term.inkey(timeout=0)
+        assert ks.code == curses.KEY_UP
+        assert ks._shift is True
+        assert ks.is_shift_up() is True
+        assert ks.is_ctrl_up() is False
+    child()
+
+
+def test_event_type_suffix_without_application_key():
+    """Test event type suffix without valid application key raises AttributeError."""
+    ks = Keystroke('\x01')
+    assert ks._ctrl is True
+    try:
+        ks.is_ctrl_pressed('a')
+        assert False
+    except AttributeError as e:
+        assert 'pressed' in str(e)
+        assert 'only valid with application keys' in str(e)
