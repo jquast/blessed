@@ -65,7 +65,6 @@ def main():
         if not os.path.exists(os.path.join(fname)):
             img = Image.new('RGB', (1, 1), color=rgb)
             img.save(fname)
-            print(f'write: {fname}')
         aliases += color_alias_fmt.format(color_name=x11_color)
         hsv = colorsys.rgb_to_hsv(*rgb)
         csv_rows += ('   '
