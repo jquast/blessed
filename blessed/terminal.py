@@ -2224,6 +2224,15 @@ class Terminal():
             ucs += self.getch()
         return ucs
 
+    def _is_incomplete_keystroke(self, text: str) -> bool:
+        # Check if text is an incomplete keystroke sequence: returns True if text
+        # matches (exact), builds toward (partial), or extends beyond a known prefix
+        if not text:
+            return False
+        return (text in self._keymap_prefixes or
+                any(text.startswith(p) for p in self._keymap_prefixes) or
+                any(p.startswith(text) for p in self._keymap_prefixes))
+
     def inkey(self, timeout: Optional[float] = None,
               esc_delay: float = DEFAULT_ESCDELAY) -> Keystroke:
         r"""
@@ -2300,25 +2309,25 @@ class Terminal():
         if ks.code == self.KEY_ESCAPE:
             esctime = time.time()
             while (ks.code == self.KEY_ESCAPE
-                   and ucs in self._keymap_prefixes
+                   and self._is_incomplete_keystroke(ucs)
                    and self.kbhit(timeout=_time_left(esctime, esc_delay))):
                 # pylint: disable=attribute-defined-outside-init
                 self._use_latin1_decoding = ucs.startswith('\x1b[')
                 ucs += self.getch()
                 # re-check 'final' after reading more bytes
-                final = bool(ucs) and ucs not in self._keymap_prefixes
+                final = bool(ucs) and not self._is_incomplete_keystroke(ucs)
                 ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
                                       final=final, dec_mode_cache=self._dec_mode_cache)
 
             # If we still have KEY_ESCAPE and ucs is a prefix, resolve with final=True
             # to handle unmatched sequences like '\x1b[' (CSI)
-            if ks.code == self.KEY_ESCAPE and ucs in self._keymap_prefixes:
+            if ks.code == self.KEY_ESCAPE and self._is_incomplete_keystroke(ucs):
                 ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
                                       final=True, dec_mode_cache=self._dec_mode_cache)
 
             # If we still have a prefix after the loop exits (e.g., '\x1b[' with no more input),
             # resolve it with final=True to properly handle CSI and other Alt sequences
-            if ks.code == self.KEY_ESCAPE and ucs in self._keymap_prefixes:
+            if ks.code == self.KEY_ESCAPE and self._is_incomplete_keystroke(ucs):
                 ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
                                       final=True)
 

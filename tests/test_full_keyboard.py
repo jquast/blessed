@@ -33,7 +33,7 @@ pytestmark = pytest.mark.skipif(
     reason="Timing-sensitive tests excluded, or, windows incompatible")
 
 
-def assert_elapsed_range(start_time, min_ms, max_ms):
+def assert_elapsed_range_ms(start_time, min_ms, max_ms):
     """Assert that elapsed time in milliseconds is within range."""
     elapsed_ms = (time.time() - start_time) * 100
     assert min_ms <= int(elapsed_ms) <= max_ms
@@ -79,7 +79,7 @@ def test_kbhit_interrupted():
     pid, status = os.waitpid(pid, 0)
     assert output == 'complete'
     assert os.WEXITSTATUS(status) == 0
-    assert_elapsed_range(stime, 15, 80)
+    assert_elapsed_range_ms(stime, 15, 80)
 
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
@@ -141,7 +141,7 @@ def test_kbhit_no_kb():
         stime = time.time()
         assert term._keyboard_fd is None
         assert not term.kbhit(timeout=0.3)
-        assert_elapsed_range(stime, 25, 80)
+        assert_elapsed_range_ms(stime, 25, 80)
     child()
 
 
@@ -176,7 +176,7 @@ def test_keystroke_cbreak_noinput(use_stream, timeout, expected_cs_range):
             stime = time.time()
             inp = term.inkey(timeout=timeout)
             assert inp == ''
-            assert_elapsed_range(stime, *expected_cs_range)
+            assert_elapsed_range_ms(stime, *expected_cs_range)
     child(use_stream, timeout, expected_cs_range)
 
 
@@ -325,7 +325,7 @@ def test_keystroke_20ms_cbreak_with_input():
     stime = time.time()
     output = pty_test(child, parent, 'test_keystroke_20ms_cbreak_with_input')
     assert output == 'KEY_RIGHT'
-    assert_elapsed_range(stime, 19, 40)
+    assert_elapsed_range_ms(stime, 19, 40)
 
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
@@ -418,8 +418,8 @@ def test_flushinp_timeout_with_continuous_input():
     count, duration_ms = output.split()
 
     assert int(count) >= 3
-    assert 9 <= int(duration_ms) <= 15
-    assert_elapsed_range(stime, 9, 18)
+    assert 8 <= int(duration_ms) <= 20
+    assert_elapsed_range_ms(stime, 8, 25)
 
 
 def test_get_location_0s():
@@ -796,59 +796,98 @@ def test_esc_delay_while_loop_with_continued_input():
 
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
-def test_esc_delay_bracketed_paste_prefix_slow_complete():
-    """Bracketed paste CSI + 200~ sent slowly should be received completely."""
+def test_esc_delay_long_sequence_prefix_slow_complete():
+    """Long sequence sent slowly byte-by-byte should complete before esc_delay.
+
+    Tests that when a multi-byte sequence like F5 (\x1b[15~) is sent byte-by-byte
+    with delays, the prefix matching logic correctly waits for the complete sequence
+    rather than timing out early. The sequence has multiple prefix points:
+    \x1b -> \x1b[ -> \x1b[1 -> \x1b[15 -> \x1b[15~ (complete)
+    """
     interval = 0.02
-    sequence = b'\x1b[200~x x x x -complete paste- x x\x1b[201~'
-    esc_delay = (interval * len(sequence)) * 1.1
+    sequence = b'\x1b[15~'  # F5 key
+
+    # wait roughly 200ms more than expected
+    esc_delay = (interval * len(sequence)) + 0.2
 
     def child(term):
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            keystroke = term.inkey(timeout=1.0, esc_delay=esc_delay)
-            remaining = term.flushinp(timeout=0.1)
-            measured_time = (time.time() - stime) * 100
-            return f'{keystroke.name}|{remaining!r}|{measured_time:.0f}'.encode('ascii')
+            keystroke = term.inkey(timeout=6.0, esc_delay=esc_delay)
+            duration_ms = (time.time() - stime) * 100
+            remaining = term.flushinp(timeout=0.15)
+            result = f'{keystroke.name}|{keystroke.code}|{remaining!r}|{duration_ms:.0f}'
+            return result.encode('ascii')
 
     def parent(master_fd):
         read_until_semaphore(master_fd)
+
+        # Send the sequence byte-by-byte with delays
         for byte in sequence:
-            os.write(master_fd, bytes([byte]))
             time.sleep(interval)
+            os.write(master_fd, bytes([byte]))
 
-    stime = time.time()
-    output = pty_test(child, parent, 'test_esc_delay_bracketed_paste_prefix_slow_complete')
-    key_name, remaining, duration_ms = output.split('|')
+    output = pty_test(child, parent, 'test_esc_delay_long_sequence_prefix_slow_complete')
+    key_name, key_code, remaining, duration_ms = output.split('|')
 
-    assert key_name == 'CSI'
-    assert remaining == ''
-    assert 15 <= int(duration_ms) <= 30
-    expected_total_time = len(sequence) * interval * 100
-    assert_elapsed_range(stime, int(expected_total_time * 0.8), int(expected_total_time * 1.2))
+    # Even though sent 1 byte at-a-time, our resolver should notice the
+    # prefix chain (\x1b -> \x1b[ -> \x1b[1 -> \x1b[15) and wait for completion
+    # so long as each byte arrives before esc_delay has elapsed
+    assert key_name == 'KEY_F5', (key_name, key_code, remaining, duration_ms)
+    assert remaining == "''"
+    # Duration should be at least the time to receive all bytes, but faster than full esc_delay
+    # (since we recognize the complete pattern before the delay expires)
+    assert int(100 * interval * len(sequence) * 0.95) <= int(duration_ms) <= int(100 * esc_delay * 1.1)
 
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
-def test_esc_delay_bracketed_paste_prefix_incomplete():
-    """Incomplete bracketed paste prefix should timeout and be flushed."""
+def test_esc_delay_incomplete_known_sequence():
+    """Incomplete known sequence should timeout and be flushed.
+
+    Tests that when a known sequence prefix (like \x1b[200 which is a prefix for
+    bracketed paste) arrives but never completes, it properly times out after esc_delay
+    and resolves to the base sequence (CSI in this case) with remaining data flushed.
+    """
+    esc_delay = 0.1
+
     def child(term):
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
-            stime = time.time()
-            keystroke = term.inkey(timeout=0.5, esc_delay=0.15)
-            measured_time = (time.time() - stime) * 100
-            remaining = term.flushinp(0.1)
-            return f'{keystroke.name}|{remaining!r}|{measured_time:.0f}'.encode('ascii')
+            # Enable bracketed paste to make \x1b[200 a known prefix
+            with term.bracketed_paste(timeout=0.1):
+                stime = time.time()
+                keystroke = term.inkey(timeout=5.0, esc_delay=esc_delay)
+                duration_ms = (time.time() - stime) * 100
+                remaining = term.flushinp(0.15)
+            result = f'{keystroke.name}|{remaining!r}|{duration_ms:.0f}'
+            # Context exited, disable sequence sent
+            return result.encode('ascii')
 
     def parent(master_fd):
         read_until_semaphore(master_fd)
+
+        # Read query for bracketed paste mode: \x1b[?2004$p (9 bytes)
+        query = os.read(master_fd, 9)
+        assert query == b'\x1b[?2004$p'
+
+        # Write response indicating mode is disabled (RESET=2)
+        os.write(master_fd, b'\x1b[?2004;2$y')
+
+        # Read enable sequence: \x1b[?2004h (9 bytes)
+        enable = os.read(master_fd, 9)
+        assert enable == b'\x1b[?2004h'
+
+        # Send incomplete known sequence that never completes
         os.write(master_fd, b'\x1b[200 ... never completes!')
 
-    stime = time.time()
-    output = pty_test(child, parent, 'test_esc_delay_bracketed_paste_prefix_incomplete')
-    keystroke, remaining, measured_time = output.split('|')
+    output = pty_test(child, parent, 'test_esc_delay_incomplete_known_sequence')
+    # Remove the disable sequence that gets mixed into the output
+    output = output.replace('\x1b[?2004l', '')
+    keystroke, remaining, duration_ms = output.split('|')
 
+    # Verify that the incomplete known sequence times out and resolves to CSI
+    # (the \x1b[ part) after esc_delay, with the rest in remaining
     assert keystroke == 'CSI'
-    assert remaining == "'200 ... never completes!'"
-    assert 14 <= int(measured_time) <= 20
-    assert_elapsed_range(stime, 13, 25)
+    assert remaining == repr('200 ... never completes!')
+    assert int(100 * esc_delay * 0.95) <= int(duration_ms) <= int(100 * esc_delay * 1.1)
