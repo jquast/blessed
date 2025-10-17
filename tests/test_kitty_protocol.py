@@ -1201,25 +1201,6 @@ def test_kitty_control_chars_event_types(sequence, event_type):
     assert ks.released == (event_type == 3)
 
 
-@pytest.mark.parametrize("sequence,expected_remainder", [
-    ('\x1b[27u', '27u'),
-    ('\x1b[27;5u', '27;5u'),
-    ('\x1b[27;1:3u', '27;1:3u'),
-])
-def test_kitty_escape_key_fallback_without_protocol(sequence, expected_remainder):
-    """Test that Kitty escape sequences fall back to CSI without protocol enabled."""
-    @as_subprocess
-    def child():
-        term = Terminal(stream=io.StringIO(), force_styling=True)
-        term.ungetch(sequence)
-        ks = term.inkey(timeout=0)
-        assert ks == '\x1b['
-        assert ks.name == 'CSI'
-        remaining = term.flushinp(timeout=0)
-        assert remaining == expected_remainder
-    child()
-
-
 def test_kitty_escape_key_with_protocol_enabled():
     """Test Escape key with Kitty protocol explicitly enabled."""
     ks = _match_kitty_key('\x1b[27u')
@@ -1234,6 +1215,38 @@ def test_kitty_escape_key_with_protocol_enabled():
     ks = _match_kitty_key('\x1b[27;1:3u')
     assert ks.released is True
     assert ks.name == 'KEY_ESCAPE_RELEASED'
+
+
+@pytest.mark.parametrize("sequence,expected_name,expected_code,ctrl,alt,released,repeated", [
+    ('\x1b[27u', 'KEY_ESCAPE', KEY_EXIT, False, False, False, False),
+    ('\x1b[27;1:1u', 'KEY_ESCAPE', KEY_EXIT, False, False, False, False),
+    ('\x1b[27;1:3u', 'KEY_ESCAPE_RELEASED', KEY_EXIT, False, False, True, False),
+    ('\x1b[27;1:2u', 'KEY_ESCAPE_REPEATED', KEY_EXIT, False, False, False, True),
+    ('\x1b[27;5u', 'KEY_CTRL_ESCAPE', KEY_EXIT, True, False, False, False),
+    ('\x1b[27;3u', 'KEY_ALT_ESCAPE', KEY_EXIT, False, True, False, False),
+    ('\x1b[27;7u', 'KEY_CTRL_ALT_ESCAPE', KEY_EXIT, True, True, False, False),
+])
+def test_kitty_escape_key_integration(
+        # pylint: disable=too-many-positional-arguments
+        sequence, expected_name, expected_code, ctrl, alt, released, repeated):
+    """Test ESC key sequences via Terminal.inkey() integration."""
+    @as_subprocess
+    def child():
+        term = Terminal(stream=io.StringIO(), force_styling=True)
+        term.ungetch(sequence)
+        ks = term.inkey(timeout=0)
+        assert ks == sequence
+        assert ks.name == expected_name
+        assert ks.code == expected_code
+        assert ks._ctrl == ctrl
+        assert ks._alt == alt
+        assert ks.released == released
+        assert ks.repeated == repeated
+        if released:
+            assert ks.value == ''
+        else:
+            assert ks.value == '\x1b'
+    child()
 
 
 @pytest.mark.parametrize("sequence,expected_name,expected_code,expected_value,alt", [
