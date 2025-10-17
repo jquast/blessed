@@ -2331,6 +2331,18 @@ class Terminal():
                 ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
                                       final=True)
 
+            # If we still have KEY_ESCAPE and ucs is a prefix, resolve with final=True
+            # to handle unmatched sequences like '\x1b[' (CSI)
+            if ks.code == self.KEY_ESCAPE and self._is_incomplete_keystroke(ucs):
+                ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                                      final=True)
+
+            # If we still have a prefix after the loop exits (e.g., '\x1b[' with no more input),
+            # resolve it with final=True to properly handle CSI and other Alt sequences
+            if ks.code == self.KEY_ESCAPE and self._is_incomplete_keystroke(ucs):
+                ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                                      final=True)
+
         # buffer any remaining text received
         self.ungetch(ucs[len(ks):])
         return ks

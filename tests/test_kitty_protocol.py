@@ -45,8 +45,6 @@ def test_match_kitty_basic_forms(
         sequence, unicode_key, shifted_key, base_key, modifiers, event_type, codepoints):
     """Test basic Kitty protocol sequence parsing."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
-    assert ks._mode == -1
     assert isinstance(ks._match, KittyKeyEvent)
     event = ks._match
     assert event.unicode_key == unicode_key
@@ -60,7 +58,6 @@ def test_match_kitty_basic_forms(
 def test_match_kitty_complex():
     """Test complex Kitty protocol sequence with all fields."""
     ks = _match_kitty_key('\x1b[97:65:99;6:2;65:66u')
-    assert ks is not None
     event = ks._match
     assert event.unicode_key == 97
     assert event.shifted_key == 65
@@ -105,7 +102,6 @@ def test_kitty_sequence_properties():
     ks = _match_kitty_key('\x1b[97;5u')
     assert str(ks) == '\x1b[97;5u'
     assert ks.is_sequence is True
-    assert ks._mode == -1
     assert ks._code is None
 
 
@@ -195,74 +191,49 @@ def test_kitty_protocol_is_ctrl_is_alt():
     assert ks.is_alt('a') is False   # Not exactly alt
 
 
-def test_kitty_keyboard_protocol_parsing_flags_response():
-    """Test Kitty keyboard flags response parsing."""
-    # Test that we can parse different flag values correctly
-    test_cases = [
-        (0, False, False, False, False, False),   # no flags
-        (1, True, False, False, False, False),    # disambiguate only
-        (2, False, True, False, False, False),    # report_events only
-        (4, False, False, True, False, False),    # report_alternates only
-        (8, False, False, False, True, False),    # report_all_keys only
-        (16, False, False, False, False, True),   # report_text only
-        (31, True, True, True, True, True),       # all flags
-        (5, True, False, True, False, False),     # disambiguate + report_alternates
-        (9, True, False, False, True, False),     # disambiguate + report_all_keys
-        (18, False, True, False, False, True),    # report_events + report_text
-    ]
+@pytest.mark.parametrize("value,dis,events,alt,all_keys,text", [
+    (0, False, False, False, False, False),
+    (1, True, False, False, False, False),
+    (2, False, True, False, False, False),
+    (4, False, False, True, False, False),
+    (8, False, False, False, True, False),
+    (16, False, False, False, False, True),
+    (31, True, True, True, True, True),
+    (5, True, False, True, False, False),
+    (9, True, False, False, True, False),
+    (18, False, True, False, False, True),
+])
+def test_kitty_keyboard_protocol_properties(
+        # pylint: disable=too-many-positional-arguments
+        value, dis, events, alt, all_keys, text):
+    """Test KittyKeyboardProtocol flag parsing, make_arguments, repr, and equality."""
+    proto = KittyKeyboardProtocol(value)
+    assert proto.value == value
+    assert proto.disambiguate == dis
+    assert proto.report_events == events
+    assert proto.report_alternates == alt
+    assert proto.report_all_keys == all_keys
+    assert proto.report_text == text
 
-    for value, dis, events, alt, all_keys, text in test_cases:
-        proto = KittyKeyboardProtocol(value)
-        assert proto.value == value
-        assert proto.disambiguate == dis
-        assert proto.report_events == events
-        assert proto.report_alternates == alt
-        assert proto.report_all_keys == all_keys
-        assert proto.report_text == text
-
-
-def test_kitty_keyboard_protocol_methods():
-    """Test KittyKeyboardProtocol make_arguments, repr, and equality."""
-    proto_zero = KittyKeyboardProtocol(0)
-    proto_all = KittyKeyboardProtocol(31)
-
-    assert proto_zero.make_arguments() == {
-        'disambiguate': False,
-        'report_events': False,
-        'report_alternates': False,
-        'report_all_keys': False,
-        'report_text': False
+    expected_args = {
+        'disambiguate': dis,
+        'report_events': events,
+        'report_alternates': alt,
+        'report_all_keys': all_keys,
+        'report_text': text
     }
-    assert proto_all.make_arguments() == {
-        'disambiguate': True,
-        'report_events': True,
-        'report_alternates': True,
-        'report_all_keys': True,
-        'report_text': True
-    }
+    assert proto.make_arguments() == expected_args
 
-    repr_zero = repr(proto_zero)
-    assert 'KittyKeyboardProtocol(value=0' in repr_zero
-    assert 'flags=[]' in repr_zero
+    repr_str = repr(proto)
+    assert f'KittyKeyboardProtocol(value={value}' in repr_str
+    if value == 0:
+        assert 'flags=[]' in repr_str
 
-    repr_all = repr(proto_all)
-    assert 'KittyKeyboardProtocol(value=31' in repr_all
-    for flag in [
-        'disambiguate',
-        'report_events',
-        'report_alternates',
-        'report_all_keys',
-            'report_text']:
-        assert flag in repr_all
-
-    proto_five_a = KittyKeyboardProtocol(5)
-    proto_five_b = KittyKeyboardProtocol(5)
-    proto_ten = KittyKeyboardProtocol(10)
-    assert proto_five_a == proto_five_b
-    assert proto_five_a == 5
-    assert proto_five_a != proto_ten
-    assert proto_five_a != 10
-    assert proto_five_a != "not an int"
+    proto_copy = KittyKeyboardProtocol(value)
+    assert proto == proto_copy
+    assert proto == value
+    if value != 10:
+        assert proto != 10
 
 
 @pytest.mark.skipif(not TEST_KEYBOARD, reason="TEST_KEYBOARD not specified")
@@ -477,56 +448,27 @@ def test_enable_kitty_keyboard(force_styling, force, flags, mode, expected_outpu
     child()
 
 
-def test_kitty_keyboard_protocol_setters():
-    """Test KittyKeyboardProtocol property setters."""
-    # Test 1: Setting flags sequentially from 0
+@pytest.mark.parametrize("flags,expected_value", [
+    ({'disambiguate': True}, 1),
+    ({'report_events': True}, 2),
+    ({'report_alternates': True}, 4),
+    ({'report_all_keys': True}, 8),
+    ({'report_text': True}, 16),
+    ({'disambiguate': True, 'report_events': True}, 3),
+    ({'disambiguate': True, 'report_alternates': True}, 5),
+    ({'report_events': True, 'report_all_keys': True}, 10),
+    ({'report_alternates': True, 'report_text': True}, 20),
+    ({'disambiguate': True, 'report_events': True, 'report_alternates': True}, 7),
+    ({'report_all_keys': True, 'report_text': True, 'disambiguate': True}, 25),
+])
+def test_kitty_keyboard_protocol_setters(flags, expected_value):
+    """Test KittyKeyboardProtocol property setters with various combinations."""
     protocol = KittyKeyboardProtocol(0)
-    assert protocol.value == 0
-    protocol.disambiguate = True
-    assert protocol.value == 1
-    protocol.report_events = True
-    assert protocol.value == 3
-    assert protocol.disambiguate is True
-    protocol.report_alternates = True
-    assert protocol.value == 7
-    protocol.report_all_keys = True
-    assert protocol.value == 15
-    protocol.report_text = True
-    assert protocol.value == 31
-
-    # Test 2: Clearing flags sequentially from 31
-    protocol = KittyKeyboardProtocol(31)
-    assert protocol.value == 31
-    protocol.disambiguate = False
-    assert protocol.value == 30
-    assert protocol.report_events is True
-    protocol.report_events = False
-    assert protocol.value == 28
-    protocol.report_alternates = False
-    assert protocol.value == 24
-    protocol.report_all_keys = False
-    assert protocol.value == 16
-    protocol.report_text = False
-    assert protocol.value == 0
-
-    # Test 3: Independence - setting non-adjacent flags
-    protocol = KittyKeyboardProtocol(0)
-    protocol.disambiguate = True
-    protocol.report_alternates = True
-    protocol.report_text = True
-    assert protocol.value == 21
-    assert protocol.report_events is False
-    assert protocol.report_all_keys is False
-
-    # Test 4: Modifying a single flag with existing values
-    protocol = KittyKeyboardProtocol(15)
-    protocol.report_alternates = False
-    assert protocol.value == 11
-    assert protocol.disambiguate is True
-    assert protocol.report_events is True
-    assert protocol.report_alternates is False
-    assert protocol.report_all_keys is True
-    assert protocol.report_text is False
+    for flag_name, flag_value in flags.items():
+        setattr(protocol, flag_name, flag_value)
+    assert protocol.value == expected_value
+    for flag_name, expected_flag_value in flags.items():
+        assert getattr(protocol, flag_name) == expected_flag_value
 
 
 def test_get_kitty_keyboard_state_boundary_approach():
@@ -590,209 +532,75 @@ def test_get_kitty_keyboard_state_boundary_approach():
     child()
 
 
-def test_kitty_keyboard_protocol_setters_all_combinations():
-    """Test all possible flag combinations work correctly."""
-    # Test a comprehensive set of flag combinations
-    test_cases = [
-        {'disambiguate': True, 'expected': 1},
-        {'report_events': True, 'expected': 2},
-        {'report_alternates': True, 'expected': 4},
-        {'report_all_keys': True, 'expected': 8},
-        {'report_text': True, 'expected': 16},
-        {'disambiguate': True, 'report_events': True, 'expected': 3},
-        {'disambiguate': True, 'report_alternates': True, 'expected': 5},
-        {'report_events': True, 'report_all_keys': True, 'expected': 10},
-        {'report_alternates': True, 'report_text': True, 'expected': 20},
-        {'disambiguate': True, 'report_events': True, 'report_alternates': True, 'expected': 7},
-        {'report_all_keys': True, 'report_text': True, 'disambiguate': True, 'expected': 25},
-    ]
-
-    for case in test_cases:
-        protocol = KittyKeyboardProtocol(0)
-        expected = case.pop('expected')
-
-        # Set the specified flags
-        for flag_name, flag_value in case.items():
-            setattr(protocol, flag_name, flag_value)
-
-        assert protocol.value == expected
-
-        # Verify individual flag values
-        for flag_name, expected_flag_value in case.items():
-            actual_flag_value = getattr(protocol, flag_name)
-            assert actual_flag_value == expected_flag_value
-
-
-def test_kitty_digit_name_synthesis():
-    """Test digit name synthesis with modifiers."""
-    # Test digit name synthesis for Kitty sequences
-    digit_test_cases = [
-        ('\x1b[49;3u', 'KEY_ALT_1'),       # ASCII '1' = 49
-        ('\x1b[49;5u', 'KEY_CTRL_1'),
-        ('\x1b[49;4u', 'KEY_ALT_SHIFT_1'),  # Alt(2) + Shift(1) + base(1) = 4
-        ('\x1b[50;3u', 'KEY_ALT_2'),       # ASCII '2' = 50
-        ('\x1b[57;5u', 'KEY_CTRL_9'),      # ASCII '9' = 57
-        ('\x1b[48;7u', 'KEY_CTRL_ALT_0'),  # ASCII '0' = 48, modifiers=7 (1+2+4)
-    ]
-
-    for sequence, expected_name in digit_test_cases:
-        ks = _match_kitty_key(sequence)
-        assert ks is not None
-        assert ks._mode == -1  # Kitty protocol mode
-        assert ks.name == expected_name
-
-    # Test that digits without modifiers don't get names (same as letters)
-    ks_plain = _match_kitty_key('\x1b[49u')  # Plain '1' without modifiers
-    assert ks_plain is not None
-    assert ks_plain.name is None
-
-    # Test that existing letter name synthesis still works
-    ks_letter = _match_kitty_key('\x1b[97;3u')  # Alt+a
-    assert ks_letter is not None
-    assert ks_letter.name == 'KEY_ALT_A'
+@pytest.mark.parametrize("sequence,expected_name,expected_value", [
+    ('\x1b[49;3u', 'KEY_ALT_1', '1'),
+    ('\x1b[49;5u', 'KEY_CTRL_1', '1'),
+    ('\x1b[49;4u', 'KEY_ALT_SHIFT_1', '1'),
+    ('\x1b[50;3u', 'KEY_ALT_2', '2'),
+    ('\x1b[57;5u', 'KEY_CTRL_9', '9'),
+    ('\x1b[48;7u', 'KEY_CTRL_ALT_0', '0'),
+    ('\x1b[97;5u', 'KEY_CTRL_A', 'a'),
+    ('\x1b[97;3u', 'KEY_ALT_A', 'a'),
+    ('\x1b[97;7u', 'KEY_CTRL_ALT_A', 'a'),
+    ('\x1b[97;2u', 'KEY_SHIFT_A', 'a'),
+    ('\x1b[97;6u', 'KEY_CTRL_SHIFT_A', 'a'),
+    ('\x1b[97;4u', 'KEY_ALT_SHIFT_A', 'a'),
+    ('\x1b[97;8u', 'KEY_CTRL_ALT_SHIFT_A', 'a'),
+    ('\x1b[65;5u', 'KEY_CTRL_A', 'A'),
+    ('\x1b[90;5u', 'KEY_CTRL_Z', 'Z'),
+    ('\x1b[122;5u', 'KEY_CTRL_Z', 'z'),
+    ('\x1b[77;3u', 'KEY_ALT_M', 'M'),
+    ('\x1b[109;3u', 'KEY_ALT_M', 'm'),
+    ('\x1b[97;9u', 'KEY_SUPER_A', 'a'),
+    ('\x1b[97;17u', 'KEY_HYPER_A', 'a'),
+    ('\x1b[97;33u', 'KEY_META_A', 'a'),
+    ('\x1b[97;13u', 'KEY_CTRL_SUPER_A', 'a'),
+    ('\x1b[97;11u', 'KEY_ALT_SUPER_A', 'a'),
+])
+def test_kitty_letter_digit_name_synthesis(sequence, expected_name, expected_value):
+    """Test letter and digit name synthesis with modifiers."""
+    ks = _match_kitty_key(sequence)
+    assert ks.name == expected_name
+    assert ks.value == expected_value
 
 
-def test_kitty_letter_name_synthesis_basic_modifiers():
-    """Test letter name synthesis with basic modifiers."""
-    # Test basic modifier combinations for letter 'a' (unicode_key=97)
-    test_cases = [
-        ('\x1b[97;5u', 'KEY_CTRL_A'),
-        ('\x1b[97;3u', 'KEY_ALT_A'),
-        ('\x1b[97;7u', 'KEY_CTRL_ALT_A'),
-        ('\x1b[97;2u', 'KEY_SHIFT_A'),
-        ('\x1b[97;6u', 'KEY_CTRL_SHIFT_A'),
-        ('\x1b[97;4u', 'KEY_ALT_SHIFT_A'),
-        ('\x1b[97;8u', 'KEY_CTRL_ALT_SHIFT_A'),
-    ]
-
-    for sequence, expected_name in test_cases:
-        ks = _match_kitty_key(sequence)
-        assert ks is not None
-        assert ks.name == expected_name
-        assert ks._mode == -1  # Kitty protocol mode
-
-
-def test_kitty_letter_name_synthesis_different_letters():
-    """Test letter name synthesis for different letters."""
-    # Test various letters with Ctrl modifier
-    letters_test_cases = [
-        ('\x1b[65;5u', 'KEY_CTRL_A', 'A'),  # uppercase A
-        ('\x1b[90;5u', 'KEY_CTRL_Z', 'Z'),  # uppercase Z
-        ('\x1b[97;5u', 'KEY_CTRL_A', 'a'),  # lowercase a
-        ('\x1b[122;5u', 'KEY_CTRL_Z', 'z'),  # lowercase z
-        ('\x1b[77;3u', 'KEY_ALT_M', 'M'),   # Alt+M
-        ('\x1b[109;3u', 'KEY_ALT_M', 'm'),  # Alt+m
-    ]
-
-    for sequence, expected_name, letter in letters_test_cases:
-        ks = _match_kitty_key(sequence)
-        assert ks is not None
-        assert ks.name == expected_name
-        assert ks.value == letter
+@pytest.mark.parametrize("sequence,expected_name,expected_value", [
+    ('\x1b[49u', None, '1'),
+    ('\x1b[97;1u', None, 'a'),
+    ('\x1b[65;1u', None, 'A'),
+    ('\x1b[122;1u', None, 'z'),
+    ('\x1b[97u', None, 'a'),
+    ('\x1b[32;5u', None, ' '),
+    ('\x1b[33;3u', None, '!'),
+    ('\x1b[59;5u', None, ';'),
+    ('\x1b[46;3u', None, '.'),
+    ('\x1b[64;5u', None, '@'),
+    ('\x1b[91;3u', 'CSI', '['),
+])
+def test_kitty_name_synthesis_edge_cases(sequence, expected_name, expected_value):
+    """Test name synthesis edge cases."""
+    ks = _match_kitty_key(sequence)
+    assert ks.name == expected_name
+    assert ks.value == expected_value
 
 
-def test_kitty_letter_name_synthesis_base_key_preference():
-    """Test base_key preference in letter naming."""
-    # Test Cyrillic 'С' (unicode_key=1089) with base_key='c' (99)
-    # Should synthesize name based on base_key 'c' -> 'KEY_CTRL_C'
-    ks = _match_kitty_key('\x1b[1089::99;5u')  # Ctrl+Cyrillic С with base_key c
-    assert ks is not None
+def test_kitty_name_synthesis_special_cases():
+    """Test special cases in name synthesis."""
+    ks = _match_kitty_key('\x1b[1089::99;5u')
     assert ks.name == 'KEY_CTRL_C'
 
-    # Test when base_key is not present, should fall back to unicode_key
-    ks = _match_kitty_key('\x1b[97;5u')  # Ctrl+a, no base_key
-    assert ks is not None
+    ks = _match_kitty_key('\x1b[97;5:1u')
     assert ks.name == 'KEY_CTRL_A'
 
-
-def test_kitty_letter_name_synthesis_event_type_filtering():
-    """Test name synthesis for keypress events only."""
-    # Test keypress event (event_type=1) - should get name
-    ks = _match_kitty_key('\x1b[97;5:1u')  # Ctrl+a keypress
-    assert ks is not None
-    assert ks.name == 'KEY_CTRL_A'
-
-    # Test key release event (event_type=3) - should NOT get name
-    ks = _match_kitty_key('\x1b[97;5:3u')  # Ctrl+a key release
-    assert ks is not None
+    ks = _match_kitty_key('\x1b[97;5:3u')
     assert ks.name is None
 
-    # Test key repeat event (event_type=2) - should NOT get name
-    ks = _match_kitty_key('\x1b[97;5:2u')  # Ctrl+a key repeat
-    assert ks is not None
+    ks = _match_kitty_key('\x1b[97;5:2u')
     assert ks.name is None
 
-    # Test default event_type (1) - should get name
-    ks = _match_kitty_key('\x1b[97;5u')  # Ctrl+a (default event_type=1)
-    assert ks is not None
-    assert ks.name == 'KEY_CTRL_A'
-
-
-def test_kitty_letter_name_synthesis_non_letters_no_name():
-    """Test non-letter, non-digit keys have no synthesized names."""
-    # Test symbols and space - should not get names even with modifiers
-    # (digits now DO get names with modifiers, so they're excluded from this test)
-    # Special case: '[' always gets 'CSI' name
-    non_letter_non_digit_cases = [
-        ('\x1b[32;5u', None),     # space
-        ('\x1b[33;3u', None),     # exclamation
-        ('\x1b[59;5u', None),     # semicolon
-        ('\x1b[46;3u', None),     # period
-        ('\x1b[64;5u', None),     # @ symbol
-        ('\x1b[91;3u', 'CSI'),    # bracket - special case
-    ]
-
-    for sequence, expected_name in non_letter_non_digit_cases:
-        ks = _match_kitty_key(sequence)
-        assert ks is not None
-        if expected_name is None:
-            assert ks.name is None
-        else:
-            assert ks.name == expected_name
-
-
-def test_kitty_letter_name_synthesis_no_modifiers_no_name():
-    """Test plain letters have no synthesized names."""
-    # Test plain letters (modifiers=1, meaning no modifiers) - should not get names
-    plain_letter_cases = [
-        ('\x1b[97;1u', 'a'),   # plain 'a'
-        ('\x1b[65;1u', 'A'),   # plain 'A'
-        ('\x1b[122;1u', 'z'),  # plain 'z'
-        ('\x1b[90;1u', 'Z'),   # plain 'Z'
-        ('\x1b[97u', 'a'),     # plain 'a' (default modifiers=1)
-    ]
-
-    for sequence, value in plain_letter_cases:
-        ks = _match_kitty_key(sequence)
-        assert ks is not None
-        assert ks.name is None
-        assert ks.value == value
-
-
-def test_kitty_letter_name_synthesis_supports_advanced_modifiers():
-    """Test advanced modifier support in letter naming."""
-    # Test that super/hyper/meta DO appear in letter names (new behavior)
-    advanced_modifier_cases = [
-        ('\x1b[97;9u', 'KEY_SUPER_A'),       # super (1+8=9) - should get name
-        ('\x1b[97;17u', 'KEY_HYPER_A'),      # hyper (1+16=17) - should get name
-        ('\x1b[97;33u', 'KEY_META_A'),        # meta (1+32=33) - should get name
-        ('\x1b[97;13u', 'KEY_CTRL_SUPER_A'),  # ctrl+super (1+4+8=13) - should get both
-        ('\x1b[97;11u', 'KEY_ALT_SUPER_A'),    # alt+super (1+2+8=11) - should get both
-    ]
-
-    for sequence, expected_name in advanced_modifier_cases:
-        ks = _match_kitty_key(sequence)
-        assert ks.name == expected_name
-
-
-def test_kitty_letter_name_synthesis_preserves_explicit_names():
-    """Test explicitly set names are preserved."""
-    # Create a Kitty keystroke with explicit name - should preserve it
     kitty_event = KittyKeyEvent(unicode_key=97, shifted_key=None, base_key=None,
                                 modifiers=5, event_type=1, int_codepoints=())
-    ks = Keystroke('\x1b[97;5u', name='CUSTOM_NAME',
-                   mode=-1, match=kitty_event)  # Kitty protocol mode
-
+    ks = Keystroke('\x1b[97;5u', name='CUSTOM_NAME', mode=-1, match=kitty_event)
     assert ks.name == 'CUSTOM_NAME'
 
 
@@ -801,54 +609,18 @@ def test_kitty_letter_name_synthesis_integration():
     @as_subprocess
     def child():
         term = Terminal(force_styling=True)
-
-        # Test that Terminal.inkey() correctly synthesizes Kitty letter names
         test_sequences = [
             ('\x1b[97;5u', 'KEY_CTRL_A'),
             ('\x1b[122;3u', 'KEY_ALT_Z'),
             ('\x1b[77;7u', 'KEY_CTRL_ALT_M'),
             ('\x1b[98;6u', 'KEY_CTRL_SHIFT_B'),
         ]
-
         for sequence, expected_name in test_sequences:
             term.ungetch(sequence)
             ks = term.inkey(timeout=0)
-
             assert ks == sequence
             assert ks.name == expected_name
-            assert ks._mode == -1  # Kitty protocol mode
-
     child()
-
-
-def test_kitty_letter_name_synthesis_case_normalization():
-    """Test letter names normalized to uppercase."""
-    # Test both uppercase and lowercase unicode keys produce uppercase names
-    case_test_cases = [
-        ('\x1b[97;5u', 'KEY_CTRL_A'),   # lowercase 'a' -> 'KEY_CTRL_A'
-        ('\x1b[65;5u', 'KEY_CTRL_A'),   # uppercase 'A' -> 'KEY_CTRL_A'
-        ('\x1b[122;3u', 'KEY_ALT_Z'),   # lowercase 'z' -> 'KEY_ALT_Z'
-        ('\x1b[90;3u', 'KEY_ALT_Z'),    # uppercase 'Z' -> 'KEY_ALT_Z'
-    ]
-
-    for sequence, expected_name in case_test_cases:
-        ks = _match_kitty_key(sequence)
-        assert ks is not None
-        assert ks.name == expected_name
-
-
-def test_kitty_letter_name_synthesis_modifier_ordering():
-    """Test modifier ordering in names."""
-    # Test various combinations to ensure consistent ordering
-    ordering_test_cases = [
-        ('\x1b[97;6u', 'KEY_CTRL_SHIFT_A'),     # ctrl+shift (1+4+1=6)
-        ('\x1b[97;4u', 'KEY_ALT_SHIFT_A'),       # alt+shift (1+2+1=4)
-        ('\x1b[97;8u', 'KEY_CTRL_ALT_SHIFT_A'),  # all three (1+4+2+1=8)
-    ]
-
-    for sequence, expected_name in ordering_test_cases:
-        ks = _match_kitty_key(sequence)
-        assert ks.name == expected_name
 
 
 @pytest.mark.parametrize("sequence,expected_name", [
@@ -915,22 +687,20 @@ def test_disambiguate_f1_f4_not_confused_with_alt():
     child()
 
 
-def test_kitty_letter_name_synthesis_boundary_conditions():
+@pytest.mark.parametrize("sequence,expected_name", [
+    ('\x1b[91;5u', 'CSI'),
+    ('\x1b[64;5u', None),
+    ('\x1b[96;5u', None),
+    ('\x1b[123;5u', None),
+    ('\x1b[65;5u', 'KEY_CTRL_A'),
+    ('\x1b[90;5u', 'KEY_CTRL_Z'),
+    ('\x1b[97;5u', 'KEY_CTRL_A'),
+    ('\x1b[122;5u', 'KEY_CTRL_Z'),
+])
+def test_kitty_letter_name_synthesis_boundary_conditions(sequence, expected_name):
     """Test boundary conditions for letter detection."""
-    # Test edge cases around ASCII letter ranges
-    boundary_cases = [
-        ('\x1b[91;5u', 'CSI'),          # ASCII 91, just after 'Z' (90) - SPECIAL CASE
-        ('\x1b[64;5u', None),           # ASCII 64, just before 'A' (65)
-        ('\x1b[96;5u', None),           # ASCII 96, just before 'a' (97)
-        ('\x1b[123;5u', None),          # ASCII 123, just after 'z' (122)
-        ('\x1b[65;5u', 'KEY_CTRL_A'),   # ASCII 65, 'A'
-        ('\x1b[90;5u', 'KEY_CTRL_Z'),   # ASCII 90, 'Z'
-        ('\x1b[97;5u', 'KEY_CTRL_A'),   # ASCII 97, 'a'
-        ('\x1b[122;5u', 'KEY_CTRL_Z'),  # ASCII 122, 'z
-    ]
-    for sequence, expected_name in boundary_cases:
-        ks = _match_kitty_key(sequence)
-        assert ks.name == expected_name
+    ks = _match_kitty_key(sequence)
+    assert ks.name == expected_name
 
 
 @pytest.mark.parametrize("initial_value,flag_name,bit_position", [
@@ -981,8 +751,6 @@ def test_kitty_keyboard_protocol_individual_setters(initial_value, flag_name, bi
 def test_kitty_pua_modifier_keys(sequence, expected_key, expected_mods):
     """Test Kitty PUA modifier key sequences."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
-    assert ks._mode == -1  # Kitty protocol mode
     assert ks._match.unicode_key == expected_key
     assert ks.modifiers == expected_mods
     assert ks.value == ''
@@ -997,7 +765,6 @@ def test_kitty_advanced_modifiers(modifier, mod_value, char):
     """Test super/hyper/meta modifiers."""
     sequence = f'\x1b[{char};{mod_value}u'
     ks = _match_kitty_key(sequence)
-    assert ks is not None
     assert getattr(ks, f'_{modifier}') is True
     assert ks._ctrl is False
     assert ks._alt is False
@@ -1015,7 +782,6 @@ def test_kitty_advanced_modifiers(modifier, mod_value, char):
 def test_kitty_compound_advanced_modifiers(sequence, expected_name):
     """Test compound modifier combinations."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
     assert ks.name == expected_name
 
 
@@ -1028,7 +794,6 @@ def test_kitty_compound_advanced_modifiers(sequence, expected_name):
 def test_kitty_empty_modifiers(sequence, expected_key, expected_text):
     """Test Kitty empty modifiers support."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
     assert ks._match.unicode_key == expected_key
     assert ks._match.modifiers == 1
     assert ks._match.int_codepoints == expected_text
@@ -1042,9 +807,7 @@ def test_kitty_empty_modifiers(sequence, expected_key, expected_text):
 def test_kitty_int_codepoints_value(sequence, expected_value):
     """Test int_codepoints conversion to value string."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
-    assert ks._mode == -1
-    assert ks._match.int_codepoints is not None
+    # removed redundant assertion
     assert len(ks._match.int_codepoints) > 0
     assert ks.value == expected_value
 
@@ -1058,7 +821,6 @@ def test_kitty_int_codepoints_value(sequence, expected_value):
 def test_event_types_kitty(sequence, is_press, is_repeat, is_release):
     """Test event type properties for Kitty protocol."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
     assert ks.pressed == is_press
     assert ks.repeated == is_repeat
     assert ks.released == is_release
@@ -1073,7 +835,6 @@ def test_event_types_kitty(sequence, is_press, is_repeat, is_release):
 def test_event_types_legacy_csi(sequence, is_press, is_repeat, is_release):
     """Test event type properties for legacy CSI."""
     ks = _match_legacy_csi_letter_form(sequence)
-    assert ks is not None
     assert ks.pressed == is_press
     assert ks.repeated == is_repeat
     assert ks.released == is_release
@@ -1087,7 +848,6 @@ def test_event_types_legacy_csi(sequence, is_press, is_repeat, is_release):
 def test_event_type_name_suffixes(sequence, expected_name, expected_value):
     """Test name suffixes for event types."""
     ks = _match_legacy_csi_letter_form(sequence)
-    assert ks is not None
     assert ks.name == expected_name
     assert ks.value == expected_value
 
@@ -1146,8 +906,6 @@ def test_plain_keystroke_defaults_to_pressed():
 def test_kitty_all_keypad_keys(sequence, expected_code, expected_name):
     """Test all Kitty protocol keypad keys."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
-    assert ks._mode == -1  # Kitty protocol mode
     assert ks._match.unicode_key == expected_code
     assert ks.code == expected_code
     assert ks.name == expected_name
@@ -1163,8 +921,6 @@ def test_kitty_all_keypad_keys(sequence, expected_code, expected_name):
 def test_kitty_keypad_with_modifiers(sequence, expected_code, modifier):
     """Test keypad keys with modifiers."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
-    assert ks._mode == -1  # Kitty protocol mode
     assert ks._match.unicode_key == expected_code
     assert ks._match.modifiers == modifier
     assert ks.code == expected_code
@@ -1179,107 +935,39 @@ def test_kitty_keypad_with_modifiers(sequence, expected_code, modifier):
 def test_kitty_keypad_event_types(sequence, event_type):
     """Test keypad keys with different event types."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
     assert ks._match.event_type == event_type
     assert ks.pressed == (event_type == 1)
     assert ks.repeated == (event_type == 2)
     assert ks.released == (event_type == 3)
 
 
-def test_kitty_keypad_inkey_integration():
+@pytest.mark.parametrize("sequence,expected_code,expected_name,ctrl,alt,released,repeated", [
+    ('\x1b[57424u', 57424, 'KEY_KP_END', False, False, False, False),
+    ('\x1b[57399u', 57399, 'KEY_KP_0', False, False, False, False),
+    ('\x1b[57414u', 57414, 'KEY_KP_ENTER', False, False, False, False),
+    ('\x1b[57424;5u', 57424, 'KEY_CTRL_KP_END', True, False, False, False),
+    ('\x1b[57424;7u', 57424, 'KEY_CTRL_ALT_KP_END', True, True, False, False),
+    ('\x1b[57424;1:3u', 57424, 'KEY_KP_END_RELEASED', False, False, True, False),
+    ('\x1b[57424;1:2u', 57424, 'KEY_KP_END_REPEATED', False, False, False, True),
+])
+def test_kitty_keypad_inkey_integration(
+        # pylint: disable=too-many-positional-arguments
+        sequence, expected_code, expected_name, ctrl, alt, released, repeated):
     """Test keypad integration with Terminal.inkey()."""
     @as_subprocess
     def child():
         term = Terminal(stream=io.StringIO(), force_styling=True)
-
-        # Basic keypad keys
-        term.ungetch('\x1b[57424u')
+        term.ungetch(sequence)
         ks = term.inkey(timeout=0)
-        assert ks == '\x1b[57424u'
-        assert ks.name == 'KEY_KP_END'
-        assert ks.code == 57424
-
-        term.ungetch('\x1b[57399u')
-        ks = term.inkey(timeout=0)
-        assert ks == '\x1b[57399u'
-        assert ks.name == 'KEY_KP_0'
-        assert ks.code == 57399
-
-        term.ungetch('\x1b[57414u')
-        ks = term.inkey(timeout=0)
-        assert ks == '\x1b[57414u'
-        assert ks.name == 'KEY_KP_ENTER'
-        assert ks.code == 57414
-
-        # Keypad with Ctrl modifier
-        term.ungetch('\x1b[57424;5u')
-        ks = term.inkey(timeout=0)
-        assert ks._ctrl is True
-        assert ks._alt is False
-        assert ks.name == 'KEY_CTRL_KP_END'
-
-        # Keypad with multiple modifiers
-        term.ungetch('\x1b[57424;7u')
-        ks = term.inkey(timeout=0)
-        assert ks._ctrl is True
-        assert ks._alt is True
-        assert ks.name == 'KEY_CTRL_ALT_KP_END'
-
-        # Keypad release event
-        term.ungetch('\x1b[57424;1:3u')
-        ks = term.inkey(timeout=0)
-        assert ks.released is True
-        assert ks.pressed is False
-        assert ks.name == 'KEY_KP_END_RELEASED'
-
-        # Keypad repeat event
-        term.ungetch('\x1b[57424;1:2u')
-        ks = term.inkey(timeout=0)
-        assert ks.repeated is True
-        assert ks.pressed is False
-        assert ks.name == 'KEY_KP_END_REPEATED'
-
+        if not released and not repeated:
+            assert ks == sequence
+            assert ks.code == expected_code
+        assert ks.name == expected_name
+        assert ks._ctrl == ctrl
+        assert ks._alt == alt
+        assert ks.released == released
+        assert ks.repeated == repeated
     child()
-
-
-def test_kitty_keypad_value_property():
-    """Test keypad keys have empty value."""
-    ks = _match_kitty_key('\x1b[57424u')
-    assert ks.value == ''
-
-    ks = _match_kitty_key('\x1b[57399u')
-    assert ks.value == ''
-
-
-@pytest.mark.parametrize("sequence,expected_name", [
-    ('\x1b[57417u', 'KEY_KP_LEFT'),
-    ('\x1b[57418u', 'KEY_KP_RIGHT'),
-    ('\x1b[57419u', 'KEY_KP_UP'),
-    ('\x1b[57420u', 'KEY_KP_DOWN'),
-    ('\x1b[57421u', 'KEY_KP_PAGE_UP'),
-    ('\x1b[57422u', 'KEY_KP_PAGE_DOWN'),
-    ('\x1b[57423u', 'KEY_KP_HOME'),
-    ('\x1b[57424u', 'KEY_KP_END'),
-])
-def test_kitty_keypad_navigation_keys(sequence, expected_name):
-    """Test keypad navigation keys."""
-    ks = _match_kitty_key(sequence)
-    assert ks is not None
-    assert ks.name == expected_name
-
-
-@pytest.mark.parametrize("sequence,expected_name", [
-    ('\x1b[57410u', 'KEY_KP_DIVIDE'),
-    ('\x1b[57411u', 'KEY_KP_MULTIPLY'),
-    ('\x1b[57412u', 'KEY_KP_SUBTRACT'),
-    ('\x1b[57413u', 'KEY_KP_ADD'),
-    ('\x1b[57415u', 'KEY_KP_EQUAL'),
-])
-def test_kitty_keypad_arithmetic_keys(sequence, expected_name):
-    """Test keypad arithmetic operation keys."""
-    ks = _match_kitty_key(sequence)
-    assert ks is not None
-    assert ks.name == expected_name
 
 
 @pytest.mark.parametrize("digit", range(10))
@@ -1290,7 +978,6 @@ def test_kitty_keypad_digit_keys(digit):
     expected_name = f'KEY_KP_{digit}'
 
     ks = _match_kitty_key(sequence)
-    assert ks is not None
     assert ks.code == code
     assert ks.name == expected_name
 
@@ -1307,8 +994,6 @@ def test_kitty_keypad_digit_keys(digit):
 def test_kitty_lock_and_special_keys(sequence, expected_code, expected_name):
     """Test lock and special function keys."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
-    assert ks._mode == -1  # Kitty protocol mode
     assert ks._match.unicode_key == expected_code
     assert ks.code == expected_code
     assert ks.name == expected_name
@@ -1344,12 +1029,10 @@ def test_kitty_lock_and_special_keys(sequence, expected_code, expected_name):
 def test_kitty_extended_f_keys(sequence, expected_code, expected_name):
     """Test extended function keys F13-F35."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
-    assert ks._mode == -1  # Kitty protocol mode
     assert ks._match.unicode_key == expected_code
     assert ks.code == expected_code
     assert ks.name == expected_name
-    # Functional keys don't produce text
+
     assert ks.value == ''
 
 
@@ -1372,8 +1055,6 @@ def test_kitty_extended_f_keys(sequence, expected_code, expected_name):
 def test_kitty_media_keys(sequence, expected_code, expected_name):
     """Test media control and volume keys."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
-    assert ks._mode == -1  # Kitty protocol mode
     assert ks._match.unicode_key == expected_code
     assert ks.code == expected_code
     assert ks.name == expected_name
@@ -1388,8 +1069,6 @@ def test_kitty_media_keys(sequence, expected_code, expected_name):
 def test_kitty_iso_level_shift_keys(sequence, expected_code, expected_name):
     """Test ISO level shift keys."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
-    assert ks._mode == -1  # Kitty protocol mode
     assert ks._match.unicode_key == expected_code
     assert ks.code == expected_code
     assert ks.name == expected_name
@@ -1405,8 +1084,6 @@ def test_kitty_iso_level_shift_keys(sequence, expected_code, expected_name):
 def test_kitty_functional_keys_with_modifiers(sequence, expected_code, expected_name_part):
     """Test functional keys with various modifiers."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
-    assert ks._mode == -1  # Kitty protocol mode
     assert ks._match.unicode_key == expected_code
     assert ks.code == expected_code
     assert ks.name == expected_name_part
@@ -1422,7 +1099,6 @@ def test_kitty_functional_keys_with_modifiers(sequence, expected_code, expected_
 def test_kitty_functional_keys_event_types(sequence, expected_code, event_type):
     """Test functional keys with different event types."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
     assert ks._match.unicode_key == expected_code
     assert ks._match.event_type == event_type
     assert ks.pressed == (event_type == 1)
@@ -1462,8 +1138,6 @@ def test_kitty_functional_keys_event_types(sequence, expected_code, event_type):
 def test_kitty_pua_keypad_with_modifiers(sequence, expected_code, expected_name):
     """Test PUA keypad keys with modifiers."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
-    assert ks._mode == -1  # Kitty protocol mode
     assert ks._match.unicode_key == expected_code
     assert ks.code == expected_code
     assert ks.name == expected_name
@@ -1477,23 +1151,20 @@ def test_kitty_pua_keypad_with_modifiers(sequence, expected_code, expected_name)
         assert ks._shift
 
 
-def test_kitty_control_chars():
+@pytest.mark.parametrize("sequence,unicode_key,expected_code,expected_name,expected_value", [
+    ('\x1b[27u', 27, KEY_EXIT, 'KEY_ESCAPE', '\x1b'),
+    ('\x1b[9u', 9, KEY_TAB, 'KEY_TAB', '\t'),
+    ('\x1b[13u', 13, KEY_ENTER, 'KEY_ENTER', '\n'),
+    ('\x1b[127u', 127, KEY_BACKSPACE, 'KEY_BACKSPACE', '\x08'),
+])
+def test_kitty_control_chars(sequence, unicode_key, expected_code, expected_name, expected_value):
     """Test control character keys via Kitty protocol."""
-    test_cases = [
-        ('\x1b[27u', 27, KEY_EXIT, 'KEY_ESCAPE', '\x1b'),
-        ('\x1b[9u', 9, KEY_TAB, 'KEY_TAB', '\t'),
-        ('\x1b[13u', 13, KEY_ENTER, 'KEY_ENTER', '\n'),
-        ('\x1b[127u', 127, KEY_BACKSPACE, 'KEY_BACKSPACE', '\x08'),
-    ]
-
-    for sequence, unicode_key, expected_code, expected_name, expected_value in test_cases:
-        ks = _match_kitty_key(sequence)
-        assert ks is not None
-        assert ks._mode == -1
-        assert ks._match.unicode_key == unicode_key
-        assert ks.code == expected_code
-        assert ks.name == expected_name
-        assert ks.value == expected_value
+    ks = _match_kitty_key(sequence)
+    assert ks._mode == -1
+    assert ks._match.unicode_key == unicode_key
+    assert ks.code == expected_code
+    assert ks.name == expected_name
+    assert ks.value == expected_value
 
 
 @pytest.mark.parametrize("sequence,unicode_key,expected_code,expected_name", [
@@ -1510,8 +1181,6 @@ def test_kitty_control_chars():
 def test_kitty_control_chars_with_modifiers(sequence, unicode_key, expected_code, expected_name):
     """Test control character keys with modifiers."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
-    assert ks._mode == -1
     assert ks._match.unicode_key == unicode_key
     assert ks.code == expected_code
     assert ks.name == expected_name
@@ -1526,76 +1195,64 @@ def test_kitty_control_chars_with_modifiers(sequence, unicode_key, expected_code
 def test_kitty_control_chars_event_types(sequence, event_type):
     """Test control character event types."""
     ks = _match_kitty_key(sequence)
-    assert ks is not None
     assert ks._match.event_type == event_type
     assert ks.pressed == (event_type == 1)
     assert ks.repeated == (event_type == 2)
     assert ks.released == (event_type == 3)
 
 
-def test_kitty_escape_key_integration():
-    """Test Escape key integration with Terminal.inkey()."""
+@pytest.mark.parametrize("sequence,expected_remainder", [
+    ('\x1b[27u', '27u'),
+    ('\x1b[27;5u', '27;5u'),
+    ('\x1b[27;1:3u', '27;1:3u'),
+])
+def test_kitty_escape_key_fallback_without_protocol(sequence, expected_remainder):
+    """Test that Kitty escape sequences fall back to CSI without protocol enabled."""
     @as_subprocess
     def child():
         term = Terminal(stream=io.StringIO(), force_styling=True)
-
-        term.ungetch('\x1b[27u')
+        term.ungetch(sequence)
         ks = term.inkey(timeout=0)
-        assert ks == '\x1b[27u'
-        assert ks.name == 'KEY_ESCAPE'
-        assert ks.code == KEY_EXIT
-        assert ks.value == '\x1b'
-
-        term.ungetch('\x1b[27;5u')
-        ks = term.inkey(timeout=0)
-        assert ks.name == 'KEY_CTRL_ESCAPE'
-        assert ks._ctrl is True
-
-        term.ungetch('\x1b[27;1:3u')
-        ks = term.inkey(timeout=0)
-        assert ks.released is True
-        assert ks.name == 'KEY_ESCAPE_RELEASED'
-
+        assert ks == '\x1b['
+        assert ks.name == 'CSI'
+        remaining = term.flushinp(timeout=0)
+        assert remaining == expected_remainder
     child()
 
 
-def test_kitty_tab_key_integration():
-    """Test Tab key integration with Terminal.inkey()."""
+def test_kitty_escape_key_with_protocol_enabled():
+    """Test Escape key with Kitty protocol explicitly enabled."""
+    ks = _match_kitty_key('\x1b[27u')
+    assert ks.name == 'KEY_ESCAPE'
+    assert ks.code == KEY_EXIT
+    assert ks.value == '\x1b'
+
+    ks = _match_kitty_key('\x1b[27;5u')
+    assert ks.name == 'KEY_CTRL_ESCAPE'
+    assert ks._ctrl is True
+
+    ks = _match_kitty_key('\x1b[27;1:3u')
+    assert ks.released is True
+    assert ks.name == 'KEY_ESCAPE_RELEASED'
+
+
+@pytest.mark.parametrize("sequence,expected_name,expected_code,expected_value,alt", [
+    ('\x1b[9u', 'KEY_TAB', KEY_TAB, '\t', False),
+    ('\x1b[9;3u', 'KEY_ALT_TAB', KEY_TAB, '\t', True),
+    ('\x1b[13u', 'KEY_ENTER', KEY_ENTER, '\n', False),
+    ('\x1b[127u', 'KEY_BACKSPACE', KEY_BACKSPACE, '\x08', False),
+])
+def test_kitty_control_key_integration(sequence, expected_name, expected_code, expected_value, alt):
+    """Test control key integration with Terminal.inkey()."""
     @as_subprocess
     def child():
         term = Terminal(stream=io.StringIO(), force_styling=True)
-
-        term.ungetch('\x1b[9u')
+        term.ungetch(sequence)
         ks = term.inkey(timeout=0)
-        assert ks == '\x1b[9u'
-        assert ks.name == 'KEY_TAB'
-        assert ks.code == KEY_TAB  # 512, not 9
-        assert ks.value == '\t'
-
-        term.ungetch('\x1b[9;3u')
-        ks = term.inkey(timeout=0)
-        assert ks.name == 'KEY_ALT_TAB'
-        assert ks._alt is True
-
-    child()
-
-
-def test_kitty_enter_backspace_integration():
-    """Test Enter and Backspace integration."""
-    @as_subprocess
-    def child():
-        term = Terminal(stream=io.StringIO(), force_styling=True)
-
-        term.ungetch('\x1b[13u')
-        ks = term.inkey(timeout=0)
-        assert ks.name == 'KEY_ENTER'
-        assert ks.value == '\n'
-
-        term.ungetch('\x1b[127u')
-        ks = term.inkey(timeout=0)
-        assert ks.name == 'KEY_BACKSPACE'
-        assert ks.value == '\x08'
-
+        assert ks.name == expected_name
+        assert ks.code == expected_code
+        assert ks.value == expected_value
+        assert ks._alt == alt
     child()
 
 

@@ -1325,12 +1325,6 @@ def resolve_sequence(text: str,
     if is_meta_escape:
         ks = Keystroke(ucs=text[:2])
 
-    # Resolve for metaSendsEscape sequences (ESC + char) when no match found
-    # and the 2-char sequence is not a known prefix (or final is True)
-    if ks is None and prefixes is not None and len(text) >= 2 and text[0] == '\x1b':
-        if final or text[:2] not in prefixes:
-            ks = Keystroke(ucs=text[:2])
-
     # final match is just simple resolution of the first codepoint of text
     if ks is None:
         ks = Keystroke(ucs=text and text[0] or '')

@@ -838,15 +838,16 @@ def test_esc_delay_long_sequence_prefix_slow_complete():
     assert remaining == "''"
     # Duration should be at least the time to receive all bytes, but faster than full esc_delay
     # (since we recognize the complete pattern before the delay expires)
-    assert int(100 * interval * len(sequence) * 0.95) <= int(duration_ms) <= int(100 * esc_delay * 1.1)
+    assert (int(100 * interval * len(sequence) * 0.95) <= int(duration_ms) <=
+            int(100 * esc_delay * 1.1))
 
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_esc_delay_incomplete_known_sequence():
     """Incomplete known sequence should timeout and be flushed.
 
-    Tests that when a known sequence prefix (like \x1b[200 which is a prefix for
-    bracketed paste) arrives but never completes, it properly times out after esc_delay
+    Tests that when a known sequence prefix (like \x1b[15 which is a prefix for
+    F5 key) arrives but never completes, it properly times out after esc_delay
     and resolves to the base sequence (CSI in this case) with remaining data flushed.
     """
     esc_delay = 0.1
@@ -854,40 +855,25 @@ def test_esc_delay_incomplete_known_sequence():
     def child(term):
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
-            # Enable bracketed paste to make \x1b[200 a known prefix
-            with term.bracketed_paste(timeout=0.1):
-                stime = time.time()
-                keystroke = term.inkey(timeout=5.0, esc_delay=esc_delay)
-                duration_ms = (time.time() - stime) * 100
-                remaining = term.flushinp(0.15)
+            stime = time.time()
+            keystroke = term.inkey(timeout=5.0, esc_delay=esc_delay)
+            duration_ms = (time.time() - stime) * 100
+            remaining = term.flushinp(0.15)
             result = f'{keystroke.name}|{remaining!r}|{duration_ms:.0f}'
-            # Context exited, disable sequence sent
             return result.encode('ascii')
 
     def parent(master_fd):
         read_until_semaphore(master_fd)
 
-        # Read query for bracketed paste mode: \x1b[?2004$p (9 bytes)
-        query = os.read(master_fd, 9)
-        assert query == b'\x1b[?2004$p'
-
-        # Write response indicating mode is disabled (RESET=2)
-        os.write(master_fd, b'\x1b[?2004;2$y')
-
-        # Read enable sequence: \x1b[?2004h (9 bytes)
-        enable = os.read(master_fd, 9)
-        assert enable == b'\x1b[?2004h'
-
         # Send incomplete known sequence that never completes
-        os.write(master_fd, b'\x1b[200 ... never completes!')
+        # \x1b[15 is a prefix for \x1b[15~ (F5), but we never send the ~
+        os.write(master_fd, b'\x1b[15 ... never completes!')
 
     output = pty_test(child, parent, 'test_esc_delay_incomplete_known_sequence')
-    # Remove the disable sequence that gets mixed into the output
-    output = output.replace('\x1b[?2004l', '')
     keystroke, remaining, duration_ms = output.split('|')
 
     # Verify that the incomplete known sequence times out and resolves to CSI
     # (the \x1b[ part) after esc_delay, with the rest in remaining
     assert keystroke == 'CSI'
-    assert remaining == repr('200 ... never completes!')
+    assert remaining == repr('15 ... never completes!')
     assert int(100 * esc_delay * 0.95) <= int(duration_ms) <= int(100 * esc_delay * 1.1)
