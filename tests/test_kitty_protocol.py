@@ -1533,26 +1533,63 @@ def test_kitty_control_chars_event_types(sequence, event_type):
     assert ks.released == (event_type == 3)
 
 
-def test_kitty_escape_key_integration():
-    """Test Escape key integration with Terminal.inkey()."""
+def test_kitty_escape_key_fallback_without_protocol():
+    """Test that Kitty escape sequences fall back to CSI without protocol enabled."""
     @as_subprocess
     def child():
         term = Terminal(stream=io.StringIO(), force_styling=True)
 
+        # Without Kitty protocol enabled, Kitty sequences are not in keymap
+        # and fall back to CSI (\x1b[), leaving the rest unread
+
         term.ungetch('\x1b[27u')
         ks = term.inkey(timeout=0)
-        assert ks == '\x1b[27u'
+        assert ks == '\x1b['
+        assert ks.name == 'CSI'
+        assert ks.value == '['
+        remaining = term.flushinp(timeout=0)
+        assert remaining == '27u'
+
+        term.ungetch('\x1b[27;5u')
+        ks = term.inkey(timeout=0)
+        assert ks == '\x1b['
+        assert ks.name == 'CSI'
+        remaining = term.flushinp(timeout=0)
+        assert remaining == '27;5u'
+
+        term.ungetch('\x1b[27;1:3u')
+        ks = term.inkey(timeout=0)
+        assert ks == '\x1b['
+        assert ks.name == 'CSI'
+        remaining = term.flushinp(timeout=0)
+        assert remaining == '27;1:3u'
+
+    child()
+
+
+def test_kitty_escape_key_with_protocol_enabled():
+    """Test Escape key with Kitty protocol explicitly enabled."""
+    @as_subprocess
+    def child():
+        term = Terminal(stream=io.StringIO(), force_styling=True)
+        term._is_a_tty = True
+
+        # Test plain ESC (without modifiers)
+        ks = _match_kitty_key('\x1b[27u')
+        assert ks is not None
         assert ks.name == 'KEY_ESCAPE'
         assert ks.code == KEY_EXIT
         assert ks.value == '\x1b'
 
-        term.ungetch('\x1b[27;5u')
-        ks = term.inkey(timeout=0)
+        # Test Ctrl+ESC
+        ks = _match_kitty_key('\x1b[27;5u')
+        assert ks is not None
         assert ks.name == 'KEY_CTRL_ESCAPE'
         assert ks._ctrl is True
 
-        term.ungetch('\x1b[27;1:3u')
-        ks = term.inkey(timeout=0)
+        # Test ESC release event
+        ks = _match_kitty_key('\x1b[27;1:3u')
+        assert ks is not None
         assert ks.released is True
         assert ks.name == 'KEY_ESCAPE_RELEASED'
 
