@@ -803,6 +803,7 @@ def test_mouse_legacy_wheel_events():
     values = ks_wheel_up._mode_values
     assert values.is_wheel
     assert values.button_value == 0
+    assert ks_wheel_up.name == 'MOUSE_SCROLL_UP'
 
     # Wheel down: cb=65 → chr(65+32)='a'
     wheel_down_seq = '\x1b[Ma@@'
@@ -811,3 +812,4 @@ def test_mouse_legacy_wheel_events():
     values_down = ks_wheel_down._mode_values
     assert values_down.is_wheel
     assert values_down.button_value == 1
+    assert ks_wheel_down.name == 'MOUSE_SCROLL_DOWN'

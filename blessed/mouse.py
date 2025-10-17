@@ -51,7 +51,7 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
         self.is_wheel = is_wheel
 
     @property
-    def button(self) -> str:
+    def button(self) -> str:  # pylint: disable=too-many-branches
         """
         Return human-readable button name.
 
@@ -74,6 +74,17 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
             if getattr(self, modifier):
                 button_name += f'{modifier.upper()}_'
 
+        # Handle wheel events first (legacy uses button_value 0/1, SGR uses 64/65)
+        if self.is_wheel:
+            # Legacy wheel: button_value 0=up, 1=down
+            # SGR wheel: button_value 64=up, 65=down
+            if self.button_value in {0, 64}:
+                button_name += "SCROLL_UP"
+            elif self.button_value in {1, 65}:
+                button_name += "SCROLL_DOWN"
+            # Wheel events don't have motion or release variants in typical usage
+            return button_name
+
         # Handle motion events specially
         if self.is_motion:
             # Motion with no button pressed (button_value=3 means no button in SGR motion)
@@ -86,8 +97,6 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
                         0: "LEFT",
                         1: "MIDDLE",
                         2: "RIGHT",
-                        64: "SCROLL_UP",
-                        65: "SCROLL_DOWN"
                     }.get(self.button_value, '')
                 else:
                     # Extended buttons (button_value >= 66)
@@ -101,8 +110,6 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
                     0: "LEFT",
                     1: "MIDDLE",
                     2: "RIGHT",
-                    64: "SCROLL_UP",
-                    65: "SCROLL_DOWN"
                 }.get(self.button_value, '')
             else:
                 # Extended buttons (button_value >= 66)
