@@ -1433,15 +1433,8 @@ def _match_dec_event(text: str,
             continue
 
         match = pattern.match(text)
-        ref_mode = mode
         if match:
-            # Special case: mode 1016 (SGR-Pixels) has same wire format as 1006
-            # (SGR) Prefer return mode value of 1016 (SGR-Pixels) when is
-            # enabled !
-            if ref_mode == DecPrivateMode.MOUSE_EXTENDED_SGR:
-                if dec_mode_cache.get(DecPrivateMode.MOUSE_SGR_PIXELS) == DecModeResponse.SET:
-                    ref_mode = DecPrivateMode.MOUSE_SGR_PIXELS
-            return Keystroke(ucs=match.group(0), mode=ref_mode, match=match)
+            return Keystroke(ucs=match.group(0), mode=mode, match=match)
     return None
 
 

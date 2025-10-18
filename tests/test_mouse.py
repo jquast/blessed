@@ -813,3 +813,47 @@ def test_mouse_legacy_wheel_events():
     assert values_down.is_wheel
     assert values_down.button_value == 1
     assert ks_wheel_down.name == 'MOUSE_SCROLL_DOWN'
+
+
+def test_mouse_wheel_unknown_button_value():
+    """Test wheel event with unexpected button_value for completeness."""
+    mouse_unknown_wheel = MouseEvent(
+        button_value=2, x=10, y=20, released=False,
+        shift=False, meta=False, ctrl=False, is_motion=False, is_wheel=True
+    )
+    button_name = mouse_unknown_wheel.button
+    assert button_name == ""
+
+
+def test_mouse_sgr_without_pixels_mode():
+    """Test SGR mouse mode (1006) when pixels mode (1016) is not enabled."""
+    cache = {
+        Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR: DecModeResponse.SET,
+        Terminal.DecPrivateMode.MOUSE_REPORT_CLICK: DecModeResponse.SET,
+    }
+    ks = _match_dec_event('\x1b[<0;10;20M', dec_mode_cache=cache)
+    assert ks.mode == Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR
+    values = ks._mode_values
+    assert isinstance(values, MouseEvent)
+    assert values.button_value == 0
+    assert values.x == 9
+    assert values.y == 19
+
+
+def test_mouse_sgr_pixels_precedence():
+    """Test that mode 1016 (SGR-Pixels) takes precedence over mode 1006 (SGR) when both enabled.
+
+    Both modes use the same wire format, but mode 1016 is listed first in DEC_EVENT_PATTERNS,
+    so it matches first when both are enabled. This is the desired behavior.
+    """
+    cache = make_enabled_dec_cache()
+    ks = _match_dec_event('\x1b[<0;10;20M', dec_mode_cache=cache)
+
+    # Should return mode 1016 (SGR-Pixels) due to pattern ordering
+    assert ks.mode == Terminal.DecPrivateMode.MOUSE_SGR_PIXELS
+
+    values = ks._mode_values
+    assert isinstance(values, MouseEvent)
+    assert values.button_value == 0
+    assert values.x == 9
+    assert values.y == 19
