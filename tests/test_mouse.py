@@ -680,6 +680,7 @@ def test_mouse_enabled_no_styling():
     (True, False, False, True, [1006, 1000, 1016]),
     (False, True, False, True, [1006, 1002, 1016]),
     (False, False, True, True, [1006, 1003, 1016]),
+    (False, False, False, False, [1006]),
 ])
 def test_does_mouse_supported(clicks, drag, motion, pixels, expected_modes):
     """Test does_mouse returns True when all required modes are supported."""
