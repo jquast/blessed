@@ -1287,10 +1287,12 @@ class Terminal():
 
         return lines
 
-    def getch(self) -> str:
+    def getch(self, decode_latin1: bool = False) -> str:
         """
         Read, decode, and return the next byte from the keyboard stream.
 
+        :arg bool decode_latin1: If True, decode byte as latin-1 (for legacy mouse
+            sequences with 8-bit coordinates).
         :rtype: unicode
         :returns: a single unicode character, or ``''`` if a multi-byte
             sequence has not yet been fully received.
@@ -1305,6 +1307,11 @@ class Terminal():
         """
         assert self._keyboard_fd is not None
         byte = os.read(self._keyboard_fd, 1)
+        if decode_latin1:
+            # Latin-1 is a simple 1:1 byte-to-character mapping (0-255)
+            # No incremental decoder needed
+            return chr(byte[0])
+        # Use UTF-8 incremental decoder for multi-byte sequences
         return self._keyboard_decoder.decode(byte, final=False)
 
     def ungetch(self, text: str) -> None:
@@ -1456,8 +1463,8 @@ class Terminal():
         r"""
         Unbuffer and return all input available within ``timeout``.
 
-        When CSI ``'\x1b['`` is detected in input stream, all remaining bytes
-        are decoded as latin1.
+        When legacy mouse sequence ``'\x1b[M'`` is detected in input stream,
+        all remaining bytes are decoded as latin1 to handle 8-bit coordinates.
         """
         stime = time.time()
         ucs = ''
@@ -1466,10 +1473,9 @@ class Terminal():
 
         # and receive all immediately available bytes
         while self.kbhit(timeout=_time_left(stime, timeout)):
-            # Use latin-1 decoding for CSI sequences (legacy mouse, etc.)
-            # pylint: disable=attribute-defined-outside-init
-            self._use_latin1_decoding = '\x1b[' in ucs
-            ucs += self.getch()
+            # Use latin-1 decoding for legacy mouse sequences (ESC[M) which may
+            # contain high bytes (≥0x80) for coordinates > 127
+            ucs += self.getch(decode_latin1=ucs.startswith('\x1b[M'))
         return ucs
 
     def _is_incomplete_keystroke(self, text: str) -> bool:
@@ -1530,11 +1536,11 @@ class Terminal():
         # a sequence is completed.
         while not ks and self.kbhit(timeout=_time_left(stime, timeout)):
             # receive any next byte
-            ucs += self.getch()
+            ucs += self.getch(decode_latin1=ucs.startswith('\x1b[M'))
 
             # and all other immediately available bytes
             while self.kbhit(timeout=0):
-                ucs += self.getch()
+                ucs += self.getch(decode_latin1=ucs.startswith('\x1b[M'))
 
             # and then resolve for sequence
             ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
@@ -1555,7 +1561,7 @@ class Terminal():
             while (ks.code == self.KEY_ESCAPE
                    and self._is_incomplete_keystroke(ucs)
                    and self.kbhit(timeout=_time_left(esctime, esc_delay))):
-                ucs += self.getch()
+                ucs += self.getch(decode_latin1=ucs.startswith('\x1b[M'))
                 # re-check 'final' after reading more bytes
                 final = bool(ucs) and not self._is_incomplete_keystroke(ucs)
                 ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
