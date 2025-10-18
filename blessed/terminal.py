@@ -1774,10 +1774,13 @@ class Terminal():
             ucs += self._keyboard_buf.pop()
 
         # and receive all immediately available bytes
+        decode_latin1 = False
         while self.kbhit(timeout=_time_left(stime, timeout)):
             # Use latin-1 decoding for legacy mouse sequences (ESC[M) which may
-            # contain high bytes (≥0x80) for coordinates > 127
-            ucs += self.getch(decode_latin1=ucs.startswith('\x1b[M'))
+            # contain high bytes (≥0x80) for coordinates > 127. Only check for
+            # '\x1b[M' when not already found (performance optimization).
+            decode_latin1 = decode_latin1 or '\x1b[M' in ucs
+            ucs += self.getch(decode_latin1=decode_latin1)
         return ucs
 
     def _is_incomplete_keystroke(self, text: str) -> bool:
