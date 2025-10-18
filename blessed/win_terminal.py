@@ -5,7 +5,6 @@ from __future__ import absolute_import
 
 # std imports
 import time
-import codecs
 import msvcrt  # pylint: disable=import-error
 import contextlib
 from typing import Optional, Generator
@@ -21,13 +20,13 @@ from .terminal import Terminal as _Terminal
 class Terminal(_Terminal):
     """Windows subclass of :class:`Terminal`."""
 
-    # pylint: disable=unused-argument
-    def getch(self, decoder: Optional[codecs.IncrementalDecoder] = None) -> str:
+    def getch(self, decode_latin1: bool = False) -> str:
         r"""
         Read, decode, and return the next byte from the keyboard stream.
 
+        :arg bool decode_latin1: If True, decode byte as latin-1 (for legacy mouse
+            sequences with 8-bit coordinates).
         :rtype: unicode
-        :arg decoder: Not used on the Windows Platform
         :returns: a single unicode character, or ``''`` if a multi-byte
             sequence has not yet been fully received.
 
@@ -40,7 +39,7 @@ class Terminal(_Terminal):
         automatically retrieved.
         """
         if win32.VTMODE_SUPPORTED:
-            return super().getch()
+            return super().getch(decode_latin1=decode_latin1)
 
         rtn = msvcrt.getwch()
         if rtn in {'\x00', '\xe0'}:
