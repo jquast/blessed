@@ -50,8 +50,24 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
         self.is_motion = is_motion
         self.is_wheel = is_wheel
 
+    def _get_base_button_name(self) -> str:
+        """
+        Get base button name without modifiers or state.
+
+        :rtype: str
+        :returns: Base button name like "LEFT", "MIDDLE", "RIGHT", or "BUTTON_6".
+        """
+        if self.button_value < 66:
+            return {
+                0: "LEFT",
+                1: "MIDDLE",
+                2: "RIGHT",
+            }.get(self.button_value, '')
+        # Extended buttons (button_value >= 66)
+        return f"BUTTON_{self.button_value - 60}"
+
     @property
-    def button(self) -> str:  # pylint: disable=too-many-branches
+    def button(self) -> str:
         """
         Return human-readable button name.
 
@@ -92,28 +108,10 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
                 button_name += "MOTION"
             else:
                 # Dragging with a specific button
-                if self.button_value < 66:
-                    base_button = {
-                        0: "LEFT",
-                        1: "MIDDLE",
-                        2: "RIGHT",
-                    }.get(self.button_value, '')
-                else:
-                    # Extended buttons (button_value >= 66)
-                    base_button = f"BUTTON_{self.button_value - 60}"
-                button_name += f"{base_button}_MOTION"
+                button_name += f"{self._get_base_button_name()}_MOTION"
         else:
             # Regular click or release events
-            # Map button_value to name
-            if self.button_value < 66:
-                button_name += {
-                    0: "LEFT",
-                    1: "MIDDLE",
-                    2: "RIGHT",
-                }.get(self.button_value, '')
-            else:
-                # Extended buttons (button_value >= 66)
-                button_name += f"BUTTON_{self.button_value - 60}"
+            button_name += self._get_base_button_name()
 
             # Add release state (only for non-motion events)
             if self.released:
