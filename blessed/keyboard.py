@@ -958,14 +958,14 @@ def _read_until(term: 'Terminal',
     while True:  # pragma: no branch
         # block as long as necessary to ensure at least one character is
         # received on input or remaining timeout has elapsed.
-        ucs = term.inkey(timeout=_time_left(stime, timeout))
+        ucs = term.inkey(timeout=_time_left(stime, timeout), esc_delay=0)
         # while the keyboard buffer is "hot" (has input), we continue to
         # aggregate all awaiting data.  We do this to ensure slow I/O
         # calls do not unnecessarily give up within the first 'while' loop
         # for short timeout periods.
         while ucs:
             buf += ucs
-            ucs = term.inkey(timeout=0)
+            ucs = term.inkey(timeout=0, esc_delay=0)
 
         match = re.search(pattern=pattern, string=buf)
         if match is not None:
