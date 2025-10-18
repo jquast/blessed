@@ -609,11 +609,8 @@ class Terminal():
         :rtype: re.Match
         """
         # Avoid changing user's desired raw or cbreak mode if already entered,
-        # by entering cbreak mode ourselves.  This is necessary to receive user
-        # input without awaiting a human to press the return key.   This mode
-        # also disables echo, which we should also hide, as our input is an
-        # sequence that is not meaningful for display as an output sequence.
-
+        # conditionally entering cbreak mode ourselves.  This is necessary to
+        # receive user input without awaiting a human to press the return key.
         ctx = None
         try:
             if self._line_buffered:
@@ -638,6 +635,7 @@ class Terminal():
 
         finally:
             if ctx is not None:
+                # exit cbreak
                 ctx.__exit__(None, None, None)
 
         return match

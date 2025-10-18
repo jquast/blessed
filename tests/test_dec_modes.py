@@ -1,16 +1,29 @@
-# -*- coding: utf-8 -*-
 """Tests for DEC Private Modes functionality."""
 # std imports
 import io
+import re
 from unittest import mock
 
 # 3rd party
 import pytest
 
 # local
+import blessed.terminal as terminal_module
 from blessed import Terminal
 from blessed.dec_modes import DecModeResponse
-from .accessories import TestTerminal, as_subprocess
+from blessed.dec_modes import DecPrivateMode as _DPM
+from blessed.keyboard import (
+    Keystroke,
+    _match_dec_event,
+    BracketedPasteEvent,
+    FocusEvent,
+    RE_PATTERN_BRACKETED_PASTE,
+    resolve_sequence,
+    OrderedDict,
+    get_leading_prefixes,
+)
+from blessed.terminal import _RE_GET_DEVICE_ATTR_RESPONSE
+from .accessories import TestTerminal, as_subprocess, make_enabled_dec_cache
 
 # For backwards compatibility and convenience in tests
 DecPrivateMode = Terminal.DecPrivateMode
@@ -20,12 +33,12 @@ EXPECTED_DECTCEM_DESC = "Text Cursor Enable Mode"
 
 def test_dec_private_mode_known_construction():
     """Known DEC mode construction."""
-    mode = DecPrivateMode(25)
-    assert mode.value == 25
+    mode = DecPrivateMode(_DPM.DECTCEM)
+    assert mode.value == _DPM.DECTCEM
     assert mode.name == "DECTCEM"
     assert mode.long_description == EXPECTED_DECTCEM_DESC
-    assert int(mode) == 25
-    assert mode.__index__() == 25
+    assert int(mode) == _DPM.DECTCEM
+    assert mode.__index__() == _DPM.DECTCEM
 
 
 def test_dec_private_mode_unknown_construction():
@@ -39,22 +52,22 @@ def test_dec_private_mode_unknown_construction():
 
 def test_dec_private_mode_equality():
     """Mode equality comparisons."""
-    mode_same_a = DecPrivateMode(25)
-    mode_same_b = DecPrivateMode(25)
-    mode_other = DecPrivateMode(1000)
+    mode_same_a = DecPrivateMode(_DPM.DECTCEM)
+    mode_same_b = DecPrivateMode(_DPM.DECTCEM)
+    mode_other = DecPrivateMode(_DPM.MOUSE_REPORT_CLICK)
 
     assert mode_same_a == mode_same_b
     assert mode_same_a != mode_other
-    assert mode_same_a != 1000
-    assert mode_same_a == 25
-    assert mode_other != 25
+    assert mode_same_a != _DPM.MOUSE_REPORT_CLICK
+    assert mode_same_a == _DPM.DECTCEM
+    assert mode_other != _DPM.DECTCEM
 
 
 def test_dec_private_mode_hashing():
     """Modes work as dict keys and in sets."""
-    mode_same_a = DecPrivateMode(25)
-    mode_same_b = DecPrivateMode(25)
-    mode_other = DecPrivateMode(1000)
+    mode_same_a = DecPrivateMode(_DPM.DECTCEM)
+    mode_same_b = DecPrivateMode(_DPM.DECTCEM)
+    mode_other = DecPrivateMode(_DPM.MOUSE_REPORT_CLICK)
 
     mode_set = {mode_same_a, mode_other, mode_same_b}
     assert len(mode_set) == 2
@@ -65,7 +78,7 @@ def test_dec_private_mode_hashing():
 
 def test_dec_private_mode_repr():
     """Mode string representation."""
-    known_mode = DecPrivateMode(25)
+    known_mode = DecPrivateMode(_DPM.DECTCEM)
     unknown_mode = DecPrivateMode(99999)
 
     assert repr(known_mode) == str(known_mode) == "DECTCEM(25)"
@@ -73,7 +86,7 @@ def test_dec_private_mode_repr():
 
 
 @pytest.mark.parametrize("value,expected_name,expected_desc", [
-    (1, "DECCKM", "Cursor Keys Mode"),
+    (_DPM.DECCKM, "DECCKM", "Cursor Keys Mode"),
     (99999, "UNKNOWN", "Unknown mode"),
 ])
 def test_dec_private_mode_types(value, expected_name, expected_desc):
@@ -83,13 +96,24 @@ def test_dec_private_mode_types(value, expected_name, expected_desc):
     assert mode.long_description == expected_desc
 
 
+def test_dec_private_mode_equality_with_non_standard_types():
+    """Test DecPrivateMode equality with non-int, non-DecPrivateMode types."""
+    mode = DecPrivateMode(_DPM.DECTCEM)
+
+    assert (mode == "string") is False
+    assert (mode is None) is False
+    assert (mode == [_DPM.DECTCEM]) is False
+    assert (mode == {"value": _DPM.DECTCEM}) is False
+    assert (mode == 25.0) is False
+
+
 def test_dec_mode_response_construction():
     """Test construction of DecModeResponse objects."""
-    mode = DecPrivateMode(DecPrivateMode.DECTCEM)
+    mode = DecPrivateMode(_DPM.DECTCEM)
     response_a = DecModeResponse(mode, DecModeResponse.SET)
-    response_b = DecModeResponse(25, 1)
+    response_b = DecModeResponse(_DPM.DECTCEM, 1)
 
-    assert response_a.mode == response_b.mode == mode == 25
+    assert response_a.mode == response_b.mode == mode == _DPM.DECTCEM
     assert response_b.mode.name == response_a.mode.name == "DECTCEM"
     assert response_a.value == response_b.value == DecModeResponse.SET == 1
     assert response_a.description == EXPECTED_DECTCEM_DESC
@@ -189,7 +213,7 @@ def test_dec_private_mode_descriptions_consistency():
 ])
 def test_dec_mode_response_predicates(value, expected):
     """Test predicates for all possible response values (-2 through 4)."""
-    response = DecModeResponse(25, value)
+    response = DecModeResponse(_DPM.DECTCEM, value)
 
     assert response.supported is expected["supported"]
     assert response.enabled is expected["enabled"]
@@ -211,19 +235,28 @@ def test_dec_mode_response_predicates(value, expected):
 ])
 def test_dec_mode_response_str_representation(value, expected_str):
     """Test string representation of response values."""
-    response = DecModeResponse(25, value)
+    response = DecModeResponse(_DPM.DECTCEM, value)
     assert str(response) == expected_str
 
 
 def test_dec_mode_response_repr():
     """Test full representation of response objects."""
-    response = DecModeResponse(25, DecModeResponse.SET)
+    response = DecModeResponse(_DPM.DECTCEM, DecModeResponse.SET)
     expected = "DECTCEM(25) is SET(1)"
     assert repr(response) == expected
 
     response_unknown = DecModeResponse(99999, DecModeResponse.NOT_RECOGNIZED)
     expected_unknown = "UNKNOWN(99999) is NOT_RECOGNIZED(0)"
     assert repr(response_unknown) == expected_unknown
+
+
+def test_dec_mode_response_description_fallback():
+    """Test DecModeResponse.description returns fallback for edge cases."""
+    response = DecModeResponse(_DPM.DECTCEM, DecModeResponse.SET)
+
+    with mock.patch.object(type(response), 'mode', new_callable=mock.PropertyMock) as mock_mode:
+        mock_mode.return_value = "not a DecPrivateMode"
+        assert response.description == "Unknown mode"
 
 
 def test_get_dec_mode_no_styling():
@@ -263,7 +296,7 @@ def test_get_dec_mode_successful_query():
             assert response.value == DecModeResponse.SET
             assert response.supported is True
             assert response.enabled is True
-            assert term._dec_mode_cache[25] == DecModeResponse.SET
+            assert term._dec_mode_cache[_DPM.DECTCEM] == DecModeResponse.SET
         assert stream.getvalue() == ''
     child()
 
@@ -293,7 +326,7 @@ def test_get_dec_mode_cached_response():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
 
-        term._dec_mode_cache[25] = DecModeResponse.SET
+        term._dec_mode_cache[_DPM.DECTCEM] = DecModeResponse.SET
 
         with mock.patch.object(term, '_is_a_tty', True), \
                 mock.patch.object(term, '_query_response') as mock_query:
@@ -312,7 +345,7 @@ def test_get_dec_mode_force_bypass_cache():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
 
-        term._dec_mode_cache[25] = DecModeResponse.SET
+        term._dec_mode_cache[_DPM.DECTCEM] = DecModeResponse.SET
 
         mock_match = mock.Mock()
         mock_match.group.return_value = '2'
@@ -323,6 +356,54 @@ def test_get_dec_mode_force_bypass_cache():
 
             mock_query.assert_called_once()
             assert response.value == DecModeResponse.RESET
+        assert stream.getvalue() == ''
+    child()
+
+
+def test_get_dec_mode_sticky_failure():
+    """Test get_dec_mode returns NOT_QUERIED after first query fails."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+
+        with mock.patch.object(term, '_is_a_tty', True), \
+                mock.patch.object(term, '_query_response', return_value=None):
+
+            first_response = term.get_dec_mode(DecPrivateMode.DECTCEM, timeout=0.1)
+            assert first_response.value == DecModeResponse.NO_RESPONSE
+            assert term._dec_first_query_failed is True
+
+            second_response = term.get_dec_mode(DecPrivateMode.BRACKETED_PASTE)
+            assert second_response.value == DecModeResponse.NOT_QUERIED
+            assert second_response.failed is True
+
+        assert stream.getvalue() == ''
+    child()
+
+
+def test_get_dec_mode_no_response_after_success():
+    """Test get_dec_mode returns NO_RESPONSE when query fails after previous success."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+
+        mock_match_success = mock.Mock()
+        mock_match_success.group.return_value = '1'
+
+        with mock.patch.object(term, '_is_a_tty', True):
+            with mock.patch.object(term, '_query_response', return_value=mock_match_success):
+                first_response = term.get_dec_mode(DecPrivateMode.DECTCEM, timeout=0.1)
+                assert first_response.value == DecModeResponse.SET
+                assert term._dec_any_query_succeeded is True
+
+            with mock.patch.object(term, '_query_response', return_value=None):
+                second_response = term.get_dec_mode(DecPrivateMode.BRACKETED_PASTE, timeout=0.1)
+                assert second_response.value == DecModeResponse.NO_RESPONSE
+                assert second_response.failed is True
+                assert term._dec_any_query_succeeded is True
+
         assert stream.getvalue() == ''
     child()
 
@@ -347,8 +428,8 @@ def test_dec_mode_set_enabled_with_styling():
 
         term._dec_mode_set_enabled(DecPrivateMode.DECTCEM, DecPrivateMode.BRACKETED_PASTE)
         assert stream.getvalue() == '\x1b[?25;2004h'
-        assert term._dec_mode_cache[25] == DecModeResponse.SET
-        assert term._dec_mode_cache[2004] == DecModeResponse.SET
+        assert term._dec_mode_cache[_DPM.DECTCEM] == DecModeResponse.SET
+        assert term._dec_mode_cache[_DPM.BRACKETED_PASTE] == DecModeResponse.SET
     child()
 
 
@@ -361,8 +442,8 @@ def test_dec_mode_set_disabled_with_styling():
 
         term._dec_mode_set_disabled(DecPrivateMode.DECTCEM, DecPrivateMode.BRACKETED_PASTE)
         assert stream.getvalue() == '\x1b[?25;2004l'
-        assert term._dec_mode_cache[25] == DecModeResponse.RESET
-        assert term._dec_mode_cache[2004] == DecModeResponse.RESET
+        assert term._dec_mode_cache[_DPM.DECTCEM] == DecModeResponse.RESET
+        assert term._dec_mode_cache[_DPM.BRACKETED_PASTE] == DecModeResponse.RESET
     child()
 
 
@@ -384,6 +465,22 @@ def test_dec_mode_set_disabled_invalid_mode_type():
     assert stream.getvalue() == ''
 
 
+@pytest.mark.parametrize("method_name,suffix", [
+    ('_dec_mode_set_enabled', 'h'),
+    ('_dec_mode_set_disabled', 'l'),
+])
+def test_dec_mode_set_with_dec_private_mode_enum(method_name, suffix):
+    """Test _dec_mode_set_enabled/disabled with DecPrivateMode instance values."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+
+    method = getattr(term, method_name)
+    method(_DPM(2004), _DPM(1006))
+
+    output = stream.getvalue()
+    assert f'\x1b[?2004;1006{suffix}' in output
+
+
 def test_context_manager_invalid_mode_type():
     """Test context managers raise TypeError for invalid mode types."""
     stream = io.StringIO()
@@ -395,6 +492,34 @@ def test_context_manager_invalid_mode_type():
         with term.dec_modes_disabled("invalid"):
             pass
     assert stream.getvalue() == ''
+
+
+def test_dec_modes_enabled_with_invalid_type():
+    """Test dec_modes_enabled raises TypeError with invalid mode type."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+
+    term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.RESET)
+
+    with pytest.raises(TypeError, match="Invalid mode argument number 0"):
+        with term.dec_modes_enabled("invalid_mode"):
+            pass
+
+
+def test_dec_modes_disabled_with_invalid_type():
+    """Test dec_modes_disabled raises TypeError with invalid mode type."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+
+    term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.SET)
+
+    # Test with invalid *type*: list [2004] instead of int 2004 or DecPrivateMode(2004)
+    # The value 2004 (BRACKETED_PASTE) is valid, but passing it in a list is not accepted
+    with pytest.raises(TypeError, match="Invalid mode argument number 0"):
+        with term.dec_modes_disabled([_DPM.BRACKETED_PASTE]):
+            pass
 
 
 def test_dec_modes_enabled_context_manager():
@@ -525,6 +650,18 @@ def test_context_manager_no_styling():
     assert stream.getvalue() == ""
 
 
+def test_terminal_dec_mode_context_no_styling():
+    """Test DEC mode context managers with force_styling=False."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=False)
+    with term.dec_modes_enabled(Terminal.DecPrivateMode.BRACKETED_PASTE):
+        pass
+    with term.dec_modes_enabled(Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR):
+        pass
+    output = stream.getvalue()
+    assert output == ''
+
+
 def test_context_manager_exception_handling():
     """Test context managers properly restore state on exception."""
     @as_subprocess
@@ -576,89 +713,42 @@ def test_multiple_modes_context_manager():
     child()
 
 
+@pytest.mark.parametrize("method_name,mock_response", [
+    ('dec_modes_enabled', 'RESET'),
+    ('dec_modes_disabled', 'SET'),
+])
+def test_dec_modes_context_with_dec_private_mode_enum(method_name, mock_response):
+    """Test dec_modes_enabled/disabled with DecPrivateMode instance values."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+
+    response_value = getattr(DecModeResponse, mock_response)
+    term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, response_value)
+
+    context_manager = getattr(term, method_name)
+    with context_manager(_DPM(2004), timeout=0.01):
+        pass
+
+    output = stream.getvalue()
+    assert '\x1b[?2004' in output
+
+
 def test_int_mode_parameters():
     """Test that integer mode parameters work correctly."""
     stream = io.StringIO()
     term = TestTerminal(stream=stream, force_styling=False)
 
-    response = term.get_dec_mode(25)
+    response = term.get_dec_mode(_DPM.DECTCEM)
     assert response.value == DecModeResponse.NOT_QUERIED
 
-    with term.dec_modes_enabled(25, 2004):
+    with term.dec_modes_enabled(_DPM.DECTCEM, _DPM.BRACKETED_PASTE):
         pass
 
-    with term.dec_modes_disabled(25, 2004):
+    with term.dec_modes_disabled(_DPM.DECTCEM, _DPM.BRACKETED_PASTE):
         pass
 
     assert stream.getvalue() == ""
-
-
-def test_dec_private_mode_equality_with_non_standard_types():
-    """Test DecPrivateMode equality with non-int, non-DecPrivateMode types."""
-    mode = DecPrivateMode(25)
-
-    assert (mode == "string") is False
-    assert (mode is None) is False
-    assert (mode == [25]) is False
-    assert (mode == {"value": 25}) is False
-    assert (mode == 25.0) is False
-
-
-def test_dec_mode_response_description_fallback():
-    """Test DecModeResponse.description returns fallback for edge cases."""
-    response = DecModeResponse(25, DecModeResponse.SET)
-
-    with mock.patch.object(type(response), 'mode', new_callable=mock.PropertyMock) as mock_mode:
-        mock_mode.return_value = "not a DecPrivateMode"
-        assert response.description == "Unknown mode"
-
-
-def test_get_dec_mode_sticky_failure():
-    """Test get_dec_mode returns NOT_QUERIED after first query fails."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-
-        with mock.patch.object(term, '_is_a_tty', True), \
-                mock.patch.object(term, '_query_response', return_value=None):
-
-            first_response = term.get_dec_mode(DecPrivateMode.DECTCEM, timeout=0.1)
-            assert first_response.value == DecModeResponse.NO_RESPONSE
-            assert term._dec_first_query_failed is True
-
-            second_response = term.get_dec_mode(DecPrivateMode.BRACKETED_PASTE)
-            assert second_response.value == DecModeResponse.NOT_QUERIED
-            assert second_response.failed is True
-
-        assert stream.getvalue() == ''
-    child()
-
-
-def test_get_dec_mode_no_response_after_success():
-    """Test get_dec_mode returns NO_RESPONSE when query fails after previous success."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-
-        mock_match_success = mock.Mock()
-        mock_match_success.group.return_value = '1'
-
-        with mock.patch.object(term, '_is_a_tty', True):
-            with mock.patch.object(term, '_query_response', return_value=mock_match_success):
-                first_response = term.get_dec_mode(DecPrivateMode.DECTCEM, timeout=0.1)
-                assert first_response.value == DecModeResponse.SET
-                assert term._dec_any_query_succeeded is True
-
-            with mock.patch.object(term, '_query_response', return_value=None):
-                second_response = term.get_dec_mode(DecPrivateMode.BRACKETED_PASTE, timeout=0.1)
-                assert second_response.value == DecModeResponse.NO_RESPONSE
-                assert second_response.failed is True
-                assert term._dec_any_query_succeeded is True
-
-        assert stream.getvalue() == ''
-    child()
 
 
 @pytest.mark.parametrize("method_name,expected_mode", [
@@ -715,3 +805,255 @@ def test_sugared_modes_attribute_exists():
     assert 'synchronized_output' in DecPrivateMode.sugared_modes
     assert 'focus_events' in DecPrivateMode.sugared_modes
     assert 'mouse_enabled' in DecPrivateMode.sugared_modes
+
+
+@pytest.mark.parametrize("kwargs,expected_modes", [
+    # Default: clicks=True → SGR encoding (1006) + click tracking (1000)
+    ({}, ['1006', '1000']),
+
+    # All tracking disabled → only SGR encoding (1006), although this is
+    # possible, there isn't any reason to do this -- no mouse events can
+    # be captured.
+    ({'clicks': False, 'report_drag': False, 'report_motion': False}, ['1006']),
+
+    # report_drag=True → SGR encoding (1006) + drag tracking (1002)
+    ({'report_drag': True}, ['1006', '1002']),
+    # report_motion=True → SGR encoding (1006) + motion tracking (1003)
+    ({'report_motion': True}, ['1006', '1003']),
+
+    # Precedence test: clicks=True + report_drag=True → drag wins (1002)
+    ({'clicks': True, 'report_drag': True}, ['1006', '1002']),
+    # Precedence test: clicks=True + report_motion=True → motion wins (1003)
+    ({'clicks': True, 'report_motion': True}, ['1006', '1003']),
+    # Precedence test: report_drag=True + report_motion=True → motion wins (1003)
+    ({'report_drag': True, 'report_motion': True}, ['1006', '1003']),
+    # Precedence test: all tracking modes True → motion wins (1003)
+    ({'clicks': True, 'report_drag': True, 'report_motion': True}, ['1006', '1003']),
+
+    # With report_pixels: default + pixels → SGR (1006) + clicks (1000) + pixels (1016)
+    ({'report_pixels': True}, ['1006', '1000', '1016']),
+    # With report_pixels: drag + pixels → SGR (1006) + drag (1002) + pixels (1016)
+    ({'report_drag': True, 'report_pixels': True}, ['1006', '1002', '1016']),
+    # With report_pixels: motion + pixels → SGR (1006) + motion (1003) + pixels (1016)
+    ({'report_motion': True, 'report_pixels': True}, ['1006', '1003', '1016']),
+    # With report_pixels: precedence (all True) + pixels
+    # → SGR (1006) + motion (1003) + pixels (1016)
+    (
+        {'clicks': True, 'report_drag': True, 'report_motion': True, 'report_pixels': True},
+        ['1006', '1003', '1016']
+    ),
+
+    # With report_pixels: no tracking + pixels → SGR (1006) + pixels (1016),
+    # again, this is possible, but there isn't any reason to do this -- no mouse
+    # events can be captured.
+    (
+        {'clicks': False, 'report_drag': False, 'report_motion': False, 'report_pixels': True},
+        ['1006', '1016']
+    ),
+
+])
+def test_mouse_enabled_variations(kwargs, expected_modes):
+    """Test mouse_enabled with various parameter combinations and precedence."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    modes_str = ';'.join(expected_modes)
+    expected_enable = f'\x1b[?{modes_str}h'
+    expected_disable = f'\x1b[?{modes_str}l'
+
+    term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.RESET)
+
+    with term.mouse_enabled(**kwargs):
+        pass
+
+    output = stream.getvalue()
+
+    assert expected_enable in output, (
+        f"Enable sequence {expected_enable!r} not found in output: {output!r}"
+    )
+    assert expected_disable in output, (
+        f"Disable sequence {expected_disable!r} not found in output: {output!r}"
+    )
+
+
+def test_does_mouse_with_no_tracking_modes():
+    """Test does_mouse with all tracking modes disabled."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+
+    term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.SET)
+
+    result = term.does_mouse(clicks=False, report_drag=False, report_motion=False, timeout=0.01)
+    assert result is True
+
+
+@pytest.mark.parametrize("sequence", [
+    'hello',
+    'abc123',
+    '',
+    '\x1b[9999z',
+    '\x1b[unknown'
+])
+def test_match_dec_event_invalid(sequence):
+    """Test that invalid sequences return None."""
+    assert _match_dec_event(sequence) is None
+
+
+def test_bracketed_paste_detection():
+    """Test bracketed paste sequence detection."""
+    sequence = '\x1b[200~hello world\x1b[201~'
+    ks = _match_dec_event(sequence, dec_mode_cache=make_enabled_dec_cache())
+
+    assert ks is not None
+    assert ks == sequence
+    assert ks.mode == Terminal.DecPrivateMode.BRACKETED_PASTE
+    assert ks._mode == _DPM.BRACKETED_PASTE
+
+    values = ks._mode_values
+    assert isinstance(values, BracketedPasteEvent)
+    assert values.text == 'hello world'
+
+
+def test_bracketed_paste_multiline():
+    """Test bracketed paste with multiline content."""
+    sequence = '\x1b[200~line1\nline2\tindented\x1b[201~'
+    ks = _match_dec_event(sequence, dec_mode_cache=make_enabled_dec_cache())
+
+    assert ks is not None
+    values = ks._mode_values
+    assert values.text == 'line1\nline2\tindented'
+
+
+@pytest.mark.parametrize("sequence,expected_gained", [
+    ('\x1b[I', True),
+    ('\x1b[O', False),
+])
+def test_focus_events(sequence, expected_gained):
+    """Test focus events for gained and lost."""
+    ks = _match_dec_event(sequence, dec_mode_cache=make_enabled_dec_cache())
+    assert ks.mode == Terminal.DecPrivateMode.FOCUS_IN_OUT_EVENTS
+
+    values = ks._mode_values
+    assert isinstance(values, FocusEvent)
+    assert values.gained is expected_gained
+
+
+@pytest.mark.parametrize("mode,match_obj", [
+    (None, None),
+    (9999, re.compile(r'\x1b\[test'))
+])
+def test_mode_values_returns_none(mode, match_obj):
+    """Test mode_values returns None for unsupported modes."""
+    match = None
+    if match_obj:
+        match = match_obj.match('\x1b[test')
+
+    ks = Keystroke('xxxxxxxxx', mode=mode, match=match)
+
+    assert ks._mode_values is None
+
+
+def test_keystroke_with_dec_mode():
+    """Test keystroke with DEC mode - minimal test."""
+    match = RE_PATTERN_BRACKETED_PASTE.match('\x1b[200~test\x1b[201~')
+    ks = Keystroke('\x1b[200~test\x1b[201~', mode=_DPM.BRACKETED_PASTE, match=match)
+    assert ks.mode == Terminal.DecPrivateMode.BRACKETED_PASTE
+    assert ks.is_sequence
+
+
+def test_resolve_sequence():
+    """Test that DEC events don't interfere with regular sequence resolution."""
+    keymap = OrderedDict([('\x1b[A', 100)])
+    prefixes = get_leading_prefixes(keymap)
+    codes = {100: 'KEY_UP'}
+
+    ks = resolve_sequence('\x1b[A', keymap, codes, prefixes)
+    assert ks.code == 100
+    assert ks.name == 'KEY_UP'
+
+    dec_sequence = '\x1b[200~test\x1b[201~'
+    ks_dec = resolve_sequence(dec_sequence, keymap, codes, prefixes,
+                              dec_mode_cache=make_enabled_dec_cache())
+    event_value = ks_dec._mode_values
+    assert isinstance(event_value, BracketedPasteEvent)
+    assert event_value.text == 'test'
+    assert ks_dec.mode == Terminal.DecPrivateMode.BRACKETED_PASTE
+
+
+def test_focus_event_names():
+    """Test that focus events have correct names."""
+    cache = make_enabled_dec_cache()
+
+    ks_focus_in = _match_dec_event('\x1b[I', dec_mode_cache=cache)
+    assert ks_focus_in.name == "FOCUS_IN"
+
+    ks_focus_out = _match_dec_event('\x1b[O', dec_mode_cache=cache)
+    assert ks_focus_out.name == "FOCUS_OUT"
+
+    ks_regular = Keystroke('I')
+    assert ks_regular.name != "FOCUS_IN"
+
+
+def test_bracketed_paste_name_and_text():
+    """Test that bracketed paste events have correct name and text property."""
+    cache = make_enabled_dec_cache()
+
+    ks_paste = _match_dec_event('\x1b[200~hello world\x1b[201~', dec_mode_cache=cache)
+    assert ks_paste.name == "BRACKETED_PASTE"
+    assert ks_paste.text == "hello world"
+
+    ks_multiline = _match_dec_event('\x1b[200~line1\nline2\x1b[201~', dec_mode_cache=cache)
+    assert ks_multiline.name == "BRACKETED_PASTE"
+    assert ks_multiline.text == "line1\nline2"
+
+    ks_empty = _match_dec_event('\x1b[200~\x1b[201~', dec_mode_cache=cache)
+    assert ks_empty.name == "BRACKETED_PASTE"
+    assert ks_empty.text == ""
+
+    ks_regular = Keystroke('a')
+    assert ks_regular.text is None
+
+
+def test_focus_event_name_with_no_match():
+    """Test _get_focus_event_name() returns None when match has no io group."""
+    ks = Keystroke('test', mode=_DPM.FOCUS_IN_OUT_EVENTS, match=None)
+    assert ks._get_focus_event_name() is None
+
+
+def test_mouse_event_name_with_non_mouse_mode():
+    """Test _get_mouse_event_name() returns None when mode_values is not MouseEvent."""
+    ks = Keystroke('test', mode=_DPM.MOUSE_EXTENDED_SGR, match=None)
+    assert ks._get_mouse_event_name() is None
+
+
+def test_query_response_with_line_buffered_mode():
+    """Test _query_response with line buffering disabled."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._line_buffered = False
+        term._keyboard_fd = None
+
+        mock_match = mock.Mock()
+        mock_match.start.return_value = 0
+        mock_match.end.return_value = 999
+
+        with mock.patch.object(term, 'ungetch') as mock_ungetch, \
+                mock.patch.object(
+                    terminal_module, '_read_until', return_value=(mock_match, '')
+                ) as mock_read_until:
+
+            match = term._query_response(
+                '\x1b[c', _RE_GET_DEVICE_ATTR_RESPONSE, timeout=0.01
+            )
+
+            mock_read_until.assert_called_once_with(
+                term=term, pattern=_RE_GET_DEVICE_ATTR_RESPONSE, timeout=0.01
+            )
+            mock_ungetch.assert_called_once_with('')
+            assert match is mock_match
+
+        assert stream.getvalue() == '\x1b[c'
+    child()

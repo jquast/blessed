@@ -158,8 +158,22 @@ Detect and report all known DEC Private Modes supported by the Terminal and
 display a report.
 
 .. _strip.py:
+
+strip.py
 -------------
 https://github.com/jquast/blessed/blob/master/bin/strip.py
 
 This wrapper of the :meth:`~Terminal.strip_seqs` method reads text from standard
 input, "strips" away all known output sequences and writes the result to stdout.
+
+
+.. _bin/mouse_paint.py:
+
+mouse_paint.py
+--------------
+https://github.com/jquast/blessed/blob/master/bin/mouse_paint.py
+
+.. figure:: https://dxtz6bzwq9sxx.cloudfront.net/mouse_paint.gif
+
+This is a basic "paint" program using :ref:`mouse input` with the :ref:`report
+motion` feature.

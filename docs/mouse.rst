@@ -1,3 +1,5 @@
+.. _`mouse input`:
+
 Mouse Input
 ===========
 
@@ -157,6 +159,8 @@ events in the :attr:`~Keystroke.name` attribute with a ``_MOTION`` suffix:
 
 Motion events include modifiers just like click events, for example ``MOUSE_CTRL_LEFT_MOTION``.
 
+.. _report_motion:
+
 report_motion
 ~~~~~~~~~~~~~
 
@@ -172,6 +176,8 @@ especially ``MOUSE_MOTION``, tracking the :attr:`Keystroke.mouse_yx` coordinate.
 .. literalinclude:: ../bin/mouse_paint.py
    :language: python
    :linenos:
+
+.. figure:: https://dxtz6bzwq9sxx.cloudfront.net/mouse_paint.gif
 
 Painting is done while the left mouse button is held down, tracking both
 ``MOUSE_LEFT`` and ``MOUSE_LEFT_MOTION``, erased with ``MOUSE_RIGHT``, and color
