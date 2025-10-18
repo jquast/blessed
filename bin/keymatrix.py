@@ -5,7 +5,7 @@ Advanced keyboard and special modes interaction example.
 Usage:
 - F1-F11: Toggle DEC private modes (bracketed paste, mouse, etc.)
 - Shift+F1-F5: Toggle Kitty keyboard protocol flags
-- Ctrl+C: Exit
+- 'q': Exit
 
 All modes that elicit responses are activated for demonstration.
 """
@@ -433,7 +433,7 @@ def main():
                     message = mgr.toggle_by_index(index)
                     break
 
-            if inp.name == 'KEY_CTRL_C':
+            if inp == 'q':
                 do_exit = True
 
             if inp:

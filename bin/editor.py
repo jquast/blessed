@@ -10,14 +10,12 @@ This example program makes use of many context manager methods:
 Early curses work focused namely around writing screen editors, naturally
 any serious editor would make liberal use of special modes.
 
-``Ctrl - L``
-  refresh
+Actions:
 
-``Ctrl - C``
-  quit
-
-``Ctrl - S``
-  save
+- ``Ctrl - L`` refresh
+- ``F2`` quit
+- ``F1`` save
+- ``LEFT MOUSE BUTTON`` move cursor
 """
 from __future__ import division, print_function
 
@@ -222,11 +220,10 @@ def main():
             echo_yx(csr, term.reverse(screen.get((csr.y, csr.x), u' ')))
             inp = term.inkey()
 
-            if inp == chr(3):
-                # ^c exits
+            if inp.name == 'KEY_F2':
                 break
 
-            elif inp == chr(19):
+            elif inp.name == 'KEY_F1':
                 # ^s saves
                 echo_yx(home(bottom(csr)),
                         term.ljust(term.bold_white(u'Filename: ')))

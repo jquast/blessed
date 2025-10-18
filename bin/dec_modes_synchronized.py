@@ -8,7 +8,7 @@ empty = " " * term.height * term.width
 
 print(term.bold_red("Warning! Screen may blink rapidly!"))
 print()
-print("Press return to continue, Ctrl+C to stop test")
+print("Press return to continue, 'q' to stop test")
 term.inkey()
 
 with term.fullscreen():
@@ -17,6 +17,7 @@ with term.fullscreen():
             print(term.home + empty, flush=True)
             print(term.home + fill, flush=True)
             print(term.home + f'step={step}')
-        term.inkey(0.01)
+        if term.inkey(0.01) == 'q':
+            break
 
 print(term.clear + "Test complete!")

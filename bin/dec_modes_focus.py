@@ -3,7 +3,7 @@ from blessed import Terminal
 
 term = Terminal()
 
-print("Switch focus to/from this terminal window, Ctrl+C to stop.")
+print("Switch focus to/from this terminal window, 'q' to stop.")
 
 with term.focus_events():
     with term.cbreak():
@@ -13,3 +13,5 @@ with term.focus_events():
                 print("Focus gained")
             elif inp.name == 'FOCUS_OUT':
                 print("Focus lost")
+            elif inp == 'q':
+                break
