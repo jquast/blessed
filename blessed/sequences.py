@@ -17,7 +17,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from blessed.terminal import Terminal
 
 # std imports
-from typing import Type, Tuple, Pattern, TypeVar, Iterator, Optional
+from typing import List, Type, Tuple, Pattern, TypeVar, Iterator, Optional
 
 # SupportsIndex was added in Python 3.8
 if sys.version_info >= (3, 8):
@@ -169,7 +169,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         also break consider sequences part of a "word" that may be broken by hyphen (``-``), where
         this implementation corrects both.
         """
-        lines: list[str] = []
+        lines: List[str] = []
         if self.width <= 0 or not isinstance(self.width, int):
             raise ValueError(
                 f"invalid width {self.width!r}({type(self.width)!r}) (must be integer > 0)"
@@ -180,7 +180,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
                                       ) or self.drop_whitespace
         chunks.reverse()
         while chunks:
-            cur_line: list[str] = []
+            cur_line: List[str] = []
             cur_len = 0
             indent = self.subsequent_indent if lines else self.initial_indent
             width = self.width - len(indent)
