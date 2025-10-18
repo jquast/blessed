@@ -916,7 +916,9 @@ def test_mouse_enabled_variations(kwargs, expected_modes):
         # Expected: DECSET (h=enable) on enter, DECRST (l=disable) on exit
         expected_output = f'\x1b[?{modes_str}h\x1b[?{modes_str}l'
 
-        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.RESET)
+        term.get_dec_mode = (
+            lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.RESET)
+        )
 
         with term.mouse_enabled(**kwargs):
             pass
@@ -938,4 +940,66 @@ def test_does_mouse_default():
         result = term.does_mouse()
         assert result is True
         assert stream.getvalue() == ''
+    child()
+
+
+def test_flushinp_with_unicode_followed_by_legacy_mouse():
+    """Test flushinp() decodes legacy mouse sequences with high bytes after unicode text."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=io.StringIO())
+        term._dec_mode_cache = make_enabled_dec_cache()
+
+        # Emoji followed by legacy mouse at coordinates (200, 190)
+        # cb=0 (button 0), x=200+1+32=233, y=190+1+32=223 (both >127, need latin1)
+        emoji_and_mouse = '😀\x1b[M' + chr(32) + chr(233) + chr(223)
+        term.ungetch(emoji_and_mouse)
+
+        with term.cbreak():
+            flushed = term.flushinp(timeout=0)
+            # Should get emoji + mouse sequence as one string
+            assert '😀' in flushed
+            assert '\x1b[M' in flushed
+
+            # Now decode and check the mouse event was properly parsed
+            term.ungetch(emoji_and_mouse)
+            # Read the emoji first
+            emoji_ks = term.inkey(timeout=0.1)
+            assert emoji_ks == '😀'
+
+            # Then read the mouse event
+            mouse_ks = term.inkey(timeout=0.1)
+            assert mouse_ks._mode_values is not None
+            evt = mouse_ks._mode_values
+            assert evt.button_value == 0
+            assert evt.x == 200
+            assert evt.y == 190
+    child()
+
+
+def test_inkey_with_cjk_followed_by_legacy_mouse():
+    """Test inkey() decodes legacy mouse sequences with high bytes after CJK characters."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=io.StringIO())
+        term._dec_mode_cache = make_enabled_dec_cache()
+
+        # CJK character '你' followed by legacy mouse at coordinates (150, 145)
+        # cb=0 (button 0), x=150+1+32=183, y=145+1+32=178 (both >127, need latin1)
+        cjk_and_mouse = '你\x1b[M' + chr(32) + chr(183) + chr(178)
+        term.ungetch(cjk_and_mouse)
+
+        with term.cbreak():
+            # Read the CJK character first
+            cjk_ks = term.inkey(timeout=0.1)
+            assert cjk_ks == '你'
+
+            # Then read the mouse event - this is where the bug manifests
+            # Without the fix, the high bytes won't be decoded as latin1
+            mouse_ks = term.inkey(timeout=0.1)
+            assert mouse_ks._mode_values is not None
+            evt = mouse_ks._mode_values
+            assert evt.button_value == 0
+            assert evt.x == 150
+            assert evt.y == 145
     child()
