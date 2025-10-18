@@ -857,3 +857,84 @@ def test_mouse_sgr_pixels_precedence():
     assert values.button_value == 0
     assert values.x == 9
     assert values.y == 19
+
+
+@pytest.mark.parametrize("kwargs,expected_modes", [
+    # Default: clicks=True → SGR encoding (1006) + click tracking (1000)
+    ({}, ['1006', '1000']),
+
+    # All tracking disabled → only SGR encoding (1006), although this is
+    # possible, there isn't any reason to do this -- no mouse events can
+    # be captured.
+    ({'clicks': False, 'report_drag': False, 'report_motion': False}, ['1006']),
+
+    # report_drag=True → SGR encoding (1006) + drag tracking (1002)
+    ({'report_drag': True}, ['1006', '1002']),
+    # report_motion=True → SGR encoding (1006) + motion tracking (1003)
+    ({'report_motion': True}, ['1006', '1003']),
+
+    # Precedence test: clicks=True + report_drag=True → drag wins (1002)
+    ({'clicks': True, 'report_drag': True}, ['1006', '1002']),
+    # Precedence test: clicks=True + report_motion=True → motion wins (1003)
+    ({'clicks': True, 'report_motion': True}, ['1006', '1003']),
+    # Precedence test: report_drag=True + report_motion=True → motion wins (1003)
+    ({'report_drag': True, 'report_motion': True}, ['1006', '1003']),
+    # Precedence test: all tracking modes True → motion wins (1003)
+    ({'clicks': True, 'report_drag': True, 'report_motion': True}, ['1006', '1003']),
+
+    # With report_pixels: default + pixels → SGR (1006) + clicks (1000) + pixels (1016)
+    ({'report_pixels': True}, ['1006', '1000', '1016']),
+    # With report_pixels: drag + pixels → SGR (1006) + drag (1002) + pixels (1016)
+    ({'report_drag': True, 'report_pixels': True}, ['1006', '1002', '1016']),
+    # With report_pixels: motion + pixels → SGR (1006) + motion (1003) + pixels (1016)
+    ({'report_motion': True, 'report_pixels': True}, ['1006', '1003', '1016']),
+    # With report_pixels: precedence (all True) + pixels
+    # → SGR (1006) + motion (1003) + pixels (1016)
+    (
+        {'clicks': True, 'report_drag': True, 'report_motion': True, 'report_pixels': True},
+        ['1006', '1003', '1016']
+    ),
+
+    # With report_pixels: no tracking + pixels → SGR (1006) + pixels (1016),
+    # again, this is possible, but there isn't any reason to do this -- no mouse
+    # events can be captured.
+    (
+        {'clicks': False, 'report_drag': False, 'report_motion': False, 'report_pixels': True},
+        ['1006', '1016']
+    ),
+
+])
+def test_mouse_enabled_variations(kwargs, expected_modes):
+    """Test mouse_enabled with various parameter combinations and precedence."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        modes_str = ';'.join(expected_modes)
+        # Expected: DECSET (h=enable) on enter, DECRST (l=disable) on exit
+        expected_output = f'\x1b[?{modes_str}h\x1b[?{modes_str}l'
+
+        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.RESET)
+
+        with term.mouse_enabled(**kwargs):
+            pass
+
+        assert stream.getvalue() == expected_output
+    child()
+
+
+def test_does_mouse_default():
+    """Test does_mouse with default parameters."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+
+        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.SET)
+
+        result = term.does_mouse()
+        assert result is True
+        assert stream.getvalue() == ''
+    child()
