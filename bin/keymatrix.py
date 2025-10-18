@@ -1,139 +1,155 @@
 #!/usr/bin/env python
 """
-A simple "game": hit all application keys to win.
+Keyboard event display tool.
 
-Display all known key capabilities that may match the terminal. As each key is pressed on input, it
-is lit up and points are scored.
+Usage:
+- Press any keys to see their properties
+- Ctrl+C: Exit
 """
-from __future__ import division, print_function
-
 # std imports
 import sys
+import functools
+from collections import deque
 
 # local
 from blessed import Terminal
 
 
-def echo(text):
-    """Display ``text`` and flush output."""
-    sys.stdout.write(u'{}'.format(text))
-    sys.stdout.flush()
+def render_header(term: Terminal) -> int:
+    """
+    Render the header section.
+
+    Returns number of rows used.
+    """
+    header = ["Press ^C to quit."]
+
+    # Display, Separators, headers, return row count
+    echo = functools.partial(print, end=term.clear_eol + '\r\n', flush=False)
+    echo(term.home, end='')
+    echo('-' * term.width)
+    row_count = 1
+    for line in header:
+        echo(line)
+        row_count += 1
+    echo('-' * term.width, flush=True)
+    row_count += 1
+    return row_count
 
 
-def refresh(term, board, level, score, inps):
-    """Refresh the game screen."""
-    echo(term.home + term.clear)
-    level_color = level % 7
-    if level_color == 0:
-        level_color = 4
-    bottom = 0
-    for keycode, attr in board.items():
-        echo(u''.join((
-            term.move_yx(attr['row'], attr['column']),
-            term.color(level_color),
-            (term.reverse if attr['hit'] else term.bold),
-            keycode,
-            term.normal)))
-        bottom = max(bottom, attr['row'])
-    echo(term.move_yx(term.height, 0) + 'level: %s score: %s' % (level, score,))
-    if bottom >= (term.height - 5):
-        sys.stderr.write(
-            ('\n' * (term.height // 2)) +
-            term.center(term.red_underline('cheater!')) + '\n')
-        sys.stderr.write(
-            term.center("(use a larger screen)") +
-            ('\n' * (term.height // 2)))
-        sys.exit(1)
-    echo(term.move_yx(bottom + 1, 0))
-    echo('Press ^C to exit.')
-    for row, inp in enumerate(inps[(term.height - (bottom + 3)) * -1:], 1):
-        echo(term.move_yx(bottom + row + 1, 0))
-        echo('{0!r}, {1}, {2}'.format(
-            inp.__str__() if inp.is_sequence else inp,
-             inp.code,
-             inp.name))
-        echo(term.clear_eol)
+def render_keymatrix(term: Terminal, n_header_rows: int, raw_sequences: deque,
+                     formatted_events: deque) -> None:
+    """Render the key matrix display with raw sequences bar and formatted table."""
+    # Calculate bar width (1/3 of terminal width)
+    bar_width = term.width // 3
+    bar_y = n_header_rows + 3
+
+    # remove raw sequences tracked until they fit
+    def _fmt(i, sequence):
+        if sequence.is_sequence:
+            rs = repr(str(sequence))
+        else:
+            rs = repr(sequence)
+        if rs.startswith("'") and rs.endswith("'"):
+            rs = rs.strip("'")
+        elif rs.startswith('"') and rs.endswith('"'):
+            rs = rs.strip('"')
+
+        if i % 2 == 0:
+            return term.reverse(rs)
+        return rs
+
+    while True:
+        bar_content = ''.join(_fmt(len(raw_sequences) - i, sequence)
+                              for i, sequence in
+                              enumerate(raw_sequences))
+        if term.length(bar_content) < bar_width:
+            break
+        raw_sequences.popleft()
+
+    echo = functools.partial(print, end=term.clear_eol + '\r\n', flush=False)
+    bar_line = ' ' * ((term.width // 3) - 3) + f'[ {bar_content} ]'
+    echo(term.move_yx(bar_y - 3, 0))
+    echo()
+    echo(bar_line)
+    echo()
+
+    # Calculate available space for formatted events table
+    max_event_rows = term.height - bar_y - 5
+
+    # Render formatted events table
+    events_to_display = list(formatted_events)[-max_event_rows:]
+
+    echo()
+    echo(f"{'value':<6} {'repr':<20} {'Name':<25} extra:")
+    echo()
+    for event_line in events_to_display:
+        echo(event_line)
+    echo('', end=term.clear_eos, flush=True)
 
 
-def build_gameboard(term):
-    """Build the gameboard layout."""
-    column, row = 0, 0
-    board = {}
-    spacing = 2
-    for keycode in sorted(term._keycodes.values()):
-        if (keycode.startswith('KEY_F')
-                and keycode[-1].isdigit()
-                and int(keycode[len('KEY_F'):]) > 24):
-            continue
-        if column + len(keycode) + (spacing * 2) >= term.width:
-            column = 0
-            row += 1
-        board[keycode] = {'column': column,
-                          'row': row,
-                          'hit': 0,
-                          }
-        column += len(keycode) + (spacing * 2)
-    return board
+def format_key_event(term, keystroke) -> str:
+    """Format a key event for columnar display."""
+    # Build columns: sequence | value | name | modifiers/mode_values
+    value_repr = repr(keystroke.value)[:6]
+    seq_repr = repr(str(keystroke))[:20]
+    name_repr = repr(keystroke.name)[:25]
 
+    modifiers = []
+    for modifier_name in (
+            # possible with most terminals
+            'shift', 'alt', 'ctrl',
+            # kitty, only
+            'super', 'hyper', 'meta'):
+        if getattr(keystroke, f'_{modifier_name}'):
+            modifiers.append(modifier_name.upper())
+    extra = f'{"+".join(modifiers)}'
 
-def add_score(score, pts, level):
-    """Add points to score, determine and return new score and level."""
-    lvl_multiplier = 10
-    score += pts
-    if (score % (pts * lvl_multiplier)) == 0:
-        level += 1
-    return score, level
+    trim_mode = max(10, term.width - 25 - 20 - 6 - 3)
+    return f"{value_repr:<6} {seq_repr:<20} {name_repr:<25} {extra[:trim_mode]}"
 
 
 def main():
-    """Program entry point."""
+    """Main application orchestrator."""
     term = Terminal()
-    score = level = hit_highbit = hit_unicode = 0
-    dirty = True
 
-    gameboard = build_gameboard(term)
-    inps = []
+    # Key event storage
+    raw_sequences = deque(maxlen=100)  # Store raw sequences
+    formatted_events = deque(maxlen=50)  # Store formatted event lines
 
-    with term.raw(), term.keypad(), term.location():
-        inp = term.inkey(timeout=0)
-        while inp != chr(3):
-            if dirty:
-                refresh(term, gameboard, level, score, inps)
-                dirty = False
-            inp = term.inkey(timeout=5.0)
-            dirty = True
-            if (inp.is_sequence and
-                    inp.name in gameboard and
-                    gameboard[inp.name]['hit'] == 0):
-                gameboard[inp.name]['hit'] = 1
-                score, level = add_score(score, 100, level)
-            elif inp and not inp.is_sequence and 128 <= ord(inp) <= 255:
-                hit_highbit += 1
-                if hit_highbit < 5:
-                    score, level = add_score(score, 100, level)
-            elif inp and not inp.is_sequence and ord(inp) > 256:
-                hit_unicode += 1
-                if hit_unicode < 5:
-                    score, level = add_score(score, 100, level)
-            inps.append(inp)
+    # Ensure clean input state
+    inp = term.flushinp(0.1)
+    if inp:
+        formatted_events.append(f"Flushed input: {inp!r}")
 
-    with term.cbreak():
-        echo(term.move_y(term.height))
-        echo(
-            u'{term.clear_eol}Your final score was {score} '
-            u'at level {level}{term.clear_eol}\n'
-            u'{term.clear_eol}\n'
-            u'{term.clear_eol}You hit {hit_highbit} '
-            u' 8-bit characters\n{term.clear_eol}\n'
-            u'{term.clear_eol}You hit {hit_unicode} '
-            u' unicode characters.\n{term.clear_eol}\n'
-            u'{term.clear_eol}press any key\n'.format(
-                term=term,
-                score=score, level=level,
-                hit_highbit=hit_highbit,
-                hit_unicode=hit_unicode)
-        )
-        term.inkey()
+    # Main interaction loop
+    input_mode = term.cbreak if '--cbreak' in sys.argv else term.raw
+    oldsize = (term.height, term.width)
+    with input_mode(), term.fullscreen():
+        n_header_rows = 0
+
+        # Initial full render
+        n_header_rows = render_header(term)
+        render_keymatrix(term, n_header_rows, raw_sequences, formatted_events)
+
+        do_exit = False
+        while not do_exit:
+            # Handle user input
+            inp = term.inkey()
+
+            if inp.name == 'KEY_CTRL_C':
+                do_exit = True
+
+            if inp:
+                raw_sequences.append(inp)
+                formatted_events.append(format_key_event(term, inp))
+
+            # If screen was resized or CTRL^L pressed, re-render header
+            if (oldsize != (term.height, term.width) or inp.name == 'KEY_CTRL_L'):
+                n_header_rows = render_header(term)
+                oldsize = (term.height, term.width)
+
+            # Always render key matrix (efficient, only updates changed area)
+            render_keymatrix(term, n_header_rows, raw_sequences, formatted_events)
 
 
 if __name__ == '__main__':
