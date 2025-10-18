@@ -578,15 +578,6 @@ class DecPrivateMode:
                       if k.isupper() and isinstance(v, int)
                       and not k.startswith('_')}
 
-    # Mapping of convenience method names to their corresponding mode constants
-    sugared_modes = {
-        'bracketed_paste': BRACKETED_PASTE,
-        'synchronized_output': SYNCHRONIZED_OUTPUT,
-        'focus_events': FOCUS_IN_OUT_EVENTS,
-        'mouse_enabled': (MOUSE_EXTENDED_SGR, MOUSE_REPORT_CLICK,
-                          MOUSE_REPORT_DRAG, MOUSE_ALL_MOTION, MOUSE_SGR_PIXELS),
-    }
-
     def __init__(self, value: int):
         """
         Initialize DEC Private Mode with numeric identifier.

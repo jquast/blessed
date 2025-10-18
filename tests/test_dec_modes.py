@@ -1,4 +1,4 @@
-"""Tests for DEC Private Modes functionality."""
+"""Tests for DEC Private Modes and related functionality (mouse, focus, bracketed paste)."""
 # std imports
 import io
 import re
@@ -259,23 +259,36 @@ def test_dec_mode_response_description_fallback():
         assert response.description == "Unknown mode"
 
 
-def test_get_dec_mode_no_styling():
-    """Test get_dec_mode returns NOT_QUERIED when does_styling is False."""
-    stream = io.StringIO()
-    term = TestTerminal(stream=stream, force_styling=False)
-    response = term.get_dec_mode(DecPrivateMode.DECTCEM)
+def test_dec_mode_calls_with_no_styling():
+    """Test _dec_mode_set_enabled does nothing when does_styling is False."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=False)
 
-    assert response.value == DecModeResponse.NOT_QUERIED
-    assert response.failed is True
-    assert not response.supported
-    assert stream.getvalue() == ''
+        term._dec_mode_set_enabled(DecPrivateMode.DECTCEM)
+        term._dec_mode_set_enabled(DecPrivateMode.DECTCEM)
+
+        assert stream.getvalue() == ''
+
+        response = term.get_dec_mode(DecPrivateMode.DECTCEM)
+
+        assert response.value == DecModeResponse.NOT_QUERIED
+        assert response.failed is True
+        assert not response.supported
+        assert stream.getvalue() == ''
+    child()
+
 
 
 def test_get_dec_mode_invalid_mode_type():
     """Test get_dec_mode raises TypeError for invalid mode types."""
-    term = TestTerminal()
-    with pytest.raises(TypeError):
-        term.get_dec_mode("invalid")
+    @as_subprocess
+    def child():
+        term = TestTerminal()
+        with pytest.raises(TypeError):
+            term.get_dec_mode("invalid")
+    child()
 
 
 def test_get_dec_mode_successful_query():
@@ -408,17 +421,6 @@ def test_get_dec_mode_no_response_after_success():
     child()
 
 
-def test_dec_mode_set_enabled_no_styling():
-    """Test _dec_mode_set_enabled does nothing when does_styling is False."""
-    stream = io.StringIO()
-    term = TestTerminal(stream=stream, force_styling=False)
-
-    term._dec_mode_set_enabled(DecPrivateMode.DECTCEM)
-    term._dec_mode_set_enabled(DecPrivateMode.DECTCEM)
-
-    assert stream.getvalue() == ''
-
-
 def test_dec_mode_set_enabled_with_styling():
     """Test _dec_mode_set_enabled writes correct sequence."""
     @as_subprocess
@@ -449,20 +451,26 @@ def test_dec_mode_set_disabled_with_styling():
 
 def test_dec_mode_set_enabled_invalid_mode_type():
     """Test _dec_mode_set_enabled raises TypeError for invalid mode types."""
-    stream = io.StringIO()
-    term = TestTerminal(stream=stream, force_styling=False)
-    with pytest.raises(TypeError):
-        term._dec_mode_set_enabled("invalid")
-    assert stream.getvalue() == ''
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=False)
+        with pytest.raises(TypeError):
+            term._dec_mode_set_enabled("invalid")
+        assert stream.getvalue() == ''
+    child()
 
 
 def test_dec_mode_set_disabled_invalid_mode_type():
     """Test _dec_mode_set_disabled raises TypeError for invalid mode types."""
-    stream = io.StringIO()
-    term = TestTerminal(stream=stream, force_styling=False)
-    with pytest.raises(TypeError):
-        term._dec_mode_set_disabled("invalid")
-    assert stream.getvalue() == ''
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=False)
+        with pytest.raises(TypeError):
+            term._dec_mode_set_disabled("invalid")
+        assert stream.getvalue() == ''
+    child()
 
 
 @pytest.mark.parametrize("method_name,suffix", [
@@ -471,55 +479,51 @@ def test_dec_mode_set_disabled_invalid_mode_type():
 ])
 def test_dec_mode_set_with_dec_private_mode_enum(method_name, suffix):
     """Test _dec_mode_set_enabled/disabled with DecPrivateMode instance values."""
-    stream = io.StringIO()
-    term = TestTerminal(stream=stream, force_styling=True)
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
 
-    method = getattr(term, method_name)
-    method(_DPM(2004), _DPM(1006))
+        method = getattr(term, method_name)
+        method(_DPM(2004), _DPM(1006))
 
-    output = stream.getvalue()
-    assert f'\x1b[?2004;1006{suffix}' in output
-
-
-def test_context_manager_invalid_mode_type():
-    """Test context managers raise TypeError for invalid mode types."""
-    stream = io.StringIO()
-    term = TestTerminal(stream=stream, force_styling=False)
-    with pytest.raises(TypeError):
-        with term.dec_modes_enabled("invalid"):
-            pass
-    with pytest.raises(TypeError):
-        with term.dec_modes_disabled("invalid"):
-            pass
-    assert stream.getvalue() == ''
+        output = stream.getvalue()
+        assert f'\x1b[?2004;1006{suffix}' in output
+    child()
 
 
 def test_dec_modes_enabled_with_invalid_type():
     """Test dec_modes_enabled raises TypeError with invalid mode type."""
-    stream = io.StringIO()
-    term = TestTerminal(stream=stream, force_styling=True)
-    term._is_a_tty = True
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
 
-    term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.RESET)
+        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.RESET)
 
-    with pytest.raises(TypeError, match="Invalid mode argument number 0"):
-        with term.dec_modes_enabled("invalid_mode"):
-            pass
+        with pytest.raises(TypeError, match="Invalid mode argument number 0"):
+            with term.dec_modes_enabled("invalid_mode"):
+                pass
+        child()
 
 
 def test_dec_modes_disabled_with_invalid_type():
     """Test dec_modes_disabled raises TypeError with invalid mode type."""
-    stream = io.StringIO()
-    term = TestTerminal(stream=stream, force_styling=True)
-    term._is_a_tty = True
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
 
-    term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.SET)
+        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.SET)
 
-    # Test with invalid *type*: list [2004] instead of int 2004 or DecPrivateMode(2004)
-    # The value 2004 (BRACKETED_PASTE) is valid, but passing it in a list is not accepted
-    with pytest.raises(TypeError, match="Invalid mode argument number 0"):
-        with term.dec_modes_disabled([_DPM.BRACKETED_PASTE]):
-            pass
+        # Test with invalid *type*: list [2004] instead of int 2004 or DecPrivateMode(2004)
+        # The value 2004 (BRACKETED_PASTE) is valid, but passing it in a list is not accepted
+        with pytest.raises(TypeError, match="Invalid mode argument number 0"):
+            with term.dec_modes_disabled([_DPM.BRACKETED_PASTE]):
+                pass
+        child()
 
 
 def test_dec_modes_enabled_context_manager():
@@ -636,30 +640,25 @@ def test_dec_modes_disabled_already_disabled():
     child()
 
 
-def test_context_manager_no_styling():
+def test_context_manager_no_styling_and_invalid_args():
     """Test context managers do nothing when does_styling is False."""
     stream = io.StringIO()
     term = TestTerminal(stream=stream, force_styling=False)
-
     with term.dec_modes_enabled(DecPrivateMode.DECTCEM):
         pass
-
     with term.dec_modes_disabled(DecPrivateMode.DECTCEM):
         pass
-
-    assert stream.getvalue() == ""
-
-
-def test_terminal_dec_mode_context_no_styling():
-    """Test DEC mode context managers with force_styling=False."""
-    stream = io.StringIO()
-    term = TestTerminal(stream=stream, force_styling=False)
     with term.dec_modes_enabled(Terminal.DecPrivateMode.BRACKETED_PASTE):
         pass
     with term.dec_modes_enabled(Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR):
         pass
-    output = stream.getvalue()
-    assert output == ''
+    with pytest.raises(TypeError):
+        with term.dec_modes_enabled("invalid"):
+            pass
+    with pytest.raises(TypeError):
+        with term.dec_modes_disabled("invalid"):
+            pass
+    assert stream.getvalue() == ""
 
 
 def test_context_manager_exception_handling():
@@ -719,35 +718,34 @@ def test_multiple_modes_context_manager():
 ])
 def test_dec_modes_context_with_dec_private_mode_enum(method_name, mock_response):
     """Test dec_modes_enabled/disabled with DecPrivateMode instance values."""
-    stream = io.StringIO()
-    term = TestTerminal(stream=stream, force_styling=True)
-    term._is_a_tty = True
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
 
-    response_value = getattr(DecModeResponse, mock_response)
-    term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, response_value)
+        response_value = getattr(DecModeResponse, mock_response)
+        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, response_value)
 
-    context_manager = getattr(term, method_name)
-    with context_manager(_DPM(2004), timeout=0.01):
-        pass
+        context_manager = getattr(term, method_name)
+        with context_manager(_DPM(2004), timeout=0.01):
+            pass
 
-    output = stream.getvalue()
-    assert '\x1b[?2004' in output
+        output = stream.getvalue()
+        assert '\x1b[?2004' in output
+    child()
 
 
 def test_int_mode_parameters():
     """Test that integer mode parameters work correctly."""
     stream = io.StringIO()
     term = TestTerminal(stream=stream, force_styling=False)
-
     response = term.get_dec_mode(_DPM.DECTCEM)
     assert response.value == DecModeResponse.NOT_QUERIED
-
     with term.dec_modes_enabled(_DPM.DECTCEM, _DPM.BRACKETED_PASTE):
         pass
-
     with term.dec_modes_disabled(_DPM.DECTCEM, _DPM.BRACKETED_PASTE):
         pass
-
     assert stream.getvalue() == ""
 
 
@@ -787,24 +785,17 @@ def test_sugary_context_managers(method_name, expected_mode):
 ])
 def test_sugary_context_managers_no_styling(method_name):
     """Test sugary context managers do nothing when does_styling is False."""
-    stream = io.StringIO()
-    term = TestTerminal(stream=stream, force_styling=False)
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=False)
 
-    method = getattr(term, method_name)
-    with method():
-        pass
+        method = getattr(term, method_name)
+        with method():
+            pass
 
-    assert stream.getvalue() == ""
-
-
-def test_sugared_modes_attribute_exists():
-    """Test DecPrivateMode has sugared_modes attribute."""
-    assert hasattr(DecPrivateMode, 'sugared_modes')
-    assert isinstance(DecPrivateMode.sugared_modes, dict)
-    assert 'bracketed_paste' in DecPrivateMode.sugared_modes
-    assert 'synchronized_output' in DecPrivateMode.sugared_modes
-    assert 'focus_events' in DecPrivateMode.sugared_modes
-    assert 'mouse_enabled' in DecPrivateMode.sugared_modes
+        assert stream.getvalue() == ""
+    child()
 
 
 @pytest.mark.parametrize("kwargs,expected_modes", [
@@ -854,38 +845,43 @@ def test_sugared_modes_attribute_exists():
 ])
 def test_mouse_enabled_variations(kwargs, expected_modes):
     """Test mouse_enabled with various parameter combinations and precedence."""
-    stream = io.StringIO()
-    term = TestTerminal(stream=stream, force_styling=True)
-    term._is_a_tty = True
-    modes_str = ';'.join(expected_modes)
-    expected_enable = f'\x1b[?{modes_str}h'
-    expected_disable = f'\x1b[?{modes_str}l'
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        modes_str = ';'.join(expected_modes)
+        expected_enable = f'\x1b[?{modes_str}h'
+        expected_disable = f'\x1b[?{modes_str}l'
 
-    term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.RESET)
+        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.RESET)
 
-    with term.mouse_enabled(**kwargs):
-        pass
+        with term.mouse_enabled(**kwargs):
+            pass
 
-    output = stream.getvalue()
+        output = stream.getvalue()
 
-    assert expected_enable in output, (
-        f"Enable sequence {expected_enable!r} not found in output: {output!r}"
-    )
-    assert expected_disable in output, (
-        f"Disable sequence {expected_disable!r} not found in output: {output!r}"
-    )
+        assert expected_enable in output, (
+            f"Enable sequence {expected_enable!r} not found in output: {output!r}"
+        )
+        assert expected_disable in output, (
+            f"Disable sequence {expected_disable!r} not found in output: {output!r}"
+        )
+    child()
 
 
 def test_does_mouse_with_no_tracking_modes():
     """Test does_mouse with all tracking modes disabled."""
-    stream = io.StringIO()
-    term = TestTerminal(stream=stream, force_styling=True)
-    term._is_a_tty = True
+    @as_subprocess
+    def test():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
 
-    term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.SET)
+        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.SET)
 
-    result = term.does_mouse(clicks=False, report_drag=False, report_motion=False, timeout=0.01)
-    assert result is True
+        result = term.does_mouse(clicks=False, report_drag=False, report_motion=False, timeout=0.01)
+        assert result is True
 
 
 @pytest.mark.parametrize("sequence", [

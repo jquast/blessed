@@ -66,6 +66,61 @@ if TEST_QUICK:
     many_columns_params = [25, ]
 
 
+@pytest.fixture(autouse=True)
+def detect_curses_contamination(request):
+    """
+    Detect when Terminal() is instantiated in parent pytest process.
+
+    The curses module can only call setupterm() once per process. If a test
+    instantiates Terminal() in the parent pytest process (instead of within
+    @as_subprocess), it contaminates all subsequent tests that try to use
+    a different terminal kind.
+
+    This fixture runs automatically for all tests and fails any test that
+    initializes curses in the parent process.
+    """
+    if IS_WINDOWS:
+        # Windows doesn't have the curses singleton limitation
+        yield
+        return
+
+    # Import here to avoid issues if module not yet imported
+    import blessed.terminal  # pylint: disable=import-outside-toplevel
+
+    # Record the state before the test
+    before = blessed.terminal._CUR_TERM
+
+    # Run the test
+    yield
+
+    # Check if curses was initialized during the test
+    after = blessed.terminal._CUR_TERM
+
+    if before is None and after is not None:
+        # Curses was initialized during this test in the parent process
+        test_name = request.node.nodeid
+        pytest.fail(
+            f"\n{'=' * 70}\n"
+            f"CURSES CONTAMINATION DETECTED in parent pytest process!\n"
+            f"Test: {test_name}\n"
+            f"Terminal kind initialized: {after}\n"
+            f"\n"
+            f"This test instantiated Terminal() or TestTerminal() in the parent\n"
+            f"pytest process instead of within @as_subprocess. This causes curses\n"
+            f"to be initialized with a specific terminal kind, which cannot be\n"
+            f"changed for the remainder of the test session, breaking later tests!\n"
+            f"\n"
+            f"FIX: Ensure Terminal() instantiation is within @as_subprocess:\n"
+            f"  @as_subprocess\n"
+            f"  def child():\n"
+            f"      term = TestTerminal(...)\n"
+            f"      ...\n"
+            f"      assert ..\n"
+            f"  child()\n"
+            f"{'=' * 70}\n"
+        )
+
+
 @pytest.fixture(params=all_terms_params)
 def all_terms(request):
     """Common kind values for all kinds of terminals."""
