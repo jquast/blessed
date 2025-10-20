@@ -829,9 +829,6 @@ class Terminal():
         When :attr:`is_a_tty` is False, no sequences are transmitted or response
         awaited, and ``None`` is returned without inquiry.
 
-        When :attr:`is_a_tty` is False, no sequences are transmitted or response
-        awaited, and ``None`` is returned without inquiry.
-
         If a Device Attributes query fails to respond within the ``timeout``
         specified, ``None`` is returned. If this was the first query for device
         attributes, all subsequent queries return ``None`` unless ``force=True``
