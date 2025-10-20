@@ -634,8 +634,8 @@ class Terminal():
         :return: re.match object for response_re or None if not found
         :rtype: re.Match
         """
-        # No query is ever done for terminals where does_styling or is_a_tty is False
-        if not self.does_styling or not self.is_a_tty:
+        # No query is ever done for terminals where is_a_tty is False
+        if not self.is_a_tty:
             return None
 
         # Avoid changing user's desired raw or cbreak mode if already entered,
@@ -725,9 +725,8 @@ class Terminal():
         r"""
         Return tuple (row, column) of cursor position.
 
-        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
-        transmitted or response awaited, and the value ``(-1, -1)`` is returned
-        without inquiry.
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and the value ``(-1, -1)`` is returned without inquiry.
 
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1)`` indicating
             that the remote end did not respond.
@@ -803,9 +802,8 @@ class Terminal():
         """
         Return tuple (r, g, b) of foreground color.
 
-        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
-        transmitted or response awaited, and the value ``(-1, -1, -1)`` is returned
-        without inquiry.
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and the value ``(-1, -1, -1)`` is returned without inquiry.
 
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1, -1)``
             indicating that the remote end did not respond.
@@ -823,9 +821,8 @@ class Terminal():
         """
         Return tuple (r, g, b) of background color.
 
-        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
-        transmitted or response awaited, and the value ``(-1, -1, -1)`` is returned
-        without inquiry.
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and the value ``(-1, -1, -1)`` is returned without inquiry.
 
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1, -1)``
             indicating that the remote end did not respond.
@@ -844,8 +841,8 @@ class Terminal():
         """
         Query the terminal's Device Attributes (DA1).
 
-        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
-        transmitted or response awaited, and ``None`` is returned without inquiry.
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``None`` is returned without inquiry.
 
         If a Device Attributes query fails to respond within the ``timeout``
         specified, ``None`` is returned. If this was the first query for device
@@ -962,8 +959,8 @@ class Terminal():
         Sixel is a bitmap graphics format supported by some modern terminal
         emulators, allowing applications to display inline images.
 
-        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
-        transmitted or response awaited, and ``False`` is returned without inquiry.
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``False`` is returned without inquiry.
 
         This method calls :meth:`get_device_attributes` to query the terminal's
         capabilities and checks for sixel support (extension 4 in the DA1 response).
@@ -1462,8 +1459,8 @@ class Terminal():
         XTWINOPS window size query if the terminal doesn't support XTSMGRAPHICS
         or reports unrealistic dimensions.
 
-        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
-        transmitted or response awaited, and ``(-1, -1)`` is returned without inquiry.
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``(-1, -1)`` is returned without inquiry.
 
         :arg float timeout: Timeout in seconds for both possible queries
         :arg bool force: Bypass cache and re-query the terminal
@@ -1522,8 +1519,8 @@ class Terminal():
         advertises Sixel support via DA1 (Device Attributes), returns 256
         as a sensible default.
 
-        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
-        transmitted or response awaited, and ``-1`` is returned without inquiry.
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``-1`` is returned without inquiry.
 
         :arg float timeout: Timeout in seconds for both possible queries
         :arg bool force: Bypass cache and re-query the terminal
@@ -1557,8 +1554,8 @@ class Terminal():
 
         Returns the height and width in pixels of a single character cell.
 
-        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
-        transmitted or response awaited, and ``(-1, -1)`` is returned without inquiry.
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``(-1, -1)`` is returned without inquiry.
 
         :arg float timeout: Timeout in seconds for the query
         :arg bool force: Bypass cache and re-query the terminal
