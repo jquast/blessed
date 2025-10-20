@@ -18,7 +18,6 @@ Text format varies by terminal:
 """
 # std
 import time
-import re
 
 # 3rd party
 import pytest
@@ -37,75 +36,28 @@ pytestmark = pytest.mark.skipif(
     reason="Timing-sensitive tests please do not run on build farms.")
 
 
-def test_software_version_from_string_parentheses_format():
-    """Test SoftwareVersion.from_match() with parentheses format."""
-    pattern = re.compile(r'\x1bP>\|(.+?)\x1b\\')
-    match = pattern.match('\x1bP>|kitty(0.24.2)\x1b\\')
+@pytest.mark.parametrize("response,expected_name,expected_version", [
+    ('\x1bP>|kitty(0.24.2)\x1b\\', 'kitty', '0.24.2'),
+    ('\x1bP>|tmux 3.2a\x1b\\', 'tmux', '3.2a'),
+    ('\x1bP>|foot\x1b\\', 'foot', ''),
+    ('\x1bP>|WezTerm 20220207-230252-0826fb06\x1b\\', 'WezTerm', '20220207-230252-0826fb06'),
+    ('\x1bP>|XTerm(367)\x1b\\', 'XTerm', '367'),
+    ('\x1bP>|X.Org 7.7.0(370)\x1b\\', 'X.Org', '7.7.0(370)'),
+])
+def test_software_version_from_match(response, expected_name, expected_version):
+    """Test SoftwareVersion.from_match() with various response formats."""
+    match = SoftwareVersion.RE_RESPONSE.match(response)
     sv = SoftwareVersion.from_match(match)
     assert sv is not None
-    assert sv.name == 'kitty'
-    assert sv.version == '0.24.2'
-    assert sv.raw == '\x1bP>|kitty(0.24.2)\x1b\\'
+    assert sv.name == expected_name
+    assert sv.version == expected_version
+    assert sv.raw == response
 
 
-def test_software_version_from_string_space_format():
-    """Test SoftwareVersion.from_match() with space-separated format."""
-    pattern = re.compile(r'\x1bP>\|(.+?)\x1b\\')
-    match = pattern.match('\x1bP>|tmux 3.2a\x1b\\')
-    sv = SoftwareVersion.from_match(match)
-    assert sv is not None
-    assert sv.name == 'tmux'
-    assert sv.version == '3.2a'
-    assert sv.raw == '\x1bP>|tmux 3.2a\x1b\\'
-
-
-def test_software_version_from_string_name_only():
-    """Test SoftwareVersion.from_match() with name-only format."""
-    pattern = re.compile(r'\x1bP>\|(.+?)\x1b\\')
-    match = pattern.match('\x1bP>|foot\x1b\\')
-    sv = SoftwareVersion.from_match(match)
-    assert sv is not None
-    assert sv.name == 'foot'
-    assert sv.version == ''
-    assert sv.raw == '\x1bP>|foot\x1b\\'
-
-
-def test_software_version_from_string_complex_version():
-    """Test SoftwareVersion.from_match() with complex version string."""
-    pattern = re.compile(r'\x1bP>\|(.+?)\x1b\\')
-    match = pattern.match('\x1bP>|WezTerm 20220207-230252-0826fb06\x1b\\')
-    sv = SoftwareVersion.from_match(match)
-    assert sv is not None
-    assert sv.name == 'WezTerm'
-    assert sv.version == '20220207-230252-0826fb06'
-
-
-def test_software_version_from_string_xterm_format():
-    """Test SoftwareVersion.from_match() with XTerm format."""
-    pattern = re.compile(r'\x1bP>\|(.+?)\x1b\\')
-    match = pattern.match('\x1bP>|XTerm(367)\x1b\\')
-    sv = SoftwareVersion.from_match(match)
-    assert sv is not None
-    assert sv.name == 'XTerm'
-    assert sv.version == '367'
-
-
-def test_software_version_from_string_xorg_format():
-    """Test SoftwareVersion.from_match() with X.Org complex format."""
-    pattern = re.compile(r'\x1bP>\|(.+?)\x1b\\')
-    match = pattern.match('\x1bP>|X.Org 7.7.0(370)\x1b\\')
-    sv = SoftwareVersion.from_match(match)
-    assert sv is not None
-    assert sv.name == 'X.Org'
-    assert sv.version == '7.7.0(370)'
-
-
-def test_software_version_from_string_invalid():
+@pytest.mark.parametrize("invalid_input", ['invalid', ''])
+def test_software_version_from_match_invalid(invalid_input):
     """Test SoftwareVersion.from_match() with invalid input."""
-    pattern = re.compile(r'\x1bP>\|(.+?)\x1b\\')
-    match = pattern.match('invalid')
-    assert match is None
-    match = pattern.match('')
+    match = SoftwareVersion.RE_RESPONSE.match(invalid_input)
     assert match is None
 
 
@@ -118,88 +70,39 @@ def test_software_version_repr():
     assert "version='0.24.2'" in repr_str
 
 
-def test_software_version_parse_text_parentheses():
-    """Test SoftwareVersion._parse_text() with parentheses format."""
-    name, version = SoftwareVersion._parse_text('kitty(0.24.2)')
-    assert name == 'kitty'
-    assert version == '0.24.2'
+@pytest.mark.parametrize("text,expected_name,expected_version", [
+    ('kitty(0.24.2)', 'kitty', '0.24.2'),
+    ('tmux 3.2a', 'tmux', '3.2a'),
+    ('foot', 'foot', ''),
+    ('WezTerm 20220207-230252-0826fb06', 'WezTerm', '20220207-230252-0826fb06'),
+])
+def test_software_version_parse_text(text, expected_name, expected_version):
+    """Test SoftwareVersion._parse_text() with various formats."""
+    name, version = SoftwareVersion._parse_text(text)
+    assert name == expected_name
+    assert version == expected_version
 
 
-def test_software_version_parse_text_space():
-    """Test SoftwareVersion._parse_text() with space-separated format."""
-    name, version = SoftwareVersion._parse_text('tmux 3.2a')
-    assert name == 'tmux'
-    assert version == '3.2a'
-
-
-def test_software_version_parse_text_name_only():
-    """Test SoftwareVersion._parse_text() with name-only format."""
-    name, version = SoftwareVersion._parse_text('foot')
-    assert name == 'foot'
-    assert version == ''
-
-
-def test_software_version_parse_text_complex():
-    """Test SoftwareVersion._parse_text() with complex version."""
-    name, version = SoftwareVersion._parse_text('WezTerm 20220207-230252-0826fb06')
-    assert name == 'WezTerm'
-    assert version == '20220207-230252-0826fb06'
-
-
-def test_get_software_version_via_ungetch_kitty():
-    """Test get_software_version() with kitty response via ungetch."""
+@pytest.mark.parametrize("response,expected_name,expected_version,test_suffix", [
+    ('\x1bP>|kitty(0.24.2)\x1b\\', 'kitty', '0.24.2', 'OK'),
+    ('\x1bP>|XTerm(367)\x1b\\', 'XTerm', '367', 'XTERM'),
+    ('\x1bP>|tmux 3.2a\x1b\\', 'tmux', '3.2a', 'TMUX'),
+    ('\x1bP>|WezTerm 20220207-230252-0826fb06\x1b\\',
+     'WezTerm', '20220207-230252-0826fb06', 'WEZTERM'),
+])
+def test_get_software_version_via_ungetch(response, expected_name, expected_version, test_suffix):
+    """Test get_software_version() with various terminal responses via ungetch."""
     def child(term):
-        term.ungetch('\x1bP>|kitty(0.24.2)\x1b\\')
+        term.ungetch(response)
         sv = term.get_software_version(timeout=0.01)
         assert sv is not None
-        assert sv.name == 'kitty'
-        assert sv.version == '0.24.2'
-        return b'OK'
+        assert sv.name == expected_name
+        assert sv.version == expected_version
+        return test_suffix.encode('ascii')
 
-    output = pty_test(child, parent_func=None, test_name='test_get_software_version_kitty')
-    assert output == '\x1b[>qOK'
-
-
-def test_get_software_version_via_ungetch_xterm():
-    """Test get_software_version() with XTerm response via ungetch."""
-    def child(term):
-        term.ungetch('\x1bP>|XTerm(367)\x1b\\')
-        sv = term.get_software_version(timeout=0.01)
-        assert sv is not None
-        assert sv.name == 'XTerm'
-        assert sv.version == '367'
-        return b'XTERM'
-
-    output = pty_test(child, parent_func=None, test_name='test_get_software_version_xterm')
-    assert output == '\x1b[>qXTERM'
-
-
-def test_get_software_version_via_ungetch_tmux():
-    """Test get_software_version() with tmux response via ungetch."""
-    def child(term):
-        term.ungetch('\x1bP>|tmux 3.2a\x1b\\')
-        sv = term.get_software_version(timeout=0.01)
-        assert sv is not None
-        assert sv.name == 'tmux'
-        assert sv.version == '3.2a'
-        return b'TMUX'
-
-    output = pty_test(child, parent_func=None, test_name='test_get_software_version_tmux')
-    assert output == '\x1b[>qTMUX'
-
-
-def test_get_software_version_via_ungetch_wezterm():
-    """Test get_software_version() with WezTerm response via ungetch."""
-    def child(term):
-        term.ungetch('\x1bP>|WezTerm 20220207-230252-0826fb06\x1b\\')
-        sv = term.get_software_version(timeout=0.01)
-        assert sv is not None
-        assert sv.name == 'WezTerm'
-        assert sv.version == '20220207-230252-0826fb06'
-        return b'WEZTERM'
-
-    output = pty_test(child, parent_func=None, test_name='test_get_software_version_wezterm')
-    assert output == '\x1b[>qWEZTERM'
+    output = pty_test(child, parent_func=None,
+                      test_name=f'test_get_software_version_{test_suffix.lower()}')
+    assert output == f'\x1b[>q{test_suffix}'
 
 
 def test_get_software_version_timeout():
@@ -290,8 +193,7 @@ def test_get_software_version_retry_after_timeout():
 def test_get_software_version_raw_stored():
     """Test SoftwareVersion stores raw response string."""
     raw = '\x1bP>|kitty(0.24.2)\x1b\\'
-    pattern = re.compile(r'\x1bP>\|(.+?)\x1b\\')
-    match = pattern.match(raw)
+    match = SoftwareVersion.RE_RESPONSE.match(raw)
     sv = SoftwareVersion.from_match(match)
     assert sv is not None
     assert sv.raw == raw
@@ -316,25 +218,3 @@ def test_software_version_init():
     assert sv.raw == '\x1bP>|kitty(0.24.2)\x1b\\'
     assert sv.name == 'kitty'
     assert sv.version == '0.24.2'
-
-
-def test_software_version_from_match():
-    """Test SoftwareVersion.from_match() method."""
-    pattern = re.compile(r'\x1bP>\|(.+?)\x1b\\')
-    match = pattern.match('\x1bP>|kitty(0.24.2)\x1b\\')
-
-    sv = SoftwareVersion.from_match(match)
-    assert sv is not None
-    assert sv.name == 'kitty'
-    assert sv.version == '0.24.2'
-
-
-def test_software_version_from_match_space_format():
-    """Test SoftwareVersion.from_match() with space-separated format."""
-    pattern = re.compile(r'\x1bP>\|(.+?)\x1b\\')
-    match = pattern.match('\x1bP>|tmux 3.2a\x1b\\')
-
-    sv = SoftwareVersion.from_match(match)
-    assert sv is not None
-    assert sv.name == 'tmux'
-    assert sv.version == '3.2a'

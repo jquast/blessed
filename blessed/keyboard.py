@@ -2131,6 +2131,8 @@ class DeviceAttribute():
 class SoftwareVersion:
     """Represents a terminal's software name and version from XTVERSION response."""
 
+    RE_RESPONSE = re.compile(r'\x1bP>\|(.+?)\x1b\\')
+
     def __init__(self, raw: str, name: str, version: str) -> None:
         """
         Initialize SoftwareVersion instance.
