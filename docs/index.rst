@@ -10,6 +10,8 @@ Welcome to Blessed documentation!
    colors
    keyboard
    keyboard_kitty
+   mouse
+   dec_modes
    location
    measuring
    examples

@@ -9,6 +9,7 @@ Version History
     terminals, :ghpull:`298`.
   * Enhanced keyboard support with Modifier keys, :ghpull:`306`.
   * Kitty keyboard protocol support, :ghpull:`309`.
+  * Mouse support, Synchronized Output, and support for DEC Private Modes, :ghpull:`310`
 
 1.22
   * performance improvements to :meth:`~Terminal.length` and

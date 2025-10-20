@@ -30,7 +30,7 @@ got_sigwinch = False
 
 pytestmark = pytest.mark.skipif(
     not TEST_KEYBOARD or IS_WINDOWS,
-    reason="Timing-sensitive tests please do not run on build farms.")
+    reason="Timing-sensitive tests excluded, or, windows incompatible")
 
 
 def assert_elapsed_range_ms(start_time, min_ms, max_ms):
@@ -664,6 +664,45 @@ def test_detached_stdout():
     pid, status = os.waitpid(pid, 0)
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
+
+
+@pytest.mark.skipif(not TEST_KEYBOARD or IS_WINDOWS, reason="Requires TTY")
+def test_cbreak_with_has_tty():
+    """Test cbreak() context manager with HAS_TTY=True"""
+    def child(term):
+        # This test exercises the HAS_TTY path in cbreak()
+        # Lines 2128-2140 in terminal.py
+        with term.cbreak():
+            # Verify we're in cbreak mode
+            assert term._line_buffered is False
+            # Write something to indicate success
+            return b'CBREAK_OK'
+        # After exiting context, line_buffered should be restored
+        return b'RESTORED'
+
+    output = pty_test(child, parent_func=None, test_name='test_cbreak_with_has_tty')
+    assert 'CBREAK_OK' in output or 'RESTORED' in output
+
+
+def test_inkey_with_csi_sequence_triggers_latin1_decoding():
+    """Test that CSI sequences trigger Latin1 decoding path in inkey()"""
+    def child(term):
+        # Send a CSI sequence to trigger Latin1 decoding
+        # This tests lines 2286-2296, 2315-2319, 2324->2330
+        os.write(sys.__stdout__.fileno(), SEMAPHORE)
+        with term.cbreak():
+            # The CSI sequence should trigger _use_latin1_decoding
+            ks = term.inkey(timeout=0.5)
+            return ks.name.encode('ascii') if ks.name else b'EMPTY'
+
+    def parent(master_fd):
+        read_until_semaphore(master_fd)
+        # Send a CSI sequence (arrow key)
+        os.write(master_fd, b'\x1b[A')
+        time.sleep(0.05)
+
+    output = pty_test(child, parent, 'test_inkey_with_csi_sequence_triggers_latin1_decoding')
+    assert output == 'KEY_UP'
 
 
 def test_read_until_pattern_found():

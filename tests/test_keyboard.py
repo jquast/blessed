@@ -320,6 +320,7 @@ def test_resolve_sequence_order():
     assert ks == ''
     assert ks.name is None
     assert ks.code is None
+    assert ks.mode is None
     assert not ks.is_sequence
     assert repr(ks) == "''"
 
@@ -327,6 +328,7 @@ def test_resolve_sequence_order():
     assert ks == 'n'
     assert ks.name is None
     assert ks.code is None
+    assert ks.mode is None
     assert not ks.is_sequence
     assert repr(ks) == "'n'"
 
@@ -335,6 +337,7 @@ def test_resolve_sequence_order():
     assert ks.name == 'KEY_SEQ1'
     assert ks.code == 1
     assert ks.is_sequence
+    assert ks.mode is None
     assert repr(ks) == "KEY_SEQ1"
 
     ks = resolve_sequence('LONGSEQ_longer', mapper, codes)
@@ -342,6 +345,7 @@ def test_resolve_sequence_order():
     assert ks.name == 'KEY_LONGSEQ'
     assert ks.code == 4
     assert ks.is_sequence
+    assert ks.mode is None
     assert repr(ks) == "KEY_LONGSEQ"
 
     ks = resolve_sequence('LONGSEQ', mapper, codes)
@@ -349,6 +353,7 @@ def test_resolve_sequence_order():
     assert ks.name == 'KEY_LONGSEQ'
     assert ks.code == 4
     assert ks.is_sequence
+    assert ks.mode is None
     assert repr(ks) == "KEY_LONGSEQ"
 
     ks = resolve_sequence('Lxxxxx', mapper, codes)
@@ -356,6 +361,7 @@ def test_resolve_sequence_order():
     assert ks.name == 'KEY_L'
     assert ks.code == 6
     assert ks.is_sequence
+    assert ks.mode is None
     assert repr(ks) == "KEY_L"
 
 
