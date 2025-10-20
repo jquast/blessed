@@ -855,8 +855,8 @@ class Terminal():
         :meth:`enable_kitty_keyboard` context manager on entrance to discover
         and restore the previous state on exit.
 
-        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
-        transmitted or response awaited, and ``None`` is returned.
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``None`` is returned.
 
         In many cases a ``timeout`` value (in seconds) should be set, as it is
         possible for a terminal that succeeds :attr:`does_styling` and
@@ -896,8 +896,8 @@ class Terminal():
         # Note that Kitty **does not answer** to DA1 despite making this very
         # recommendation! So we must handle all possible 2x2 match combinations:
         # DA1 + Kitty, !DA1 + Kitty, DA1 + !Kitty, and !DA1 and !Kitty (timeout)
-        if not self.does_styling or not self.is_a_tty:
-            # no query is ever done for terminals where does_styling or is_a_tty is False
+        if not self.is_a_tty:
+            # no query is ever done for terminals where is_a_tty is False
             return None
 
         if self._kitty_kb_first_query_failed and not force:
