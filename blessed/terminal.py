@@ -260,6 +260,11 @@ class Terminal():
         # Cache for get_cell_height_and_width() - (height, width) or (-1, -1)
         self._xtwinops_cell_cache: Optional[Tuple[int, int]] = None
 
+        # Cache for in-band resize notifications (mode 2048)
+        # When notify_on_resize() context manager is active, this stores the latest
+        # terminal dimensions from resize events
+        self._preferred_size_cache: Optional["WINSZ"] = None
+
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
         if os.getenv('NO_COLOR'):
@@ -596,6 +601,10 @@ class Terminal():
             .. note:: the peculiar (height, width, width, height) order, which
                matches the return order of TIOCGWINSZ!
         """
+        # Return preferred cache if available (from in-band resize notifications)
+        if self._preferred_size_cache is not None:
+            return self._preferred_size_cache
+
         for fd in (self._init_descriptor, sys.__stdout__):
             try:
                 if fd is not None:
@@ -619,8 +628,8 @@ class Terminal():
         :return: re.match object for response_re or None if not found
         :rtype: re.Match
         """
-        # No query is ever done for terminals where is_a_tty is False
-        if not self.is_a_tty:
+        # No query is ever done for terminals where does_styling or is_a_tty is False
+        if not self.does_styling or not self.is_a_tty:
             return None
 
         # Avoid changing user's desired raw or cbreak mode if already entered,
@@ -710,8 +719,9 @@ class Terminal():
         r"""
         Return tuple (row, column) of cursor position.
 
-        When :attr:`is_a_tty` is False, no sequences are transmitted or response
-        awaited, and the value ``(-1, -1)`` is returned without inquiry.
+        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
+        transmitted or response awaited, and the value ``(-1, -1)`` is returned
+        without inquiry.
 
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1)`` indicating
             that the remote end did not respond.
@@ -787,8 +797,9 @@ class Terminal():
         """
         Return tuple (r, g, b) of foreground color.
 
-        When :attr:`is_a_tty` is False, no sequences are transmitted or response
-        awaited, and the value ``(-1, -1, -1)`` is returned without inquiry.
+        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
+        transmitted or response awaited, and the value ``(-1, -1, -1)`` is returned
+        without inquiry.
 
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1, -1)``
             indicating that the remote end did not respond.
@@ -806,8 +817,9 @@ class Terminal():
         """
         Return tuple (r, g, b) of background color.
 
-        When :attr:`is_a_tty` is False, no sequences are transmitted or response
-        awaited, and the value ``(-1, -1, -1)`` is returned without inquiry.
+        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
+        transmitted or response awaited, and the value ``(-1, -1, -1)`` is returned
+        without inquiry.
 
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1, -1)``
             indicating that the remote end did not respond.
@@ -826,11 +838,8 @@ class Terminal():
         """
         Query the terminal's Device Attributes (DA1).
 
-        When :attr:`is_a_tty` is False, no sequences are transmitted or response
-        awaited, and ``None`` is returned without inquiry.
-
-        When :attr:`is_a_tty` is False, no sequences are transmitted or response
-        awaited, and ``None`` is returned without inquiry.
+        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
+        transmitted or response awaited, and ``None`` is returned without inquiry.
 
         If a Device Attributes query fails to respond within the ``timeout``
         specified, ``None`` is returned. If this was the first query for device
@@ -892,8 +901,8 @@ class Terminal():
         Sixel is a bitmap graphics format supported by some modern terminal
         emulators, allowing applications to display inline images.
 
-        When :attr:`is_a_tty` is False, no sequences are transmitted or response
-        awaited, and ``False`` is returned without inquiry.
+        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
+        transmitted or response awaited, and ``False`` is returned without inquiry.
 
         This method calls :meth:`get_device_attributes` to query the terminal's
         capabilities and checks for sixel support (extension 4 in the DA1 response).
@@ -1139,6 +1148,32 @@ class Terminal():
 
         return True
 
+    def does_inband_resize(self, timeout: float = 1.0) -> bool:
+        """
+        Check if the terminal supports in-band window resize notifications.
+
+        This method queries whether the terminal supports DEC mode 2048
+        (IN_BAND_WINDOW_RESIZE), which allows receiving resize events as
+        in-band sequences through :meth:`inkey` instead of relying on
+        SIGWINCH signals.
+
+        :arg float timeout: Timeout for mode query (default 1.0s)
+        :returns: True if in-band resize notifications are supported
+        :rtype: bool
+
+        Example::
+
+            if term.does_inband_resize():
+                with term.notify_on_resize():
+                    # Use in-band resize events
+                    pass
+            else:
+                # Fall back to SIGWINCH or other methods
+                pass
+        """
+        response = self.get_dec_mode(_DecPrivateMode.IN_BAND_WINDOW_RESIZE, timeout=timeout)
+        return response.supported
+
     @contextlib.contextmanager
     def mouse_enabled(self, *, clicks: bool = True, report_pixels: bool = False,
                       report_drag: bool = False, report_motion: bool = False,
@@ -1238,6 +1273,43 @@ class Terminal():
         with self.dec_modes_enabled(_DecPrivateMode.FOCUS_IN_OUT_EVENTS, timeout=timeout):
             yield
 
+    @contextlib.contextmanager
+    def notify_on_resize(self, timeout: float = 1.0) -> Generator[None, None, None]:
+        """
+        Context manager for enabling in-band window resize notifications.
+
+        When enabled, the terminal will automatically send resize events as in-band sequences
+        whenever the window size changes. These events are received by :meth:`inkey` as
+        keystroke events with :attr:`~.Keystroke.name` equal to ``'RESIZE_EVENT'``.
+
+        The new dimensions are automatically cached and available immediately through the
+        standard :attr:`height`, :attr:`width`, :attr:`pixel_height`, and :attr:`pixel_width`
+        properties without additional ioctl system calls.
+
+        This is the preferred method for handling terminal resizes as it avoids the race
+        conditions and signal handling complexity of SIGWINCH on Unix systems, and provides
+        a consistent cross-platform API.
+
+        :arg float timeout: Timeout for mode query (default 1.0s)
+
+        Example::
+
+            with term.notify_on_resize():
+                while True:
+                    inp = term.inkey(timeout=0.1)
+                    if inp.name == 'RESIZE_EVENT':
+                        # Dimensions updated automatically
+                        redraw_display(term.height, term.width)
+                    elif inp == 'q':
+                        break
+        """
+        try:
+            with self.dec_modes_enabled(_DecPrivateMode.IN_BAND_WINDOW_RESIZE, timeout=timeout):
+                yield
+        finally:
+            # Clear the cache when exiting the context
+            self._preferred_size_cache = None
+
     def _dec_mode_set_enabled(self, *modes: Union[int, _DecPrivateMode]) -> None:
         """
         Enable one or more DEC Private Modes (DECSET).
@@ -1320,6 +1392,7 @@ class Terminal():
 
     def get_sixel_height_and_width(self, timeout: Optional[float] = 1.0,
                                    force: bool = False) -> Tuple[int, int]:
+        # pylint: disable=too-many-return-statements
         """
         Query sixel graphics pixel dimensions.
 
@@ -1328,14 +1401,24 @@ class Terminal():
         XTWINOPS window size query if the terminal doesn't support XTSMGRAPHICS
         or reports unrealistic dimensions.
 
-        When :attr:`is_a_tty` is False, no sequences are transmitted or response
-        awaited, and ``(-1, -1)`` is returned without inquiry.
+        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
+        transmitted or response awaited, and ``(-1, -1)`` is returned without inquiry.
 
         :arg float timeout: Timeout in seconds for both possible queries
         :arg bool force: Bypass cache and re-query the terminal
         :rtype: tuple
         :returns: ``(height, width)`` in pixels, or ``(-1, -1)`` if unsupported/timeout
         """
+        # Use preferred size cache from in-band resize notifications if available
+        # (unless force=True which requires re-querying)
+        if not force and self._preferred_size_cache is not None:
+            # Extract pixel dimensions from preferred cache
+            # Return them if they're non-zero (terminal supports pixel reporting)
+            if (self._preferred_size_cache.ws_ypixel and
+                    self._preferred_size_cache.ws_xpixel):
+                return (self._preferred_size_cache.ws_ypixel,
+                        self._preferred_size_cache.ws_xpixel)
+
         # Fast path: if both caches are populated (unless force=True), compute result from caches
         if not force and self._xtsmgraphics_cache is not None and self._xtwinops_cache is not None:
             # If XTSMGRAPHICS succeeded, use it
@@ -1378,8 +1461,8 @@ class Terminal():
         advertises Sixel support via DA1 (Device Attributes), returns 256
         as a sensible default.
 
-        When :attr:`is_a_tty` is False, no sequences are transmitted or response
-        awaited, and ``-1`` is returned without inquiry.
+        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
+        transmitted or response awaited, and ``-1`` is returned without inquiry.
 
         :arg float timeout: Timeout in seconds for both possible queries
         :arg bool force: Bypass cache and re-query the terminal
@@ -1413,8 +1496,8 @@ class Terminal():
 
         Returns the height and width in pixels of a single character cell.
 
-        When :attr:`is_a_tty` is False, no sequences are transmitted or response
-        awaited, and ``(-1, -1)`` is returned without inquiry.
+        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
+        transmitted or response awaited, and ``(-1, -1)`` is returned without inquiry.
 
         :arg float timeout: Timeout in seconds for the query
         :arg bool force: Bypass cache and re-query the terminal
@@ -2509,6 +2592,16 @@ class Terminal():
 
         # buffer any remaining text received
         self.ungetch(ucs[len(ks):])
+
+        # Update preferred size cache if this is a resize event
+        if ks._mode == _DecPrivateMode.IN_BAND_WINDOW_RESIZE:  # pylint: disable=protected-access
+            event_vals = ks._mode_values  # pylint: disable=protected-access
+            self._preferred_size_cache = WINSZ(
+                ws_row=event_vals.height_chars,  # type: ignore[union-attr]
+                ws_col=event_vals.width_chars,  # type: ignore[union-attr]
+                ws_xpixel=event_vals.width_pixels,  # type: ignore[union-attr]
+                ws_ypixel=event_vals.height_pixels)  # type: ignore[union-attr]
+
         return ks
 
 
