@@ -63,10 +63,11 @@ keymatrix.py
 ------------
 https://github.com/jquast/blessed/blob/master/bin/keymatrix.py
 
-This program displays a "gameboard" of all known special KEY_NAME
-constants. When the key is depressed, it is highlighted, as well
-as displaying the unicode sequence, integer code, and friendly-name
-of any key pressed.
+This program displays a special REPL for using :meth:`~.inkey` and displaying
+the returned :class:`~.Keystroke` events, their names, events, and values.
+
+This also provides an interface for toggling special modes, such as any of the
+supported Kitty Keyboard Protocols.
 
 .. _on_resize.py:
 

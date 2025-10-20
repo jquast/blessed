@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Core blessed Terminal() tests."""
 
 # std imports
@@ -11,6 +10,7 @@ import platform
 import warnings
 import importlib
 from io import StringIO
+from unittest import mock
 
 # 3rd party
 import pytest
@@ -18,13 +18,6 @@ import pytest
 # local
 from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, unicode_cap, as_subprocess
-
-try:
-    # std imports
-    from unittest import mock
-except ImportError:
-    # 3rd party
-    import mock
 
 
 def test_export_only_Terminal():

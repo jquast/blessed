@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-# pylint: disable=too-many-lines
 """Module containing :class:`Terminal`, the primary API entry point."""
 # std imports
 import os
@@ -354,7 +352,10 @@ class Terminal():
         # Build database of int code <=> KEY_NAME.
         self._keycodes = get_keyboard_codes()
 
-        # Store attributes as: self.KEY_NAME = code.
+        # Store attributes as: self.KEY_NAME = code. These only work for porting
+        # legacy curses applications that used key codes, and are not really
+        # suggested, and they do not support modifier keys, eg. 'KEY_SHIFT_F1'
+        # does not exist and has no code.
         for key_code, key_name in self._keycodes.items():
             setattr(self, key_name, key_code)
 
@@ -514,7 +515,7 @@ class Terminal():
             return WINSZ(*struct.unpack(WINSZ._FMT, data))
         return WINSZ(ws_row=25, ws_col=80, ws_xpixel=0, ws_ypixel=0)
 
-    def _height_and_width(self):    # type: ignore[no-untyped-def]
+    def _height_and_width(self) -> "WINSZ":
         """
         Return a tuple of (terminal height, terminal width).
 
@@ -551,7 +552,7 @@ class Terminal():
                      ws_xpixel=None,
                      ws_ypixel=None)
 
-    def _query_response(self, query_str: str, response_re: str,
+    def _query_response(self, query_str: str, response_re: Union[str, Match[str]],
                         timeout: Optional[float]) -> Optional[Match[str]]:
         """
         Sends a query string to the terminal and waits for a response.
@@ -698,8 +699,7 @@ class Terminal():
 
         response_str = getattr(self, self.caps['cursor_report'].attribute) or '\x1b[%i%d;%dR'
         match = self._query_response(
-            self.u7 or '\x1b[6n', self.caps['cursor_report'].re_compiled.pattern, timeout
-        )
+            self.u7 or '\x1b[6n', self.caps['cursor_report'].re_compiled, timeout)
 
         if match:
             # return matching sequence response, the cursor location.
@@ -1077,7 +1077,7 @@ class Terminal():
         self.__clear_color_capabilities()
 
     @property
-    def _foreground_color(self):  # type: ignore[no-untyped-def]
+    def _foreground_color(self) -> Union[NullCallableString, ParameterizingString]:
         """
         Convenience capability to support :attr:`~.on_color`.
 
@@ -1088,7 +1088,7 @@ class Terminal():
         return self.setaf or self.setf
 
     @property
-    def _background_color(self):  # type: ignore[no-untyped-def]
+    def _background_color(self) -> Union[NullCallableString, ParameterizingString]:
         """
         Convenience capability to support :attr:`~.on_color`.
 
@@ -1287,10 +1287,12 @@ class Terminal():
 
         return lines
 
-    def getch(self) -> str:
+    def getch(self, decode_latin1: bool = False) -> str:
         """
         Read, decode, and return the next byte from the keyboard stream.
 
+        :arg bool decode_latin1: If True, decode byte as latin-1 (for legacy mouse
+            sequences with 8-bit coordinates).
         :rtype: unicode
         :returns: a single unicode character, or ``''`` if a multi-byte
             sequence has not yet been fully received.
@@ -1305,6 +1307,11 @@ class Terminal():
         """
         assert self._keyboard_fd is not None
         byte = os.read(self._keyboard_fd, 1)
+        if decode_latin1:
+            # Latin-1 is a simple 1:1 byte-to-character mapping (0-255)
+            # No incremental decoder needed
+            return chr(byte[0])
+        # Use UTF-8 incremental decoder for multi-byte sequences
         return self._keyboard_decoder.decode(byte, final=False)
 
     def ungetch(self, text: str) -> None:
@@ -1452,6 +1459,37 @@ class Terminal():
             self.stream.write(self.rmkx)
             self.stream.flush()
 
+    def flushinp(self, timeout: float = 0) -> str:
+        r"""
+        Unbuffer and return all input available within ``timeout``.
+
+        When legacy mouse sequence ``'\x1b[M'`` is detected in input stream,
+        all remaining bytes are decoded as latin1 to handle 8-bit coordinates.
+        """
+        stime = time.time()
+        ucs = ''
+        while self._keyboard_buf:
+            ucs += self._keyboard_buf.pop()
+
+        # and receive all immediately available bytes
+        decode_latin1 = False
+        while self.kbhit(timeout=_time_left(stime, timeout)):
+            # Use latin-1 decoding for legacy mouse sequences (ESC[M) which may
+            # contain high bytes (≥0x80) for coordinates > 127. Only check for
+            # '\x1b[M' when not already found (performance optimization).
+            decode_latin1 = decode_latin1 or '\x1b[M' in ucs
+            ucs += self.getch(decode_latin1=decode_latin1)
+        return ucs
+
+    def _is_incomplete_keystroke(self, text: str) -> bool:
+        # Check if text is an incomplete keystroke sequence: returns True if text
+        # matches (exact), builds toward (partial), or extends beyond a known prefix
+        if not text:
+            return False
+        return (text in self._keymap_prefixes or
+                any(text.startswith(p) for p in self._keymap_prefixes) or
+                any(p.startswith(text) for p in self._keymap_prefixes))
+
     def inkey(self, timeout: Optional[float] = None,
               esc_delay: float = DEFAULT_ESCDELAY) -> Keystroke:
         r"""
@@ -1490,25 +1528,26 @@ class Terminal():
         _`ncurses(3)`: https://www.man7.org/linux/man-pages/man3/ncurses.3x.html
         """
         stime = time.time()
+        ucs = self.flushinp()
 
-        # re-buffer previously received keystrokes,
-        ucs = ''
-        while self._keyboard_buf:
-            ucs += self._keyboard_buf.pop()
-
-        # receive all immediately available bytes
-        while self.kbhit(timeout=0):
-            ucs += self.getch()
-
-        # decode keystroke, if any
-        ks = resolve_sequence(ucs, self._keymap, self._keycodes)
+        # decode buffered keystroke, if any
+        ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                              final=False)
 
         # so long as the most immediately received or buffered keystroke is
         # incomplete, (which may be a multibyte encoding), block until until
-        # one is received.
+        # a sequence is completed.
         while not ks and self.kbhit(timeout=_time_left(stime, timeout)):
-            ucs += self.getch()
-            ks = resolve_sequence(ucs, self._keymap, self._keycodes)
+            # receive any next byte
+            ucs += self.getch(decode_latin1=ucs.startswith('\x1b[M'))
+
+            # and all other immediately available bytes
+            while self.kbhit(timeout=0):
+                ucs += self.getch(decode_latin1=ucs.startswith('\x1b[M'))
+
+            # and then resolve for sequence
+            ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                                  final=False)
 
         # handle escape key (KEY_ESCAPE) vs. escape sequence (like those
         # that begin with \x1b[ or \x1bO) up to esc_delay when
@@ -1523,10 +1562,25 @@ class Terminal():
         if ks.code == self.KEY_ESCAPE:
             esctime = time.time()
             while (ks.code == self.KEY_ESCAPE
-                   and ucs in self._keymap_prefixes
+                   and self._is_incomplete_keystroke(ucs)
                    and self.kbhit(timeout=_time_left(esctime, esc_delay))):
-                ucs += self.getch()
-                ks = resolve_sequence(ucs, self._keymap, self._keycodes)
+                ucs += self.getch(decode_latin1=ucs.startswith('\x1b[M'))
+                # re-check 'final' after reading more bytes
+                final = bool(ucs) and not self._is_incomplete_keystroke(ucs)
+                ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                                      final=final)
+
+            # If we still have KEY_ESCAPE and ucs is a prefix, resolve with final=True
+            # to handle unmatched sequences like '\x1b[' (CSI)
+            if ks.code == self.KEY_ESCAPE and self._is_incomplete_keystroke(ucs):
+                ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                                      final=True)
+
+            # If we still have a prefix after the loop exits (e.g., '\x1b[' with no more input),
+            # resolve it with final=True to properly handle CSI and other Alt sequences
+            if ks.code == self.KEY_ESCAPE and self._is_incomplete_keystroke(ucs):
+                ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
+                                      final=True)
 
         # buffer any remaining text received
         self.ungetch(ucs[len(ks):])
