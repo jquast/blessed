@@ -49,9 +49,10 @@ sequences.
 * Use :attr:`~.Keystroke.name` to identify special keys by name (e.g., ``KEY_F1``, ``KEY_CTRL_Q``)
 * Or, by using magic methods like ``keystroke.is_f1()`` or ``keystroke.is_key_ctrl('q')``.
 
-Be careful printing  :class:`~.Keystroke` objects directly. Our examples uses format string,
-``f'{ks!r}'`` for ``repr()``, because ``str(ks)`` may contain escape sequences
-beginning with (``KEY_ESCAPE``) and are generally unprintable.
+Be careful printing  :class:`~.Keystroke` objects directly. Our examples uses
+format string, ``f'{ks!r}'`` for ``repr()``, because ``str(ks)`` may contain
+control characters or escape sequences beginning with (``KEY_ESCAPE``) and are
+generally unprintable.
 
 Special Keys
 ~~~~~~~~~~~~
@@ -134,6 +135,22 @@ have an empty :attr:`~.Keystroke.value` string.
 Control characters like ``KEY_CTRL_C`` are :attr:`~.Keystroke.value` ``c``
 (lowercase). Similarly for alt, ``KEY_ALT_a`` is :attr:`~.Keystroke.value`
 ``a``.
+
+Event Types
+~~~~~~~~~~~
+
+The :class:`~.Keystroke` class provides properties about key events:
+
+* :attr:`~.Keystroke.pressed` - ``True`` if this is a key press event
+* :attr:`~.Keystroke.repeated` - ``True`` if this is a key repeat event
+* :attr:`~.Keystroke.released` - ``True`` if this is a key release event
+
+**Note:** These event types can only be distinguished when using the :doc:`Kitty
+Keyboard Protocol <keyboard_kitty>`. Without it, all keystrokes will have
+``pressed=True`` and ``repeated=False``, ``released=False``.
+
+See :doc:`keyboard_kitty` for more information about enabling and using the
+Kitty Keyboard Protocol.
 
 Magic Methods
 ~~~~~~~~~~~~~

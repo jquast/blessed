@@ -67,7 +67,7 @@ This program displays a special REPL for using :meth:`~.inkey` and displaying
 the returned :class:`~.Keystroke` events, their names, events, and values.
 
 This also provides an interface for toggling special modes, such as any of the
-supported Kitty Keyboard Protocols.
+supported :ref:`kitty` Keyboard Protocols.
 
 .. _on_resize.py:
 
