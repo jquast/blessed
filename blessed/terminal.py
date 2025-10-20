@@ -27,6 +27,7 @@ from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256col
 from .keyboard import (DEFAULT_ESCDELAY,
                        Keystroke,
                        DeviceAttribute,
+                       SoftwareVersion,
                        KittyKeyboardProtocol,
                        _time_left,
                        _read_until,
@@ -91,6 +92,8 @@ _RE_XTSMGRAPHICS_COLORS_RESPONSE = re.compile(r'\x1b\[\?1;0;(\d+)S')
 _RE_XTWINOPS_14_RESPONSE = re.compile(r'\x1b\[4;(\d+);(\d+)t')
 # XTWINOPS 16t - Query character cell pixel size: ESC[6;<height>;<width>t
 _RE_XTWINOPS_16_RESPONSE = re.compile(r'\x1b\[6;(\d+);(\d+)t')
+_RE_GET_DEVICE_ATTR_RESPONSE = re.compile('\x1b\\[\\?([0-9]+)((?:;[0-9]+)*)c')
+_RE_GET_SOFTWARE_VERSION_RESPONSE = re.compile('\x1bP>\\|(.+?)\x1b\\\\')
 
 
 class Terminal():
@@ -248,6 +251,9 @@ class Terminal():
         # Device Attributes (DA1) cache and sticky failure tracking
         self._device_attributes_cache: Optional[DeviceAttribute] = None
         self._device_attributes_first_query_failed = False
+
+        # Software Version cache
+        self._software_version_cache: Optional[SoftwareVersion] = None
 
         # Initialize sixel graphics query caches,
         # Cache for _get_xtsmgraphics() query result - (height, width) or (-1, -1)
@@ -893,6 +899,61 @@ class Terminal():
             self._device_attributes_cache = result
 
         return result
+
+    def get_software_version(self, timeout: Optional[float] = None,
+                             force: bool = False) -> Optional[SoftwareVersion]:
+        """
+        Query the terminal's software name and version using XTVERSION.
+
+        Sends an XTVERSION query to the terminal and returns a
+        :class:`SoftwareVersion` instance with the terminal's name and version.
+
+        If an XTVERSION query fails to respond within the ``timeout``
+        specified, ``None`` is returned.
+
+        **Successful responses are cached indefinitely** unless ``force=True`` is
+        specified. Unlike other query methods, there is no sticky failure mechanism -
+        each failed query can be retried.
+
+        .. note:: A ``timeout`` value should be set to avoid blocking when the
+            terminal does not respond to XTVERSION queries, which may happen with
+            some kinds of "dumb" terminals.
+
+        :arg float timeout: Timeout in seconds to await terminal response
+        :arg bool force: Force active terminal inquiry even if cached result exists
+        :rtype: SoftwareVersion or None
+        :returns: SoftwareVersion instance with terminal name and version, or None
+            if unsupported/timeout
+
+        .. code-block:: python
+
+            term = Terminal()
+
+            # Query software version
+            sv = term.get_software_version(timeout=1.0)
+            if sv is not None:
+                print(f"Terminal: {sv.name} {sv.version}")
+        """
+        # Return None if not a TTY
+        if not self.is_a_tty:
+            return None
+
+        # Return cached result unless force=True
+        if self._software_version_cache is not None and not force:
+            return self._software_version_cache
+
+        # Build and send query sequence and expected response pattern
+        query = '\x1b[>q'
+
+        match = self._query_response(query, _RE_GET_SOFTWARE_VERSION_RESPONSE, timeout)
+
+        # invalid or no response (timeout)
+        if match is None:
+            return None
+
+        # parse, cache, and return the response
+        self._software_version_cache = SoftwareVersion.from_match(match)
+        return self._software_version_cache
 
     def does_sixel(self, timeout: Optional[float] = 1.0, force: bool = False) -> bool:
         """

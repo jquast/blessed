@@ -2128,6 +2128,68 @@ class DeviceAttribute():
                 f'extensions={self.extensions}, supports_sixel={self.supports_sixel})')
 
 
+class SoftwareVersion:
+    """Represents a terminal's software name and version from XTVERSION response."""
+
+    def __init__(self, raw: str, name: str, version: str) -> None:
+        """
+        Initialize SoftwareVersion instance.
+
+        :arg str raw: Original response string from terminal
+        :arg str name: Software name (e.g., "kitty", "XTerm")
+        :arg str version: Version string (e.g., "0.24.2", "367") or empty string if no version
+        """
+        self.raw = raw
+        self.name = name
+        self.version = version
+
+    @classmethod
+    def from_match(cls, match: Match[str]) -> 'SoftwareVersion':
+        """
+        Create SoftwareVersion from regex match object.
+
+        :arg re.Match match: Regex match object with group for software text
+        :rtype: SoftwareVersion
+        :returns: SoftwareVersion instance parsed from match
+        """
+        text = match.group(1)
+        name, version = cls._parse_text(text)
+        return cls(match.group(0), name, version)
+
+    @staticmethod
+    def _parse_text(text: str) -> typing.Tuple[str, str]:
+        """
+        Parse software name and version from text.
+
+        Parsing logic (in order):
+        1. Check for space-separated format: "tmux 3.2a" or "X.Org 7.7.0(370)"
+        2. Check for parentheses format: "kitty(0.24.2)"
+        3. Name-only format: "software" (version is empty string)
+
+        :arg str text: Text from XTVERSION response
+        :rtype: tuple
+        :returns: Tuple of (name, version) where both are strings
+        """
+        # Check for space-separated format first
+        if ' ' in text:
+            name, version = text.split(' ', 1)
+            return name, version
+
+        # Check for parentheses format
+        if '(' in text:
+            parts = text.split('(', 1)
+            name = parts[0]
+            version = parts[1].rstrip(')')
+            return name, version
+
+        # Name-only format
+        return text, ''
+
+    def __repr__(self) -> str:
+        """String representation of SoftwareVersion."""
+        return f'SoftwareVersion(name={self.name!r}, version={self.version!r})'
+
+
 class KittyKeyboardProtocol:
     """
     Represents Kitty keyboard protocol flags.
@@ -2253,5 +2315,5 @@ class KittyKeyboardProtocol:
 
 __all__ = ('Keystroke', 'get_keyboard_codes', 'get_keyboard_sequences',
            'KittyKeyEvent', 'ModifyOtherKeysEvent', 'LegacyCSIKeyEvent',
-           'KittyKeyboardProtocol', 'DeviceAttribute',
+           'KittyKeyboardProtocol', 'DeviceAttribute', 'SoftwareVersion',
            'BracketedPasteEvent', 'FocusEvent', 'SyncEvent',)
