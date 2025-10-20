@@ -21,8 +21,8 @@ from blessed.keyboard import (
     resolve_sequence,
     OrderedDict,
     get_leading_prefixes,
+    DeviceAttribute,
 )
-from blessed.keyboard import DeviceAttribute
 from .accessories import TestTerminal, as_subprocess, make_enabled_dec_cache
 
 # For backwards compatibility and convenience in tests
@@ -499,7 +499,7 @@ def test_dec_modes_enabled_with_invalid_type():
         term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
 
-        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(
+        term.get_dec_mode = lambda mode_num, timeout=None, force=False: DecModeResponse(
             mode_num, DecModeResponse.RESET)
 
         with pytest.raises(TypeError, match="Invalid mode argument number 0"):
@@ -516,7 +516,8 @@ def test_dec_modes_disabled_with_invalid_type():
         term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
 
-        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.SET)
+        term.get_dec_mode = lambda mode_num, timeout=None, force=False: DecModeResponse(
+            mode_num, DecModeResponse.SET)
 
         # Test with invalid *type*: list [2004] instead of int 2004 or DecPrivateMode(2004)
         # The value 2004 (BRACKETED_PASTE) is valid, but passing it in a list is not accepted
@@ -725,7 +726,8 @@ def test_dec_modes_context_with_dec_private_mode_enum(method_name, mock_response
         term._is_a_tty = True
 
         response_value = getattr(DecModeResponse, mock_response)
-        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, response_value)
+        term.get_dec_mode = lambda mode_num, timeout=None, force=False: DecModeResponse(
+            mode_num, response_value)
 
         context_manager = getattr(term, method_name)
         with context_manager(_DPM(2004), timeout=0.01):
@@ -943,6 +945,7 @@ def test_query_response_with_line_buffered_mode():
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
         term._line_buffered = False
         term._keyboard_fd = None
 
