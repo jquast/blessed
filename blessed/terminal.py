@@ -892,14 +892,14 @@ class Terminal():
         :meth:`DecModeResponse.is_supported`,
         :meth:`DecModeResponse.is_enabled`, etc. to interpret the result.
 
-        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
-        transmitted or response awaited, and the :class:`DecModeResponse` value
-        returned is always :attr:`DecModeResponse.NOT_QUERIED`.
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and the :class:`DecModeResponse` value returned is always
+        :attr:`DecModeResponse.NOT_QUERIED`.
 
         In some cases a ``timeout`` value should be set, as it is possible for a
-        terminal that succeeds :attr:`does_styling` and :attr:`is_a_tty` to fail
-        to respond to DEC Private Modes, such as in a CI Build Service or other
-        "dumb" terminal, even a few popular modern ones such as Konsole.
+        terminal that succeeds :attr:`is_a_tty` to fail to respond to DEC Private
+        Modes, such as in a CI Build Service or other "dumb" terminal, even a few
+        popular modern ones such as Konsole.
 
         If a DEC Private mode query fails to respond within the ``timeout``
         specified, the :class:`DecModeResponse` value returned is
@@ -936,8 +936,8 @@ class Terminal():
             raise TypeError(f"Invalid mode argument, got {mode!r}, "
                             "DecPrivateMode or int expected")
 
-        if not self.does_styling or not self.is_a_tty:
-            # no query is ever done for terminals where does_styling is False
+        if not self.is_a_tty:
+            # no query is ever done for terminals where is_a_tty is False
             return DecModeResponse(mode, DecModeResponse.NOT_QUERIED)
 
         if self._dec_first_query_failed and not force:
@@ -1302,15 +1302,14 @@ class Terminal():
         :meth:`enable_kitty_keyboard` context manager on entrance to discover
         and restore the previous state on exit.
 
-        When :attr:`does_styling` or :attr:`is_a_tty` is False, no sequences are
-        transmitted or response awaited, and ``None`` is returned.
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``None`` is returned.
 
         In many cases a ``timeout`` value (in seconds) should be set, as it is
-        possible for a terminal that succeeds :attr:`does_styling` and
-        :attr:`is_a_tty` to fail to respond to either Kitty keyboard protocol
-        state request, or the simple device attribute request query carried with
-        it! And not just "dumb" terminals fail to respond, even some fairly
-        modern terminals like Konsole.
+        possible for a terminal that succeeds :attr:`is_a_tty` to fail to respond
+        to either Kitty keyboard protocol state request, or the simple device
+        attribute request query carried with it! And not just "dumb" terminals
+        fail to respond, even some fairly modern terminals like Konsole.
 
         If a Kitty keyboard protocol query fails to respond within the
         ``timeout`` specified, ``None`` is returned. If this was the first Kitty
@@ -1343,8 +1342,8 @@ class Terminal():
         # Note that Kitty **does not answer** to DA1 despite making this very
         # recommendation! So we must handle all possible 2x2 match combinations:
         # DA1 + Kitty, !DA1 + Kitty, DA1 + !Kitty, and !DA1 and !Kitty (timeout)
-        if not self.does_styling or not self.is_a_tty:
-            # no query is ever done for terminals where does_styling or is_a_tty is False
+        if not self.is_a_tty:
+            # no query is ever done for terminals where is_a_tty is False
             return None
 
         if self._kitty_kb_first_query_failed and not force:
