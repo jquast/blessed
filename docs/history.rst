@@ -7,6 +7,7 @@ Version History
     :class:`blessed.Terminal` argument value, ``force_styling``.
   * performance improvements in :meth:`~Terminal.rgb_downconvert` for 256-color
     terminals, :ghpull:`298`.
+  * Enhanced keyboard support with Modifier keys, :ghpull:`306`.
 
 1.22
   * performance improvements to :meth:`~Terminal.length` and
