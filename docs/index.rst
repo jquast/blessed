@@ -9,6 +9,7 @@ Welcome to Blessed documentation!
    terminal
    colors
    keyboard
+   keyboard_kitty
    location
    measuring
    examples

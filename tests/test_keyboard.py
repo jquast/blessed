@@ -160,11 +160,38 @@ def test_get_keyboard_codes():
     """Test all values returned by get_keyboard_codes are from curses."""
     import blessed.keyboard
     exemptions = dict(blessed.keyboard.CURSES_KEYCODE_OVERRIDE_MIXIN)
+    # Add PUA overrides to exemptions since they intentionally override curses keys
+    exemptions.update(blessed.keyboard.KITTY_PUA_KEYCODE_OVERRIDE_MIXIN)
     # List of homemade keycodes that are not in curses
     homemade_keycodes = ('TAB', 'KP_MULTIPLY', 'KP_ADD', 'KP_SEPARATOR',
                          'KP_SUBTRACT', 'KP_DECIMAL', 'KP_DIVIDE', 'KP_EQUAL',
                          'KP_0', 'KP_1', 'KP_2', 'KP_3', 'KP_4', 'KP_5',
-                         'KP_6', 'KP_7', 'KP_8', 'KP_9', 'MENU')
+                         'KP_6', 'KP_7', 'KP_8', 'KP_9', 'MENU',
+                         # Kitty protocol PUA keycodes
+                         'KP_0', 'KP_1', 'KP_2', 'KP_3', 'KP_4',
+                         'KP_5', 'KP_6', 'KP_7', 'KP_8', 'KP_9',
+                         'KP_DECIMAL', 'KP_DIVIDE', 'KP_MULTIPLY',
+                         'KP_SUBTRACT', 'KP_ADD', 'KP_ENTER', 'KP_EQUAL',
+                         'KP_SEPARATOR', 'KP_LEFT', 'KP_RIGHT', 'KP_UP',
+                         'KP_DOWN', 'KP_PAGE_UP', 'KP_PAGE_DOWN', 'KP_HOME',
+                         'KP_END', 'KP_INSERT', 'KP_DELETE', 'KP_BEGIN',
+                         # Lock and special function keys
+                         'CAPS_LOCK', 'SCROLL_LOCK', 'NUM_LOCK',
+                         'PRINT_SCREEN', 'PAUSE', 'MENU',
+                         # Extended F-keys F13-F35 may exist in curses on some systems
+                         # Only list those that don't exist in curses as "homemade"
+                         # Media control keys
+                         'MEDIA_PLAY', 'MEDIA_PAUSE', 'MEDIA_PLAY_PAUSE',
+                         'MEDIA_REVERSE', 'MEDIA_STOP', 'MEDIA_FAST_FORWARD',
+                         'MEDIA_REWIND', 'MEDIA_TRACK_NEXT', 'MEDIA_TRACK_PREVIOUS',
+                         'MEDIA_RECORD', 'LOWER_VOLUME', 'RAISE_VOLUME',
+                         'MUTE_VOLUME',
+                         # ISO level shift keys
+                         'ISO_LEVEL3_SHIFT', 'ISO_LEVEL5_SHIFT',
+                         # Modifier keys
+                         'LEFT_SHIFT', 'LEFT_CONTROL', 'LEFT_ALT', 'LEFT_SUPER',
+                         'LEFT_HYPER', 'LEFT_META', 'RIGHT_SHIFT', 'RIGHT_CONTROL',
+                         'RIGHT_ALT', 'RIGHT_SUPER', 'RIGHT_HYPER', 'RIGHT_META')
     for value, keycode in blessed.keyboard.get_keyboard_codes().items():
         if keycode in exemptions:
             assert value == exemptions[keycode]
