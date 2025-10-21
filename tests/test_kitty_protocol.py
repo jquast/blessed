@@ -340,7 +340,7 @@ def test_kitty_state_styling_indifferent():
         assert flags.report_all_keys is True  # bit 3 (8) is set in value 15
         assert flags.report_text is False
 
-        # Test with styling disabled - queries still work (styling is indifferent)
+        # Test with styling disabled - should still work (only checks is_a_tty)
         term = TestTerminal(stream=io.StringIO(), force_styling=False)
         term._is_a_tty = True
         # Need both Kitty and DA response for boundary approach on first call
