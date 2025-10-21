@@ -41,28 +41,77 @@ In the following example, :meth:`~Terminal.wrap` word-wraps a short poem contain
 Resizing
 --------
 
-To detect when the size of the window changes, you can author a callback for SIGWINCH_ signals:
+The terminal can notify your application when the window size changes. Blessed provides a modern
+cross-platform method using in-band resize notifications, with SIGWINCH_ as a fallback for older
+terminals.
+
+Checking for support
+~~~~~~~~~~~~~~~~~~~~
+
+Use :meth:`~.Terminal.does_inband_resize` to check if the terminal supports in-band resize
+notifications (DEC mode 2048):
 
 .. code-block:: python
 
-    import signal
     from blessed import Terminal
 
     term = Terminal()
 
-    def on_resize(sig, action):
-        print(f'height={term.height}, width={term.width}')
+    if term.does_inband_resize(timeout=0.5):
+        print('In-band resize notifications are supported!')
+    else:
+        print('Falling back to SIGWINCH or polling')
 
-    signal.signal(signal.SIGWINCH, on_resize)
+.. note::
 
-    # wait for keypress
-    term.inkey()
+    In-band resize notification support (DEC mode 2048) is currently **very limited** among
+    terminal emulators. Most terminals do not support this feature yet. Always check with
+    :meth:`~.Terminal.does_inband_resize` and provide a fallback using SIGWINCH on Unix systems
+    (see example below)
+
+Using :meth:`~.Terminal.notify_on_resize` (recommended)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The :meth:`~.Terminal.notify_on_resize` context manager enables automatic resize event reporting.
+When the window is resized, :meth:`~.Terminal.inkey` will return a keystroke with
+:attr:`~.Keystroke.name` equal to ``'RESIZE_EVENT'``. The new dimensions are immediately available
+through :attr:`~.Terminal.height`, :attr:`~.Terminal.width`, :attr:`~.Terminal.pixel_height`, and
+:attr:`~.Terminal.pixel_width`.
+
+This method is preferred because it:
+
+- Works cross-platform (Linux, Mac, BSD, Windows)
+- Avoids race conditions inherent in signal handlers
+- Delivers resize events in-band with other input
+- Automatically caches dimensions for fast access
+
+Complete example with fallback
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The following example demonstrates checking for support, using in-band resize notifications when
+available, and falling back to SIGWINCH on Unix systems:
+
+.. literalinclude:: ../bin/on_resize.py
+   :language: python
+
+SIGWINCH (fallback for older terminals)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For terminals that don't support in-band resize notifications (DEC mode 2048), you can use
+SIGWINCH_ signals on Unix systems. See the example above for a complete implementation with
+automatic fallback
 
 .. image:: https://dxtz6bzwq9sxx.cloudfront.net/demo_resize_window.gif
     :alt: A visual animated example of the on_resize() function callback
 
-.. note:: This is not compatible with Windows! We hope to make a cross-platform API for this in the
-          future https://github.com/jquast/blessed/issues/131.
+.. warning:: SIGWINCH has limitations:
+
+    - Not compatible with Windows
+    - Signal handlers should avoid blocking operations
+    - Race conditions can occur between signal delivery and terminal state
+    - Requires careful synchronization with application state
+
+    For new code, prefer :meth:`~.Terminal.notify_on_resize` instead.
 
 Sometimes it is necessary to make sense of sequences, and to distinguish them
 from plain text.  The :meth:`~.Terminal.split_seqs` method can allow us to

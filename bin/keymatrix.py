@@ -433,7 +433,7 @@ def main():
                     message = mgr.toggle_by_index(index)
                     break
 
-            if inp == 'q':
+            if inp == 'q' or inp.name == 'KEY_CTRL_C':
                 do_exit = True
 
             if inp:
