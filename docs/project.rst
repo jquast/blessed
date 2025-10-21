@@ -34,19 +34,28 @@ Install and run tox::
     pip install --upgrade tox
     tox
 
-Py.test is used as the test runner, and with the tox target supporting positional arguments, you may
-for example use `--looponfail`, stopping at the first failing test case, and looping (retrying)
-after a filesystem save is detected::
+Py.test is used as the test runner, and with the tox target supporting positional arguments::
 
-    tox -e py39 -- --looponfail --exitfirst
+    tox -e py39 -- -x tests/test.py
 
-The test runner (``tox``) ensures all code and documentation complies with standard python style
-guides, pep8 and pep257, as well as various static analysis tools.
+Formatting
+----------
+
+run::
+
+    tox -e format
+
+Linting
+-------
+
+ruj
+
+    tox -e lint
 
 .. warning::
    When you contribute a new feature, make sure it is covered by tests.
 
-   Likewise, some bug fixes should include a test demonstrating the bug.
+   Likewise, some bug fixes include a test demonstrating the bug and is linted.
 
 Further Reading
 ---------------

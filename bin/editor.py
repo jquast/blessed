@@ -10,39 +10,25 @@ This example program makes use of many context manager methods:
 Early curses work focused namely around writing screen editors, naturally
 any serious editor would make liberal use of special modes.
 
-``Ctrl - L``
-  refresh
+Actions:
 
-``Ctrl - C``
-  quit
-
-``Ctrl - S``
-  save
+- ``Ctrl - L`` refresh
+- ``F2`` quit
+- ``F1`` save
+- ``LEFT MOUSE BUTTON`` move cursor
 """
 from __future__ import division, print_function
 
 # std imports
-import functools
 import collections
 
 # local
 from blessed import Terminal
 
-# python 2/3 compatibility, provide 'echo' function as an
-# alias for "print without newline and flush"
-try:
-    # pylint: disable=invalid-name
-    #         Invalid constant name "echo"
-    echo = functools.partial(print, end='', flush=True)
-    echo(u'')
-except TypeError:
-    # TypeError: 'flush' is an invalid keyword argument for this function
-    import sys
 
-    def echo(text):
-        """Display ``text`` and flush output."""
-        sys.stdout.write(u'{}'.format(text))
-        sys.stdout.flush()
+def echo(text):
+    """Display ``text`` and flush output."""
+    print(text, end='', flush=True)
 
 
 def input_filter(keystroke):
@@ -227,17 +213,17 @@ def main():
             term.raw(), \
             term.location(), \
             term.fullscreen(), \
-            term.keypad():
+            term.keypad(), \
+            term.mouse_enabled():
         inp = None
         while True:
             echo_yx(csr, term.reverse(screen.get((csr.y, csr.x), u' ')))
             inp = term.inkey()
 
-            if inp == chr(3):
-                # ^c exits
+            if inp.name == 'KEY_F2':
                 break
 
-            elif inp == chr(19):
+            elif inp.name == 'KEY_F1':
                 # ^s saves
                 echo_yx(home(bottom(csr)),
                         term.ljust(term.bold_white(u'Filename: ')))
@@ -252,6 +238,11 @@ def main():
             elif inp == chr(12):
                 # ^l refreshes
                 redraw(term=term, screen=screen)
+
+            elif inp.is_mouse_left():
+                # Handle left mouse button press
+                csr = Cursor(inp.y - 1, inp.x - 1, term)
+                continue
 
             else:
                 n_csr = lookup_move(inp.code, csr)
