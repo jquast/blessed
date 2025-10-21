@@ -46,55 +46,33 @@ from .accessories import (
     as_subprocess,
 )
 from blessed.keyboard import DeviceAttribute
-# Removed import
 
 pytestmark = pytest.mark.skipif(
     not TEST_KEYBOARD or IS_WINDOWS,
     reason="Timing-sensitive tests please do not run on build farms.")
 
 
-def test_device_attribute_from_string_with_sixel():
-    """Test DeviceAttribute.from_match() with sixel support."""
-    # DA1 response: VT420 (64) with extensions: 132-col (1), Printer (2), Sixel (4), DRCS (7)
-    pattern = re.compile(r'\x1b\[\?([0-9]+)((?:;[0-9]+)*)c')
-    match = pattern.match('\x1b[?64;1;2;4;7c')
+@pytest.mark.parametrize("response,service_class,extensions,supports_sixel", [
+    ('\x1b[?64;1;2;4;7c', 64, {1, 2, 4, 7}, True),
+    ('\x1b[?64;1;2c', 64, {1, 2}, False),
+    ('\x1b[?1c', 1, set(), False),
+    ('\x1b[?62;1;4;6c', 62, {1, 4, 6}, True),
+])
+def test_device_attribute_from_match(response, service_class, extensions, supports_sixel):
+    """Test DeviceAttribute.from_match() with various response formats."""
+    match = DeviceAttribute.RE_RESPONSE.match(response)
     da = DeviceAttribute.from_match(match)
     assert da is not None
-    assert da.service_class == 64  # VT420
-    assert da.extensions == {1, 2, 4, 7}
-    assert da.supports_sixel is True
+    assert da.service_class == service_class
+    assert da.extensions == extensions
+    assert da.supports_sixel is supports_sixel
+    assert da.raw == response
 
 
-def test_device_attribute_from_string_without_sixel():
-    """Test DeviceAttribute.from_match() without sixel support."""
-    # DA1 response: VT420 (64) with extensions: 132-col (1), Printer (2) - no Sixel (4)
-    pattern = re.compile(r'\x1b\[\?([0-9]+)((?:;[0-9]+)*)c')
-    match = pattern.match('\x1b[?64;1;2c')
-    da = DeviceAttribute.from_match(match)
-    assert da is not None
-    assert da.service_class == 64  # VT420
-    assert da.extensions == {1, 2}
-    assert da.supports_sixel is False
-
-
-def test_device_attribute_from_string_no_extensions():
-    """Test DeviceAttribute.from_match() with no extensions."""
-    # DA1 response: VT101 (1) with no extensions
-    pattern = re.compile(r'\x1b\[\?([0-9]+)((?:;[0-9]+)*)c')
-    match = pattern.match('\x1b[?1c')
-    da = DeviceAttribute.from_match(match)
-    assert da is not None
-    assert da.service_class == 1  # VT101
-    assert da.extensions == set()
-    assert da.supports_sixel is False
-
-
-def test_device_attribute_from_string_invalid():
+@pytest.mark.parametrize("invalid_input", ['invalid', ''])
+def test_device_attribute_from_match_invalid(invalid_input):
     """Test DeviceAttribute.from_match() with invalid input."""
-    pattern = re.compile(r'\x1b\[\?([0-9]+)((?:;[0-9]+)*)c')
-    match = pattern.match('invalid')
-    assert match is None
-    match = pattern.match('')
+    match = DeviceAttribute.RE_RESPONSE.match(invalid_input)
     assert match is None
 
 
@@ -249,30 +227,6 @@ def test_get_device_attributes_multiple_extensions():
     assert output == '\x1b[cMULTI'
 
 
-def test_device_attribute_from_match():
-    """Test DeviceAttribute.from_match() method."""
-    # DA1 response: VT220 (62) with 132-col (1), Sixel (4), Selective erase (6)
-    match = DeviceAttribute.RE_RESPONSE.match('\x1b[?62;1;4;6c')
-
-    da = DeviceAttribute.from_match(match)
-    assert da is not None
-    assert da.service_class == 62  # VT220
-    assert da.extensions == {1, 4, 6}
-    assert da.supports_sixel is True
-
-
-def test_device_attribute_from_match_no_extensions():
-    """Test DeviceAttribute.from_match() with no extensions."""
-    # DA1 response: VT101 (1) with no extensions
-    match = DeviceAttribute.RE_RESPONSE.match('\x1b[?1c')
-
-    da = DeviceAttribute.from_match(match)
-    assert da is not None
-    assert da.service_class == 1  # VT101
-    assert da.extensions == set()
-    assert da.supports_sixel is False
-
-
 def test_device_attribute_init_with_none_extensions():
     """Test DeviceAttribute.__init__() with None extensions."""
     # DA1 response: VT101 (1) with no extensions
@@ -293,10 +247,8 @@ def test_device_attribute_init_with_list_extensions():
 
 def test_device_attribute_raw_stored():
     """Test DeviceAttribute stores raw response string."""
-    # DA1 response: VT420 (64) with 132-col (1), Printer (2), Sixel (4)
     raw = '\x1b[?64;1;2;4c'
-    pattern = re.compile(r'\x1b\[\?([0-9]+)((?:;[0-9]+)*)c')
-    match = pattern.match(raw)
+    match = DeviceAttribute.RE_RESPONSE.match(raw)
     da = DeviceAttribute.from_match(match)
     assert da is not None
     assert da.raw == raw

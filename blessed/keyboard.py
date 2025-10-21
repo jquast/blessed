@@ -41,6 +41,7 @@ BracketedPasteEvent = namedtuple('BracketedPasteEvent', 'text')
 
 FocusEvent = namedtuple('FocusEvent', 'gained')
 SyncEvent = namedtuple('SyncEvent', 'begin')
+ResizeEvent = namedtuple('ResizeEvent', 'height_chars width_chars height_pixels width_pixels')
 
 
 # Keyboard protocol namedtuples
@@ -75,6 +76,9 @@ RE_PATTERN_MODIFY_OTHER = re.compile(
 RE_PATTERN_BRACKETED_PASTE = re.compile(r'\x1b\[200~(?P<text>.*?)\x1b\[201~', re.DOTALL)
 # Focus tracking (mode 1004): ESC [ I or ESC [ O
 RE_PATTERN_FOCUS = re.compile(r'\x1b\[(?P<io>[IO])')
+# Resize notification (mode 2048): ESC [ 48 ; height ; width ; height_px ; width_px t
+RE_PATTERN_RESIZE = re.compile(r'\x1b\[48;(?P<height_chars>\d+);(?P<width_chars>\d+)'
+                               r';(?P<height_pixels>\d+);(?P<width_pixels>\d+)t')
 
 # DEC event pattern container
 DECEventPattern = functools.namedtuple("DEC_EVENT_PATTERN", ["mode", "pattern"])
@@ -91,6 +95,7 @@ DEC_EVENT_PATTERNS = [
     DECEventPattern(mode=DecPrivateMode.MOUSE_REPORT_DRAG, pattern=RE_PATTERN_MOUSE_LEGACY),
     DECEventPattern(mode=DecPrivateMode.MOUSE_REPORT_CLICK, pattern=RE_PATTERN_MOUSE_LEGACY),
     DECEventPattern(mode=DecPrivateMode.FOCUS_IN_OUT_EVENTS, pattern=RE_PATTERN_FOCUS),
+    DECEventPattern(mode=DecPrivateMode.IN_BAND_WINDOW_RESIZE, pattern=RE_PATTERN_RESIZE),
 ]
 
 # Control character mappings
@@ -471,11 +476,12 @@ class Keystroke(str):
         For other DEC events:
         - Focus events: 'FOCUS_IN' or 'FOCUS_OUT'
         - Bracketed paste: 'BRACKETED_PASTE'
+        - Resize events: 'RESIZE_EVENT'
 
-        When non-None, all phrases begin with either 'KEY', 'MOUSE', 'FOCUS_IN', 'FOCUS_OUT', or
-        'BRACKETED_PASTE', with one exception: 'CSI' is returned for '\\x1b[' to indicate the
-        beginning of a presumed unsupported input sequence. The phrase 'KEY_ALT_[' is never
-        returned and unsupported.
+        When non-None, all phrases begin with either 'KEY', 'MOUSE', 'FOCUS_IN', 'FOCUS_OUT',
+        'BRACKETED_PASTE', or 'RESIZE_EVENT', with one exception: 'CSI' is returned for '\\x1b['
+        to indicate the beginning of a presumed unsupported input sequence. The phrase 'KEY_ALT_['
+        is never returned and unsupported.
 
         If this value is None, then it can probably be assumed that the value is an unsurprising
         textual character without any modifiers, like the letter ``'a'``.
@@ -496,6 +502,10 @@ class Keystroke(str):
         result = self._get_bracketed_paste_name()
         if result is not None:
             return result
+
+        # Inline resize event check
+        if self._mode == DecPrivateMode.IN_BAND_WINDOW_RESIZE:
+            return 'RESIZE_EVENT'
 
         # Keyboard events
         result = self._get_modified_keycode_name()
@@ -1056,7 +1066,9 @@ class Keystroke(str):
 
     @property
     def _mode_values(self) -> Optional[typing.Union[BracketedPasteEvent,
-                                                    MouseSGREvent, MouseLegacyEvent, FocusEvent]]:
+                                                    MouseSGREvent, MouseLegacyEvent, FocusEvent,
+                                                    ResizeEvent]]:
+        # pylint: disable=too-many-return-statements
         """
         Return structured data for DEC private mode events (private API).
 
@@ -1068,6 +1080,7 @@ class Keystroke(str):
           and ``MOUSE_REPORT_CLICK`` events: :class:`MouseEvent` with button,
           coordinates, and modifier flags
         - ``FOCUS_IN_OUT_EVENTS``: :class:`FocusEvent` with ``gained`` boolean field
+        - ``IN_BAND_WINDOW_RESIZE``: :class:`ResizeEvent` with dimension fields
 
         :rtype: namedtuple or None
         :returns: Structured event data for this DEC mode event, or ``None`` if this
@@ -1089,6 +1102,8 @@ class Keystroke(str):
             return self._parse_focus()
         if self._mode == DecPrivateMode.BRACKETED_PASTE:
             return self._parse_bracketed_paste()
+        if self._mode == DecPrivateMode.IN_BAND_WINDOW_RESIZE:
+            return self._parse_resize()
 
         # Unknown DEC mode or unsupported mode
         return None
@@ -1101,6 +1116,15 @@ class Keystroke(str):
     def _parse_bracketed_paste(self) -> BracketedPasteEvent:
         """Parse bracketed paste event from stored regex match."""
         return BracketedPasteEvent(text=self._match.group('text'))
+
+    def _parse_resize(self) -> ResizeEvent:
+        """Parse resize event from stored regex match."""
+        return ResizeEvent(
+            height_chars=int(self._match.group('height_chars')),
+            width_chars=int(self._match.group('width_chars')),
+            height_pixels=int(self._match.group('height_pixels')),
+            width_pixels=int(self._match.group('width_pixels'))
+        )
 
 
 def get_curses_keycodes() -> Dict[str, int]:
@@ -2104,6 +2128,70 @@ class DeviceAttribute():
                 f'extensions={self.extensions}, supports_sixel={self.supports_sixel})')
 
 
+class SoftwareVersion:
+    """Represents a terminal's software name and version from XTVERSION response."""
+
+    RE_RESPONSE = re.compile(r'\x1bP>\|(.+?)\x1b\\')
+
+    def __init__(self, raw: str, name: str, version: str) -> None:
+        """
+        Initialize SoftwareVersion instance.
+
+        :arg str raw: Original response string from terminal
+        :arg str name: Software name (e.g., "kitty", "XTerm")
+        :arg str version: Version string (e.g., "0.24.2", "367") or empty string if no version
+        """
+        self.raw = raw
+        self.name = name
+        self.version = version
+
+    @classmethod
+    def from_match(cls, match: Match[str]) -> 'SoftwareVersion':
+        """
+        Create SoftwareVersion from regex match object.
+
+        :arg re.Match match: Regex match object with group for software text
+        :rtype: SoftwareVersion
+        :returns: SoftwareVersion instance parsed from match
+        """
+        text = match.group(1)
+        name, version = cls._parse_text(text)
+        return cls(match.group(0), name, version)
+
+    @staticmethod
+    def _parse_text(text: str) -> typing.Tuple[str, str]:
+        """
+        Parse software name and version from text.
+
+        Parsing logic (in order):
+        1. Check for space-separated format: "tmux 3.2a" or "X.Org 7.7.0(370)"
+        2. Check for parentheses format: "kitty(0.24.2)"
+        3. Name-only format: "software" (version is empty string)
+
+        :arg str text: Text from XTVERSION response
+        :rtype: tuple
+        :returns: Tuple of (name, version) where both are strings
+        """
+        # Check for space-separated format first
+        if ' ' in text:
+            name, version = text.split(' ', 1)
+            return name, version
+
+        # Check for parentheses format
+        if '(' in text:
+            parts = text.split('(', 1)
+            name = parts[0]
+            version = parts[1].rstrip(')')
+            return name, version
+
+        # Name-only format
+        return text, ''
+
+    def __repr__(self) -> str:
+        """String representation of SoftwareVersion."""
+        return f'SoftwareVersion(name={self.name!r}, version={self.version!r})'
+
+
 class KittyKeyboardProtocol:
     """
     Represents Kitty keyboard protocol flags.
@@ -2229,5 +2317,5 @@ class KittyKeyboardProtocol:
 
 __all__ = ('Keystroke', 'get_keyboard_codes', 'get_keyboard_sequences',
            'KittyKeyEvent', 'ModifyOtherKeysEvent', 'LegacyCSIKeyEvent',
-           'KittyKeyboardProtocol', 'DeviceAttribute',
+           'KittyKeyboardProtocol', 'DeviceAttribute', 'SoftwareVersion',
            'BracketedPasteEvent', 'FocusEvent', 'SyncEvent',)

@@ -17,6 +17,7 @@ from blessed.keyboard import (
     _match_dec_event,
     BracketedPasteEvent,
     FocusEvent,
+    ResizeEvent,
     RE_PATTERN_BRACKETED_PASTE,
     resolve_sequence,
     OrderedDict,
@@ -969,3 +970,210 @@ def test_query_response_with_line_buffered_mode():
 
         assert stream.getvalue() == '\x1b[c'
     child()
+
+
+@pytest.mark.parametrize("sequence,h_chars,w_chars,h_pix,w_pix", [
+    ('\x1b[48;24;80;480;1600t', 24, 80, 480, 1600),
+    ('\x1b[48;30;120;0;0t', 30, 120, 0, 0),
+    ('\x1b[48;50;100;500;2000t', 50, 100, 500, 2000),
+])
+def test_resize_events(sequence, h_chars, w_chars, h_pix, w_pix):
+    """Test resize event detection and value extraction."""
+    cache = make_enabled_dec_cache()
+    ks = _match_dec_event(sequence, dec_mode_cache=cache)
+
+    assert ks is not None
+    assert ks.name == 'RESIZE_EVENT'
+    assert ks.mode == Terminal.DecPrivateMode.IN_BAND_WINDOW_RESIZE
+
+    values = ks._mode_values
+    assert isinstance(values, ResizeEvent)
+    assert values.height_chars == h_chars
+    assert values.width_chars == w_chars
+    assert values.height_pixels == h_pix
+    assert values.width_pixels == w_pix
+
+
+def test_notify_on_resize_context_manager():
+    """Test notify_on_resize enables and disables mode correctly."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+
+        mock_response = mock.Mock()
+        mock_response.supported = True
+        mock_response.enabled = False
+
+        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
+                mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
+                mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
+
+            with term.notify_on_resize():
+                mock_set_enabled.assert_called_once_with(DecPrivateMode.IN_BAND_WINDOW_RESIZE)
+                mock_set_enabled.reset_mock()
+
+            mock_set_disabled.assert_called_once_with(DecPrivateMode.IN_BAND_WINDOW_RESIZE)
+    child()
+
+
+def test_notify_on_resize_cache_cleared_on_exit():
+    """Test preferred size cache is cleared when exiting context."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+
+        mock_response = mock.Mock()
+        mock_response.supported = True
+        mock_response.enabled = False
+
+        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
+                mock.patch.object(term, '_dec_mode_set_enabled'), \
+                mock.patch.object(term, '_dec_mode_set_disabled'):
+
+            # Set cache inside context
+            with term.notify_on_resize():
+                from blessed.terminal import WINSZ
+                term._preferred_size_cache = WINSZ(ws_row=50, ws_col=100,
+                                                   ws_xpixel=500, ws_ypixel=1000)
+                assert term._preferred_size_cache is not None
+
+            # Cache should be cleared after exit
+            assert term._preferred_size_cache is None
+    child()
+
+
+def test_height_width_use_preferred_cache():
+    """Test height and width properties use preferred cache."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+
+        from blessed.terminal import WINSZ
+        term._preferred_size_cache = WINSZ(ws_row=42, ws_col=123,
+                                           ws_xpixel=2460, ws_ypixel=840)
+
+        assert term.height == 42
+        assert term.width == 123
+        assert term.pixel_height == 840
+        assert term.pixel_width == 2460
+    child()
+
+
+def test_sixel_uses_preferred_cache():
+    """Test get_sixel_height_and_width uses pixel dimensions from cache."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+
+        from blessed.terminal import WINSZ
+        term._preferred_size_cache = WINSZ(ws_row=40, ws_col=100,
+                                           ws_xpixel=2000, ws_ypixel=800)
+
+        height, width = term.get_sixel_height_and_width()
+        assert height == 800
+        assert width == 2000
+    child()
+
+
+def test_sixel_ignores_zero_pixel_cache():
+    """Test get_sixel_height_and_width falls back when pixel dimensions are zero."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+
+        from blessed.terminal import WINSZ
+        term._preferred_size_cache = WINSZ(ws_row=40, ws_col=100,
+                                           ws_xpixel=0, ws_ypixel=0)
+
+        # Set XTSMGRAPHICS cache to verify fallback
+        term._xtsmgraphics_cache = (1000, 2500)
+        term._xtwinops_cache = (1000, 2500)
+
+        height, width = term.get_sixel_height_and_width()
+        # Should use xtsmgraphics cache instead of preferred cache with zeros
+        assert height == 1000
+        assert width == 2500
+    child()
+
+
+@pytest.mark.parametrize("response_value,expected", [
+    (DecModeResponse.SET, True),
+    (DecModeResponse.NOT_RECOGNIZED, False),
+])
+def test_does_inband_resize(response_value, expected):
+    """Test does_inband_resize returns expected value based on mode support."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+
+        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(
+            mode_num, response_value)
+
+        result = term.does_inband_resize()
+        assert result is expected
+        assert stream.getvalue() == ''
+    child()
+
+
+def test_does_inband_resize_not_a_tty():
+    """Test does_inband_resize returns False when not a TTY."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=io.StringIO(), force_styling=True, is_a_tty=False)
+
+        result = term.does_inband_resize(timeout=0.01)
+        assert result is False
+    child()
+
+
+def test_inkey_updates_preferred_cache_on_resize_event():
+    """Test inkey() updates preferred size cache when receiving resize event."""
+    from .accessories import pty_test
+
+    def child(term):
+        # Ungetch a resize event sequence
+        term.ungetch('\x1b[48;30;120;600;1920t')
+
+        # Enable resize notifications in cache
+        term._dec_mode_cache = make_enabled_dec_cache()
+
+        # Call inkey() to receive the resize event
+        ks = term.inkey(timeout=0.01)
+
+        # Verify it's a resize event
+        assert ks.name == 'RESIZE_EVENT'
+
+        # Verify the preferred cache was updated
+        from blessed.terminal import WINSZ
+        assert term._preferred_size_cache is not None
+        expected = WINSZ(ws_row=30, ws_col=120, ws_xpixel=1920, ws_ypixel=600)
+        assert term._preferred_size_cache == expected
+
+        # Verify the cached dimensions are returned by properties
+        assert term.height == 30
+        assert term.width == 120
+        assert term.pixel_height == 600
+        assert term.pixel_width == 1920
+
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_inkey_updates_preferred_cache_on_resize_event')
+    assert 'OK' in output
+
+
+def test_does_inband_resize_no_styling():
+    """Test does_inband_resize returns False when does_styling is False."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=False)
+
+    result = term.does_inband_resize()
+    assert result is False
+    assert stream.getvalue() == ""
