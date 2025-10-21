@@ -496,7 +496,7 @@ def test_get_location_0s_reply_via_ungetch():
     """0-second get_location call with response."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
+        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         stime = time.time()
         # monkey patch in an invalid response !
         term.ungetch('\x1b[10;10R')
@@ -514,8 +514,7 @@ def test_get_location_0s_nonstandard_u6():
 
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
-
+        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         stime = time.time()
         # monkey patch in an invalid response !
         term.ungetch('\x1b[10;10R')
@@ -532,12 +531,12 @@ def test_get_location_styling_indifferent():
     """Ensure get_location() behavior is the same regardless of styling"""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True)
+        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         term.ungetch('\x1b[10;10R')
         y, x = term.get_location(timeout=0.01)
         assert (y, x) == (9, 9)
 
-        term = TestTerminal(stream=StringIO(), force_styling=False)
+        term = TestTerminal(stream=StringIO(), force_styling=False, is_a_tty=True)
         term.ungetch('\x1b[10;10R')
         y, x = term.get_location(timeout=0.01)
         assert (y, x) == (9, 9)
@@ -575,7 +574,7 @@ def test_get_fgcolor_0s_reply_via_ungetch():
     """0-second get_fgcolor call with response."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
+        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         stime = time.time()
         term.ungetch('\x1b]10;rgb:a0/52/2d\x07')  # sienna
 
@@ -589,12 +588,12 @@ def test_get_fgcolor_styling_indifferent():
     """Ensure get_fgcolor() behavior is the same regardless of styling"""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True)
+        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         term.ungetch('\x1b]10;rgb:d2/b4/8c\x07')  # tan
         rgb = term.get_fgcolor(timeout=0.01)
         assert rgb == (210, 180, 140)
 
-        term = TestTerminal(stream=StringIO(), force_styling=False)
+        term = TestTerminal(stream=StringIO(), force_styling=False, is_a_tty=True)
         term.ungetch('\x1b]10;rgb:40/e0/d0\x07')  # turquoise
         rgb = term.get_fgcolor(timeout=0.01)
         assert rgb == (64, 224, 208)
@@ -617,7 +616,7 @@ def test_get_bgcolor_0s_reply_via_ungetch():
     """0-second get_bgcolor call with response."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
+        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         stime = time.time()
         term.ungetch('\x1b]11;rgb:99/32/cc\x07')  # darkorchid
 
@@ -631,12 +630,12 @@ def test_get_bgcolor_styling_indifferent():
     """Ensure get_bgcolor() behavior is the same regardless of styling"""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True)
+        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         term.ungetch('\x1b]11;rgb:ff/e4/c4\x07')  # bisque
         rgb = term.get_bgcolor(timeout=0.01)
         assert rgb == (255, 228, 196)
 
-        term = TestTerminal(stream=StringIO(), force_styling=False)
+        term = TestTerminal(stream=StringIO(), force_styling=False, is_a_tty=True)
         term.ungetch('\x1b]11;rgb:de/b8/87\x07')  # burlywood
         rgb = term.get_bgcolor(timeout=0.01)
         assert rgb == (222, 184, 135)
