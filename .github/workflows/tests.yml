@@ -39,6 +39,10 @@ jobs:
             os: windows-latest
             test_quick: 0
 
+          - python-version: '3.14t'
+            # Use manylinux while waiting for https://github.com/docker-library/python/issues/1082
+            container: quay.io/pypa/manylinux_2_34_x86_64
+            test_quick: 0
 
     env:
       TOXENV: ${{ matrix.toxenv || format('py{0}', matrix.python-version) }}
