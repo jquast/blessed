@@ -1,6 +1,7 @@
 """Tests for Terminal.wrap()"""
 
 # std imports
+import sys
 import textwrap
 
 # 3rd party
@@ -19,6 +20,10 @@ TEXTWRAP_KEYWORD_COMBINATIONS = [
     {'break_long_words': True, 'drop_whitespace': True, 'subsequent_indent': ''},
     {'break_long_words': True, 'drop_whitespace': False, 'subsequent_indent': ' '},
     {'break_long_words': True, 'drop_whitespace': True, 'subsequent_indent': ' '},
+    {
+        'break_long_words': True, 'drop_whitespace': False,
+        'subsequent_indent': '', 'max_lines': 4, 'placeholder': '~',
+    },
 ]
 if TEST_QUICK:
     # test only one feature: everything on
@@ -70,6 +75,18 @@ def test_SequenceWrapper(many_columns, kwargs):
         internal_wrapped = textwrap.wrap(pgraph, width=width, **kwargs)
         my_wrapped = term.wrap(pgraph, width=width, **kwargs)
         my_wrapped_colored = term.wrap(pgraph_colored, width=width, **kwargs)
+
+        # Older versions of textwrap could leave a preceding all whitespace line
+        # https://github.com/python/cpython/issues/140627
+        if (
+            kwargs.get('drop_whitespace') and
+            sys.version_info[:2] < (3, 16) and
+            not internal_wrapped[0].strip()
+        ):
+            internal_wrapped = internal_wrapped[1:]
+            # # This also means any subsequent indent got applied to the first line
+            if kwargs.get('subsequent_indent'):
+                internal_wrapped[0] = internal_wrapped[0][len(kwargs['subsequent_indent']):]
 
         # ensure we textwrap ascii the same as python
         assert internal_wrapped == my_wrapped
