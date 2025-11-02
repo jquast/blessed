@@ -110,7 +110,7 @@ ignore_case=False)`` matches only uppercase.
 Application keys (arrows, function keys, etc.) support ``SHIFT`` in their names:
 
 * ``KEY_SHIFT_LEFT``
-* ``KEY_CTRL_BACKSPACE``
+* ``KEY_CTRL_ALT_BACKSPACE``
 * ``KEY_ALT_DELETE``
 * ``KEY_CTRL_SHIFT_F3``
 * ``KEY_CTRL_ALT_SHIFT_F9``
@@ -188,8 +188,19 @@ argument to False:
 
 - ``key.is_alt('u', ignore_case=False)``
 
-Keycodes
---------
+All Names
+---------
+
+These are duplicated from the key names found in :linuxman:`curses(3)`, or those
+`constants <https://docs.python.org/3/library/curses.html#constants>`_ in
+:mod:`curses` beginning with phrase *KEY_*, as follows:
+
+   .. include:: all_the_keys.txt
+
+However, these keys do not represent the full range of keys that can be detected
+with their modifiers, such as ``KEY_CTRL_LEFT`` is not matched by any Keycode
+constant, but rather a combination of existing ``KEY_LEFT`` with the ``CTRL``
+modifier.
 
 For Legacy API of classic curses applications, :attr:`~.Keystroke.code` may be
 be compared with attributes of :class:`~.Terminal`, which are duplicated from
@@ -197,14 +208,3 @@ those found in :linuxman:`curses(3)`, or those `constants
 <https://docs.python.org/3/library/curses.html#constants>`_ in :mod:`curses`
 beginning with phrase *KEY_*. These have numeric values that can be used for
 all basic application keys.
-
-However, these keys do not represent the full range of keys that can be detected
-with their modifiers, such as ``KEY_CTRL_LEFT`` is not matched by any Keycode
-constant.
-
-These are duplicated from those found in :linuxman:`curses(3)`, or those
-`constants <https://docs.python.org/3/library/curses.html#constants>`_ in
-:mod:`curses` beginning with phrase *KEY_*, as follows:
-
-.. include:: all_the_keys.txt
-
