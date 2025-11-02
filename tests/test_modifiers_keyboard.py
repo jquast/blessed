@@ -68,6 +68,7 @@ def test_legacy_ctrl_alt_exact_matching():
     ('\x1b\x03', 'c', False),
     ('\x1b\x05', 'e', False),
     ('\x1b\x06', 'f', False),
+    ('\x1b\x08', '', False),
     ('\x1b\x1a', 'z', False),
     ('\x1b\x00', ' ', False),
     ('\x1b\x1b', '', False),
@@ -133,7 +134,7 @@ def test_keystroke_value_by_keycode(code, expected_value):
     ('\x1b\x01', 'KEY_CTRL_ALT_A', 7),
     ('\x1b\x02', 'KEY_CTRL_ALT_B', 7),
     ('\x1b\x06', 'KEY_CTRL_ALT_F', 7),
-    ('\x1b\x08', 'KEY_CTRL_ALT_H', 7),
+    ('\x1b\x08', 'KEY_CTRL_ALT_BACKSPACE', 7),
     ('\x1b\x17', 'KEY_CTRL_ALT_W', 7),
     ('\x1b\x1a', 'KEY_CTRL_ALT_Z', 7),
     ('\x1b\x00', 'KEY_CTRL_ALT_SPACE', 7),
@@ -181,7 +182,7 @@ def test_keystroke_modifiers_comprehensive(sequence, expected_modifiers, ctrl, a
     ('\x1b\x06', 'f', 'KEY_CTRL_ALT_F', 7, True, True, False),
     ('\x1b\x1a', 'z', 'KEY_CTRL_ALT_Z', 7, True, True, False),
     ('\x1b\x00', ' ', 'KEY_CTRL_ALT_SPACE', 7, True, True, False),
-    ('\x1b\x08', 'h', 'KEY_CTRL_ALT_H', 7, True, True, False),
+    ('\x1b\x08', '', 'KEY_CTRL_ALT_BACKSPACE', 7, True, True, False),
     ('\x1b\x1b', '', 'KEY_ALT_ESCAPE', 3, False, True, False),
     ('\x1b\x7f', '', 'KEY_ALT_BACKSPACE', 3, False, True, False),
     ('\x1b\x0d', '', 'KEY_ALT_ENTER', 3, False, True, False),
@@ -259,7 +260,7 @@ def test_keystroke_legacy_ctrl_alt_name_generation():
         ('\x1b\x1d', 'KEY_CTRL_ALT_]'),
         ('\x1b\x1e', 'KEY_CTRL_ALT_^'),
         ('\x1b\x1f', 'KEY_CTRL_ALT__'),
-        ('\x1b\x08', 'KEY_CTRL_ALT_H'),
+        ('\x1b\x08', 'KEY_CTRL_ALT_BACKSPACE'),
     ]
 
     for sequence, expected_name in symbol_test_cases:
@@ -1133,7 +1134,7 @@ def test_get_meta_escape_name_symbol_branch_without_alt_name():
     ks = Keystroke('\x1b\x08')
     assert ks.modifiers == 7
     result = ks._get_meta_escape_name()
-    assert result == 'KEY_CTRL_ALT_H'
+    assert result == 'KEY_CTRL_ALT_BACKSPACE'
 
 
 def test_get_meta_escape_name_not_printable_edge_case():

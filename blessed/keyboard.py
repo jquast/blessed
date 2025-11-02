@@ -221,11 +221,14 @@ class Keystroke(str):
         """
         Get control symbol for a character code.
 
-        Returns symbol like 'A' for Ctrl+A, 'SPACE' for Ctrl+Space, etc.
+        Returns symbol like 'A' for Ctrl+A, 'SPACE' for Ctrl+Space, 'BACKSPACE' for Ctrl+H, etc.
         """
         # Special case: Ctrl+Space sends \x00
         if char_code == 0:
             return 'SPACE'
+        # Special case: Ctrl+H (Backspace) sends \x08
+        if char_code == 8:
+            return 'BACKSPACE'
         if 1 <= char_code <= 26:
             # Ctrl+A through Ctrl+Z
             return chr(char_code + ord("A") - 1)
@@ -607,6 +610,11 @@ class Keystroke(str):
         # Special case: Ctrl+Alt+Space sends ESC + \x00
         if char_code == 0:
             return ' '
+
+        # Special case: Ctrl+Alt+Backspace sends ESC + \x08
+        # This is an application key, not a text key, so return empty string
+        if char_code == 8:
+            return ''
 
         # Ctrl+A through Ctrl+Z (codes 1-26)
         if 1 <= char_code <= 26:
