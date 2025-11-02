@@ -57,6 +57,7 @@ def make_enabled_dec_cache():
         1004: DecModeResponse.SET,  # FOCUS_IN_OUT_EVENTS
         1006: DecModeResponse.SET,  # MOUSE_EXTENDED_SGR
         1016: DecModeResponse.SET,  # MOUSE_SGR_PIXELS
+        2048: DecModeResponse.SET,  # IN_BAND_WINDOW_RESIZE
     }
 
 

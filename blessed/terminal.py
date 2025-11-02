@@ -27,6 +27,7 @@ from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256col
 from .keyboard import (DEFAULT_ESCDELAY,
                        Keystroke,
                        DeviceAttribute,
+                       SoftwareVersion,
                        KittyKeyboardProtocol,
                        _time_left,
                        _read_until,
@@ -91,6 +92,8 @@ _RE_XTSMGRAPHICS_COLORS_RESPONSE = re.compile(r'\x1b\[\?1;0;(\d+)S')
 _RE_XTWINOPS_14_RESPONSE = re.compile(r'\x1b\[4;(\d+);(\d+)t')
 # XTWINOPS 16t - Query character cell pixel size: ESC[6;<height>;<width>t
 _RE_XTWINOPS_16_RESPONSE = re.compile(r'\x1b\[6;(\d+);(\d+)t')
+_RE_GET_DEVICE_ATTR_RESPONSE = re.compile('\x1b\\[\\?([0-9]+)((?:;[0-9]+)*)c')
+_RE_GET_SOFTWARE_VERSION_RESPONSE = re.compile('\x1bP>\\|(.+?)\x1b\\\\')
 
 
 class Terminal():
@@ -249,6 +252,9 @@ class Terminal():
         self._device_attributes_cache: Optional[DeviceAttribute] = None
         self._device_attributes_first_query_failed = False
 
+        # Software Version cache
+        self._software_version_cache: Optional[SoftwareVersion] = None
+
         # Initialize sixel graphics query caches,
         # Cache for _get_xtsmgraphics() query result - (height, width) or (-1, -1)
         # the value of (-1, -1) is used for 'sticky failure' unless force=True
@@ -259,6 +265,11 @@ class Terminal():
         self._xtsmgraphics_colors_cache: Optional[int] = None
         # Cache for get_cell_height_and_width() - (height, width) or (-1, -1)
         self._xtwinops_cell_cache: Optional[Tuple[int, int]] = None
+
+        # Cache for in-band resize notifications (mode 2048)
+        # When notify_on_resize() context manager is active, this stores the latest
+        # terminal dimensions from resize events
+        self._preferred_size_cache: Optional["WINSZ"] = None
 
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
@@ -596,6 +607,10 @@ class Terminal():
             .. note:: the peculiar (height, width, width, height) order, which
                matches the return order of TIOCGWINSZ!
         """
+        # Return preferred cache if available (from in-band resize notifications)
+        if self._preferred_size_cache is not None:
+            return self._preferred_size_cache
+
         for fd in (self._init_descriptor, sys.__stdout__):
             try:
                 if fd is not None:
@@ -882,6 +897,61 @@ class Terminal():
 
         return result
 
+    def get_software_version(self, timeout: Optional[float] = None,
+                             force: bool = False) -> Optional[SoftwareVersion]:
+        """
+        Query the terminal's software name and version using XTVERSION.
+
+        Sends an XTVERSION query to the terminal and returns a
+        :class:`SoftwareVersion` instance with the terminal's name and version.
+
+        If an XTVERSION query fails to respond within the ``timeout``
+        specified, ``None`` is returned.
+
+        **Successful responses are cached indefinitely** unless ``force=True`` is
+        specified. Unlike other query methods, there is no sticky failure mechanism -
+        each failed query can be retried.
+
+        .. note:: A ``timeout`` value should be set to avoid blocking when the
+            terminal does not respond to XTVERSION queries, which may happen with
+            some kinds of "dumb" terminals.
+
+        :arg float timeout: Timeout in seconds to await terminal response
+        :arg bool force: Force active terminal inquiry even if cached result exists
+        :rtype: SoftwareVersion or None
+        :returns: SoftwareVersion instance with terminal name and version, or None
+            if unsupported/timeout
+
+        .. code-block:: python
+
+            term = Terminal()
+
+            # Query software version
+            sv = term.get_software_version(timeout=1.0)
+            if sv is not None:
+                print(f"Terminal: {sv.name} {sv.version}")
+        """
+        # Return None if not a TTY
+        if not self.is_a_tty:
+            return None
+
+        # Return cached result unless force=True
+        if self._software_version_cache is not None and not force:
+            return self._software_version_cache
+
+        # Build and send query sequence and expected response pattern
+        query = '\x1b[>q'
+
+        match = self._query_response(query, _RE_GET_SOFTWARE_VERSION_RESPONSE, timeout)
+
+        # invalid or no response (timeout)
+        if match is None:
+            return None
+
+        # parse, cache, and return the response
+        self._software_version_cache = SoftwareVersion.from_match(match)
+        return self._software_version_cache
+
     def does_sixel(self, timeout: Optional[float] = 1.0, force: bool = False) -> bool:
         """
         Query whether the terminal supports sixel graphics.
@@ -1136,6 +1206,32 @@ class Terminal():
 
         return True
 
+    def does_inband_resize(self, timeout: float = 1.0) -> bool:
+        """
+        Check if the terminal supports in-band window resize notifications.
+
+        This method queries whether the terminal supports DEC mode 2048
+        (IN_BAND_WINDOW_RESIZE), which allows receiving resize events as
+        in-band sequences through :meth:`inkey` instead of relying on
+        SIGWINCH signals.
+
+        :arg float timeout: Timeout for mode query (default 1.0s)
+        :returns: True if in-band resize notifications are supported
+        :rtype: bool
+
+        Example::
+
+            if term.does_inband_resize():
+                with term.notify_on_resize():
+                    # Use in-band resize events
+                    pass
+            else:
+                # Fall back to SIGWINCH or other methods
+                pass
+        """
+        response = self.get_dec_mode(_DecPrivateMode.IN_BAND_WINDOW_RESIZE, timeout=timeout)
+        return response.supported
+
     @contextlib.contextmanager
     def mouse_enabled(self, *, clicks: bool = True, report_pixels: bool = False,
                       report_drag: bool = False, report_motion: bool = False,
@@ -1235,6 +1331,43 @@ class Terminal():
         with self.dec_modes_enabled(_DecPrivateMode.FOCUS_IN_OUT_EVENTS, timeout=timeout):
             yield
 
+    @contextlib.contextmanager
+    def notify_on_resize(self, timeout: float = 1.0) -> Generator[None, None, None]:
+        """
+        Context manager for enabling in-band window resize notifications.
+
+        When enabled, the terminal will automatically send resize events as in-band sequences
+        whenever the window size changes. These events are received by :meth:`inkey` as
+        keystroke events with :attr:`~.Keystroke.name` equal to ``'RESIZE_EVENT'``.
+
+        The new dimensions are automatically cached and available immediately through the
+        standard :attr:`height`, :attr:`width`, :attr:`pixel_height`, and :attr:`pixel_width`
+        properties without additional ioctl system calls.
+
+        This is the preferred method for handling terminal resizes as it avoids the race
+        conditions and signal handling complexity of SIGWINCH on Unix systems, and provides
+        a consistent cross-platform API.
+
+        :arg float timeout: Timeout for mode query (default 1.0s)
+
+        Example::
+
+            with term.notify_on_resize():
+                while True:
+                    inp = term.inkey(timeout=0.1)
+                    if inp.name == 'RESIZE_EVENT':
+                        # Dimensions updated automatically
+                        redraw_display(term.height, term.width)
+                    elif inp == 'q':
+                        break
+        """
+        try:
+            with self.dec_modes_enabled(_DecPrivateMode.IN_BAND_WINDOW_RESIZE, timeout=timeout):
+                yield
+        finally:
+            # Clear the cache when exiting the context
+            self._preferred_size_cache = None
+
     def _dec_mode_set_enabled(self, *modes: Union[int, _DecPrivateMode]) -> None:
         """
         Enable one or more DEC Private Modes (DECSET).
@@ -1317,6 +1450,7 @@ class Terminal():
 
     def get_sixel_height_and_width(self, timeout: Optional[float] = 1.0,
                                    force: bool = False) -> Tuple[int, int]:
+        # pylint: disable=too-many-return-statements
         """
         Query sixel graphics pixel dimensions.
 
@@ -1333,6 +1467,16 @@ class Terminal():
         :rtype: tuple
         :returns: ``(height, width)`` in pixels, or ``(-1, -1)`` if unsupported/timeout
         """
+        # Use preferred size cache from in-band resize notifications if available
+        # (unless force=True which requires re-querying)
+        if not force and self._preferred_size_cache is not None:
+            # Extract pixel dimensions from preferred cache
+            # Return them if they're non-zero (terminal supports pixel reporting)
+            if (self._preferred_size_cache.ws_ypixel and
+                    self._preferred_size_cache.ws_xpixel):
+                return (self._preferred_size_cache.ws_ypixel,
+                        self._preferred_size_cache.ws_xpixel)
+
         # Fast path: if both caches are populated (unless force=True), compute result from caches
         if not force and self._xtsmgraphics_cache is not None and self._xtwinops_cache is not None:
             # If XTSMGRAPHICS succeeded, use it
@@ -2506,6 +2650,16 @@ class Terminal():
 
         # buffer any remaining text received
         self.ungetch(ucs[len(ks):])
+
+        # Update preferred size cache if this is a resize event
+        if ks._mode == _DecPrivateMode.IN_BAND_WINDOW_RESIZE:  # pylint: disable=protected-access
+            event_vals = ks._mode_values  # pylint: disable=protected-access
+            self._preferred_size_cache = WINSZ(
+                ws_row=event_vals.height_chars,  # type: ignore[union-attr]
+                ws_col=event_vals.width_chars,  # type: ignore[union-attr]
+                ws_xpixel=event_vals.width_pixels,  # type: ignore[union-attr]
+                ws_ypixel=event_vals.height_pixels)  # type: ignore[union-attr]
+
         return ks
 
 
