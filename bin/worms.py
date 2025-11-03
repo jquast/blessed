@@ -9,27 +9,16 @@ from __future__ import division, print_function
 
 # std imports
 from random import randrange
-from functools import partial
 from collections import namedtuple
 
 # local
 from blessed import Terminal
 
-# python 2/3 compatibility, provide 'echo' function as an
-# alias for "print without newline and flush"
-try:
-    # pylint: disable=invalid-name
-    #         Invalid constant name "echo"
-    echo = partial(print, end='', flush=True)
-    echo(u'')
-except TypeError:
-    # TypeError: 'flush' is an invalid keyword argument for this function
-    import sys
 
-    def echo(text):
-        """Python 2 version of print(end='', flush=True)."""
-        sys.stdout.write(u'{0}'.format(text))
-        sys.stdout.flush()
+def echo(text):
+    """Display ``text`` and flush output."""
+    print(text, end='', flush=True)
+
 
 # a worm is a list of (y, x) segments Locations
 Location = namedtuple('Point', ('y', 'x',))

@@ -1,49 +1,34 @@
 #!/usr/bin/env python
-"""
-Example application for the 'blessed' Terminal library for python.
-
-Window size changes are caught by the 'on_resize' function using a traditional signal handler.
-Meanwhile, blocking keyboard input is displayed to stdout. If a resize event is discovered, an empty
-string is returned by term.inkey().
-"""
-from __future__ import print_function
-
-# std imports
-import signal
-
-# local
 from blessed import Terminal
 
+term = Terminal()
 
-def main():
-    """Program entry point."""
-    term = Terminal()
 
-    def on_resize(*args):
-        # pylint: disable=unused-argument
-        #         Unused argument 'args'
+def on_resize():
+    print()
+    print(f'height={term.height}, width={term.width}, ' +
+          f'pixel_height={term.pixel_height}, pixel_width={term.pixel_width}',
+          end='', flush=True)
 
-        # Its generally not a good idea to put blocking functions (such as
-        # print) within a signal handler -- if another SIGWINCH is received
-        # while this function blocks, an error will occur.
 
-        # In most programs, you'll want to set some kind of 'dirty' flag,
-        # perhaps by a Semaphore like threading.Event or (thanks to the GIL)
-        # a simple global variable will suffice.
-        print('height={t.height}, width={t.width}\r'.format(t=term))
+if not term.does_inband_resize(timeout=0.5):
+    print('IN_BAND_WINDOW_RESIZE not supported on this terminal')
+    import sys
+    if sys.platform != 'win32':
+        import signal
 
-    signal.signal(signal.SIGWINCH, on_resize)
+        def _on_resize(*args):
+            on_resize()
+        signal.signal(signal.SIGWINCH, _on_resize)
 
+with term.cbreak(), term.notify_on_resize():
+    print("press 'q' to quit.")
     # display initial size
-    on_resize(term)
-
-    with term.cbreak():
-        print("press 'X' to stop.")
-        inp = None
-        while inp != 'X':
-            inp = term.inkey()
-            print(repr(inp))
-
-
-if __name__ == '__main__':
-    main()
+    on_resize()
+    while True:
+        inp = term.inkey()
+        if inp == 'q':
+            break
+        # capture in-band resize events
+        if inp.name == 'RESIZE_EVENT':
+            on_resize()

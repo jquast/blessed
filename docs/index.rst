@@ -9,8 +9,12 @@ Welcome to Blessed documentation!
    terminal
    colors
    keyboard
+   keyboard_kitty
+   mouse
+   dec_modes
    location
    measuring
+   sixel
    examples
    api
    project

@@ -1,17 +1,17 @@
-# -*- coding: utf-8 -*-
 """Accessories for automated py.test runner."""
 
 # std imports
 import os
 import sys
 import codecs
-import functools
 import traceback
 import contextlib
-from typing import Callable
+import time
+import signal
 
 # local
 from blessed import Terminal
+from blessed.dec_modes import DecModeResponse
 # local
 from .conftest import IS_WINDOWS
 
@@ -24,11 +24,41 @@ else:
     import curses
     import termios
 
-
+MAX_SUBPROC_TIME_SECONDS = 2  # no test should ever take over 2 seconds
 test_kind = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
-TestTerminal = functools.partial(Terminal, kind=test_kind)  # type: Callable[..., Terminal]
+
+
+def TestTerminal(is_a_tty=None, **kwargs):  # type: (...) -> Terminal
+    """
+    Create a Terminal instance with optional is_a_tty override.
+
+    'is_a_tty' is useful to pass "is a tty" tests without pty_test
+    """
+    if 'kind' not in kwargs:
+        kwargs['kind'] = test_kind
+    term = Terminal(**kwargs)
+    if is_a_tty is not None:
+        term._is_a_tty = is_a_tty
+    return term
+
+
 SEND_SEMAPHORE = SEMAPHORE = b'SEMAPHORE\n'
 RECV_SEMAPHORE = b'SEMAPHORE\r\n'
+
+
+def make_enabled_dec_cache():
+    """Create a dec_mode_cache with all DEC event modes enabled."""
+    return {
+        2004: DecModeResponse.SET,  # BRACKETED_PASTE
+        1000: DecModeResponse.SET,  # MOUSE_REPORT_CLICK
+        1002: DecModeResponse.SET,  # MOUSE_REPORT_DRAG
+        1003: DecModeResponse.SET,  # MOUSE_ALL_MOTION
+        1001: DecModeResponse.SET,  # MOUSE_HILITE_TRACKING
+        1004: DecModeResponse.SET,  # FOCUS_IN_OUT_EVENTS
+        1006: DecModeResponse.SET,  # MOUSE_EXTENDED_SGR
+        1016: DecModeResponse.SET,  # MOUSE_SGR_PIXELS
+        2048: DecModeResponse.SET,  # IN_BAND_WINDOW_RESIZE
+    }
 
 
 def init_subproc_coverage(run_note):
@@ -55,7 +85,8 @@ class as_subprocess():  # pylint: disable=too-few-public-methods
     def __init__(self, func):
         self.func = func
 
-    def __call__(self, *args, **kwargs):  # pylint: disable=too-many-locals,too-complex
+    def __call__(self, *args, **kwargs):
+        # pylint: disable=too-many-locals,too-complex,too-many-branches,too-many-statements
         if IS_WINDOWS:
             self.func(*args, **kwargs)
             return
@@ -113,7 +144,31 @@ class as_subprocess():  # pylint: disable=too-few-public-methods
 
         # parent process asserts exit code is 0, causing test
         # to fail if child process raised an exception/assertion
-        pid, status = os.waitpid(pid, 0)
+        # Use non-blocking wait with timeout to detect hung child processes
+        timeout = MAX_SUBPROC_TIME_SECONDS
+        start_time = time.time()
+        status = None
+        while True:
+            pid_result, status = os.waitpid(pid, os.WNOHANG)
+            if pid_result != 0:
+                # Child has exited
+                break
+            if time.time() - start_time > timeout:
+                # Child hasn't exited, it's hung - kill it and report what we know
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                    os.waitpid(pid, 0)  # Clean up zombie
+                except OSError:
+                    pass
+                os.close(master_fd)
+                # Show the output we captured - this likely contains the root cause
+                exc_output_msg = (
+                    f'Child process hung and did not exit within {timeout}s.\n'
+                    f'Output captured from child:\n{"=" * 40}\n{exc_output}\n{"=" * 40}'
+                )
+                raise AssertionError(exc_output_msg)
+            time.sleep(0.05)  # Poll every 50ms
+
         os.close(master_fd)
 
         # Display any output written by child process
@@ -216,6 +271,115 @@ def unicode_parm(cap, *parms):
     return ''
 
 
+def pty_test(child_func, parent_func=None, test_name=None):
+    """
+    Wrapper for PTY-based tests to reduce boilerplate.
+
+    Handles the common pattern of forking a PTY, running test code in the child
+    process with coverage tracking, and optionally running parent-side code.
+
+    Args:
+        child_func: Function to run in child process. Receives a TestTerminal instance.
+                   Should return bytes/str to write to stdout, or None.
+        parent_func: Optional function to run in parent. Receives master_fd.
+        test_name: Optional name for coverage tracking. Auto-derived from child_func if None.
+
+    Returns:
+        str: Output from child process (everything written to stdout)
+
+    Example:
+        def test_something():
+            def child(term):
+                with term.cbreak():
+                    inp = term.inkey(timeout=0)
+                    return inp.encode('utf-8')
+
+            def parent(master_fd):
+                os.write(master_fd, b'x')
+
+            output = pty_test(child, parent)
+            assert output == 'x'
+    """
+    # pylint: disable=too-complex,too-many-branches,too-many-locals
+    # pylint: disable=missing-raises-doc,missing-type-doc
+    if IS_WINDOWS:
+        # On Windows, just run child_func directly without PTY
+        term = TestTerminal()
+        result = child_func(term)
+        return result.decode('utf-8') if isinstance(result, bytes) else (result or '')
+
+    import pty as pty_module  # pylint: disable=import-outside-toplevel
+
+    if test_name is None:
+        test_name = getattr(child_func, '__name__', 'pty_test')
+
+    pid, master_fd = pty_module.fork()
+
+    if pid == 0:  # Child process
+        cov = init_subproc_coverage(test_name)
+        try:
+            term = TestTerminal()
+            result = child_func(term)
+
+            # Write result to stdout if provided
+            if result is not None:
+                if isinstance(result, str):
+                    result = result.encode('utf-8')
+                os.write(sys.__stdout__.fileno(), result)
+        except Exception:  # pylint: disable=broad-except
+            # Write exception to stdout for debugging
+            e_type, e_value, e_tb = sys.exc_info()
+            o_err = [line.rstrip().encode('utf-8') for line in traceback.format_tb(e_tb)]
+            o_err.append(('-=' * 20).encode('ascii'))
+            o_err.extend([_exc.rstrip().encode('utf-8') for _exc in
+                          traceback.format_exception_only(e_type, e_value)])
+            os.write(sys.__stdout__.fileno(), b'\n'.join(o_err))
+            if cov is not None:
+                cov.stop()
+                cov.save()
+            os._exit(1)
+
+        if cov is not None:
+            cov.stop()
+            cov.save()
+        os._exit(0)
+
+    # Parent process
+    with echo_off(master_fd):
+        if parent_func is not None:
+            parent_func(master_fd)
+        output = read_until_eof(master_fd)
+
+    # Use non-blocking wait with timeout to detect hung child processes
+    timeout = 5.0  # 5 second timeout
+    start_time = time.time()
+    status = None
+    while True:
+        pid_result, status = os.waitpid(pid, os.WNOHANG)
+        if pid_result != 0:
+            # Child has exited
+            break
+        if time.time() - start_time > timeout:
+            # Child hasn't exited, it's hung - kill it and report what we know
+            try:
+                os.kill(pid, signal.SIGKILL)
+                os.waitpid(pid, 0)  # Clean up zombie
+            except OSError:
+                pass
+            # Show the output we captured - this likely contains the root cause
+            raise AssertionError(
+                f'Child process hung and did not exit within {timeout}s.\n'
+                f'Output captured from child:\n{"=" * 40}\n{output}\n{"=" * 40}'
+            )
+        time.sleep(0.05)  # Poll every 50ms
+
+    assert os.WEXITSTATUS(status) == 0, (
+        f"Child process exited with status {os.WEXITSTATUS(status)}",
+        f"Output from child: {output}")
+
+    return output
+
+
 class MockTigetstr():  # pylint: disable=too-few-public-methods
     """
     Wraps curses.tigetstr() to override specific capnames
@@ -229,3 +393,54 @@ class MockTigetstr():  # pylint: disable=too-few-public-methods
 
     def __call__(self, capname):
         return self.kwargs.get(capname, self.callable(capname))
+
+
+def assert_modifiers(ks, ctrl=False, alt=False, shift=False, _super=False):
+    """Assert keystroke modifier flags match expected values."""
+    assert ks._ctrl is ctrl
+    assert ks._alt is alt
+    assert ks._shift is shift
+    if _super is not None:
+        assert ks._super is _super
+
+
+def assert_modifiers_value(ks, modifiers):
+    """Assert keystroke modifier integer values (modifiers_bits is auto-calculated)."""
+    assert ks.modifiers == modifiers
+    expected_bits = max(0, modifiers - 1)
+    assert ks.modifiers_bits == expected_bits
+
+
+def assert_only_modifiers(ks, *modifiers):
+    """Assert keystroke has only the specified modifiers.
+
+    Args:
+        ks: The keystroke to check
+        *modifiers: Variable number of modifier names ('ctrl', 'alt', 'shift')
+
+    Examples:
+        assert_only_modifiers(ks, 'alt')           # Alt only
+        assert_only_modifiers(ks, 'ctrl')          # Ctrl only
+        assert_only_modifiers(ks, 'shift')         # Shift only
+        assert_only_modifiers(ks, 'ctrl', 'alt')   # Ctrl+Alt
+    """
+    # pylint: disable=missing-type-doc
+    # Import KittyModifierBits to avoid magic numbers
+    from blessed.keyboard import KittyModifierBits
+
+    # Convert modifiers to a set for easy lookup
+    modifier_set = set(mod.lower() for mod in modifiers)
+
+    # Calculate expected bits using getattr - naturally validates modifier names
+    expected_bits = 0
+    for modifier in modifier_set:
+        expected_bits |= getattr(KittyModifierBits, modifier)
+
+    expected_modifiers = expected_bits + 1
+
+    # Build modifier flags for assert_modifiers using getattr
+    modifier_flags = {mod: mod in modifier_set for mod in ('ctrl', 'alt', 'shift')}
+
+    # Assert using existing helper functions
+    assert_modifiers_value(ks, modifiers=expected_modifiers)
+    assert_modifiers(ks, **modifier_flags)
