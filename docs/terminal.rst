@@ -120,6 +120,22 @@ You can check whether your terminal supports sixel graphics using the
     important in CI/build environments or non-interactive contexts where the terminal
     may not respond to capability queries.
 
+Terminal Software Version
+-------------------------
+
+Many modern terminal emulators support the XTVERSION query (CSI > q), which allows
+applications to identify the terminal software name and version.
+
+You can query the terminal's software version using the
+:meth:`~.Terminal.get_software_version` method, which returns a
+:class:`~.SoftwareVersion` object with ``name`` and ``version`` attributes, or,
+``None`` if the terminal fails to respond.
+
+Example program to display terminal version information:
+
+.. literalinclude:: ../bin/display-version.py
+   :language: python
+
 Styles
 ------
 

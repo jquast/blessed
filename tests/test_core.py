@@ -48,8 +48,8 @@ def test_location_to_move_xy(all_terms):
         buf = StringIO()
         t = TestTerminal(stream=buf, force_styling=True)
         x, y = 12, 34
-        with t.location(y, x):
-            xy_val_from_move_xy = t.move_xy(y, x)
+        with t.location(x, y):
+            xy_val_from_move_xy = t.move_xy(x, y)
             xy_val_from_location = buf.getvalue()[len(t.sc):]
             assert xy_val_from_move_xy == xy_val_from_location
 
@@ -527,5 +527,47 @@ def test_termcap_repr():
         term = blessed.Terminal(given_ttype)
         given = repr(term.caps[given_capname])
         assert given in expected
+
+    child()
+
+
+@pytest.mark.parametrize("force_styling,is_a_tty", [
+    (False, True),
+    (True, False),
+])
+def test_query_methods_respect_does_styling_and_is_a_tty(force_styling, is_a_tty):
+    """Test that all query methods respect does_styling and is_a_tty guardrails."""
+    @as_subprocess
+    def child():
+        stream = StringIO()
+        term = TestTerminal(stream=stream, force_styling=force_styling)
+        if not is_a_tty:
+            term._is_a_tty = False
+
+        result_location = term.get_location(timeout=0.01)
+        assert result_location == (-1, -1)
+
+        result_fgcolor = term.get_fgcolor(timeout=0.01)
+        assert result_fgcolor == (-1, -1, -1)
+
+        result_bgcolor = term.get_bgcolor(timeout=0.01)
+        assert result_bgcolor == (-1, -1, -1)
+
+        result_device_attributes = term.get_device_attributes(timeout=0.01)
+        assert result_device_attributes is None
+
+        result_does_sixel = term.does_sixel(timeout=0.01)
+        assert result_does_sixel is False
+
+        result_sixel_hw = term.get_sixel_height_and_width(timeout=0.01)
+        assert result_sixel_hw == (-1, -1)
+
+        result_sixel_colors = term.get_sixel_colors(timeout=0.01)
+        assert result_sixel_colors == -1
+
+        result_cell_hw = term.get_cell_height_and_width(timeout=0.01)
+        assert result_cell_hw == (-1, -1)
+
+        assert stream.getvalue() == ''
 
     child()

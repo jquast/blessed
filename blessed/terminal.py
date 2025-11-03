@@ -27,6 +27,7 @@ from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256col
 from .keyboard import (DEFAULT_ESCDELAY,
                        Keystroke,
                        DeviceAttribute,
+                       SoftwareVersion,
                        KittyKeyboardProtocol,
                        _time_left,
                        _read_until,
@@ -83,6 +84,16 @@ RE_GET_FGCOLOR_RESPONSE = re.compile(
     '\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
 RE_GET_BGCOLOR_RESPONSE = re.compile(
     '\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+# XTSMGRAPHICS - Query sixel graphics geometry: ESC[?2;0;<width>;<height>S
+_RE_XTSMGRAPHICS_RESPONSE = re.compile(r'\x1b\[\?2;0;(\d+);(\d+)S')
+# XTSMGRAPHICS - Query sixel color registers: ESC[?1;0;<colors>S
+_RE_XTSMGRAPHICS_COLORS_RESPONSE = re.compile(r'\x1b\[\?1;0;(\d+)S')
+# XTWINOPS 14t - Query window pixel size: ESC[4;<height>;<width>t
+_RE_XTWINOPS_14_RESPONSE = re.compile(r'\x1b\[4;(\d+);(\d+)t')
+# XTWINOPS 16t - Query character cell pixel size: ESC[6;<height>;<width>t
+_RE_XTWINOPS_16_RESPONSE = re.compile(r'\x1b\[6;(\d+);(\d+)t')
+_RE_GET_DEVICE_ATTR_RESPONSE = re.compile('\x1b\\[\\?([0-9]+)((?:;[0-9]+)*)c')
+_RE_GET_SOFTWARE_VERSION_RESPONSE = re.compile('\x1bP>\\|(.+?)\x1b\\\\')
 
 
 class Terminal():
@@ -240,6 +251,25 @@ class Terminal():
         # Device Attributes (DA1) cache and sticky failure tracking
         self._device_attributes_cache: Optional[DeviceAttribute] = None
         self._device_attributes_first_query_failed = False
+
+        # Software Version cache
+        self._software_version_cache: Optional[SoftwareVersion] = None
+
+        # Initialize sixel graphics query caches,
+        # Cache for _get_xtsmgraphics() query result - (height, width) or (-1, -1)
+        # the value of (-1, -1) is used for 'sticky failure' unless force=True
+        self._xtsmgraphics_cache: Optional[Tuple[int, int]] = None
+        # Cache for XTWINOPS window pixel dimensions - (height, width) or (-1, -1)
+        self._xtwinops_cache: Optional[Tuple[int, int]] = None
+        # Cache for get_sixel_colors() - stores color count or -1
+        self._xtsmgraphics_colors_cache: Optional[int] = None
+        # Cache for get_cell_height_and_width() - (height, width) or (-1, -1)
+        self._xtwinops_cell_cache: Optional[Tuple[int, int]] = None
+
+        # Cache for in-band resize notifications (mode 2048)
+        # When notify_on_resize() context manager is active, this stores the latest
+        # terminal dimensions from resize events
+        self._preferred_size_cache: Optional["WINSZ"] = None
 
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
@@ -577,6 +607,10 @@ class Terminal():
             .. note:: the peculiar (height, width, width, height) order, which
                matches the return order of TIOCGWINSZ!
         """
+        # Return preferred cache if available (from in-band resize notifications)
+        if self._preferred_size_cache is not None:
+            return self._preferred_size_cache
+
         for fd in (self._init_descriptor, sys.__stdout__):
             try:
                 if fd is not None:
@@ -600,6 +634,10 @@ class Terminal():
         :return: re.match object for response_re or None if not found
         :rtype: re.Match
         """
+        # No query is ever done for terminals where is_a_tty is False
+        if not self.is_a_tty:
+            return None
+
         # Avoid changing user's desired raw or cbreak mode if already entered,
         # conditionally entering cbreak mode ourselves.  This is necessary to
         # receive user input without awaiting a human to press the return key.
@@ -687,6 +725,9 @@ class Terminal():
         r"""
         Return tuple (row, column) of cursor position.
 
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and the value ``(-1, -1)`` is returned without inquiry.
+
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1)`` indicating
             that the remote end did not respond.
         :rtype: tuple
@@ -761,6 +802,9 @@ class Terminal():
         """
         Return tuple (r, g, b) of foreground color.
 
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and the value ``(-1, -1, -1)`` is returned without inquiry.
+
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1, -1)``
             indicating that the remote end did not respond.
         :rtype: tuple
@@ -776,6 +820,9 @@ class Terminal():
     def get_bgcolor(self, timeout: Optional[float] = None) -> Tuple[int, int, int]:
         """
         Return tuple (r, g, b) of background color.
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and the value ``(-1, -1, -1)`` is returned without inquiry.
 
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1, -1)``
             indicating that the remote end did not respond.
@@ -804,6 +851,10 @@ class Terminal():
 
         **Responses are cached indefinitely** unless ``force=True`` is
         specified.
+
+        .. note:: A ``timeout`` value should be set to avoid blocking when the
+            terminal does not respond to DA1 queries, which may happen with some
+            kinds of "dumb" terminals.
 
         :arg float timeout: Timeout in seconds to await terminal response
         :arg bool force: Force active terminal inquiry even if cached result exists
@@ -834,6 +885,7 @@ class Terminal():
         query = '\x1b[c'
         match = self._query_response(query, DeviceAttribute.RE_RESPONSE, timeout)
 
+        # invalid or no response (timeout)
         if match is None:
             self._device_attributes_first_query_failed = True
             return None
@@ -845,41 +897,82 @@ class Terminal():
 
         return result
 
-    def does_sixel(self, timeout: Optional[float] = None) -> bool:
+    def get_software_version(self, timeout: Optional[float] = None,
+                             force: bool = False) -> Optional[SoftwareVersion]:
+        """
+        Query the terminal's software name and version using XTVERSION.
+
+        Sends an XTVERSION query to the terminal and returns a
+        :class:`SoftwareVersion` instance with the terminal's name and version.
+
+        If an XTVERSION query fails to respond within the ``timeout``
+        specified, ``None`` is returned.
+
+        **Successful responses are cached indefinitely** unless ``force=True`` is
+        specified. Unlike other query methods, there is no sticky failure mechanism -
+        each failed query can be retried.
+
+        .. note:: A ``timeout`` value should be set to avoid blocking when the
+            terminal does not respond to XTVERSION queries, which may happen with
+            some kinds of "dumb" terminals.
+
+        :arg float timeout: Timeout in seconds to await terminal response
+        :arg bool force: Force active terminal inquiry even if cached result exists
+        :rtype: SoftwareVersion or None
+        :returns: SoftwareVersion instance with terminal name and version, or None
+            if unsupported/timeout
+
+        .. code-block:: python
+
+            term = Terminal()
+
+            # Query software version
+            sv = term.get_software_version(timeout=1.0)
+            if sv is not None:
+                print(f"Terminal: {sv.name} {sv.version}")
+        """
+        # Return None if not a TTY
+        if not self.is_a_tty:
+            return None
+
+        # Return cached result unless force=True
+        if self._software_version_cache is not None and not force:
+            return self._software_version_cache
+
+        # Build and send query sequence and expected response pattern
+        query = '\x1b[>q'
+
+        match = self._query_response(query, _RE_GET_SOFTWARE_VERSION_RESPONSE, timeout)
+
+        # invalid or no response (timeout)
+        if match is None:
+            return None
+
+        # parse, cache, and return the response
+        self._software_version_cache = SoftwareVersion.from_match(match)
+        return self._software_version_cache
+
+    def does_sixel(self, timeout: Optional[float] = 1.0, force: bool = False) -> bool:
         """
         Query whether the terminal supports sixel graphics.
 
         Sixel is a bitmap graphics format supported by some modern terminal
         emulators, allowing applications to display inline images.
 
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``False`` is returned without inquiry.
+
         This method calls :meth:`get_device_attributes` to query the terminal's
         capabilities and checks for sixel support (extension 4 in the DA1 response).
         Results are cached, so subsequent calls are fast.
 
         :arg float timeout: Timeout in seconds to await terminal response. When
-            ``None`` (default), the query may block indefinitely. It is recommended
-            to specify a timeout value (e.g., ``1.0`` seconds) to avoid blocking,
-            especially in CI/build environments or non-interactive contexts.
+            ``None`` (default), the query may block indefinitely.
+        :arg bool force: Bypass cache and re-query the terminal
         :rtype: bool
         :returns: ``True`` if terminal supports sixel graphics, ``False`` otherwise
-
-        .. note:: A ``timeout`` value should be set to avoid blocking when the
-            terminal does not respond to DA1 queries, which may happen with some
-            kinds of "dumb" terminals.
-
-        .. code-block:: python
-
-            term = Terminal()
-
-            # Check sixel support with timeout
-            if term.does_sixel(timeout=1.0):
-                # Terminal supports sixel graphics
-                display_sixel_image()
-            else:
-                # Fall back to ASCII art or text
-                display_text_fallback()
         """
-        da = self.get_device_attributes(timeout=timeout, force=False)
+        da = self.get_device_attributes(timeout=timeout, force=force)
         return da.supports_sixel if da is not None else False
 
     def get_dec_mode(self, mode: Union[int, _DecPrivateMode],
@@ -888,9 +981,9 @@ class Terminal():
         Query the state of a DEC Private Mode (DECRQM).
 
         Sends a DECRQM query to the terminal and returns a
-        :class:`DecModeResponse` instance. Use the helper methods,
-        :meth:`DecModeResponse.is_supported`,
-        :meth:`DecModeResponse.is_enabled`, etc. to interpret the result.
+        :class:`DecModeResponse` instance. Use the helper methods like
+        :meth:`DecModeResponse.is_supported` or
+        :meth:`DecModeResponse.is_enabled` and others to interpret the result.
 
         When :attr:`is_a_tty` is False, no sequences are transmitted or response
         awaited, and the :class:`DecModeResponse` value returned is always
@@ -936,10 +1029,6 @@ class Terminal():
             raise TypeError(f"Invalid mode argument, got {mode!r}, "
                             "DecPrivateMode or int expected")
 
-        if not self.is_a_tty:
-            # no query is ever done for terminals where is_a_tty is False
-            return DecModeResponse(mode, DecModeResponse.NOT_QUERIED)
-
         if self._dec_first_query_failed and not force:
             # When the first query is not responded, we can safely assume all
             # subsequent inqueries will be ignored
@@ -956,8 +1045,13 @@ class Terminal():
 
         match = self._query_response(query, response_pattern, timeout)
 
-        # invalid or no response (timeout)
+        # invalid or no response (timeout or not a TTY)
         if match is None:
+            # If not a TTY, _query_response() returned None immediately
+            if not self.is_a_tty:
+                return DecModeResponse(mode, DecModeResponse.NOT_QUERIED)
+
+            # We have a TTY but query failed (timeout)
             if not self._dec_any_query_succeeded:
                 # This is the first-ever query and it failed! This query returns
                 # NO_RESPONSE to indicate the timeout, subsequent queries will
@@ -1112,6 +1206,32 @@ class Terminal():
 
         return True
 
+    def does_inband_resize(self, timeout: float = 1.0) -> bool:
+        """
+        Check if the terminal supports in-band window resize notifications.
+
+        This method queries whether the terminal supports DEC mode 2048
+        (IN_BAND_WINDOW_RESIZE), which allows receiving resize events as
+        in-band sequences through :meth:`inkey` instead of relying on
+        SIGWINCH signals.
+
+        :arg float timeout: Timeout for mode query (default 1.0s)
+        :returns: True if in-band resize notifications are supported
+        :rtype: bool
+
+        Example::
+
+            if term.does_inband_resize():
+                with term.notify_on_resize():
+                    # Use in-band resize events
+                    pass
+            else:
+                # Fall back to SIGWINCH or other methods
+                pass
+        """
+        response = self.get_dec_mode(_DecPrivateMode.IN_BAND_WINDOW_RESIZE, timeout=timeout)
+        return response.supported
+
     @contextlib.contextmanager
     def mouse_enabled(self, *, clicks: bool = True, report_pixels: bool = False,
                       report_drag: bool = False, report_motion: bool = False,
@@ -1211,6 +1331,43 @@ class Terminal():
         with self.dec_modes_enabled(_DecPrivateMode.FOCUS_IN_OUT_EVENTS, timeout=timeout):
             yield
 
+    @contextlib.contextmanager
+    def notify_on_resize(self, timeout: float = 1.0) -> Generator[None, None, None]:
+        """
+        Context manager for enabling in-band window resize notifications.
+
+        When enabled, the terminal will automatically send resize events as in-band sequences
+        whenever the window size changes. These events are received by :meth:`inkey` as
+        keystroke events with :attr:`~.Keystroke.name` equal to ``'RESIZE_EVENT'``.
+
+        The new dimensions are automatically cached and available immediately through the
+        standard :attr:`height`, :attr:`width`, :attr:`pixel_height`, and :attr:`pixel_width`
+        properties without additional ioctl system calls.
+
+        This is the preferred method for handling terminal resizes as it avoids the race
+        conditions and signal handling complexity of SIGWINCH on Unix systems, and provides
+        a consistent cross-platform API.
+
+        :arg float timeout: Timeout for mode query (default 1.0s)
+
+        Example::
+
+            with term.notify_on_resize():
+                while True:
+                    inp = term.inkey(timeout=0.1)
+                    if inp.name == 'RESIZE_EVENT':
+                        # Dimensions updated automatically
+                        redraw_display(term.height, term.width)
+                    elif inp == 'q':
+                        break
+        """
+        try:
+            with self.dec_modes_enabled(_DecPrivateMode.IN_BAND_WINDOW_RESIZE, timeout=timeout):
+                yield
+        finally:
+            # Clear the cache when exiting the context
+            self._preferred_size_cache = None
+
     def _dec_mode_set_enabled(self, *modes: Union[int, _DecPrivateMode]) -> None:
         """
         Enable one or more DEC Private Modes (DECSET).
@@ -1291,6 +1448,181 @@ class Terminal():
         for mode_num in mode_numbers:
             self._dec_mode_cache[mode_num] = DecModeResponse.RESET
 
+    def get_sixel_height_and_width(self, timeout: Optional[float] = 1.0,
+                                   force: bool = False) -> Tuple[int, int]:
+        # pylint: disable=too-many-return-statements
+        """
+        Query sixel graphics pixel dimensions.
+
+        Returns the maximum height and width in pixels for sixel graphics
+        rendering. Tries XTSMGRAPHICS first, then validates or falls back to
+        XTWINOPS window size query if the terminal doesn't support XTSMGRAPHICS
+        or reports unrealistic dimensions.
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``(-1, -1)`` is returned without inquiry.
+
+        :arg float timeout: Timeout in seconds for both possible queries
+        :arg bool force: Bypass cache and re-query the terminal
+        :rtype: tuple
+        :returns: ``(height, width)`` in pixels, or ``(-1, -1)`` if unsupported/timeout
+        """
+        # Use preferred size cache from in-band resize notifications if available
+        # (unless force=True which requires re-querying)
+        if not force and self._preferred_size_cache is not None:
+            # Extract pixel dimensions from preferred cache
+            # Return them if they're non-zero (terminal supports pixel reporting)
+            if (self._preferred_size_cache.ws_ypixel and
+                    self._preferred_size_cache.ws_xpixel):
+                return (self._preferred_size_cache.ws_ypixel,
+                        self._preferred_size_cache.ws_xpixel)
+
+        # Fast path: if both caches are populated (unless force=True), compute result from caches
+        if not force and self._xtsmgraphics_cache is not None and self._xtwinops_cache is not None:
+            # If XTSMGRAPHICS succeeded, use it
+            if self._xtsmgraphics_cache != (-1, -1):
+                return self._xtsmgraphics_cache
+            # Otherwise use XTWINOPS (even if it's (-1, -1))
+            return self._xtwinops_cache
+
+        # Try XTSMGRAPHICS first (unless it previously failed - sticky failure at (-1, -1))
+        # Even with force=True, skip XTSMGRAPHICS if it previously failed to avoid wasting timeout
+        stime = time.time()
+        if self._xtsmgraphics_cache is None or (force and self._xtsmgraphics_cache != (-1, -1)):
+            # Use half of remaining timeout, saving the other for XTWINOPS fallback
+            half_timeout = timeout / 2 if timeout is not None else None
+            result = self._get_xtsmgraphics(half_timeout)
+            self._xtsmgraphics_cache = result
+            # If XTSMGRAPHICS succeeded, use it
+            if result != (-1, -1):
+                return result
+        elif self._xtsmgraphics_cache != (-1, -1):
+            # Cache hit with successful value (not force mode)
+            return self._xtsmgraphics_cache
+
+        # Fallback to XTWINOPS window pixel dimensions when:
+        # - XTSMGRAPHICS previously failed (sticky failure)
+        # - XTSMGRAPHICS just failed, using remaining time left
+        if force or self._xtwinops_cache is None:
+            result = self._get_xtwinops_window_size(_time_left(stime, timeout))
+            self._xtwinops_cache = result
+            return result
+        return self._xtwinops_cache
+
+    def get_sixel_colors(self, timeout: Optional[float] = 1.0,
+                         force: bool = False) -> int:
+        """
+        Query number of sixel color registers (XTSMGRAPHICS).
+
+        Returns the maximum number of color registers available for sixel
+        graphics rendering. If XTSMGRAPHICS query fails but the terminal
+        advertises Sixel support via DA1 (Device Attributes), returns 256
+        as a sensible default.
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``-1`` is returned without inquiry.
+
+        :arg float timeout: Timeout in seconds for both possible queries
+        :arg bool force: Bypass cache and re-query the terminal
+        :rtype: int
+        :returns: Number of color registers, 256 if DA1 advertises sixel but
+            XTSMGRAPHICS fails, or ``-1`` if unsupported/timeout
+        """
+        if self._xtsmgraphics_colors_cache is not None and not force:
+            return self._xtsmgraphics_colors_cache
+
+        stime = time.time()
+
+        # Use half of timeout for XTSMGRAPHICS, saving the other for DA1 fallback
+        half_timeout = timeout / 2 if timeout is not None else None
+        result = self._get_xtsmgraphics_colors(half_timeout)
+        self._xtsmgraphics_colors_cache = result
+
+        # If XTSMGRAPHICS failed but terminal advertises sixel support in DA1,
+        # assume 256 color registers as a sensible default
+        if self._xtsmgraphics_colors_cache == -1:
+            # Use remaining time for DA1 query, though usually this result is
+            if self.does_sixel(timeout=_time_left(stime, timeout), force=force):
+                self._xtsmgraphics_colors_cache = 256
+
+        return self._xtsmgraphics_colors_cache
+
+    def get_cell_height_and_width(self, timeout: Optional[float] = 1.0,
+                                  force: bool = False) -> Tuple[int, int]:
+        """
+        Query character cell pixel dimensions (XTWINOPS).
+
+        Returns the height and width in pixels of a single character cell.
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``(-1, -1)`` is returned without inquiry.
+
+        :arg float timeout: Timeout in seconds for the query
+        :arg bool force: Bypass cache and re-query the terminal
+        :rtype: tuple
+        :returns: ``(height, width)`` in pixels, or ``(-1, -1)`` if unsupported/timeout
+        """
+        if self._xtwinops_cell_cache is not None and not force:
+            return self._xtwinops_cell_cache
+
+        result = self._get_xtwinops_cell_size(timeout)
+        self._xtwinops_cell_cache = result
+        return result
+
+    def _get_xtwinops_window_size(self, timeout: Optional[float]) -> Tuple[int, int]:
+        # Query XTWINOPS 14t for window size: ESC[14t
+        # Response: ESC[4;<height>;<width>t - return (height, width)
+        query = '\x1b[14t'
+        match = self._query_response(query, _RE_XTWINOPS_14_RESPONSE, timeout)
+
+        if match is None:
+            return -1, -1
+
+        # Response is height, width - return as-is
+        return int(match.group(1)), int(match.group(2))
+
+    def _get_xtwinops_cell_size(self, timeout: Optional[float]) -> Tuple[int, int]:
+        # Query XTWINOPS 16t for cell size: ESC[16t
+        # Response: ESC[6;<height>;<width>t - return (height, width)
+        query = '\x1b[16t'
+        match = self._query_response(query, _RE_XTWINOPS_16_RESPONSE, timeout)
+
+        if match is None:
+            return -1, -1
+
+        # Response is height, width - return as-is
+        return int(match.group(1)), int(match.group(2))
+
+    def _get_xtsmgraphics(self, timeout: Optional[float]) -> Tuple[int, int]:
+        # Query XTSMGRAPHICS for sixel geometry: ESC[?2;1;0S
+        # Response: ESC[?2;0;<width>;<height>S - return (height, width)
+        query = '\x1b[?2;1;0S'
+        match = self._query_response(query, _RE_XTSMGRAPHICS_RESPONSE, timeout)
+
+        if match is None:
+            return -1, -1
+
+        # Response is width, height - swap to return height, width
+        result = (int(match.group(2)), int(match.group(1)))
+
+        # Konsole workaround: Some terminals like Konsole report 16384x16384 (2^14) as the
+        # maximum sixel dimension instead of actual window size. Treat this as unsupported.
+        if result == (16384, 16384):
+            return -1, -1
+
+        return result
+
+    def _get_xtsmgraphics_colors(self, timeout: Optional[float]) -> int:
+        # Query XTSMGRAPHICS for color registers: ESC[?1;1;0S
+        # Response: ESC[?1;0;<colors>S
+        query = '\x1b[?1;1;0S'
+        match = self._query_response(query, _RE_XTSMGRAPHICS_COLORS_RESPONSE, timeout)
+
+        if match is None:
+            return -1
+
+        return int(match.group(1))
+
     def get_kitty_keyboard_state(self, timeout: Optional[float] = None,
                                  force: bool = False) -> Optional[KittyKeyboardProtocol]:
         """
@@ -1342,10 +1674,6 @@ class Terminal():
         # Note that Kitty **does not answer** to DA1 despite making this very
         # recommendation! So we must handle all possible 2x2 match combinations:
         # DA1 + Kitty, !DA1 + Kitty, DA1 + !Kitty, and !DA1 and !Kitty (timeout)
-        if not self.is_a_tty:
-            # no query is ever done for terminals where is_a_tty is False
-            return None
-
         if self._kitty_kb_first_query_failed and not force:
             # When the first query is not responded, we can safely assume all
             # subsequent inquiries will be ignored
@@ -1370,10 +1698,12 @@ class Terminal():
 
             match = self._query_response(boundary_query, boundary_pattern, timeout)
 
-            # invalid or no response (timeout)
+            # invalid or no response (timeout or not a TTY)
             if match is None:
-                # Set sticky failure flag on first timeout
-                self._kitty_kb_first_query_failed = True
+                # Set sticky failure flag only if we have a TTY but query failed
+                # If not a TTY, _query_response() returned None immediately
+                if self.is_a_tty:
+                    self._kitty_kb_first_query_failed = True
                 return None
 
             response_text = match.group(1)
@@ -1407,9 +1737,8 @@ class Terminal():
 
         match = self._query_response(query, response_pattern, timeout)
 
-        # invalid or no response (timeout)
+        # invalid or no response (timeout or not a TTY)
         if match is None:
-            # Set sticky failure flag on timeout (though this should be rare for subsequent calls)
             self._kitty_kb_first_query_failed = True
             return None
 
@@ -2321,6 +2650,16 @@ class Terminal():
 
         # buffer any remaining text received
         self.ungetch(ucs[len(ks):])
+
+        # Update preferred size cache if this is a resize event
+        if ks._mode == _DecPrivateMode.IN_BAND_WINDOW_RESIZE:  # pylint: disable=protected-access
+            event_vals = ks._mode_values  # pylint: disable=protected-access
+            self._preferred_size_cache = WINSZ(
+                ws_row=event_vals.height_chars,  # type: ignore[union-attr]
+                ws_col=event_vals.width_chars,  # type: ignore[union-attr]
+                ws_xpixel=event_vals.width_pixels,  # type: ignore[union-attr]
+                ws_ypixel=event_vals.height_pixels)  # type: ignore[union-attr]
+
         return ks
 
 

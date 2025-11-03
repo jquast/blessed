@@ -340,14 +340,18 @@ def test_kitty_state_styling_indifferent():
         assert flags.report_all_keys is True  # bit 3 (8) is set in value 15
         assert flags.report_text is False
 
-        # Test with styling disabled - should still work (only checks is_a_tty)
+        # Test with styling disabled, still works when is_a_tty is True
         term = TestTerminal(stream=io.StringIO(), force_styling=False)
         term._is_a_tty = True
-        # Need both Kitty and DA response for boundary approach on first call
         term.ungetch('\x1b[?15u\x1b[?64c')
         flags = term.get_kitty_keyboard_state(timeout=0.01)
         assert flags is not None
         assert flags.value == 15
+        assert flags.disambiguate is True
+        assert flags.report_events is True
+        assert flags.report_alternates is True
+        assert flags.report_all_keys is True
+        assert flags.report_text is False
     child()
 
 
