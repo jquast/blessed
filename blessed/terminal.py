@@ -976,7 +976,7 @@ class Terminal():
         return da.supports_sixel if da is not None else False
 
     def get_dec_mode(self, mode: Union[int, _DecPrivateMode],
-                     timeout: Optional[float] = None, force: bool = False) -> DecModeResponse:
+                     timeout: float = 1.0, force: bool = False) -> DecModeResponse:
         """
         Query the state of a DEC Private Mode (DECRQM).
 
@@ -1005,7 +1005,7 @@ class Terminal():
         re-inquiry unless ``force=True``.  Although there are special cases
         where a user may re-configure their terminal settings after the state
         was requested by an application, the application is generally restarted
-        to recognize the new settings rather than to repeatidly re-inquire about
+        to recognize the new settings rather than to repeatedly re-inquire about
         their latest value!
 
         :arg mode: DEC Private Mode to query
