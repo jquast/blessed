@@ -224,7 +224,7 @@ Version History
     to support several instances of different Terminal :attr:`~.Terminal.kind`,
     but was actually using the :attr:`~Terminal.kind` specified by the first
     instantiation of :class:`~.Terminal`.  A warning is now issued.  Although
-    this is misbehavior is still allowed, a :class:`warnings.WarningMessage` is
+    this misbehavior is still allowed, a :class:`warnings.WarningMessage` is
     now emitted to notify about subsequent terminal misbehavior.
   * bugfix: resolved issue where :attr:`~.number_of_colors` fails when
     :attr:`~.does_styling` is ``False``.  Resolves issue where piping tests
