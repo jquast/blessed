@@ -907,18 +907,14 @@ class Keystroke(str):
             # Ctrl+Space (code 0)
             if char_code == 0:
                 return ' '
+            # Special case: Ctrl+Alt+Backspace sends ESC + \x08
+            # This is an application key, not a text key, so return empty string
+            if char_code == 8:
+                return ''
             # Ctrl+A through Ctrl+Z (codes 1-26)
             if 1 <= char_code <= 26:
                 return chr(char_code + ord('a') - 1)  # lowercase
 
-        # Special case: Ctrl+Alt+Backspace sends ESC + \x08
-        # This is an application key, not a text key, so return empty string
-        if char_code == 8:
-            return ''
-
-        # Ctrl+A through Ctrl+Z (codes 1-26)
-        if 1 <= char_code <= 26:
-            return chr(char_code + ord('a') - 1)  # lowercase
         return None
 
     def _get_ctrl_sequence_value(self) -> Optional[str]:

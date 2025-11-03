@@ -33,6 +33,12 @@ The protocol is automatically detected and enabled when you use the
 doesn't support it, your code continues to work normally using standard
 keyboard input.
 
+Like standard keyboard input, Kitty protocol keystrokes provide a
+:attr:`~.Keystroke.name` attribute for special keys (``KEY_ESCAPE``, ``KEY_F1``,
+``KEY_UP``) and modified alphanumeric keys (``KEY_CTRL_A``, ``KEY_ALT_5``).
+Plain text input like typing 'a' or '5' has no name, making it easy to
+distinguish between commands and regular text.
+
 Getting Started
 ---------------
 
@@ -61,6 +67,10 @@ three properties to distinguish between key event types:
 These properties are only meaningful when Kitty keyboard protocol is enabled
 with ``report_events=True``. Without the protocol, all keystrokes will have
 ``pressed=True`` and ``repeated=False``, ``released=False``.
+
+The :attr:`~.Keystroke.name` attribute also includes event type suffixes:
+``KEY_CTRL_J`` for press, ``KEY_CTRL_J_REPEATED`` for repeat, and
+``KEY_CTRL_J_RELEASED`` for release events.
 
 Example use case - detect only initial key presses and ignore repeats:
 
