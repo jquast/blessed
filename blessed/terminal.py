@@ -721,7 +721,7 @@ class Terminal():
             self.stream.write(self.restore)
             self.stream.flush()
 
-    def get_location(self, timeout: Optional[float] = None) -> Tuple[int, int]:
+    def get_location(self, timeout: float = 1) -> Tuple[int, int]:
         r"""
         Return tuple (row, column) of cursor position.
 
@@ -798,7 +798,7 @@ class Terminal():
         # rather than crowbarring such logic into an exception handler.
         return -1, -1
 
-    def get_fgcolor(self, timeout: Optional[float] = None) -> Tuple[int, int, int]:
+    def get_fgcolor(self, timeout: float = 1) -> Tuple[int, int, int]:
         """
         Return tuple (r, g, b) of foreground color.
 
@@ -817,7 +817,7 @@ class Terminal():
         match = self._query_response('\x1b]10;?\x07', RE_GET_FGCOLOR_RESPONSE, timeout)
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
 
-    def get_bgcolor(self, timeout: Optional[float] = None) -> Tuple[int, int, int]:
+    def get_bgcolor(self, timeout: float = 1) -> Tuple[int, int, int]:
         """
         Return tuple (r, g, b) of background color.
 
