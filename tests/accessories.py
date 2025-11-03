@@ -4,15 +4,14 @@
 import os
 import sys
 import codecs
-import functools
 import traceback
 import contextlib
 import time
 import signal
-from typing import Callable
 
 # local
 from blessed import Terminal
+from blessed.dec_modes import DecModeResponse
 # local
 from .conftest import IS_WINDOWS
 
@@ -27,9 +26,39 @@ else:
 
 MAX_SUBPROC_TIME_SECONDS = 2  # no test should ever take over 2 seconds
 test_kind = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
-TestTerminal = functools.partial(Terminal, kind=test_kind)  # type: Callable[..., Terminal]
+
+
+def TestTerminal(is_a_tty=None, **kwargs):  # type: (...) -> Terminal
+    """
+    Create a Terminal instance with optional is_a_tty override.
+
+    'is_a_tty' is useful to pass "is a tty" tests without pty_test
+    """
+    if 'kind' not in kwargs:
+        kwargs['kind'] = test_kind
+    term = Terminal(**kwargs)
+    if is_a_tty is not None:
+        term._is_a_tty = is_a_tty
+    return term
+
+
 SEND_SEMAPHORE = SEMAPHORE = b'SEMAPHORE\n'
 RECV_SEMAPHORE = b'SEMAPHORE\r\n'
+
+
+def make_enabled_dec_cache():
+    """Create a dec_mode_cache with all DEC event modes enabled."""
+    return {
+        2004: DecModeResponse.SET,  # BRACKETED_PASTE
+        1000: DecModeResponse.SET,  # MOUSE_REPORT_CLICK
+        1002: DecModeResponse.SET,  # MOUSE_REPORT_DRAG
+        1003: DecModeResponse.SET,  # MOUSE_ALL_MOTION
+        1001: DecModeResponse.SET,  # MOUSE_HILITE_TRACKING
+        1004: DecModeResponse.SET,  # FOCUS_IN_OUT_EVENTS
+        1006: DecModeResponse.SET,  # MOUSE_EXTENDED_SGR
+        1016: DecModeResponse.SET,  # MOUSE_SGR_PIXELS
+        2048: DecModeResponse.SET,  # IN_BAND_WINDOW_RESIZE
+    }
 
 
 def init_subproc_coverage(run_note):

@@ -1,17 +1,26 @@
 """Sub-module providing 'keyboard awareness'."""
+# pylint: disable=too-many-lines
 # std imports
 import os
 import re
 import time
 import typing
 import platform
-from typing import TYPE_CHECKING, Set, Dict, Match, TypeVar, Optional
+import functools
+from typing import TYPE_CHECKING, Set, Dict, Match, Tuple, TypeVar, Optional
 from collections import OrderedDict, namedtuple
 
 if TYPE_CHECKING:  # pragma: no cover
     # local
     from blessed.terminal import Terminal
 
+# local
+from blessed.mouse import (RE_PATTERN_MOUSE_SGR,
+                           RE_PATTERN_MOUSE_LEGACY,
+                           MouseEvent,
+                           MouseSGREvent,
+                           MouseLegacyEvent)
+from blessed.dec_modes import DecPrivateMode
 
 _T = TypeVar('_T', bound='Keystroke')
 
@@ -25,6 +34,14 @@ if platform.system() == 'Windows':
 else:
     import curses
     from curses.has_key import _capability_names as capability_names
+
+
+# DEC event namedtuples
+BracketedPasteEvent = namedtuple('BracketedPasteEvent', 'text')
+
+FocusEvent = namedtuple('FocusEvent', 'gained')
+SyncEvent = namedtuple('SyncEvent', 'begin')
+ResizeEvent = namedtuple('ResizeEvent', 'height_chars width_chars height_pixels width_pixels')
 
 
 # Keyboard protocol namedtuples
@@ -54,6 +71,32 @@ RE_PATTERN_LEGACY_SS3_FKEYS = re.compile(r'\x1bO(?P<mod>\d)(?P<final>[PQRS])')
 # ModifyOtherKeys: ESC [ 27 ; modifiers ; key [~]
 RE_PATTERN_MODIFY_OTHER = re.compile(
     r'\x1b\[27;(?P<modifiers>\d+);(?P<key>\d+)(?P<tilde>~?)')
+
+# Bracketed paste (mode 2004): ESC [ 200 ~ text ESC [ 201 ~
+RE_PATTERN_BRACKETED_PASTE = re.compile(r'\x1b\[200~(?P<text>.*?)\x1b\[201~', re.DOTALL)
+# Focus tracking (mode 1004): ESC [ I or ESC [ O
+RE_PATTERN_FOCUS = re.compile(r'\x1b\[(?P<io>[IO])')
+# Resize notification (mode 2048): ESC [ 48 ; height ; width ; height_px ; width_px t
+RE_PATTERN_RESIZE = re.compile(r'\x1b\[48;(?P<height_chars>\d+);(?P<width_chars>\d+)'
+                               r';(?P<height_pixels>\d+);(?P<width_pixels>\d+)t')
+
+# DEC event pattern container
+DECEventPattern = functools.namedtuple("DEC_EVENT_PATTERN", ["mode", "pattern"])
+
+# DEC event patterns - compiled regexes with metadata of the 'mode' that
+# triggered it, this prevents searching for bracketed paste or mouse modes
+# unless it is enabled, and, when enabled, to supplant the match with the DEC
+# mode that triggered it. For Mouse modes, there is some order of precedence.
+DEC_EVENT_PATTERNS = [
+    DECEventPattern(mode=DecPrivateMode.BRACKETED_PASTE, pattern=RE_PATTERN_BRACKETED_PASTE),
+    DECEventPattern(mode=DecPrivateMode.MOUSE_SGR_PIXELS, pattern=RE_PATTERN_MOUSE_SGR),
+    DECEventPattern(mode=DecPrivateMode.MOUSE_EXTENDED_SGR, pattern=RE_PATTERN_MOUSE_SGR),
+    DECEventPattern(mode=DecPrivateMode.MOUSE_ALL_MOTION, pattern=RE_PATTERN_MOUSE_LEGACY),
+    DECEventPattern(mode=DecPrivateMode.MOUSE_REPORT_DRAG, pattern=RE_PATTERN_MOUSE_LEGACY),
+    DECEventPattern(mode=DecPrivateMode.MOUSE_REPORT_CLICK, pattern=RE_PATTERN_MOUSE_LEGACY),
+    DECEventPattern(mode=DecPrivateMode.FOCUS_IN_OUT_EVENTS, pattern=RE_PATTERN_FOCUS),
+    DECEventPattern(mode=DecPrivateMode.IN_BAND_WINDOW_RESIZE, pattern=RE_PATTERN_RESIZE),
+]
 
 # Control character mappings
 # Note: Ctrl+Space (code 0) is handled specially as 'SPACE', not '@' or ' '.
@@ -105,24 +148,23 @@ class KittyModifierBits:
 
 class Keystroke(str):
     """
-    A unicode-derived class for describing a single keystroke.
+    A unicode-derived class for describing a single "keystroke".
 
-    A class instance describes a single keystroke received on input,
-    which may contain multiple characters as a multibyte sequence,
-    which is indicated by properties :attr:`is_sequence` returning
-    ``True``.
+    A class instance describes a single keystroke received on input, which may
+    contain multiple characters as a multibyte sequence, which is indicated by
+    properties :attr:`is_sequence` returning ``True``. Note that keystrokes may
+    also represent mouse input, bracketed paste, or focus in/out events
+    depending on enabled terminal modes.
 
-    When the string is a known sequence, :attr:`code` matches terminal
-    class attributes for comparison, such as ``term.KEY_LEFT``.
-
-    The string-name of the sequence, such as ``'KEY_LEFT'`` is accessed
-    by property :attr:`name`, and is used by the :meth:`__repr__` method
-    to display a human-readable form of the Keystroke this class
-    instance represents. It may otherwise by joined, split, or evaluated
-    just as as any other unicode string.
+    The string :attr:`name` of the sequence is used to identify in code logic,
+    such as ``'KEY_LEFT'`` to represent a common and human-readable form of
+    the Keystroke this class instance represents.
     """
-    _name = None
-    _code = None
+    _name: Optional[str] = None
+    _code: Optional[int] = None
+    _mode: Optional[int] = None
+    _match: typing.Any = None
+    _modifiers: int = 1
 
     def __new__(cls: typing.Type[_T], ucs: str = '', code: Optional[int] = None,
                 name: Optional[str] = None, mode: Optional[int] = None,
@@ -131,7 +173,7 @@ class Keystroke(str):
         """Class constructor."""
         new = str.__new__(cls, ucs)
         new._name = name
-        new._code = code
+        new._code = code  # curses keycode is exposed for legacy API
         new._mode = mode  # Internal mode indicator for different protocols
         new._match = match  # regex match object for protocol-specific data
         new._modifiers = cls._infer_modifiers(ucs, mode, match)
@@ -197,7 +239,8 @@ class Keystroke(str):
         Returns name like 'KEY_CTRL_ALT_F1' or 'KEY_SHIFT_UP_RELEASED'. Also handles release/repeat
         events for keys without modifiers.
         """
-        if not (self._mode is not None and self._mode < 0 and self._code is not None):
+        # Check if this is a special keyboard protocol mode
+        if not (self.uses_keyboard_protocol and self._code is not None):
             return None
 
         # turn keycode value into 'base name', eg.
@@ -249,7 +292,7 @@ class Keystroke(str):
 
         Returns name like 'KEY_CTRL_ALT_A' or 'KEY_ALT_SHIFT_5'.
         """
-        if self._mode != -1:
+        if self._mode != DecPrivateMode.SpecialInternalKitty:
             return None
 
         # Only synthesize for keypress events (event_type == 1), not release/repeat
@@ -365,8 +408,59 @@ class Keystroke(str):
             return 'KEY_ALT_SPACE'
         return f'KEY_ALT_{ch}'
 
+    def _get_mouse_event_name(self) -> Optional[str]:
+        """
+        Get name for mouse events.
+
+        Returns name like 'MOUSE_LEFT', 'MOUSE_CTRL_LEFT', 'MOUSE_SCROLL_UP', 'MOUSE_LEFT_RELEASED',
+        'MOUSE_MOTION', 'MOUSE_RIGHT_MOTION', etc.
+        """
+        # Check if this is a mouse mode
+        if self._mode not in (DecPrivateMode.MOUSE_EXTENDED_SGR,
+                              DecPrivateMode.MOUSE_SGR_PIXELS,
+                              DecPrivateMode.MOUSE_REPORT_CLICK,
+                              DecPrivateMode.MOUSE_HILITE_TRACKING,
+                              DecPrivateMode.MOUSE_REPORT_DRAG,
+                              DecPrivateMode.MOUSE_ALL_MOTION):
+            return None
+
+        # Get the button name from _mode_values
+        mouse_event = self._mode_values
+        if not isinstance(mouse_event, MouseEvent):
+            return None
+
+        # Return MOUSE_ prefix + button name
+        return f'MOUSE_{mouse_event.button}'
+
+    def _get_focus_event_name(self) -> Optional[str]:
+        """
+        Get name for focus events.
+
+        Returns 'FOCUS_IN' or 'FOCUS_OUT'.
+        """
+        if self._mode != DecPrivateMode.FOCUS_IN_OUT_EVENTS:
+            return None
+
+        # Check the io group to determine if focus was gained or lost
+        if self._match is not None and self._match.group('io') == 'I':
+            return 'FOCUS_IN'
+        if self._match is not None and self._match.group('io') == 'O':
+            return 'FOCUS_OUT'
+
+        return None
+
+    def _get_bracketed_paste_name(self) -> Optional[str]:
+        """
+        Get name for bracketed paste events.
+
+        Returns 'BRACKETED_PASTE'.
+        """
+        if self._mode == DecPrivateMode.BRACKETED_PASTE:
+            return 'BRACKETED_PASTE'
+        return None
+
     @property
-    def name(self) -> Optional[str]:
+    def name(self) -> Optional[str]:  # pylint: disable=too-many-return-statements
         r"""
         Special application key name.
 
@@ -378,9 +472,19 @@ class Keystroke(str):
         The name supports "modifiers", such as ``'KEY_CTRL_F1'``,
         ``'KEY_CTRL_ALT_F1'``, ``'KEY_CTRL_ALT_SHIFT_F1'``
 
-        When non-None, all phrases begin with either 'KEY', with one exception: 'CSI' is returned
-        for '\\x1b[' to indicate the beginning of a presumed unsupported input sequence. The phrase
-        'KEY_ALT_[' is never returned and unsupported.
+        For mouse events, the name includes the ``'MOUSE_'`` prefix followed by the
+        button/action name, such as ``'MOUSE_LEFT'``, ``'MOUSE_MOTION'``,
+        ``'MOUSE_RIGHT_MOTION'``, ``'MOUSE_LEFT_RELEASED'``.
+
+        For other DEC events:
+        - Focus events: 'FOCUS_IN' or 'FOCUS_OUT'
+        - Bracketed paste: 'BRACKETED_PASTE'
+        - Resize events: 'RESIZE_EVENT'
+
+        When non-None, all phrases begin with either 'KEY', 'MOUSE', 'FOCUS_IN', 'FOCUS_OUT',
+        'BRACKETED_PASTE', or 'RESIZE_EVENT', with one exception: 'CSI' is returned for '\\x1b['
+        to indicate the beginning of a presumed unsupported input sequence. The phrase 'KEY_ALT_['
+        is never returned and unsupported.
 
         If this value is None, then it can probably be assumed that the value is an unsurprising
         textual character without any modifiers, like the letter ``'a'``.
@@ -389,6 +493,24 @@ class Keystroke(str):
             return self._name
 
         # Try each helper method in sequence
+        # DEC events first
+        result = self._get_mouse_event_name()
+        if result is not None:
+            return result
+
+        result = self._get_focus_event_name()
+        if result is not None:
+            return result
+
+        result = self._get_bracketed_paste_name()
+        if result is not None:
+            return result
+
+        # Inline resize event check
+        if self._mode == DecPrivateMode.IN_BAND_WINDOW_RESIZE:
+            return 'RESIZE_EVENT'
+
+        # Keyboard events
         result = self._get_modified_keycode_name()
         if result is not None:
             return result
@@ -485,6 +607,20 @@ class Keystroke(str):
         return bool(self.modifiers_bits & KittyModifierBits.num_lock)
 
     @property
+    def uses_keyboard_protocol(self) -> bool:
+        """
+        Whether this keystroke uses a special keyboard protocol mode.
+
+        Returns True for Kitty, ModifyOtherKeys, or LegacyCSIModifier protocols, which use negative
+        mode values (SpecialInternalKitty=-1, SpecialInternalModifyOtherKeys=-2,
+        SpecialInternalLegacyCSIModifier=-3).
+
+        :rtype: bool
+        :returns: True if using special keyboard protocol mode
+        """
+        return self._mode is not None and self._mode < 0
+
+    @property
     def pressed(self) -> bool:
         """
         Whether this is a key press event.
@@ -493,7 +629,7 @@ class Keystroke(str):
         :returns: True if this is a key press event (event_type=1 or not specified), False for
             repeat or release events
         """
-        if self._mode is not None and self._mode < 0:
+        if self.uses_keyboard_protocol:
             # Check if _match has event_type (Kitty, LegacyCSI, ModifyOtherKeys),
             # defaulting to 1 (pressed) if not present.
             return getattr(self._match, 'event_type', 1) == 1
@@ -508,7 +644,7 @@ class Keystroke(str):
         :rtype: bool
         :returns: True if this is a key repeat event (event_type=2), False otherwise
         """
-        if self._mode is not None and self._mode < 0:
+        if self.uses_keyboard_protocol:
             return getattr(self._match, 'event_type', 1) == 2
         # Default: not a repeat event
         return False
@@ -521,7 +657,7 @@ class Keystroke(str):
         :rtype: bool
         :returns: True if this is a key release event (event_type=3), False otherwise
         """
-        if self._mode is not None and self._mode < 0:
+        if self.uses_keyboard_protocol:
             return getattr(self._match, 'event_type', 1) == 3
         # Default: not a release event
         return False
@@ -630,6 +766,7 @@ class Keystroke(str):
 
         return modifier_predicate
 
+    # pylint: disable=too-complex
     def __getattr__(self, attr: str) -> typing.Callable[[Optional[str], bool], bool]:
         """
         Dynamic compound modifier and application key predicates via __getattr__.
@@ -647,8 +784,12 @@ class Keystroke(str):
             - ``char`` (Optional[str]): Character to match against keystroke value
             - ``ignore_case`` (bool): Whether to ignore case when matching characters
 
-            For event predicates and application key predicates, these
-            parameters are accepted but not used.
+            For event predicates, application key predicates, and mouse button predicates,
+            these parameters are accepted but not used.
+
+            Mouse button predicates use the pattern ``is_mouse_<button>()`` where
+            ``<button>`` matches the button name: ``is_mouse_left()``, ``is_mouse_ctrl_left()``,
+            ``is_mouse_scroll_up()``, ``is_mouse_left_released()``, etc.
         """
         if not attr.startswith('is_'):
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}'")
@@ -660,6 +801,20 @@ class Keystroke(str):
 
         # Parse tokens to separate modifiers from potential key name
         tokens = tokens_str.split('_')
+
+        # Check for mouse button predicates (is_mouse_*)
+        if tokens and tokens[0] == 'mouse':
+            # Build expected mouse event name from remaining tokens
+            # is_mouse_left -> MOUSE_LEFT
+            # is_mouse_ctrl_left -> MOUSE_CTRL_LEFT
+            # is_mouse_scroll_up -> MOUSE_SCROLL_UP
+            expected_name = 'MOUSE_' + '_'.join(tokens[1:]).upper()
+
+            def mouse_predicate(char: Optional[str] = None, ignore_case: bool = False) -> bool:
+                # pylint: disable=unused-argument
+                return self.name == expected_name
+
+            return mouse_predicate
 
         # Check for event type suffix at the end (pressed, repeated, released)
         event_type_token = None
@@ -793,7 +948,7 @@ class Keystroke(str):
         Extracts the character from modern keyboard protocols.
         """
         # Kitty protocol
-        if self._mode == -1:
+        if self._mode == DecPrivateMode.SpecialInternalKitty:
             # prefer text_codepoints if available
             if self._match.int_codepoints:
                 return ''.join(chr(cp) for cp in self._match.int_codepoints)
@@ -813,7 +968,7 @@ class Keystroke(str):
             return chr(self._match.unicode_key)
 
         # ModifyOtherKeys protocol - extract character from key
-        if self._mode == -2:
+        if self._mode == DecPrivateMode.SpecialInternalModifyOtherKeys:
             return chr(self._match.key)
 
         return None
@@ -858,6 +1013,130 @@ class Keystroke(str):
                 or self._get_ascii_value()
                 or '')
 
+    @property
+    def mode(self) -> Optional['DecPrivateMode']:
+        """
+        DEC Private Mode associated with this keystroke, if any.
+
+        :rtype: blessed.dec_modes.DecPrivateMode or None
+        :returns: The :class:`~blessed.dec_modes.DecPrivateMode` enum value
+            associated with this keystroke, or ``None`` if this is not a DEC mode event.
+
+        .. note:: Mode names beginning SpecialInternal with negative values (-1,
+            -2, -3) are used to track how some kinds of application keys are
+            matched.
+        """
+        if self._mode is not None:
+            return DecPrivateMode(self._mode)
+        return None
+
+    @property
+    def mouse_yx(self) -> Tuple[int, int]:
+        """
+        Mouse position as (y, x) tuple for mouse events.
+
+        This is particularly useful with terminal movement functions:
+        ``term.move_yx(*keystroke.mouse_yx)``
+
+        :rtype: tuple of (int, int)
+        :returns: (y, x) coordinate tuple (0-indexed) for mouse events,
+                  or ``(-1, -1)`` if not a mouse event
+        """
+        mouse_event = self._mode_values
+        if isinstance(mouse_event, MouseEvent):
+            return (mouse_event.y, mouse_event.x)
+        return (-1, -1)
+
+    @property
+    def mouse_xy(self) -> Tuple[int, int]:
+        """
+        Mouse position as (x, y) tuple for mouse events.
+
+        :rtype: tuple of (int, int)
+        :returns: (x, y) coordinate tuple (0-indexed) for mouse events,
+                  or ``(-1, -1)`` if not a mouse event
+        """
+        mouse_event = self._mode_values
+        if isinstance(mouse_event, MouseEvent):
+            return (mouse_event.x, mouse_event.y)
+        return (-1, -1)
+
+    @property
+    def text(self) -> Optional[str]:
+        """
+        Pasted text for bracketed paste events.
+
+        :rtype: str or None
+        :returns: The pasted text for ``BRACKETED_PASTE`` events,
+                  or ``None`` if not a bracketed paste event
+        """
+        paste_event = self._mode_values
+        if isinstance(paste_event, BracketedPasteEvent):
+            return paste_event.text
+        return None
+
+    @property
+    def _mode_values(self) -> Optional[typing.Union[BracketedPasteEvent,
+                                                    MouseSGREvent, MouseLegacyEvent, FocusEvent,
+                                                    ResizeEvent]]:
+        # pylint: disable=too-many-return-statements
+        """
+        Return structured data for DEC private mode events (private API).
+
+        Returns a namedtuple with parsed event data for supported
+        :class:`~blessed.dec_modes.DecPrivateMode` modes:
+
+        - ``BRACKETED_PASTE``: :class:`BracketedPasteEvent` with ``text`` field
+        - ``MOUSE_EXTENDED_SGR``, ``MOUSE_ALL_MOTION``,  ``MOUSE_REPORT_DRAG``,
+          and ``MOUSE_REPORT_CLICK`` events: :class:`MouseEvent` with button,
+          coordinates, and modifier flags
+        - ``FOCUS_IN_OUT_EVENTS``: :class:`FocusEvent` with ``gained`` boolean field
+        - ``IN_BAND_WINDOW_RESIZE``: :class:`ResizeEvent` with dimension fields
+
+        :rtype: namedtuple or None
+        :returns: Structured event data for this DEC mode event, or ``None`` if this
+            keystroke is not a DEC mode event or the mode is not supported
+        """
+        if self._mode is None or self._match is None:
+            return None
+
+        # Parse based on mode type
+        if self._mode in (DecPrivateMode.MOUSE_REPORT_CLICK,
+                          DecPrivateMode.MOUSE_HILITE_TRACKING,
+                          DecPrivateMode.MOUSE_REPORT_DRAG,
+                          DecPrivateMode.MOUSE_ALL_MOTION):
+            return MouseEvent.from_legacy_match(self._match)
+        if self._mode in (DecPrivateMode.MOUSE_EXTENDED_SGR,
+                          DecPrivateMode.MOUSE_SGR_PIXELS):
+            return MouseEvent.from_sgr_match(self._match)
+        if self._mode == DecPrivateMode.FOCUS_IN_OUT_EVENTS:
+            return self._parse_focus()
+        if self._mode == DecPrivateMode.BRACKETED_PASTE:
+            return self._parse_bracketed_paste()
+        if self._mode == DecPrivateMode.IN_BAND_WINDOW_RESIZE:
+            return self._parse_resize()
+
+        # Unknown DEC mode or unsupported mode
+        return None
+
+    def _parse_focus(self) -> FocusEvent:
+        """Parse focus event from stored regex match."""
+        gained = bool(self._match.group('io') == 'I')
+        return FocusEvent(gained=gained)
+
+    def _parse_bracketed_paste(self) -> BracketedPasteEvent:
+        """Parse bracketed paste event from stored regex match."""
+        return BracketedPasteEvent(text=self._match.group('text'))
+
+    def _parse_resize(self) -> ResizeEvent:
+        """Parse resize event from stored regex match."""
+        return ResizeEvent(
+            height_chars=int(self._match.group('height_chars')),
+            width_chars=int(self._match.group('width_chars')),
+            height_pixels=int(self._match.group('height_pixels')),
+            width_pixels=int(self._match.group('width_pixels'))
+        )
+
 
 def get_curses_keycodes() -> Dict[str, int]:
     """
@@ -875,7 +1154,7 @@ def get_curses_keycodes() -> Dict[str, int]:
 
 def get_keyboard_codes() -> Dict[int, str]:
     """
-    Return mapping of keycode integer values paired by their curses key-name.
+    Return mapping of keycode integer values paired by their curses key- name.
 
     :rtype: dict
     :returns: Dictionary of (code, name) pairs for curses keyboard constant
@@ -1008,11 +1287,13 @@ def get_leading_prefixes(sequences: typing.Iterable[str]) -> Set[str]:
     return {seq[:i] for seq in sequences for i in range(1, len(seq))}
 
 
+# pylint: disable=too-many-positional-arguments
 def resolve_sequence(text: str,
                      mapper: typing.Mapping[str, int],
                      codes: typing.Mapping[int, str],
                      prefixes: Optional[Set[str]] = None,
-                     final: bool = False) -> Keystroke:
+                     final: bool = False,
+                     dec_mode_cache: Optional[Dict[int, int]] = None) -> Keystroke:
     r"""
     Return a single :class:`Keystroke` instance for given sequence ``text``.
 
@@ -1023,6 +1304,7 @@ def resolve_sequence(text: str,
         by their mnemonic name, such as ``'KEY_LEFT'``.
     :arg set prefixes: Set of all valid sequence prefixes for quick matching
     :arg bool final: Whether this is the final resolution attempt (no more input expected)
+    :arg dict dec_mode_cache: Dictionary of DEC private mode states (mode number -> state value)
     :rtype: Keystroke
     :returns: Keystroke instance for the given sequence
 
@@ -1032,24 +1314,26 @@ def resolve_sequence(text: str,
     calls to determine that ``xxx`` remains unresolved.
 
     In an ideal world, we could detect and resolve only for key sequences
-    expected in the current terminal mode. For example, only the ennoblement of
+    expected in the current terminal mode. For example, only the enabling of
     mode 1036 (META_SENDS_ESC) would match for 2-character ESC+char sequences.
 
-    But terminals are unpredictable, I am using a popular linux terminal now
-    that does not negotiate about any DEC Private modes but transmits
-    metaSendsEscape anyway, so exhaustive match is performed in all cases.
+    But terminals are unpredictable, the popular terminal "Konsole" does
+    not negotiate about any DEC Private modes but transmits metaSendsEscape
+    anyway, so exhaustive match is performed in all cases.
     """
     # Handle None prefixes (convert to empty set for compatibility)
     if prefixes is None:
         prefixes = set()
 
-    # First try advanced keyboard protocol matchers
+    # First try advanced keyboard protocol matchers and DEC events
     ks = None
-    for match_fn in (_match_kitty_key,
-                     _match_modify_other_keys,
-                     _match_legacy_csi_letter_form,
-                     _match_legacy_csi_tilde_form,
-                     _match_legacy_ss3_fkey_form):
+    for match_fn in (
+            functools.partial(_match_dec_event, dec_mode_cache=dec_mode_cache),
+            _match_kitty_key,
+            _match_modify_other_keys,
+            _match_legacy_csi_letter_form,
+            _match_legacy_csi_tilde_form,
+            _match_legacy_ss3_fkey_form):
         ks = match_fn(text)
         if ks:
             break
@@ -1154,6 +1438,37 @@ def _read_until(term: 'Terminal',
             break
 
     return match, buf
+
+
+def _match_dec_event(text: str,
+                     dec_mode_cache: Optional[Dict[int,
+                                                   int]] = None) -> Optional[Keystroke]:
+    """
+    Attempt to match text against DEC event patterns.
+
+    Only matches patterns whose corresponding DEC modes are enabled in the cache.
+    This prevents false positives like matching focus events when focus tracking is disabled.
+
+    :arg str text: Input text to match against DEC patterns
+    :arg dict dec_mode_cache: Dictionary of DEC private mode states (mode number -> state value)
+    :rtype: Keystroke or None
+    :returns: :class:`Keystroke` with DEC event data if matched, ``None`` otherwise
+    """
+    from blessed.dec_modes import DecModeResponse  # pylint: disable=import-outside-toplevel
+
+    if dec_mode_cache is None:
+        dec_mode_cache = {}
+
+    for mode, pattern in DEC_EVENT_PATTERNS:
+        # Only match if the mode is enabled (state == SET)
+        mode_state = dec_mode_cache.get(int(mode))
+        if mode_state != DecModeResponse.SET:
+            continue
+
+        match = pattern.match(text)
+        if match:
+            return Keystroke(ucs=match.group(0), mode=mode, match=match)
+    return None
 
 
 def _match_kitty_key(text: str) -> Optional[Keystroke]:
@@ -1824,6 +2139,70 @@ class DeviceAttribute():
                 f'extensions={self.extensions}, supports_sixel={self.supports_sixel})')
 
 
+class SoftwareVersion:
+    """Represents a terminal's software name and version from XTVERSION response."""
+
+    RE_RESPONSE = re.compile(r'\x1bP>\|(.+?)\x1b\\')
+
+    def __init__(self, raw: str, name: str, version: str) -> None:
+        """
+        Initialize SoftwareVersion instance.
+
+        :arg str raw: Original response string from terminal
+        :arg str name: Software name (e.g., "kitty", "XTerm")
+        :arg str version: Version string (e.g., "0.24.2", "367") or empty string if no version
+        """
+        self.raw = raw
+        self.name = name
+        self.version = version
+
+    @classmethod
+    def from_match(cls, match: Match[str]) -> 'SoftwareVersion':
+        """
+        Create SoftwareVersion from regex match object.
+
+        :arg re.Match match: Regex match object with group for software text
+        :rtype: SoftwareVersion
+        :returns: SoftwareVersion instance parsed from match
+        """
+        text = match.group(1)
+        name, version = cls._parse_text(text)
+        return cls(match.group(0), name, version)
+
+    @staticmethod
+    def _parse_text(text: str) -> typing.Tuple[str, str]:
+        """
+        Parse software name and version from text.
+
+        Parsing logic (in order):
+        1. Check for space-separated format: "tmux 3.2a" or "X.Org 7.7.0(370)"
+        2. Check for parentheses format: "kitty(0.24.2)"
+        3. Name-only format: "software" (version is empty string)
+
+        :arg str text: Text from XTVERSION response
+        :rtype: tuple
+        :returns: Tuple of (name, version) where both are strings
+        """
+        # Check for space-separated format first
+        if ' ' in text:
+            name, version = text.split(' ', 1)
+            return name, version
+
+        # Check for parentheses format
+        if '(' in text:
+            parts = text.split('(', 1)
+            name = parts[0]
+            version = parts[1].rstrip(')')
+            return name, version
+
+        # Name-only format
+        return text, ''
+
+    def __repr__(self) -> str:
+        """String representation of SoftwareVersion."""
+        return f'SoftwareVersion(name={self.name!r}, version={self.version!r})'
+
+
 class KittyKeyboardProtocol:
     """
     Represents Kitty keyboard protocol flags.
@@ -1949,4 +2328,5 @@ class KittyKeyboardProtocol:
 
 __all__ = ('Keystroke', 'get_keyboard_codes', 'get_keyboard_sequences',
            'KittyKeyEvent', 'ModifyOtherKeysEvent', 'LegacyCSIKeyEvent',
-           'KittyKeyboardProtocol', 'DeviceAttribute',)
+           'KittyKeyboardProtocol', 'DeviceAttribute', 'SoftwareVersion',
+           'BracketedPasteEvent', 'FocusEvent', 'SyncEvent',)
