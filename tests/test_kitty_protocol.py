@@ -690,31 +690,30 @@ def test_kitty_name_synthesis_edge_cases(sequence, expected_name, expected_value
 
 @pytest.mark.parametrize("sequence,expected_name", [
     # Base key usage: unicode_key=1089, base_key=99 ('c'), modifiers=5 (Ctrl)
-    # Tests that name synthesis uses base_key (99) instead of unicode_key (1089)
     ('\x1b[1089::99;5u', 'KEY_CTRL_C'),
 
     # Press event: unicode_key=97 ('a'), modifiers=5 (Ctrl), event_type=1 (press)
-    # Tests that press events (event_type=1) get names synthesized
     ('\x1b[97;5:1u', 'KEY_CTRL_A'),
 
     # Release event: unicode_key=97 ('a'), modifiers=5 (Ctrl), event_type=3 (release)
-    # Tests that release events (event_type=3) return None for name
-    ('\x1b[97;5:3u', None),
+    ('\x1b[97;5:3u', 'KEY_CTRL_A_RELEASED'),
 
     # Repeat event: unicode_key=97 ('a'), modifiers=5 (Ctrl), event_type=2 (repeat)
-    # Tests that repeat events (event_type=2) return None for name
-    ('\x1b[97;5:2u', None),
+    ('\x1b[97;5:2u', 'KEY_CTRL_A_REPEATED'),
+
+    # Additional release event tests - text keys with modifiers
+    ('\x1b[106;5:3u', 'KEY_CTRL_J_RELEASED'),
+    ('\x1b[106;5u', 'KEY_CTRL_J'),
+    ('\x1b[97;3:3u', 'KEY_ALT_A_RELEASED'),
+    ('\x1b[122;7:3u', 'KEY_CTRL_ALT_Z_RELEASED'),
+    ('\x1b[49;5:3u', 'KEY_CTRL_1_RELEASED'),
+
+    # Repeat event tests
+    ('\x1b[106;5:2u', 'KEY_CTRL_J_REPEATED'),
+    ('\x1b[97;3:2u', 'KEY_ALT_A_REPEATED'),
 ])
 def test_kitty_name_synthesis_special_cases(sequence, expected_name):
-    """
-    Test special cases in Kitty protocol name synthesis.
-
-    This test covers critical edge cases in _get_kitty_protocol_name():
-    1. Alternate/base key handling (prefers base_key over unicode_key)
-    2. Event type filtering (only press events get synthesized names)
-    3. Release event handling (event_type=3 returns None)
-    4. Repeat event handling (event_type=2 returns None)
-    """
+    """Test special cases in Kitty protocol name synthesis including event types."""
     ks = _match_kitty_key(sequence)
     assert ks.name == expected_name
 

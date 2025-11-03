@@ -290,13 +290,9 @@ class Keystroke(str):
         """
         Get name for Kitty keyboard protocol letter/digit/symbol.
 
-        Returns name like 'KEY_CTRL_ALT_A' or 'KEY_ALT_SHIFT_5'.
+        Returns name like 'KEY_CTRL_ALT_A', 'KEY_ALT_SHIFT_5', 'KEY_CTRL_J_RELEASED', etc.
         """
         if self._mode != DecPrivateMode.SpecialInternalKitty:
-            return None
-
-        # Only synthesize for keypress events (event_type == 1), not release/repeat
-        if self._match.event_type != 1:
             return None
 
         # Determine the base key - prefer base_key if available
@@ -326,9 +322,17 @@ class Keystroke(str):
                 mod_parts.append(mod_name.upper())
 
         # Only synthesize name if at least one modifier is present
-        if mod_parts:
-            return f"KEY_{'_'.join(mod_parts)}_{char}"
-        return None
+        if not mod_parts:
+            return None
+
+        base_result = f"KEY_{'_'.join(mod_parts)}_{char}"
+
+        # Append event type suffix if not a press event
+        if self.repeated:
+            return f"{base_result}_REPEATED"
+        if self.released:
+            return f"{base_result}_RELEASED"
+        return base_result  # pressed (no suffix)
 
     def _get_control_char_name(self) -> Optional[str]:
         """
