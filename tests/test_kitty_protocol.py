@@ -1443,3 +1443,72 @@ def test_kitty_negotiation_force_True_incurs_second_timeout():
         assert 20 <= elapsed_ms <= 35
 
     child()
+
+
+def test_kitty_keyboard_protocol_report_all_keys_setter_false():
+    """Test report_all_keys setter with False value."""
+    protocol = KittyKeyboardProtocol(31)
+    assert protocol.report_all_keys is True
+    protocol.report_all_keys = False
+    assert protocol.report_all_keys is False
+    assert protocol.value == 23
+
+
+def test_kitty_keyboard_protocol_report_text_getter_setter():
+    """Test report_text property getter and setter."""
+    protocol = KittyKeyboardProtocol(0)
+    assert protocol.report_text is False
+    protocol.report_text = True
+    assert protocol.report_text is True
+    assert protocol.value == 16
+    protocol.report_text = False
+    assert protocol.report_text is False
+    assert protocol.value == 0
+
+
+@pytest.mark.parametrize("value,expected_flags", [
+    (0, []),
+    (1, ['disambiguate']),
+    (2, ['report_events']),
+    (4, ['report_alternates']),
+    (8, ['report_all_keys']),
+    (16, ['report_text']),
+    (3, ['disambiguate', 'report_events']),
+    (12, ['report_alternates', 'report_all_keys']),
+    (31, ['disambiguate', 'report_events', 'report_alternates', 'report_all_keys', 'report_text']),
+])
+def test_kitty_keyboard_protocol_repr_all_combinations(value, expected_flags):
+    """Test __repr__ with all flag combinations."""
+    protocol = KittyKeyboardProtocol(value)
+    repr_str = repr(protocol)
+    assert f'KittyKeyboardProtocol(value={value}' in repr_str
+    for flag in expected_flags:
+        assert flag in repr_str
+    if not expected_flags:
+        assert 'flags=[]' in repr_str
+
+
+def test_kitty_keyboard_protocol_equality_with_protocol():
+    """Test __eq__ with another KittyKeyboardProtocol instance."""
+    proto1 = KittyKeyboardProtocol(15)
+    proto2 = KittyKeyboardProtocol(15)
+    proto3 = KittyKeyboardProtocol(7)
+    assert proto1 == proto2
+    assert not (proto1 == proto3)
+
+
+def test_kitty_keyboard_protocol_equality_with_int():
+    """Test __eq__ with int values."""
+    protocol = KittyKeyboardProtocol(15)
+    assert protocol == 15
+    assert not (protocol == 7)
+
+
+def test_kitty_keyboard_protocol_equality_with_other_types():
+    """Test __eq__ with types that are neither KittyKeyboardProtocol nor int."""
+    protocol = KittyKeyboardProtocol(15)
+    assert not (protocol == "15")
+    assert not (protocol == 15.0)
+    assert not (protocol == None)
+    assert not (protocol == [15])
+    assert not (protocol == {'value': 15})
