@@ -2,15 +2,21 @@
 
 Version History
 ===============
-*next*
-  * Environment values FORCE_COLOR_, CLICOLOR_FORCE_, and NO_COLOR_ overrides
-    :class:`blessed.Terminal` argument value, ``force_styling``.
-  * performance improvements in :meth:`~Terminal.rgb_downconvert` for 256-color
+
+1.23
+  * introduced: Environment values FORCE_COLOR_, CLICOLOR_FORCE_, and NO_COLOR_ overrides
+    :class:`blessed.Terminal` argument value, ``force_styling`` :ghpull:`295`
+  * improved: performance of :meth:`~Terminal.rgb_downconvert` for 256-color
     terminals, :ghpull:`298`.
-  * Enhanced keyboard support with Modifier keys, :ghpull:`306`.
-  * Kitty keyboard protocol support, :ghpull:`309`.
-  * Mouse support, Synchronized Output, and support for DEC Private Modes, :ghpull:`310`
-  * Sixel Support, methods to determine dimensions and color depth :ghpull:`312`
+  * deprecated: Python 2.7 through 3.6 no longer supported. :ghpull:`299`.
+  * improved: keyboard support for modifier keys, :ghpull:`306`.
+  * introduced: kitty keyboard protocol support, :ghpull:`309`.
+  * introduced: mouse support, Synchronized Output, and support for DEC Private Modes, :ghpull:`310`
+  * introduced: methods to determine Sixel, dimensions and color depth :ghpull:`312`
+  * introduced:``does_sixel()`` and color depth query support :ghpull:`312`
+  * introduced: in-band resize support (DEC Private Mode 2048) :ghpull:`313`
+  * introduced: XTVersion identification: :ghpull:`314`
+  * bugfix: default timeout for get_bgcolor, get_fgcolor :ghpull:`315`
 
 1.22
   * performance improvements to :meth:`~Terminal.length` and
