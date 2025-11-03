@@ -813,6 +813,8 @@ class Terminal():
 
         The foreground color is determined by emitting an `OSC 10 color query
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
+
+        See also :meth:`~.Terminal.get_bgcolor` for querying the background color.
         """
         match = self._query_response('\x1b]10;?\x07', RE_GET_FGCOLOR_RESPONSE, timeout)
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
@@ -832,6 +834,8 @@ class Terminal():
 
         The background color is determined by emitting an `OSC 11 color query
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
+
+        See also :meth:`~.Terminal.get_fgcolor` for querying the foreground color.
         """
         match = self._query_response('\x1b]11;?\x07', RE_GET_BGCOLOR_RESPONSE, timeout)
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)

@@ -51,6 +51,19 @@ color!
 
 .. include:: all_the_colors.txt
 
+Querying Terminal Colors
+-------------------------
+
+You can query the terminal's current foreground and background colors using
+:meth:`~.Terminal.get_fgcolor` and :meth:`~.Terminal.get_bgcolor`. These methods return RGB tuples
+that represent the actual colors configured in the terminal emulator:
+
+.. literalinclude:: ../bin/color_query.py
+   :language: python
+
+These methods are useful for adapting your application's color scheme to match the user's terminal
+theme, or for detecting whether the terminal has a light or dark background.
+
 256 Colors
 ----------
 

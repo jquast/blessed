@@ -48,7 +48,7 @@ def get_pos(term):
     #         Invalid variable name "Position"
     Position = collections.namedtuple('Position', ('row', 'column'))
 
-    pos = Position(*term.get_location(timeout=5.0))
+    pos = Position(*term.get_location())
 
     if -1 in pos:
         print('stdin: not a human', file=sys.stderr)
