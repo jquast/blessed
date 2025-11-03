@@ -1167,3 +1167,13 @@ def test_inkey_updates_preferred_cache_on_resize_event():
     output = pty_test(child, parent_func=None,
                       test_name='test_inkey_updates_preferred_cache_on_resize_event')
     assert 'OK' in output
+
+
+def test_does_inband_resize_no_styling():
+    """Test does_inband_resize returns False when does_styling is False."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=False)
+
+    result = term.does_inband_resize()
+    assert result is False
+    assert stream.getvalue() == ""
