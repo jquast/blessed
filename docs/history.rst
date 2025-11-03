@@ -13,7 +13,6 @@ Version History
   * introduced: kitty keyboard protocol support, :ghpull:`309`.
   * introduced: mouse support, Synchronized Output, and support for DEC Private Modes, :ghpull:`310`
   * introduced: methods to determine Sixel, dimensions and color depth :ghpull:`312`
-  * introduced:``does_sixel()`` and color depth query support :ghpull:`312`
   * introduced: in-band resize support (DEC Private Mode 2048) :ghpull:`313`
   * introduced: XTVersion identification: :ghpull:`314`
   * bugfix: default timeout for get_bgcolor, get_fgcolor :ghpull:`315`
