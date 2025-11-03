@@ -44,8 +44,9 @@ detect-multibyte.py
 https://github.com/jquast/blessed/blob/master/bin/detect-multibyte.py
 
 This program also demonstrates how the :meth:`~.get_location` method
-can be used to reliably test whether the terminal emulator of the connecting
-client is capable of rendering multibyte characters as a single cell.
+can be used to reliably test whether the terminal emulator supports
+utf-8 or other multibyte encoding, by rendering multibyte characters
+and measuring the change in cursor location.
 
 .. _editor.py:
 
@@ -67,7 +68,7 @@ This program displays a special REPL for using :meth:`~.inkey` and displaying
 the returned :class:`~.Keystroke` events, their names, events, and values.
 
 This also provides an interface for toggling special modes, such as any of the
-supported Kitty Keyboard Protocols.
+supported :ref:`kitty` Keyboard Protocols.
 
 .. _on_resize.py:
 
@@ -146,3 +147,32 @@ https://github.com/jquast/blessed/blob/master/bin/x11_colorpicker.py
 
 This program shows all of the X11 colors, demonstrates a basic keyboard-interactive program and
 color selection, but is also a useful utility to pick colors!
+
+.. _display_modes.py:
+
+display_modes.py
+----------------
+https://github.com/jquast/blessed/blob/master/bin/display_modes.py
+
+Detect and report all known DEC Private Modes supported by the Terminal and
+display a report.
+
+.. _strip.py:
+
+strip.py
+-------------
+https://github.com/jquast/blessed/blob/master/bin/strip.py
+
+This wrapper of the :meth:`~Terminal.strip_seqs` method reads text from standard
+input, "strips" away all known output sequences and writes the result to stdout.
+
+
+.. _bin/mouse_paint.py:
+
+mouse_paint.py
+--------------
+https://github.com/jquast/blessed/blob/master/bin/mouse_paint.py
+
+.. figure:: https://dxtz6bzwq9sxx.cloudfront.net/mouse_paint.gif
+
+This is a basic "paint" program using :ref:`mouse input` with the :ref:`report_motion` feature.

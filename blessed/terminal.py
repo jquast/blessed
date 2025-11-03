@@ -1,4 +1,5 @@
 """Module containing :class:`Terminal`, the primary API entry point."""
+# pylint: disable=too-many-lines
 # std imports
 import os
 import re
@@ -12,7 +13,7 @@ import platform
 import warnings
 import contextlib
 import collections
-from typing import IO, List, Match, Tuple, Union, Optional, Generator
+from typing import IO, Dict, List, Match, Tuple, Union, Optional, Generator
 
 # SupportsIndex was added in Python 3.8
 if sys.version_info >= (3, 8):
@@ -25,12 +26,17 @@ else:
 from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
 from .keyboard import (DEFAULT_ESCDELAY,
                        Keystroke,
+                       DeviceAttribute,
+                       SoftwareVersion,
+                       KittyKeyboardProtocol,
                        _time_left,
                        _read_until,
                        resolve_sequence,
                        get_keyboard_codes,
                        get_leading_prefixes,
                        get_keyboard_sequences)
+from .dec_modes import DecPrivateMode as _DecPrivateMode
+from .dec_modes import DecModeResponse
 from .sequences import Termcap, Sequence, SequenceTextWrapper
 from .colorspace import RGB_256TABLE
 from .formatters import (COLORS,
@@ -74,10 +80,20 @@ else:
         HAS_TTY = False  # pylint: disable=invalid-name
 
 _CUR_TERM = None  # See comments at end of file pylint: disable=invalid-name
-_RE_GET_FGCOLOR_RESPONSE = re.compile(
+RE_GET_FGCOLOR_RESPONSE = re.compile(
     '\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
-_RE_GET_BGCOLOR_RESPONSE = re.compile(
+RE_GET_BGCOLOR_RESPONSE = re.compile(
     '\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+# XTSMGRAPHICS - Query sixel graphics geometry: ESC[?2;0;<width>;<height>S
+_RE_XTSMGRAPHICS_RESPONSE = re.compile(r'\x1b\[\?2;0;(\d+);(\d+)S')
+# XTSMGRAPHICS - Query sixel color registers: ESC[?1;0;<colors>S
+_RE_XTSMGRAPHICS_COLORS_RESPONSE = re.compile(r'\x1b\[\?1;0;(\d+)S')
+# XTWINOPS 14t - Query window pixel size: ESC[4;<height>;<width>t
+_RE_XTWINOPS_14_RESPONSE = re.compile(r'\x1b\[4;(\d+);(\d+)t')
+# XTWINOPS 16t - Query character cell pixel size: ESC[6;<height>;<width>t
+_RE_XTWINOPS_16_RESPONSE = re.compile(r'\x1b\[6;(\d+);(\d+)t')
+_RE_GET_DEVICE_ATTR_RESPONSE = re.compile('\x1b\\[\\?([0-9]+)((?:;[0-9]+)*)c')
+_RE_GET_SOFTWARE_VERSION_RESPONSE = re.compile('\x1bP>\\|(.+?)\x1b\\\\')
 
 
 class Terminal():
@@ -129,10 +145,13 @@ class Terminal():
         'terminal_enquire': 'u9',
     }
 
+    #: DEC Private Mode constants accessible via Terminal.DecPrivateMode or term.DecPrivateMode
+    DecPrivateMode = _DecPrivateMode
+
     def __init__(self,
                  kind: Optional[str] = None,
                  stream: Optional[IO[str]] = None,
-                 force_styling: bool = False) -> None:
+                 force_styling: Union[bool, None] = False) -> None:
         """
         Initialize the terminal.
 
@@ -223,6 +242,34 @@ class Terminal():
         self.__init__color_capabilities()
         self.__init__capabilities()
         self.__init__keycodes()
+        self.__init__dec_private_modes()
+
+        # Initialize Kitty keyboard protocol tracking
+        self._kitty_kb_first_query_failed = False
+        self._kitty_kb_first_query_attempted = False
+
+        # Device Attributes (DA1) cache and sticky failure tracking
+        self._device_attributes_cache: Optional[DeviceAttribute] = None
+        self._device_attributes_first_query_failed = False
+
+        # Software Version cache
+        self._software_version_cache: Optional[SoftwareVersion] = None
+
+        # Initialize sixel graphics query caches,
+        # Cache for _get_xtsmgraphics() query result - (height, width) or (-1, -1)
+        # the value of (-1, -1) is used for 'sticky failure' unless force=True
+        self._xtsmgraphics_cache: Optional[Tuple[int, int]] = None
+        # Cache for XTWINOPS window pixel dimensions - (height, width) or (-1, -1)
+        self._xtwinops_cache: Optional[Tuple[int, int]] = None
+        # Cache for get_sixel_colors() - stores color count or -1
+        self._xtsmgraphics_colors_cache: Optional[int] = None
+        # Cache for get_cell_height_and_width() - (height, width) or (-1, -1)
+        self._xtwinops_cell_cache: Optional[Tuple[int, int]] = None
+
+        # Cache for in-band resize notifications (mode 2048)
+        # When notify_on_resize() context manager is active, this stores the latest
+        # terminal dimensions from resize events
+        self._preferred_size_cache: Optional["WINSZ"] = None
 
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
@@ -365,6 +412,18 @@ class Terminal():
         # build set of prefixes of sequences
         self._keymap_prefixes = get_leading_prefixes(self._keymap)
 
+        # Add DEC event prefixes (mouse, bracketed paste, focus tracking) These
+        # are not in the keymap but need to be recognized as valid "prefixes",
+        # so that they are not detected early as metaSendsEscape sequence until
+        # after esc_delay has elapsed.
+        self._keymap_prefixes.update([
+            '\x1b[M',     # Legacy mouse (needs 3 more bytes)
+            '\x1b[<',     # SGR mouse (variable length)
+            '\x1b[200',   # Bracketed paste start and its starting prefixes,
+            '\x1b[20',
+            '\x1b[2',
+        ])
+
         # keyboard stream buffer
         self._keyboard_buf: collections.deque[str] = collections.deque()
 
@@ -385,6 +444,14 @@ class Terminal():
                 warnings.warn(f'LookupError: {err}, defaulting to UTF-8 for keyboard.')
                 self._encoding = 'UTF-8'
                 self._keyboard_decoder = codecs.getincrementaldecoder(self._encoding)()
+
+    def __init__dec_private_modes(self) -> None:
+        """Initialize DEC Private Mode caching and state tracking."""
+        # Cache for queried DEC private modes to avoid repeated queries
+        self._dec_mode_cache: Dict[int, int] = {}
+        # Global timeout tracking state
+        self._dec_any_query_succeeded = False
+        self._dec_first_query_failed = False
 
     def __getattr__(self,
                     attr: str) -> Union[NullCallableString,
@@ -540,6 +607,10 @@ class Terminal():
             .. note:: the peculiar (height, width, width, height) order, which
                matches the return order of TIOCGWINSZ!
         """
+        # Return preferred cache if available (from in-band resize notifications)
+        if self._preferred_size_cache is not None:
+            return self._preferred_size_cache
+
         for fd in (self._init_descriptor, sys.__stdout__):
             try:
                 if fd is not None:
@@ -563,12 +634,13 @@ class Terminal():
         :return: re.match object for response_re or None if not found
         :rtype: re.Match
         """
-        # Avoid changing user's desired raw or cbreak mode if already entered,
-        # by entering cbreak mode ourselves.  This is necessary to receive user
-        # input without awaiting a human to press the return key.   This mode
-        # also disables echo, which we should also hide, as our input is an
-        # sequence that is not meaningful for display as an output sequence.
+        # No query is ever done for terminals where is_a_tty is False
+        if not self.is_a_tty:
+            return None
 
+        # Avoid changing user's desired raw or cbreak mode if already entered,
+        # conditionally entering cbreak mode ourselves.  This is necessary to
+        # receive user input without awaiting a human to press the return key.
         ctx = None
         try:
             if self._line_buffered:
@@ -593,6 +665,7 @@ class Terminal():
 
         finally:
             if ctx is not None:
+                # exit cbreak
                 ctx.__exit__(None, None, None)
 
         return match
@@ -651,6 +724,9 @@ class Terminal():
     def get_location(self, timeout: Optional[float] = None) -> Tuple[int, int]:
         r"""
         Return tuple (row, column) of cursor position.
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and the value ``(-1, -1)`` is returned without inquiry.
 
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1)`` indicating
             that the remote end did not respond.
@@ -726,6 +802,9 @@ class Terminal():
         """
         Return tuple (r, g, b) of foreground color.
 
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and the value ``(-1, -1, -1)`` is returned without inquiry.
+
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1, -1)``
             indicating that the remote end did not respond.
         :rtype: tuple
@@ -735,12 +814,15 @@ class Terminal():
         The foreground color is determined by emitting an `OSC 10 color query
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
         """
-        match = self._query_response('\x1b]10;?\x07', _RE_GET_FGCOLOR_RESPONSE, timeout)
+        match = self._query_response('\x1b]10;?\x07', RE_GET_FGCOLOR_RESPONSE, timeout)
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
 
     def get_bgcolor(self, timeout: Optional[float] = None) -> Tuple[int, int, int]:
         """
         Return tuple (r, g, b) of background color.
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and the value ``(-1, -1, -1)`` is returned without inquiry.
 
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1, -1)``
             indicating that the remote end did not respond.
@@ -751,8 +833,995 @@ class Terminal():
         The background color is determined by emitting an `OSC 11 color query
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
         """
-        match = self._query_response('\x1b]11;?\x07', _RE_GET_BGCOLOR_RESPONSE, timeout)
+        match = self._query_response('\x1b]11;?\x07', RE_GET_BGCOLOR_RESPONSE, timeout)
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
+
+    def get_device_attributes(self, timeout: Optional[float] = None,
+                              force: bool = False) -> Optional[DeviceAttribute]:
+        """
+        Query the terminal's Device Attributes (DA1).
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``None`` is returned without inquiry.
+
+        If a Device Attributes query fails to respond within the ``timeout``
+        specified, ``None`` is returned. If this was the first query for device
+        attributes, all subsequent queries return ``None`` unless ``force=True``
+        is set (sticky failure).
+
+        **Responses are cached indefinitely** unless ``force=True`` is
+        specified.
+
+        .. note:: A ``timeout`` value should be set to avoid blocking when the
+            terminal does not respond to DA1 queries, which may happen with some
+            kinds of "dumb" terminals.
+
+        :arg float timeout: Timeout in seconds to await terminal response
+        :arg bool force: Force active terminal inquiry even if cached result exists
+            or previous query failed
+        :rtype: DeviceAttribute or None
+        :returns: DeviceAttribute instance with terminal capabilities, or None
+            if unsupported/timeout
+
+        .. code-block:: python
+
+            term = Terminal()
+
+            # Query device attributes
+            da = term.get_device_attributes(timeout=1.0)
+            if da is not None:
+                print(f"Service class: {da.service_class}")
+                print(f"Supports sixel: {da.supports_sixel}")
+                print(f"Extensions: {sorted(da.extensions)}")
+        """
+        # Return None if first query failed and force is not set
+        if self._device_attributes_first_query_failed and not force:
+            return None
+
+        # Return cached result unless force=True
+        if self._device_attributes_cache is not None and not force:
+            return self._device_attributes_cache
+
+        query = '\x1b[c'
+        match = self._query_response(query, DeviceAttribute.RE_RESPONSE, timeout)
+
+        # invalid or no response (timeout)
+        if match is None:
+            self._device_attributes_first_query_failed = True
+            return None
+
+        result = DeviceAttribute.from_match(match)
+
+        if result is not None:
+            self._device_attributes_cache = result
+
+        return result
+
+    def get_software_version(self, timeout: Optional[float] = None,
+                             force: bool = False) -> Optional[SoftwareVersion]:
+        """
+        Query the terminal's software name and version using XTVERSION.
+
+        Sends an XTVERSION query to the terminal and returns a
+        :class:`SoftwareVersion` instance with the terminal's name and version.
+
+        If an XTVERSION query fails to respond within the ``timeout``
+        specified, ``None`` is returned.
+
+        **Successful responses are cached indefinitely** unless ``force=True`` is
+        specified. Unlike other query methods, there is no sticky failure mechanism -
+        each failed query can be retried.
+
+        .. note:: A ``timeout`` value should be set to avoid blocking when the
+            terminal does not respond to XTVERSION queries, which may happen with
+            some kinds of "dumb" terminals.
+
+        :arg float timeout: Timeout in seconds to await terminal response
+        :arg bool force: Force active terminal inquiry even if cached result exists
+        :rtype: SoftwareVersion or None
+        :returns: SoftwareVersion instance with terminal name and version, or None
+            if unsupported/timeout
+
+        .. code-block:: python
+
+            term = Terminal()
+
+            # Query software version
+            sv = term.get_software_version(timeout=1.0)
+            if sv is not None:
+                print(f"Terminal: {sv.name} {sv.version}")
+        """
+        # Return None if not a TTY
+        if not self.is_a_tty:
+            return None
+
+        # Return cached result unless force=True
+        if self._software_version_cache is not None and not force:
+            return self._software_version_cache
+
+        # Build and send query sequence and expected response pattern
+        query = '\x1b[>q'
+
+        match = self._query_response(query, _RE_GET_SOFTWARE_VERSION_RESPONSE, timeout)
+
+        # invalid or no response (timeout)
+        if match is None:
+            return None
+
+        # parse, cache, and return the response
+        self._software_version_cache = SoftwareVersion.from_match(match)
+        return self._software_version_cache
+
+    def does_sixel(self, timeout: Optional[float] = 1.0, force: bool = False) -> bool:
+        """
+        Query whether the terminal supports sixel graphics.
+
+        Sixel is a bitmap graphics format supported by some modern terminal
+        emulators, allowing applications to display inline images.
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``False`` is returned without inquiry.
+
+        This method calls :meth:`get_device_attributes` to query the terminal's
+        capabilities and checks for sixel support (extension 4 in the DA1 response).
+        Results are cached, so subsequent calls are fast.
+
+        :arg float timeout: Timeout in seconds to await terminal response. When
+            ``None`` (default), the query may block indefinitely.
+        :arg bool force: Bypass cache and re-query the terminal
+        :rtype: bool
+        :returns: ``True`` if terminal supports sixel graphics, ``False`` otherwise
+        """
+        da = self.get_device_attributes(timeout=timeout, force=force)
+        return da.supports_sixel if da is not None else False
+
+    def get_dec_mode(self, mode: Union[int, _DecPrivateMode],
+                     timeout: Optional[float] = None, force: bool = False) -> DecModeResponse:
+        """
+        Query the state of a DEC Private Mode (DECRQM).
+
+        Sends a DECRQM query to the terminal and returns a
+        :class:`DecModeResponse` instance. Use the helper methods like
+        :meth:`DecModeResponse.is_supported` or
+        :meth:`DecModeResponse.is_enabled` and others to interpret the result.
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and the :class:`DecModeResponse` value returned is always
+        :attr:`DecModeResponse.NOT_QUERIED`.
+
+        In some cases a ``timeout`` value should be set, as it is possible for a
+        terminal that succeeds :attr:`is_a_tty` to fail to respond to DEC Private
+        Modes, such as in a CI Build Service or other "dumb" terminal, even a few
+        popular modern ones such as Konsole.
+
+        If a DEC Private mode query fails to respond within the ``timeout``
+        specified, the :class:`DecModeResponse` value returned is
+        :attr:`DecModeResponse.NO_RESPONSE`. If this was the first DEC Private
+        mode query, all subsequent queries return a :class:`DecModeResponse`
+        value of :attr:`DecModeResponse.NOT_QUERIED` unless ``force=True`` is
+        set.
+
+        **Repeat queries return the (cached) known state immediately** without
+        re-inquiry unless ``force=True``.  Although there are special cases
+        where a user may re-configure their terminal settings after the state
+        was requested by an application, the application is generally restarted
+        to recognize the new settings rather than to repeatidly re-inquire about
+        their latest value!
+
+        :arg mode: DEC Private Mode to query
+        :type mode: DecPrivateMode | int
+        :arg float timeout: Timeout in seconds to await terminal response
+        :arg bool force: Force active terminal inquery in all cases
+        :rtype: DecModeResponse
+        :returns: DecModeResponse instance
+        :raises TypeError: If mode is not DecPrivateMode or int
+
+        .. code-block:: python
+
+            term = Terminal()
+
+            # Query synchronized output support
+            response = term.get_dec_mode(DecPrivateMode.SYNCHRONIZED_OUTPUT)
+            if response.supported:
+                print("Synchronized output is available")
+        """
+        if not isinstance(mode, (int, _DecPrivateMode)):
+            raise TypeError(f"Invalid mode argument, got {mode!r}, "
+                            "DecPrivateMode or int expected")
+
+        if self._dec_first_query_failed and not force:
+            # When the first query is not responded, we can safely assume all
+            # subsequent inqueries will be ignored
+            return DecModeResponse(mode, DecModeResponse.NOT_QUERIED)
+
+        # Always return the cached response when available unless force=True
+        if int(mode) in self._dec_mode_cache and not force:
+            cached_value = self._dec_mode_cache[int(mode)]
+            return DecModeResponse(mode, cached_value)
+
+        # Build and send query sequence and expected response pattern
+        query = f'\x1b[?{int(mode):d}$p'
+        response_pattern = re.compile(f'\x1b\\[\\?{int(mode):d};([0-4])\\$y')
+
+        match = self._query_response(query, response_pattern, timeout)
+
+        # invalid or no response (timeout or not a TTY)
+        if match is None:
+            # If not a TTY, _query_response() returned None immediately
+            if not self.is_a_tty:
+                return DecModeResponse(mode, DecModeResponse.NOT_QUERIED)
+
+            # We have a TTY but query failed (timeout)
+            if not self._dec_any_query_succeeded:
+                # This is the first-ever query and it failed! This query returns
+                # NO_RESPONSE to indicate the timeout, subsequent queries will
+                # return NOT_QUERIED.
+                # pylint: disable=attribute-defined-outside-init
+                self._dec_first_query_failed = True
+                return DecModeResponse(mode, DecModeResponse.NO_RESPONSE)
+            # Rather unusual, we've previously had success with get_dec_mode,
+            # but no response was found in this instance -- presumably the
+            # remote end is disconnected or stalled, indicated by NO_RESPONSE,
+            # or otherwise had some corruption in this specific response string.
+            return DecModeResponse(mode, DecModeResponse.NO_RESPONSE)
+
+        # parse, cache, and return the response value
+        response_value = int(match.group(1))
+        # pylint: disable=attribute-defined-outside-init
+        self._dec_mode_cache[int(mode)] = response_value
+        self._dec_any_query_succeeded = True
+        return DecModeResponse(mode, response_value)
+
+    @contextlib.contextmanager
+    def dec_modes_enabled(self, *modes: Union[int, _DecPrivateMode],
+                          timeout: Optional[float] = None) -> Generator[None, None, None]:
+        """
+        Context manager for temporarily enabling DEC Private Modes.
+
+        On entry, queries each mode's current state using get_dec_mode().
+
+        For modes that are supported but currently disabled, enables them
+        and tracks them for restoration. On exit, disables all modes that
+        were enabled by this context manager, restoring original state.
+
+        Unsupported modes are silently ignored.
+
+        :arg modes: One or more DEC Private Mode numbers or enum members
+        :arg float timeout: Timeout in seconds for get_dec_mode calls
+        :raises TypeError: If mode is not DecPrivateMode or int
+
+        .. code-block:: python
+
+            term = Terminal()
+
+            # Enable synchronized output temporarily
+            with term.dec_modes_enabled(DecPrivateMode.SYNCHRONIZED_OUTPUT):
+                # All output will be atomic
+                print("Frame 1")
+                print("Frame 2")
+        """
+        # Track modes enabled ('SET") to be re-enabled ('RESET') after the yield
+        enabled_modes = []
+
+        # Query current state of each mode and build enable list
+        for arg_pos, mode in enumerate(modes):
+            if isinstance(mode, _DecPrivateMode):
+                mode_num = mode.value
+            elif isinstance(mode, int):
+                mode_num = mode
+            else:
+                raise TypeError(f"Invalid mode argument number {arg_pos}, got {mode!r}, "
+                                "DecPrivateMode or int expected")
+
+            response = self.get_dec_mode(mode_num, timeout=timeout)
+            if response.supported and not response.enabled:
+                enabled_modes.append(mode_num)
+
+        self._dec_mode_set_enabled(*enabled_modes)
+        try:
+            yield
+        finally:
+            self._dec_mode_set_disabled(*enabled_modes)
+
+    @contextlib.contextmanager
+    def dec_modes_disabled(self, *modes: Union[int, _DecPrivateMode],
+                           timeout: Optional[float] = None) -> Generator[None, None, None]:
+        """
+        Context manager for temporarily disabling DEC Private Modes.
+
+        Uses the same logic as dec_modes_enabled but inverted: disables
+        supported modes that are currently enabled on entry, then restores
+        them on exit.
+
+        :arg modes: One or more DEC Private Mode numbers or enum members
+        :arg float timeout: Timeout in seconds for get_dec_mode calls
+        :raises TypeError: If mode is not DecPrivateMode or int
+        """
+        # Track modes disabled ('RESET") to be re-enabled ('SET') after the yield
+        disabled_modes = []
+
+        # Query current state of each mode and build disable list
+        for arg_pos, mode in enumerate(modes):
+            if isinstance(mode, _DecPrivateMode):
+                mode_num = mode.value
+            elif isinstance(mode, int):
+                mode_num = mode
+            else:
+                raise TypeError(f"Invalid mode argument number {arg_pos}, got {mode!r}, "
+                                "DecPrivateMode or int expected")
+
+            response = self.get_dec_mode(mode_num, timeout=timeout)
+            if response.supported and response.enabled:
+                disabled_modes.append(mode_num)
+
+        self._dec_mode_set_disabled(*disabled_modes)
+        try:
+            yield
+        finally:
+            self._dec_mode_set_enabled(*disabled_modes)
+
+    def does_mouse(self, *, clicks: bool = True, report_pixels: bool = False,
+                   report_drag: bool = False, report_motion: bool = False,
+                   timeout: float = 1.0) -> bool:
+        """
+        Check if the terminal supports the specified mouse tracking features.
+
+        This method queries terminal support for the same DEC modes that
+        :meth:`mouse_enabled` would enable with the given parameters.
+
+        :arg bool clicks: Check for basic click reporting (default True)
+        :arg bool report_pixels: Check for pixel coordinate reporting
+        :arg bool report_drag: Check for drag reporting
+        :arg bool report_motion: Check for motion reporting
+        :arg float timeout: Timeout for mode queries (default 1.0s)
+        :returns: True if all required modes are supported
+        :rtype: bool
+
+        Example::
+
+            if term.does_mouse(report_drag=True, report_pixels=True):
+                with term.mouse_enabled(report_drag=True, report_pixels=True):
+                    # Use mouse tracking with drag and pixel support
+                    pass
+        """
+        modes = [_DecPrivateMode.MOUSE_EXTENDED_SGR]
+
+        # Determine tracking mode by precedence: motion > drag > clicks
+        if report_motion:
+            modes.append(_DecPrivateMode.MOUSE_ALL_MOTION)
+        elif report_drag:
+            modes.append(_DecPrivateMode.MOUSE_REPORT_DRAG)
+        elif clicks:
+            modes.append(_DecPrivateMode.MOUSE_REPORT_CLICK)
+
+        # Add pixel reporting if requested
+        if report_pixels:
+            modes.append(_DecPrivateMode.MOUSE_SGR_PIXELS)
+
+        # Check if all required modes are supported
+        for mode in modes:
+            response = self.get_dec_mode(mode, timeout=timeout)
+            if not response.supported:
+                return False
+
+        return True
+
+    def does_inband_resize(self, timeout: float = 1.0) -> bool:
+        """
+        Check if the terminal supports in-band window resize notifications.
+
+        This method queries whether the terminal supports DEC mode 2048
+        (IN_BAND_WINDOW_RESIZE), which allows receiving resize events as
+        in-band sequences through :meth:`inkey` instead of relying on
+        SIGWINCH signals.
+
+        :arg float timeout: Timeout for mode query (default 1.0s)
+        :returns: True if in-band resize notifications are supported
+        :rtype: bool
+
+        Example::
+
+            if term.does_inband_resize():
+                with term.notify_on_resize():
+                    # Use in-band resize events
+                    pass
+            else:
+                # Fall back to SIGWINCH or other methods
+                pass
+        """
+        response = self.get_dec_mode(_DecPrivateMode.IN_BAND_WINDOW_RESIZE, timeout=timeout)
+        return response.supported
+
+    @contextlib.contextmanager
+    def mouse_enabled(self, *, clicks: bool = True, report_pixels: bool = False,
+                      report_drag: bool = False, report_motion: bool = False,
+                      timeout: float = 1.0) -> Generator[None, None, None]:
+        """
+        Context manager for enabling mouse tracking with various reporting modes.
+
+        Enables mouse event reporting with sensible defaults, and always
+        enables SGR extended mouse mode (1006).
+
+        :arg bool clicks: Enable basic click reporting (default True)
+        :arg bool report_pixels: Report pixel coordinates instead of cell coordinates
+        :arg bool report_drag: Report mouse drag events (button held while moving)
+        :arg bool report_motion: Report all mouse motion events
+        :arg float timeout: Timeout for mode queries (default 1.0s)
+
+        The reporting modes have precedence: motion > drag > clicks. Enabling
+        a higher-precedence mode automatically includes lower modes.
+
+        Example::
+
+            with term.mouse_enabled():
+                # Basic click tracking
+                inp = term.inkey()
+                if inp.name and inp.name.startswith('MOUSE_'):
+                    print(f"Clicked at {inp.x}, {inp.y}")
+
+            with term.mouse_enabled(report_drag=True):
+                # Track clicks and drags
+                pass
+
+            with term.mouse_enabled(report_motion=True, report_pixels=True):
+                # Track all motion with pixel coordinates
+                pass
+        """
+        modes = [_DecPrivateMode.MOUSE_EXTENDED_SGR]
+
+        # Determine tracking mode by precedence: motion > drag > clicks
+        if report_motion:
+            modes.append(_DecPrivateMode.MOUSE_ALL_MOTION)
+        elif report_drag:
+            modes.append(_DecPrivateMode.MOUSE_REPORT_DRAG)
+        elif clicks:
+            modes.append(_DecPrivateMode.MOUSE_REPORT_CLICK)
+
+        # Add pixel reporting if requested
+        if report_pixels:
+            modes.append(_DecPrivateMode.MOUSE_SGR_PIXELS)
+
+        with self.dec_modes_enabled(*modes, timeout=timeout):
+            yield
+
+    @contextlib.contextmanager
+    def bracketed_paste(self, timeout: float = 1.0) -> Generator[None, None, None]:
+        """
+        Context manager for enabling bracketed paste mode.
+
+        When enabled, pasted text is wrapped with special escape sequences,
+        allowing applications to distinguish pasted content from typed input.
+
+        :arg float timeout: Timeout for mode query (default 1.0s)
+
+        Example::
+
+            with term.bracketed_paste():
+                inp = term.inkey()
+                if inp.name == 'BRACKETED_PASTE':
+                    pasted_text = inp.text
+                    print(f"You pasted: {pasted_text}")
+        """
+        with self.dec_modes_enabled(_DecPrivateMode.BRACKETED_PASTE, timeout=timeout):
+            yield
+
+    @contextlib.contextmanager
+    def synchronized_output(self, timeout: float = 1.0) -> Generator[None, None, None]:
+        """
+        Context manager for enabling synchronized output mode.
+
+        Buffers all terminal output until the context exits, eliminating screen flicker during
+        redraws. Perfect for animations and full-screen updates.
+
+        :arg float timeout: Timeout for mode query (default 1.0s)
+        """
+        with self.dec_modes_enabled(_DecPrivateMode.SYNCHRONIZED_OUTPUT, timeout=timeout):
+            yield
+
+    @contextlib.contextmanager
+    def focus_events(self, timeout: float = 1.0) -> Generator[None, None, None]:
+        """
+        Context manager for enabling focus event reporting.
+
+        Reports when the terminal window gains or loses focus, useful for pausing animations or
+        updating status indicators.
+
+        :arg float timeout: Timeout for mode query (default 1.0s)
+        """
+        with self.dec_modes_enabled(_DecPrivateMode.FOCUS_IN_OUT_EVENTS, timeout=timeout):
+            yield
+
+    @contextlib.contextmanager
+    def notify_on_resize(self, timeout: float = 1.0) -> Generator[None, None, None]:
+        """
+        Context manager for enabling in-band window resize notifications.
+
+        When enabled, the terminal will automatically send resize events as in-band sequences
+        whenever the window size changes. These events are received by :meth:`inkey` as
+        keystroke events with :attr:`~.Keystroke.name` equal to ``'RESIZE_EVENT'``.
+
+        The new dimensions are automatically cached and available immediately through the
+        standard :attr:`height`, :attr:`width`, :attr:`pixel_height`, and :attr:`pixel_width`
+        properties without additional ioctl system calls.
+
+        This is the preferred method for handling terminal resizes as it avoids the race
+        conditions and signal handling complexity of SIGWINCH on Unix systems, and provides
+        a consistent cross-platform API.
+
+        :arg float timeout: Timeout for mode query (default 1.0s)
+
+        Example::
+
+            with term.notify_on_resize():
+                while True:
+                    inp = term.inkey(timeout=0.1)
+                    if inp.name == 'RESIZE_EVENT':
+                        # Dimensions updated automatically
+                        redraw_display(term.height, term.width)
+                    elif inp == 'q':
+                        break
+        """
+        try:
+            with self.dec_modes_enabled(_DecPrivateMode.IN_BAND_WINDOW_RESIZE, timeout=timeout):
+                yield
+        finally:
+            # Clear the cache when exiting the context
+            self._preferred_size_cache = None
+
+    def _dec_mode_set_enabled(self, *modes: Union[int, _DecPrivateMode]) -> None:
+        """
+        Enable one or more DEC Private Modes (DECSET).
+
+        :arg int | DecPrivateMode modes: One or more DEC Private Modes to enable
+
+        Emits the DECSET sequence to the attached stream as a side-effect, to
+        enable the specified modes, and cache their known state as 'SET'
+        (enabled) for subsequent :meth:`get_dec_mode` queries.
+
+        It is suggested to use the context manager, :meth:`dec_modes_enabled`.
+        Otherwise, an application should also evaluate the :meth:`get_dec_mode`
+        response to conditionally only call this method when
+        :meth:`DecModeResponse.is_supported` is True for the given mode, and to
+        conditionally call :meth:`_dec_mode_set_disabled` to return terminal to
+        its prior state in a try/finally clause.
+        """
+        # Extract mode numbers
+        mode_numbers = []
+        for arg_pos, mode in enumerate(modes):
+            if isinstance(mode, _DecPrivateMode):
+                mode_num = mode.value
+            elif isinstance(mode, int):
+                mode_num = mode
+            else:
+                raise TypeError(f"Invalid mode argument number {arg_pos}, got {mode!r}, "
+                                "DecPrivateMode or int expected")
+            mode_numbers.append(mode_num)
+
+        if not self.does_styling or not mode_numbers:
+            return
+
+        sequence = f'\x1b[?{";".join(str(val) for val in mode_numbers)}h'
+        self.stream.write(sequence)
+        self.stream.flush()
+
+        # Update cache for set (enabled) modes
+        for mode_num in mode_numbers:
+            self._dec_mode_cache[mode_num] = DecModeResponse.SET
+
+    def _dec_mode_set_disabled(self, *modes: Union[int, _DecPrivateMode]) -> None:
+        """
+        Disable one or more DEC Private Modes (DECRST).
+
+        :arg int | DecPrivateMode modes: One or more DEC Private Modes to disable
+
+        Emits the DECRST sequence to the attached stream as a side-effect, to
+        enable the specified modes, and cache their known state as 'RESET'
+        (disabled) for subsequent :meth:`get_dec_mode` queries.
+
+        It is suggested to use the context manager, :meth:`dec_modes_disabled`.
+        Otherwise, an application should also evaluate the :meth:`get_dec_mode`
+        response to conditionally only call this method when
+        :meth:`DecModeResponse.is_supported` is True for the given mode, and to
+        conditionally call :meth:`_dec_mode_set_enabled` to return terminal to
+        its prior state in a try/finally clause.
+        """
+        # Extract mode numbers
+        mode_numbers = []
+        for arg_pos, mode in enumerate(modes):
+            if isinstance(mode, _DecPrivateMode):
+                mode_num = mode.value
+            elif isinstance(mode, int):
+                mode_num = mode
+            else:
+                raise TypeError(f"Invalid mode argument number {arg_pos}, got {mode!r}, "
+                                "DecPrivateMode or int expected")
+            mode_numbers.append(mode_num)
+
+        if not self.does_styling or not mode_numbers:
+            return
+
+        sequence = f'\x1b[?{";".join(str(val) for val in mode_numbers)}l'
+        self.stream.write(sequence)
+        self.stream.flush()
+
+        # Update cache for reset (disabled) modes
+        for mode_num in mode_numbers:
+            self._dec_mode_cache[mode_num] = DecModeResponse.RESET
+
+    def get_sixel_height_and_width(self, timeout: Optional[float] = 1.0,
+                                   force: bool = False) -> Tuple[int, int]:
+        # pylint: disable=too-many-return-statements
+        """
+        Query sixel graphics pixel dimensions.
+
+        Returns the maximum height and width in pixels for sixel graphics
+        rendering. Tries XTSMGRAPHICS first, then validates or falls back to
+        XTWINOPS window size query if the terminal doesn't support XTSMGRAPHICS
+        or reports unrealistic dimensions.
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``(-1, -1)`` is returned without inquiry.
+
+        :arg float timeout: Timeout in seconds for both possible queries
+        :arg bool force: Bypass cache and re-query the terminal
+        :rtype: tuple
+        :returns: ``(height, width)`` in pixels, or ``(-1, -1)`` if unsupported/timeout
+        """
+        # Use preferred size cache from in-band resize notifications if available
+        # (unless force=True which requires re-querying)
+        if not force and self._preferred_size_cache is not None:
+            # Extract pixel dimensions from preferred cache
+            # Return them if they're non-zero (terminal supports pixel reporting)
+            if (self._preferred_size_cache.ws_ypixel and
+                    self._preferred_size_cache.ws_xpixel):
+                return (self._preferred_size_cache.ws_ypixel,
+                        self._preferred_size_cache.ws_xpixel)
+
+        # Fast path: if both caches are populated (unless force=True), compute result from caches
+        if not force and self._xtsmgraphics_cache is not None and self._xtwinops_cache is not None:
+            # If XTSMGRAPHICS succeeded, use it
+            if self._xtsmgraphics_cache != (-1, -1):
+                return self._xtsmgraphics_cache
+            # Otherwise use XTWINOPS (even if it's (-1, -1))
+            return self._xtwinops_cache
+
+        # Try XTSMGRAPHICS first (unless it previously failed - sticky failure at (-1, -1))
+        # Even with force=True, skip XTSMGRAPHICS if it previously failed to avoid wasting timeout
+        stime = time.time()
+        if self._xtsmgraphics_cache is None or (force and self._xtsmgraphics_cache != (-1, -1)):
+            # Use half of remaining timeout, saving the other for XTWINOPS fallback
+            half_timeout = timeout / 2 if timeout is not None else None
+            result = self._get_xtsmgraphics(half_timeout)
+            self._xtsmgraphics_cache = result
+            # If XTSMGRAPHICS succeeded, use it
+            if result != (-1, -1):
+                return result
+        elif self._xtsmgraphics_cache != (-1, -1):
+            # Cache hit with successful value (not force mode)
+            return self._xtsmgraphics_cache
+
+        # Fallback to XTWINOPS window pixel dimensions when:
+        # - XTSMGRAPHICS previously failed (sticky failure)
+        # - XTSMGRAPHICS just failed, using remaining time left
+        if force or self._xtwinops_cache is None:
+            result = self._get_xtwinops_window_size(_time_left(stime, timeout))
+            self._xtwinops_cache = result
+            return result
+        return self._xtwinops_cache
+
+    def get_sixel_colors(self, timeout: Optional[float] = 1.0,
+                         force: bool = False) -> int:
+        """
+        Query number of sixel color registers (XTSMGRAPHICS).
+
+        Returns the maximum number of color registers available for sixel
+        graphics rendering. If XTSMGRAPHICS query fails but the terminal
+        advertises Sixel support via DA1 (Device Attributes), returns 256
+        as a sensible default.
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``-1`` is returned without inquiry.
+
+        :arg float timeout: Timeout in seconds for both possible queries
+        :arg bool force: Bypass cache and re-query the terminal
+        :rtype: int
+        :returns: Number of color registers, 256 if DA1 advertises sixel but
+            XTSMGRAPHICS fails, or ``-1`` if unsupported/timeout
+        """
+        if self._xtsmgraphics_colors_cache is not None and not force:
+            return self._xtsmgraphics_colors_cache
+
+        stime = time.time()
+
+        # Use half of timeout for XTSMGRAPHICS, saving the other for DA1 fallback
+        half_timeout = timeout / 2 if timeout is not None else None
+        result = self._get_xtsmgraphics_colors(half_timeout)
+        self._xtsmgraphics_colors_cache = result
+
+        # If XTSMGRAPHICS failed but terminal advertises sixel support in DA1,
+        # assume 256 color registers as a sensible default
+        if self._xtsmgraphics_colors_cache == -1:
+            # Use remaining time for DA1 query, though usually this result is
+            if self.does_sixel(timeout=_time_left(stime, timeout), force=force):
+                self._xtsmgraphics_colors_cache = 256
+
+        return self._xtsmgraphics_colors_cache
+
+    def get_cell_height_and_width(self, timeout: Optional[float] = 1.0,
+                                  force: bool = False) -> Tuple[int, int]:
+        """
+        Query character cell pixel dimensions (XTWINOPS).
+
+        Returns the height and width in pixels of a single character cell.
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``(-1, -1)`` is returned without inquiry.
+
+        :arg float timeout: Timeout in seconds for the query
+        :arg bool force: Bypass cache and re-query the terminal
+        :rtype: tuple
+        :returns: ``(height, width)`` in pixels, or ``(-1, -1)`` if unsupported/timeout
+        """
+        if self._xtwinops_cell_cache is not None and not force:
+            return self._xtwinops_cell_cache
+
+        result = self._get_xtwinops_cell_size(timeout)
+        self._xtwinops_cell_cache = result
+        return result
+
+    def _get_xtwinops_window_size(self, timeout: Optional[float]) -> Tuple[int, int]:
+        # Query XTWINOPS 14t for window size: ESC[14t
+        # Response: ESC[4;<height>;<width>t - return (height, width)
+        query = '\x1b[14t'
+        match = self._query_response(query, _RE_XTWINOPS_14_RESPONSE, timeout)
+
+        if match is None:
+            return -1, -1
+
+        # Response is height, width - return as-is
+        return int(match.group(1)), int(match.group(2))
+
+    def _get_xtwinops_cell_size(self, timeout: Optional[float]) -> Tuple[int, int]:
+        # Query XTWINOPS 16t for cell size: ESC[16t
+        # Response: ESC[6;<height>;<width>t - return (height, width)
+        query = '\x1b[16t'
+        match = self._query_response(query, _RE_XTWINOPS_16_RESPONSE, timeout)
+
+        if match is None:
+            return -1, -1
+
+        # Response is height, width - return as-is
+        return int(match.group(1)), int(match.group(2))
+
+    def _get_xtsmgraphics(self, timeout: Optional[float]) -> Tuple[int, int]:
+        # Query XTSMGRAPHICS for sixel geometry: ESC[?2;1;0S
+        # Response: ESC[?2;0;<width>;<height>S - return (height, width)
+        query = '\x1b[?2;1;0S'
+        match = self._query_response(query, _RE_XTSMGRAPHICS_RESPONSE, timeout)
+
+        if match is None:
+            return -1, -1
+
+        # Response is width, height - swap to return height, width
+        result = (int(match.group(2)), int(match.group(1)))
+
+        # Konsole workaround: Some terminals like Konsole report 16384x16384 (2^14) as the
+        # maximum sixel dimension instead of actual window size. Treat this as unsupported.
+        if result == (16384, 16384):
+            return -1, -1
+
+        return result
+
+    def _get_xtsmgraphics_colors(self, timeout: Optional[float]) -> int:
+        # Query XTSMGRAPHICS for color registers: ESC[?1;1;0S
+        # Response: ESC[?1;0;<colors>S
+        query = '\x1b[?1;1;0S'
+        match = self._query_response(query, _RE_XTSMGRAPHICS_COLORS_RESPONSE, timeout)
+
+        if match is None:
+            return -1
+
+        return int(match.group(1))
+
+    def get_kitty_keyboard_state(self, timeout: Optional[float] = None,
+                                 force: bool = False) -> Optional[KittyKeyboardProtocol]:
+        """
+        Query the current Kitty keyboard protocol flags.
+
+        Sends a Kitty keyboard protocol query to the terminal and returns a
+        :class:`KittyKeyboardProtocol` instance with the current flags. This
+        method is not normally used directly, rather it is used by the
+        :meth:`enable_kitty_keyboard` context manager on entrance to discover
+        and restore the previous state on exit.
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``None`` is returned.
+
+        In many cases a ``timeout`` value (in seconds) should be set, as it is
+        possible for a terminal that succeeds :attr:`is_a_tty` to fail to respond
+        to either Kitty keyboard protocol state request, or the simple device
+        attribute request query carried with it! And not just "dumb" terminals
+        fail to respond, even some fairly modern terminals like Konsole.
+
+        If a Kitty keyboard protocol query fails to respond within the
+        ``timeout`` specified, ``None`` is returned. If this was the first Kitty
+        keyboard protocol query, all subsequent queries return ``None`` unless
+        ``force=True`` is set.
+
+        **No state caching is performed** - each call re-queries the terminal unless
+        the first query previously failed (sticky failure) and ``force=False``.
+
+        :arg float timeout: Timeout in seconds to await terminal response
+        :arg bool force: Force active terminal inquiry in all cases
+        :rtype: KittyKeyboardProtocol or None
+        :returns: KittyKeyboardProtocol instance with current flags, or None if unsupported/timeout
+        """
+        # pylint: disable=too-many-return-statements
+        # This method uses a boundary detection approach on the first query to quickly
+        # determine terminal capabilities by sending both Kitty keyboard and Device
+        # Attributes (DA1) queries simultaneously, as suggested by Kitty,
+        # https://sw.kovidgoyal.net/kitty/keyboard-protocol/#detection-of-support-for-this-protocol
+        # By sending both queries together and checking which responses are
+        # received, we can quickly infer support without multiple round trips.
+        #
+        # > An application can query the terminal for support of this protocol by
+        # > sending the escape code querying for the current progressive
+        # > enhancement status followed by request for the primary device
+        # > attributes. If an answer for the device attributes is received without
+        # > getting back an answer for the progressive enhancement the terminal
+        # > does not support this protocol.
+        #
+        # Note that Kitty **does not answer** to DA1 despite making this very
+        # recommendation! So we must handle all possible 2x2 match combinations:
+        # DA1 + Kitty, !DA1 + Kitty, DA1 + !Kitty, and !DA1 and !Kitty (timeout)
+        if self._kitty_kb_first_query_failed and not force:
+            # When the first query is not responded, we can safely assume all
+            # subsequent inquiries will be ignored
+            return None
+
+        # Use boundary approach on first query attempt (when not previously
+        # attempted and not forced)
+        if not self._kitty_kb_first_query_attempted and not force:
+            # Mark that we've attempted the first query
+            self._kitty_kb_first_query_attempted = True
+
+            # Send both Kitty and DA queries together for boundary detection
+            # This allows us to quickly determine which protocols are supported:
+            # - Kitty terminal: responds to Kitty query but not DA1
+            # - xterm-like: responds to both Kitty and DA1
+            # - Konsole-like: responds to DA1 but not Kitty
+            # - Dumb terminals: respond to neither
+            boundary_query = '\x1b[?u\x1b[c'
+
+            # Use a simple pattern that captures the full response
+            boundary_pattern = re.compile('(.+)', re.DOTALL)
+
+            match = self._query_response(boundary_query, boundary_pattern, timeout)
+
+            # invalid or no response (timeout or not a TTY)
+            if match is None:
+                # Set sticky failure flag only if we have a TTY but query failed
+                # If not a TTY, _query_response() returned None immediately
+                if self.is_a_tty:
+                    self._kitty_kb_first_query_failed = True
+                return None
+
+            response_text = match.group(1)
+
+            # Check for Kitty keyboard response first
+            kitty_pattern = re.compile(r'\x1b\[\?([0-9]+)u')
+            kitty_match = kitty_pattern.search(response_text)
+
+            if kitty_match:
+                # Kitty response found - parse and return flags
+                # (doesn't matter if DA1 also responded or not)
+                flags_value = int(kitty_match.group(1))
+                return KittyKeyboardProtocol(flags_value)
+
+            # Check for DA1 response
+            da1_pattern = re.compile(r'\x1b\[\?([0-9]+)(?:;[0-9]+)*c')
+            da1_match = da1_pattern.search(response_text)
+
+            if da1_match:
+                # Only DA1 response found, no Kitty support
+                self._kitty_kb_first_query_failed = True
+                return None
+
+            # Neither response found - no support
+            self._kitty_kb_first_query_failed = True
+            return None
+
+        # Subsequent calls or forced calls use the standard single-query approach
+        query = '\x1b[?u'
+        response_pattern = re.compile('\x1b\\[\\?([0-9]+)u')
+
+        match = self._query_response(query, response_pattern, timeout)
+
+        # invalid or no response (timeout or not a TTY)
+        if match is None:
+            self._kitty_kb_first_query_failed = True
+            return None
+
+        # parse and return the response value (no caching)
+        flags_value = int(match.group(1))
+        return KittyKeyboardProtocol(flags_value)
+
+    @contextlib.contextmanager
+    def enable_kitty_keyboard(self, *, disambiguate: bool = True, report_events: bool = False,
+                              report_alternates: bool = False, report_all_keys: bool = False,
+                              report_text: bool = False, mode: int = 1,
+                              timeout: Optional[float] = None,
+                              force: bool = False) -> Generator[None, None, None]:
+        """
+        Context manager that enables Kitty keyboard protocol features.
+
+        :arg bool disambiguate: Enable disambiguated escape codes (fixes issues
+            with Esc vs sequences)
+        :arg bool report_events: Report key repeat and release events
+        :arg bool report_alternates: Report shifted and base layout keys for shortcuts
+        :arg bool report_all_keys: Report all keys as escape codes (including text keys)
+        :arg bool report_text: Report associated text with key events (requires report_all_keys)
+        :arg int mode: Protocol mode (1=set/clear specified flags, 2=set only, 3=clear only)
+        :arg float timeout: Timeout for querying current flags before setting new ones
+        :arg bool force: Force sequences to be emitted even if timeout previously occurred
+
+        Always queries current state before setting new flags and restores previous state on exit.
+
+        Example::
+
+            with term.enable_kitty_keyboard(disambiguate=True):
+                # Now Alt+C won't conflict with Ctrl+C
+                key = term.inkey()
+                if key.alt and key.is_alt('c'):
+                    print("Alt+C pressed")
+
+        .. note:: A ``timeout`` value should be set to avoid blocking when the
+            terminal does not respond to DA1 or kitty protocol queries, which
+            may happen with some kinds of "dumb" terminals, even some modern
+            terminals like Konsole.
+        """
+        if not self.does_styling:
+            yield
+            return
+
+        # When not a real TTY (like StringIO), don't emit sequences unless force=True
+        if not self.is_a_tty and not force:
+            yield
+            return
+
+        # Check if timeout occurred before and force is not set
+        if self._kitty_kb_first_query_failed and not force:
+            yield
+            return
+
+        # Compute flags based on parameters
+        flags = 0
+        if disambiguate:
+            flags |= 1
+        if report_events:
+            flags |= 2
+        if report_alternates:
+            flags |= 4
+        if report_all_keys:
+            flags |= 8
+        if report_text:
+            flags |= 16
+
+        # Always query current flags before setting new ones
+        previous_flags = self.get_kitty_keyboard_state(timeout=timeout, force=force)
+
+        try:
+            # Set new flags
+            self.stream.write(f'\x1b[={flags};{mode}u')  # Set flags with specified mode
+            self.stream.flush()
+            yield
+
+        finally:
+            # Restore previous state
+            if previous_flags is not None:
+                # Restore to specific previous flags
+                self.stream.write(f'\x1b[={previous_flags.value};1u')  # Mode 1 = set flags exactly
+                self.stream.flush()
 
     @contextlib.contextmanager
     def fullscreen(self) -> Generator[None, None, None]:
@@ -1438,7 +2507,7 @@ class Terminal():
         r"""
         Context manager that enables directional keypad input.
 
-        On entrying, this puts the terminal into "keyboard_transmit" mode by
+        On entry, this puts the terminal into "keyboard_transmit" mode by
         emitting the keypad_xmit (smkx) capability. On exit, it emits
         keypad_local (rmkx).
 
@@ -1532,7 +2601,7 @@ class Terminal():
 
         # decode buffered keystroke, if any
         ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
-                              final=False)
+                              final=False, dec_mode_cache=self._dec_mode_cache)
 
         # so long as the most immediately received or buffered keystroke is
         # incomplete, (which may be a multibyte encoding), block until until
@@ -1547,7 +2616,7 @@ class Terminal():
 
             # and then resolve for sequence
             ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
-                                  final=False)
+                                  final=False, dec_mode_cache=self._dec_mode_cache)
 
         # handle escape key (KEY_ESCAPE) vs. escape sequence (like those
         # that begin with \x1b[ or \x1bO) up to esc_delay when
@@ -1559,7 +2628,10 @@ class Terminal():
         # keystrokes such as Alt + Z ("\x1b[z" with metaSendsEscape): because
         # no known input sequences begin with such phrasing to allow it to be
         # returned more quickly than esc_delay otherwise blocks for.
-        if ks.code == self.KEY_ESCAPE:
+        #
+        # Only bare escape ('\x1b') needs escape delay to distinguish from sequences.
+        # Kitty's disambiguated escape ('\x1b[27u') already resolves with len > 1.
+        if ks.code == self.KEY_ESCAPE and len(ks) == 1:
             esctime = time.time()
             while (ks.code == self.KEY_ESCAPE
                    and self._is_incomplete_keystroke(ucs)
@@ -1568,22 +2640,26 @@ class Terminal():
                 # re-check 'final' after reading more bytes
                 final = bool(ucs) and not self._is_incomplete_keystroke(ucs)
                 ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
-                                      final=final)
+                                      final=final, dec_mode_cache=self._dec_mode_cache)
 
             # If we still have KEY_ESCAPE and ucs is a prefix, resolve with final=True
             # to handle unmatched sequences like '\x1b[' (CSI)
             if ks.code == self.KEY_ESCAPE and self._is_incomplete_keystroke(ucs):
                 ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
-                                      final=True)
-
-            # If we still have a prefix after the loop exits (e.g., '\x1b[' with no more input),
-            # resolve it with final=True to properly handle CSI and other Alt sequences
-            if ks.code == self.KEY_ESCAPE and self._is_incomplete_keystroke(ucs):
-                ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
-                                      final=True)
+                                      final=True, dec_mode_cache=self._dec_mode_cache)
 
         # buffer any remaining text received
         self.ungetch(ucs[len(ks):])
+
+        # Update preferred size cache if this is a resize event
+        if ks._mode == _DecPrivateMode.IN_BAND_WINDOW_RESIZE:  # pylint: disable=protected-access
+            event_vals = ks._mode_values  # pylint: disable=protected-access
+            self._preferred_size_cache = WINSZ(
+                ws_row=event_vals.height_chars,  # type: ignore[union-attr]
+                ws_col=event_vals.width_chars,  # type: ignore[union-attr]
+                ws_xpixel=event_vals.width_pixels,  # type: ignore[union-attr]
+                ws_ypixel=event_vals.height_pixels)  # type: ignore[union-attr]
+
         return ks
 
 

@@ -1,7 +1,7 @@
 """Sub-module providing sequence-formatting functions."""
 # std imports
 import platform
-from typing import TYPE_CHECKING, Set, List, Type, Tuple, Union, TypeVar, Callable, Optional
+from typing import TYPE_CHECKING, Set, Dict, List, Type, Tuple, Union, TypeVar, Callable, Optional
 
 # local
 from blessed.colorspace import CGA_COLORS, X11_COLORNAMES_TO_RGB
@@ -324,7 +324,7 @@ def get_proxy_string(term: 'Terminal', attr: str) -> Optional[ParameterizingProx
     # normalize 'screen-256color', or 'ansi.sys' to its basic names
     term_kind = next(iter(_kind for _kind in ('screen', 'ansi',)
                           if term.kind.startswith(_kind)), term.kind)
-    _proxy_table: dict[str, dict[str, object]] = {  # pragma: no cover
+    _proxy_table: Dict[str, Dict[str, object]] = {  # pragma: no cover
         'screen': {
             # proxy move_x/move_y for 'screen' terminal type, used by tmux(1).
             'hpa': ParameterizingProxyString(

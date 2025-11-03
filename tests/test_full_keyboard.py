@@ -30,7 +30,7 @@ got_sigwinch = False
 
 pytestmark = pytest.mark.skipif(
     not TEST_KEYBOARD or IS_WINDOWS,
-    reason="Timing-sensitive tests please do not run on build farms.")
+    reason="Timing-sensitive tests excluded, or, windows incompatible")
 
 
 def assert_elapsed_range_ms(start_time, min_ms, max_ms):
@@ -496,7 +496,7 @@ def test_get_location_0s_reply_via_ungetch():
     """0-second get_location call with response."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
+        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         stime = time.time()
         # monkey patch in an invalid response !
         term.ungetch('\x1b[10;10R')
@@ -514,8 +514,7 @@ def test_get_location_0s_nonstandard_u6():
 
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
-
+        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         stime = time.time()
         # monkey patch in an invalid response !
         term.ungetch('\x1b[10;10R')
@@ -532,12 +531,12 @@ def test_get_location_styling_indifferent():
     """Ensure get_location() behavior is the same regardless of styling"""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True)
+        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         term.ungetch('\x1b[10;10R')
         y, x = term.get_location(timeout=0.01)
         assert (y, x) == (9, 9)
 
-        term = TestTerminal(stream=StringIO(), force_styling=False)
+        term = TestTerminal(stream=StringIO(), force_styling=False, is_a_tty=True)
         term.ungetch('\x1b[10;10R')
         y, x = term.get_location(timeout=0.01)
         assert (y, x) == (9, 9)
@@ -575,7 +574,7 @@ def test_get_fgcolor_0s_reply_via_ungetch():
     """0-second get_fgcolor call with response."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
+        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         stime = time.time()
         term.ungetch('\x1b]10;rgb:a0/52/2d\x07')  # sienna
 
@@ -589,12 +588,12 @@ def test_get_fgcolor_styling_indifferent():
     """Ensure get_fgcolor() behavior is the same regardless of styling"""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True)
+        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         term.ungetch('\x1b]10;rgb:d2/b4/8c\x07')  # tan
         rgb = term.get_fgcolor(timeout=0.01)
         assert rgb == (210, 180, 140)
 
-        term = TestTerminal(stream=StringIO(), force_styling=False)
+        term = TestTerminal(stream=StringIO(), force_styling=False, is_a_tty=True)
         term.ungetch('\x1b]10;rgb:40/e0/d0\x07')  # turquoise
         rgb = term.get_fgcolor(timeout=0.01)
         assert rgb == (64, 224, 208)
@@ -617,7 +616,7 @@ def test_get_bgcolor_0s_reply_via_ungetch():
     """0-second get_bgcolor call with response."""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO())
+        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         stime = time.time()
         term.ungetch('\x1b]11;rgb:99/32/cc\x07')  # darkorchid
 
@@ -631,12 +630,12 @@ def test_get_bgcolor_styling_indifferent():
     """Ensure get_bgcolor() behavior is the same regardless of styling"""
     @as_subprocess
     def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True)
+        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         term.ungetch('\x1b]11;rgb:ff/e4/c4\x07')  # bisque
         rgb = term.get_bgcolor(timeout=0.01)
         assert rgb == (255, 228, 196)
 
-        term = TestTerminal(stream=StringIO(), force_styling=False)
+        term = TestTerminal(stream=StringIO(), force_styling=False, is_a_tty=True)
         term.ungetch('\x1b]11;rgb:de/b8/87\x07')  # burlywood
         rgb = term.get_bgcolor(timeout=0.01)
         assert rgb == (222, 184, 135)
@@ -664,6 +663,45 @@ def test_detached_stdout():
     pid, status = os.waitpid(pid, 0)
     assert os.WEXITSTATUS(status) == 0
     assert math.floor(time.time() - stime) == 0.0
+
+
+@pytest.mark.skipif(not TEST_KEYBOARD or IS_WINDOWS, reason="Requires TTY")
+def test_cbreak_with_has_tty():
+    """Test cbreak() context manager with HAS_TTY=True"""
+    def child(term):
+        # This test exercises the HAS_TTY path in cbreak()
+        # Lines 2128-2140 in terminal.py
+        with term.cbreak():
+            # Verify we're in cbreak mode
+            assert term._line_buffered is False
+            # Write something to indicate success
+            return b'CBREAK_OK'
+        # After exiting context, line_buffered should be restored
+        return b'RESTORED'
+
+    output = pty_test(child, parent_func=None, test_name='test_cbreak_with_has_tty')
+    assert 'CBREAK_OK' in output or 'RESTORED' in output
+
+
+def test_inkey_with_csi_sequence_triggers_latin1_decoding():
+    """Test that CSI sequences trigger Latin1 decoding path in inkey()"""
+    def child(term):
+        # Send a CSI sequence to trigger Latin1 decoding
+        # This tests lines 2286-2296, 2315-2319, 2324->2330
+        os.write(sys.__stdout__.fileno(), SEMAPHORE)
+        with term.cbreak():
+            # The CSI sequence should trigger _use_latin1_decoding
+            ks = term.inkey(timeout=0.5)
+            return ks.name.encode('ascii') if ks.name else b'EMPTY'
+
+    def parent(master_fd):
+        read_until_semaphore(master_fd)
+        # Send a CSI sequence (arrow key)
+        os.write(master_fd, b'\x1b[A')
+        time.sleep(0.05)
+
+    output = pty_test(child, parent, 'test_inkey_with_csi_sequence_triggers_latin1_decoding')
+    assert output == 'KEY_UP'
 
 
 def test_read_until_pattern_found():

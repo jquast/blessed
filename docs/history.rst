@@ -8,6 +8,9 @@ Version History
   * performance improvements in :meth:`~Terminal.rgb_downconvert` for 256-color
     terminals, :ghpull:`298`.
   * Enhanced keyboard support with Modifier keys, :ghpull:`306`.
+  * Kitty keyboard protocol support, :ghpull:`309`.
+  * Mouse support, Synchronized Output, and support for DEC Private Modes, :ghpull:`310`
+  * Sixel Support, methods to determine dimensions and color depth :ghpull:`312`
 
 1.22
   * performance improvements to :meth:`~Terminal.length` and
@@ -163,9 +166,9 @@ Version History
   * enhancement: no longer depend on the '2to3' tool for python 3 support.
   * enhancement: allow ``civis`` and ``cnorm`` (*hide_cursor*, *normal_hide*)
     to work with terminal-type *ansi* by emulating support by proxy.
-  * enhancement: new public attribute: :attr:`~.kind`: the very same as given
-    :paramref:`Terminal.__init__.kind` keyword argument.  Or, when not given,
-    determined by and equivalent to the ``TERM`` Environment variable.
+  * enhancement: new public attribute: :attr:`~.Terminal.kind`: the very same as
+    given :paramref:`Terminal.__init__.kind` keyword argument.  Or, when not
+    given, determined by and equivalent to the ``TERM`` Environment variable.
 
 1.8
   * enhancement: export keyboard-read function as public method ``getch()``,
@@ -218,16 +221,16 @@ Version History
     both sequences and trailing or leading whitespace, respectively.
   * bugfix: cannot call :func:`curses.setupterm` more than once per process
     (from :meth:`Terminal.__init__`):  Previously, blessed pretended
-    to support several instances of different Terminal :attr:`~.kind`, but was
-    actually using the :attr:`~.kind` specified by the first instantiation of
-    :class:`~.Terminal`.  A warning is now issued.  Although this is
-    misbehavior is still allowed, a :class:`warnings.WarningMessage` is now
-    emitted to notify about subsequent terminal misbehavior.
+    to support several instances of different Terminal :attr:`~.Terminal.kind`,
+    but was actually using the :attr:`~Terminal.kind` specified by the first
+    instantiation of :class:`~.Terminal`.  A warning is now issued.  Although
+    this misbehavior is still allowed, a :class:`warnings.WarningMessage` is
+    now emitted to notify about subsequent terminal misbehavior.
   * bugfix: resolved issue where :attr:`~.number_of_colors` fails when
     :attr:`~.does_styling` is ``False``.  Resolves issue where piping tests
     output would fail.
   * bugfix: warn and set :attr:`~.does_styling` to ``False`` when the given
-    :attr:`~.kind` is not found in the terminal capability database.
+    :attr:`~Terminal.kind` is not found in the terminal capability database.
   * bugfix: allow unsupported terminal capabilities to be callable just as
     supported capabilities, so that the return value of
     :attr:`~.color`\(n) may be called on terminals without color
