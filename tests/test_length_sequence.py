@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests for Terminal methods that account for sequences in strings"""
 
 # std imports
@@ -62,7 +61,7 @@ def test_length_ansiart():
         # this 'ansi' art contributed by xzip!impure for another project,
         # unlike most CP-437 DOS ansi art, this is actually utf-8 encoded.
         fname = os.path.join(os.path.dirname(__file__), 'wall.ans')
-        with open(fname, 'r', encoding='utf-8') as ansiart:
+        with open(fname, encoding='utf-8') as ansiart:
             lines = ansiart.readlines()
         assert term.length(lines[0]) == 67  # ^[[64C^[[34m▄▓▄
         assert term.length(lines[1]) == 75

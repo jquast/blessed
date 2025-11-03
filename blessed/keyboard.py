@@ -1263,9 +1263,9 @@ def get_keyboard_sequences(term: 'Terminal') -> typing.OrderedDict[str, int]:
     # This is for fast lookup matching of sequences, preferring
     # full-length sequence such as ('\x1b[D', KEY_LEFT)
     # over simple sequences such as ('\x1b', KEY_EXIT).
-    return OrderedDict((
+    return OrderedDict(
         (seq, sequence_map[seq]) for seq in sorted(
-            sequence_map.keys(), key=len, reverse=True)))
+            sequence_map.keys(), key=len, reverse=True))
 
 
 def get_leading_prefixes(sequences: typing.Iterable[str]) -> Set[str]:

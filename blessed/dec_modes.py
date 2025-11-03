@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Class definitions for DEC Private Modes and their Response values."""
 
 # std imports

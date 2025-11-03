@@ -129,7 +129,7 @@ class as_subprocess():  # pylint: disable=too-few-public-methods
             print(f'TEST RUNNER HAS FORKED, {pid_testrunner}=>{os.getpid()}: EXIT', file=sys.stderr)
             os._exit(1)
 
-        exc_output = str()
+        exc_output = ''
         decoder = codecs.getincrementaldecoder(self.encoding)()
         while True:
             try:
@@ -192,7 +192,7 @@ def read_until_semaphore(fd, semaphore=RECV_SEMAPHORE, encoding='utf8'):
     # process will read xyz\\r\\n -- this is how pseudo terminals
     # behave; a virtual terminal requires both carriage return and
     # line feed, it is only for convenience that \\n does both.
-    outp = str()
+    outp = ''
     decoder = codecs.getincrementaldecoder(encoding)()
     semaphore = semaphore.decode('ascii')
     while not outp.startswith(semaphore):
@@ -216,7 +216,7 @@ def read_until_eof(fd, encoding='utf8'):
     Return decoded string.
     """
     decoder = codecs.getincrementaldecoder(encoding)()
-    outp = str()
+    outp = ''
     while True:
         try:
             _exc = os.read(fd, 100)
@@ -429,7 +429,7 @@ def assert_only_modifiers(ks, *modifiers):
     from blessed.keyboard import KittyModifierBits
 
     # Convert modifiers to a set for easy lookup
-    modifier_set = set(mod.lower() for mod in modifiers)
+    modifier_set = {mod.lower() for mod in modifiers}
 
     # Calculate expected bits using getattr - naturally validates modifier names
     expected_bits = 0

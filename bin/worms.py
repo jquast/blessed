@@ -5,7 +5,6 @@ Example application for the 'blessed' Terminal library for python.
 It is also an experiment in functional programming.
 """
 
-from __future__ import division, print_function
 
 # std imports
 from random import randrange
@@ -135,7 +134,7 @@ def next_speed(nibble, head, speed, modifier):
 
 def head_glyph(direction):
     """Return character for worm head depending on horiz/vert orientation."""
-    return u':' if direction in (left_of, right_of) else u'"'
+    return ':' if direction in (left_of, right_of) else '"'
 
 
 def next_nibble(term, nibble, head, worm):
@@ -159,7 +158,7 @@ def nibble_locations(nibble_location, nibble_value):
     # -- a digit such as '123' may be hit at 3 different (y, x) coordinates.
     return [
         Location(x=nibble_location.x + offset, y=nibble_location.y)
-        for offset in range(1 + len('{}'.format(nibble_value)) - 1)
+        for offset in range(1 + len(f'{nibble_value}') - 1)
     ]
 
 
@@ -187,12 +186,12 @@ def main():
 
     echo(term.move_yx(term.height, 0))
     with term.hidden_cursor(), term.cbreak(), term.location():
-        while inp not in (u'q', u'Q'):
+        while inp not in ('q', 'Q'):
 
             # delete the tail of the worm at worm_length
             if len(worm) > worm_length:
                 echo(term.move_yx(*worm.pop(0)))
-                echo(color_bg(u' '))
+                echo(color_bg(' '))
 
             # compute head location
             head = worm.pop()
@@ -214,14 +213,14 @@ def main():
                 # erase the old one, careful to redraw the nibble contents
                 # with a worm color for those portions that overlay.
                 for (yloc, xloc) in nibble_locations(*nibble):
-                    echo(u''.join((
+                    echo(''.join((
                         term.move_yx(yloc, xloc),
                         (color_worm if (yloc, xloc) == head
-                         else color_bg)(u' '),
+                         else color_bg)(' '),
                         term.normal)))
                 # and draw the new,
                 echo(term.move_yx(*n_nibble.location) + (
-                    color_nibble('{}'.format(n_nibble.value))))
+                    color_nibble(f'{n_nibble.value}')))
 
             # display new worm head
             echo(term.move_yx(*head) + color_head(head_glyph(direction)))
@@ -229,7 +228,7 @@ def main():
             # and its old head (now, a body piece)
             if worm:
                 echo(term.move_yx(*(worm[-1])))
-                echo(color_worm(u' '))
+                echo(color_worm(' '))
             echo(term.move_yx(*head))
 
             # wait for keyboard input, which may indicate
@@ -257,8 +256,8 @@ def main():
 
     echo(term.normal)
     score = (worm_length - 1) * 100
-    echo(u''.join((term.move_yx(term.height - 1, 1), term.normal)))
-    echo(u''.join((u'\r\n', u'score: {}'.format(score), u'\r\n')))
+    echo(''.join((term.move_yx(term.height - 1, 1), term.normal)))
+    echo(''.join(('\r\n', f'score: {score}', '\r\n')))
 
 
 if __name__ == '__main__':

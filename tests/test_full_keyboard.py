@@ -243,7 +243,7 @@ def test_keystroke_0s_cbreak_multibyte_utf8():
 
     def parent(master_fd):
         os.write(master_fd, SEND_SEMAPHORE)
-        os.write(master_fd, '\u01b1'.encode('utf-8'))
+        os.write(master_fd, '\u01b1'.encode())
         read_until_semaphore(master_fd)
 
     stime = time.time()
@@ -280,7 +280,7 @@ def test_keystroke_0s_raw_input_ctrl_c():
         # ensure child is in raw mode before sending ^C,
         read_until_semaphore(master_fd)
         time.sleep(0.05)
-        os.write(master_fd, '\x03'.encode('latin1'))
+        os.write(master_fd, b'\x03')
         stime = time.time()
         output = read_until_eof(master_fd)
     pid, status = os.waitpid(pid, 0)

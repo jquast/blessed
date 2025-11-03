@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests specific to Kitty keyboard protocol features."""
 import io
 import os
