@@ -66,7 +66,7 @@ def main():
         # to the farthest lower-right corner.  By requesting the current
         # position, we may negotiate about the window size directly with the
         # terminal emulator connected at the distant end.
-        pos = Position(*term.get_location(timeout=5.0))
+        pos = Position(*term.get_location())
 
         if -1 not in pos:
             # true size was determined

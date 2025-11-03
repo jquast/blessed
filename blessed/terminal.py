@@ -721,7 +721,7 @@ class Terminal():
             self.stream.write(self.restore)
             self.stream.flush()
 
-    def get_location(self, timeout: Optional[float] = None) -> Tuple[int, int]:
+    def get_location(self, timeout: float = 1) -> Tuple[int, int]:
         r"""
         Return tuple (row, column) of cursor position.
 
@@ -798,7 +798,7 @@ class Terminal():
         # rather than crowbarring such logic into an exception handler.
         return -1, -1
 
-    def get_fgcolor(self, timeout: Optional[float] = None) -> Tuple[int, int, int]:
+    def get_fgcolor(self, timeout: float = 1) -> Tuple[int, int, int]:
         """
         Return tuple (r, g, b) of foreground color.
 
@@ -813,11 +813,13 @@ class Terminal():
 
         The foreground color is determined by emitting an `OSC 10 color query
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
+
+        See also :meth:`~.Terminal.get_bgcolor` for querying the background color.
         """
         match = self._query_response('\x1b]10;?\x07', RE_GET_FGCOLOR_RESPONSE, timeout)
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
 
-    def get_bgcolor(self, timeout: Optional[float] = None) -> Tuple[int, int, int]:
+    def get_bgcolor(self, timeout: float = 1) -> Tuple[int, int, int]:
         """
         Return tuple (r, g, b) of background color.
 
@@ -832,6 +834,8 @@ class Terminal():
 
         The background color is determined by emitting an `OSC 11 color query
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
+
+        See also :meth:`~.Terminal.get_fgcolor` for querying the foreground color.
         """
         match = self._query_response('\x1b]11;?\x07', RE_GET_BGCOLOR_RESPONSE, timeout)
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
@@ -976,7 +980,7 @@ class Terminal():
         return da.supports_sixel if da is not None else False
 
     def get_dec_mode(self, mode: Union[int, _DecPrivateMode],
-                     timeout: Optional[float] = None, force: bool = False) -> DecModeResponse:
+                     timeout: float = 1.0, force: bool = False) -> DecModeResponse:
         """
         Query the state of a DEC Private Mode (DECRQM).
 
@@ -1005,7 +1009,7 @@ class Terminal():
         re-inquiry unless ``force=True``.  Although there are special cases
         where a user may re-configure their terminal settings after the state
         was requested by an application, the application is generally restarted
-        to recognize the new settings rather than to repeatidly re-inquire about
+        to recognize the new settings rather than to repeatedly re-inquire about
         their latest value!
 
         :arg mode: DEC Private Mode to query

@@ -5,7 +5,7 @@ term = Terminal()
 
 # Query mouse support
 mode = term.DecPrivateMode(term.DecPrivateMode.MOUSE_REPORT_CLICK)
-response = term.get_dec_mode(mode, timeout=1)
+response = term.get_dec_mode(mode)
 
 print(f"Checking {mode.name} (mode {mode.value}) {mode.long_description}: ", end="")
 

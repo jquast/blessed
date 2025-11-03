@@ -89,7 +89,7 @@ def display_dec_modes(term):
     # Query each mode
     for idx, (mode_name, mode_code) in enumerate(sorted(all_modes.items(), key=lambda x: x[1])):
         print(f'  Testing {mode_name}...' + term.clear_eol, end='\r', flush=True)
-        response = term.get_dec_mode(mode_code, timeout=0.1, force=force_mode)
+        response = term.get_dec_mode(mode_code, force=force_mode)
         if response.supported:
             supported_modes[mode_name] = response
 

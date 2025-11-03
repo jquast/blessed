@@ -90,7 +90,7 @@ This uses a kind of "answer back" sequence that your terminal emulator responds 
 terminal may not respond, or may take some time to respond, the :paramref:`~.get_location.timeout`
 keyword argument can be specified to return coordinates (-1, -1) after a blocking timeout:
 
-    >>> term.get_location(timeout=5)
+    >>> term.get_location()
     (32, 0)
 
 The return value of :meth:`~.Terminal.get_location` mirrors the arguments of
