@@ -53,7 +53,7 @@ Get the pixel dimensions of a single character cell using
 
     term = Terminal()
 
-    cell_height, cell_width = term.get_cell_pixel_height_and_width(timeout=1.0)
+    cell_height, cell_width = term.get_cell_pixel_height_and_width()
     if (cell_height, cell_width) != (-1, -1):
         print(f"Character cell size: {cell_width}x{cell_height} pixels")
         # Useful for pixel-perfect positioning of graphics
@@ -89,12 +89,13 @@ Returns ``-1`` when sixel is not supported.
 Caching
 -------
 
-Query results are always cached, successful or not. If any call fails to return
-under timeout and returns ``-1`` values, all subsequent calls return that same
-value until ``force=True`` is set.
 
-Successful queries are *also* cached and always returned without direct re-inquiry
-unless ``force=True``.
+:meth:`~.Terminal.get_sixel_height_and_width` queries the terminal for automatic
+response using XTSMGRAPHICS and XTWINOPS within combined ``timeout``, and, once
+received, that value is cached and always returned without further query unless
+``force=True`` is set.
+
+When In-band resizing is used, the return values are updated automatically.
 
 Any method used to determine window size changes can be used to "force" a new
 lookup and bypassing the cache:
@@ -104,7 +105,7 @@ lookup and bypassing the cache:
     term = Terminal()
 
     # First call queries the terminal
-    height1, width1 = term.get_sixel_height_and_width(timeout=1.0)
+    height1, width1 = term.get_sixel_height_and_width()
 
     # Second call returns cached result (instant)
     # and always returns same result
@@ -112,7 +113,7 @@ lookup and bypassing the cache:
     assert width2, height2 == width1, height2
 
     # Force a fresh inquiry,
-    height, width = term.get_sixel_height_and_width(timeout=1.0, force=True)
+    height, width = term.get_sixel_height_and_width(force=True)
 
 
 Complete Workflow

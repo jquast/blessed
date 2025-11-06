@@ -143,13 +143,12 @@ You can optionally check for protocol support:
 
     term = Terminal()
 
-    # Query with a timeout to avoid hanging
-    state = term.get_kitty_keyboard_state(timeout=1.0)
+    state = term.get_kitty_keyboard_state()
 
     if state is not None:
         print("Kitty keyboard protocol is supported")
     else:
-        print("Using standard keyboard input")
+        print("No kitty protocol support.")
 
 This check is not necessary but may be useful in some cases.
 

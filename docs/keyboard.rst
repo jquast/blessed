@@ -26,9 +26,9 @@ Here's a simple example that reads a single keystroke:
    :language: python
    :linenos:
 
-The :meth:`~.Terminal.inkey` method also accepts a ``timeout`` parameter (in
-seconds). When timeout is exceeded without input, an empty :class:`~.Keystroke`
-is returned, ``''``.
+The :meth:`~.Terminal.inkey` method also accepts a ``timeout`` parameter that
+defaults to 1 second. When ``timeout`` is exceeded without input, an empty
+:class:`~.Keystroke` is returned, ``''``.
 
 In this example, a 10Hz animation is displayed by ``timeout=0.1``, stopped
 by pressing any key:
