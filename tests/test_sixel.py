@@ -245,7 +245,7 @@ def test_sixel_height_and_width_fallback_to_xtwinops():
         # Read and discard first query (XTWINOPS 16t - cell size)
         os.read(master_fd, 100)
         # Wait for XTWINOPS 16t timeout, then read XTWINOPS 14t query
-        time.sleep(0.28)  # timeout/4 = 0.25, add a bit
+        time.sleep(0.36)  # timeout/3, add a bit
         os.read(master_fd, 100)  # Read XTWINOPS 14t query
         # Respond to XTWINOPS 14t (window size)
         os.write(master_fd, b'\x1b[4;600;800t')
@@ -255,8 +255,8 @@ def test_sixel_height_and_width_fallback_to_xtwinops():
     dimensions, duration = output.split('|')
 
     assert dimensions == '600x800'
-    # Should take around timeout/4 (0.25s) + response time
-    assert 0.25 <= float(duration) <= 0.5
+    # Should take around timeout/3 + a bit
+    assert 0.30 <= float(duration) <= 0.5
     assert math.floor(time.time() - stime) == 0.0
 
 
@@ -277,10 +277,10 @@ def test_sixel_height_and_width_both_timeout():
         # Read and discard first query (XTWINOPS 16t)
         os.read(master_fd, 100)
         # Wait for first timeout, then read XTWINOPS 14t query
-        time.sleep(0.28)  # timeout/4 = 0.25, add a bit
+        time.sleep(0.36)  # timeout/3, add a bit
         os.read(master_fd, 100)  # Read XTWINOPS 14t query
         # Wait for second timeout, read XTSMGRAPHICS query
-        time.sleep(0.28)
+        time.sleep(0.36)
         os.read(master_fd, 100)  # Read XTSMGRAPHICS query
         # Don't respond - let all timeout (TIOCSWINSZ doesn't send query)
 
@@ -289,9 +289,9 @@ def test_sixel_height_and_width_both_timeout():
     dimensions, duration = output.split('|')
 
     assert dimensions == '-1x-1'
-    # Should take around timeout/4 * 3 = 0.75s for the three queries
-    assert 0.65 <= float(duration) <= 0.95
-    assert math.floor(time.time() - stime) == 0.0
+    # Should take around timeout/3 * 3 = 1.0s for the three queries
+    assert 0.90 <= float(duration) <= 1.15
+    assert math.floor(time.time() - stime) <= 1.0
 
 
 @pytest.mark.parametrize('method_name,ungetch_response,expected_result,expected_failure', [
@@ -354,17 +354,17 @@ def test_timeout_allocation_across_methods():
     def parent(master_fd):
         read_until_semaphore(master_fd)
         os.read(master_fd, 100)  # Read XTWINOPS 16t query
-        time.sleep(0.23)  # Wait for first timeout (timeout/4 = 0.2 seconds)
+        time.sleep(0.29)  # Wait for first timeout (timeout/3 ≈ 0.267 seconds)
         os.read(master_fd, 100)  # Read XTWINOPS 14t query
-        time.sleep(0.23)  # Wait for second timeout
+        time.sleep(0.29)  # Wait for second timeout
         os.read(master_fd, 100)  # Read XTSMGRAPHICS query
 
     output = pty_test(child, parent, 'test_timeout_allocation_across_methods')
     result, elapsed, cell_cached, window_cached = output.split('|')
 
     assert result == '-1x-1'
-    # Should take around 3 * timeout/4 = 0.6s (3 queries at quarter timeout each)
-    assert 0.55 <= float(elapsed) <= 0.85
+    # Should take around 3 * timeout/3 = 0.8s (3 queries at third timeout each)
+    assert 0.75 <= float(elapsed) <= 0.95
     # Should cache the failures
     assert cell_cached == '-1x-1'
     assert window_cached == '-1x-1'
@@ -372,7 +372,7 @@ def test_timeout_allocation_across_methods():
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_cell_cache_sticky_failure():
-    """Test that cell cache failure sets sticky flag and skips to window query."""
+    """Test that cell cache failure is cached but can be bypassed with force=True."""
     def child(term):
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
@@ -394,25 +394,26 @@ def test_cell_cache_sticky_failure():
 
         # First query - read cell, wait for timeout, read window, respond
         os.read(master_fd, 100)  # XTWINOPS 16t query
-        time.sleep(0.28)  # timeout/4 = 0.25, add a bit
+        time.sleep(0.36)  # timeout/3 ≈ 0.33s, add a bit
         os.read(master_fd, 100)  # XTWINOPS 14t query after fallback
         os.write(master_fd, b'\x1b[4;480;640t')
 
-        # Second query - should only be window (sticky failure skips cell)
-        os.read(master_fd, 100)  # XTWINOPS 14t query
-        time.sleep(0.05)
+        # Second query with force=True - re-queries cell, then window
+        os.read(master_fd, 100)  # XTWINOPS 16t query (force=True bypasses sticky failure)
+        time.sleep(0.36)  # timeout/3 ≈ 0.33s, add a bit
+        os.read(master_fd, 100)  # XTWINOPS 14t query after fallback
         os.write(master_fd, b'\x1b[4;480;640t')
 
     output = pty_test(child, parent, 'test_cell_cache_sticky_failure')
     dim1, dur1, dim2, dur2 = output.split('|')
 
-    # First call should fallback (takes ~timeout/4)
+    # First call should fallback (takes ~timeout/3)
     assert dim1 == '480x640'
-    assert 0.25 <= float(dur1) <= 0.5
+    assert 0.30 <= float(dur1) <= 0.5
 
-    # Second call should skip cell and go directly to window (fast)
+    # Second call with force=True also re-queries and fallbacks (takes ~timeout/3)
     assert dim2 == '480x640'
-    assert float(dur2) < 0.2  # Much faster than first call
+    assert 0.30 <= float(dur2) <= 0.5
 
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
@@ -437,12 +438,12 @@ def test_cached_failure_returns_immediately(method_name, expected_failure, max_t
         assert result2 == expected_failure
         assert elapsed2 < 0.01  # Should be instant from cache
 
-        # Third call with force=True - should bypass cache and timeout again
+        # Third call with force=True - bypasses cache and re-queries
         stime3 = time.time()
         result3 = getattr(term, method_name)(timeout=0.1, force=True)
         elapsed3 = time.time() - stime3
         assert result3 == expected_failure
-        assert 0.08 <= elapsed3 <= max_time
+        assert 0.08 <= elapsed3 <= max_time  # Should timeout again
         return b'OK'
 
     output = pty_test(child, parent_func=None,

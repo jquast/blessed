@@ -1508,20 +1508,30 @@ class Terminal():
 
         # Try methods in order of reliability, as suggested by j4james,
         # https://github.com/pexpect/ptyprocess/issues/79#issuecomment-3498498155
-        stime = time.time()
-        quarter_timeout = timeout / 4 if timeout is not None else None
+        # Split timeout evenly across the 3 query methods (16t, 14t, XTSMGRAPHICS)
+        # for the worst-case scenario that all three methods timeout.
+        third_timeout = timeout / 3 if timeout is not None else None
 
         # 1. Try XTWINOPS 16t (character cell size) - most accurate
-        cell_result = self.get_cell_pixel_height_and_width(_time_left(stime, quarter_timeout), force)
+        # Sticky failure: don't re-query if previously failed, unless force=True
+        if self._xtwinops_cell_cache == (-1, -1) and not force:
+            cell_result = (-1, -1)
+        elif self._xtwinops_cell_cache is not None and not force:
+            cell_result = self._xtwinops_cell_cache
+        else:
+            cell_result = self.get_cell_pixel_height_and_width(third_timeout, force)
         if cell_result != (-1, -1):
             cell_height, cell_width = cell_result
             return (cell_height * self.height, cell_width * self.width)
 
         # 2. Try XTWINOPS 14t (text area size) - widely supported
-        if self._xtwinops_cache is not None and not force:
+        # Sticky failure: don't re-query if previously failed, unless force=True
+        if self._xtwinops_cache == (-1, -1) and not force:
+            result = (-1, -1)
+        elif self._xtwinops_cache is not None and not force:
             result = self._xtwinops_cache
         else:
-            result = self._get_xtwinops_window_size(_time_left(stime, quarter_timeout))
+            result = self._get_xtwinops_window_size(third_timeout)
             self._xtwinops_cache = result
         if result != (-1, -1):
             return result
@@ -1534,10 +1544,13 @@ class Terminal():
                 return (winsize.ws_ypixel, winsize.ws_xpixel)
 
         # 4. Last resort: XTSMGRAPHICS - least reliable
-        if self._xtsmgraphics_cache is not None and not force:
+        # Sticky failure: don't re-query if previously failed, unless force=True
+        if self._xtsmgraphics_cache == (-1, -1) and not force:
+            result = (-1, -1)
+        elif self._xtsmgraphics_cache is not None and not force:
             result = self._xtsmgraphics_cache
         else:
-            result = self._get_xtsmgraphics(_time_left(stime, quarter_timeout))
+            result = self._get_xtsmgraphics(third_timeout)
             self._xtsmgraphics_cache = result
         if result != (-1, -1):
             return result
