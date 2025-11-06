@@ -24,7 +24,7 @@ else:
     print(f"Colors available: {colors}")
 
 # Get cell dimensions for positioning
-cell_height, cell_width = term.get_cell_pixel_height_and_width(timeout=1.0)
+cell_height, cell_width = term.get_cell_pixel_height_and_width()
 if (cell_height, cell_width) == (-1, -1):
     print("Could not determine cell size")
 else:
