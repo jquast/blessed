@@ -492,6 +492,48 @@ def test_sixel_height_width_with_xtwinops_14t():
     assert 'OK' in output
 
 
+def test_konsole_bogus_xtsmgraphics_16384():
+    """Test that bogus XTSMGRAPHICS values (like Konsole's 16384x16384) are rejected."""
+    def child(term):
+        # Note that real Konsole returns the correct values, answering to
+        # XTWINOPS, this is just a "theoretical" terminal -- for code coverage.
+        term.ungetch('\x1b[?2;0;16384;16384S')  # XTSMGRAPHICS response: bogus 16384x16384
+        # Pre-cache failures to skip directly to XTSMGRAPHICS
+        term._xtwinops_cell_cache = (-1, -1)
+        term._xtwinops_cache = (-1, -1)
+
+        height, width = term.get_sixel_height_and_width(timeout=0.1)
+
+        # Should reject the bogus 16384x16384 value and return failure
+        # XTSMGRAPHICS detected Konsole's bogus 16384x16384 and cached failure
+        assert (height, width) == (-1, -1)
+        assert term._xtsmgraphics_cache == (-1, -1)
+
+    pty_test(child, parent_func=None, test_name='test_konsole_bogus_xtsmgraphics_16384')
+
+
+@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
+def test_konsole_bogus_xtsmgraphics_real_terminal():
+    """Test _get_xtsmgraphics rejects Konsole's bogus 16384x16384 value."""
+    def child(term):
+        os.write(sys.__stdout__.fileno(), SEMAPHORE)
+        with term.cbreak():
+            result = term._get_xtsmgraphics(timeout=0.5)
+            return f'{result[0]}x{result[1]}'.encode('utf-8')
+
+    def parent(master_fd):
+        read_until_semaphore(master_fd)
+        # Read XTSMGRAPHICS query
+        os.read(master_fd, 100)
+        # Respond with bogus Konsole-like value
+        os.write(master_fd, b'\x1b[?2;0;16384;16384S')
+
+    output = pty_test(child, parent, 'test_konsole_bogus_xtsmgraphics_real_terminal')
+
+    # Should reject the bogus 16384x16384 value and return failure
+    assert output == '-1x-1'
+
+
 @pytest.mark.parametrize('cell_cache,window_cache,expected_result', [
     ((16, 8), None, (384, 640)),      # Cell size: 16*24=384, 8*80=640
     ((-1, -1), (1080, 1920), (1080, 1920)),  # Cell failed, window succeeded
@@ -614,6 +656,47 @@ def test_preferred_size_cache_with_zero_pixels():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_preferred_size_cache_with_zero_pixels')
+    assert 'OK' in output
+
+
+@pytest.mark.parametrize('ws_ypixel,ws_xpixel', [
+    (1920, 0),
+    (0, 1080),
+])
+def test_preferred_size_cache_with_partial_zero_pixels(ws_ypixel, ws_xpixel):
+    """Test that partial zero dimensions in preferred_size_cache are skipped."""
+    # this is something of a fictional terminal, though maybe for some it may
+    # someday be possible, very far down the logical fall-back ladder: that if
+    # any of either width or height is 0 through in-band resize protocol, that
+    # TIOCSWINSZ is used.
+    def child(term):
+        from blessed.terminal import WINSZ
+
+        # Pre-cache failures for methods 1-3 so it falls through to method 4
+        term._xtwinops_cell_cache = (-1, -1)
+        term._xtwinops_cache = (-1, -1)
+        term._xtsmgraphics_cache = (-1, -1)
+        term._preferred_size_cache = WINSZ(ws_row=24, ws_col=80,
+                                           ws_xpixel=ws_xpixel, ws_ypixel=ws_ypixel)
+
+        # Since preferred_size_cache has partial zero, should fall through to TIOCSWINSZ
+        # Mock TIOCSWINSZ to return valid dimensions
+        from blessed.terminal import WINSZ
+        original_height_and_width = term._height_and_width
+
+        def mock_height_and_width():
+            orig = original_height_and_width()
+            return WINSZ(ws_row=orig.ws_row, ws_col=orig.ws_col,
+                        ws_xpixel=1600, ws_ypixel=900)
+
+        term._height_and_width = mock_height_and_width
+
+        result = term.get_sixel_height_and_width(timeout=0.1)
+        assert result == (900, 1600)  # Falls through to TIOCSWINSZ
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name=f'test_preferred_size_cache_partial_zero_{ws_ypixel}_{ws_xpixel}')
     assert 'OK' in output
 
 
