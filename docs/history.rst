@@ -2,6 +2,9 @@
 
 Version History
 ===============
+*next*
+  * Improve get_sixel_height_and_width and improve documentation on
+    window resize event handling :ghpull:`320`
 
 1.23
   * introduced: Environment values FORCE_COLOR_, CLICOLOR_FORCE_, and NO_COLOR_ overrides
