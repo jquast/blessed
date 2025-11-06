@@ -617,6 +617,27 @@ def test_preferred_size_cache_with_zero_pixels():
     assert 'OK' in output
 
 
+def test_xtsmgraphics_cache_hit():
+    """Test XTSMGRAPHICS cache is returned when cell and window caches fail."""
+    def child(term):
+        # Pre-cache failures for cell and window, but success for XTSMGRAPHICS
+        term._xtwinops_cell_cache = (-1, -1)
+        term._xtwinops_cache = (-1, -1)
+        term._xtsmgraphics_cache = (600, 800)
+
+        # Should return cached XTSMGRAPHICS value instantly
+        stime = time.time()
+        result = term.get_sixel_height_and_width(timeout=0.1)
+        elapsed = time.time() - stime
+
+        assert result == (600, 800)
+        assert elapsed < 0.01  # Instant from cache
+        return b'OK'
+
+    output = pty_test(child, parent_func=None, test_name='test_xtsmgraphics_cache_hit')
+    assert 'OK' in output
+
+
 def test_tiocswinsz_path():
     """Test TIOCSWINSZ path when all queries fail but ioctl returns pixel dimensions."""
     def child(term):

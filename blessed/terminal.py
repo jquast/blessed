@@ -1525,8 +1525,7 @@ class Terminal():
         elif self._xtwinops_cache is not None and not force:
             result = self._xtwinops_cache
         else:
-            result = self._get_xtwinops_window_size(third_timeout)
-            self._xtwinops_cache = result
+            result = self._xtwinops_cache = self._get_xtwinops_window_size(third_timeout)
         if result != (-1, -1):
             return result
 
@@ -1537,8 +1536,7 @@ class Terminal():
         elif self._xtsmgraphics_cache is not None and not force:
             result = self._xtsmgraphics_cache
         else:
-            result = self._get_xtsmgraphics(third_timeout)
-            self._xtsmgraphics_cache = result
+            result = self._xtsmgraphics_cache = self._get_xtsmgraphics(third_timeout)
         if result != (-1, -1):
             return result
 
