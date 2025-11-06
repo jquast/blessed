@@ -19,8 +19,8 @@ def display_device_attributes(term):
     print(term.bold("Device Attributes (DA1):"))
     print("-" * 40)
 
-    # Query device attributes with a reasonable timeout
-    da = term.get_device_attributes(timeout=0.5)
+    # Query device attributes
+    da = term.get_device_attributes()
 
     if da is None:
         print("  " + term.bright_red("No response - terminal does NOT support DA1 queries"))
