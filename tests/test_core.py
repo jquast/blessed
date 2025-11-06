@@ -565,7 +565,7 @@ def test_query_methods_respect_does_styling_and_is_a_tty(force_styling, is_a_tty
         result_sixel_colors = term.get_sixel_colors(timeout=0.01)
         assert result_sixel_colors == -1
 
-        result_cell_hw = term.get_cell_height_and_width(timeout=0.01)
+        result_cell_hw = term.get_cell_pixel_height_and_width(timeout=0.01)
         assert result_cell_hw == (-1, -1)
 
         assert stream.getvalue() == ''

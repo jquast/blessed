@@ -263,7 +263,7 @@ class Terminal():
         self._xtwinops_cache: Optional[Tuple[int, int]] = None
         # Cache for get_sixel_colors() - stores color count or -1
         self._xtsmgraphics_colors_cache: Optional[int] = None
-        # Cache for get_cell_height_and_width() - (height, width) or (-1, -1)
+        # Cache for get_cell_pixel_height_and_width() - (height, width) or (-1, -1)
         self._xtwinops_cell_cache: Optional[Tuple[int, int]] = None
 
         # Cache for in-band resize notifications (mode 2048)
@@ -1452,6 +1452,28 @@ class Terminal():
         for mode_num in mode_numbers:
             self._dec_mode_cache[mode_num] = DecModeResponse.RESET
 
+    def get_cell_pixel_height_and_width(self, timeout: Optional[float] = 1.0,
+                                        force: bool = False) -> Tuple[int, int]:
+        """
+        Query character cell pixel dimensions (XTWINOPS).
+
+        Returns the height and width in pixels of a single character cell.
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``(-1, -1)`` is returned without inquiry.
+
+        :arg float timeout: Timeout in seconds for the query
+        :arg float force: Bypass cache and re-query the terminal
+        :rtype: tuple
+        :returns: ``(height, width)`` in pixels, or ``(-1, -1)`` if unsupported/timeout
+        """
+        if self._xtwinops_cell_cache is not None and not force:
+            return self._xtwinops_cell_cache
+
+        result = self._get_xtwinops_cell_size(timeout)
+        self._xtwinops_cell_cache = result
+        return result
+
     def get_sixel_height_and_width(self, timeout: Optional[float] = 1.0,
                                    force: bool = False) -> Tuple[int, int]:
         # pylint: disable=too-many-return-statements
@@ -1459,20 +1481,23 @@ class Terminal():
         Query sixel graphics pixel dimensions.
 
         Returns the maximum height and width in pixels for sixel graphics
-        rendering. Tries XTSMGRAPHICS first, then validates or falls back to
-        XTWINOPS window size query if the terminal doesn't support XTSMGRAPHICS
-        or reports unrealistic dimensions.
+        rendering. Detection order (from most to least reliable):
+
+        1. In-Band resize notifications when enabled.
+        2. XTWINOPS 16t (CSI 16 t) - Character cell size, multiplied by rows/cols
+        3. XTWINOPS 14t (CSI 14 t) - Text area size in pixels
+        4. TIOCSWINSZ - System ioctl pixel dimensions
+        5. XTSMGRAPHICS - Sixel graphics query (least reliable)
 
         When :attr:`is_a_tty` is False, no sequences are transmitted or response
         awaited, and ``(-1, -1)`` is returned without inquiry.
 
-        :arg float timeout: Timeout in seconds for both possible queries
+        :arg float timeout: Timeout in seconds for queries
         :arg bool force: Bypass cache and re-query the terminal
         :rtype: tuple
         :returns: ``(height, width)`` in pixels, or ``(-1, -1)`` if unsupported/timeout
         """
-        # Use preferred size cache from in-band resize notifications if available
-        # (unless force=True which requires re-querying)
+        # Use preferred size cache (from in-band resize notifications) if available
         if not force and self._preferred_size_cache is not None:
             # Extract pixel dimensions from preferred cache
             # Return them if they're non-zero (terminal supports pixel reporting)
@@ -1481,37 +1506,44 @@ class Terminal():
                 return (self._preferred_size_cache.ws_ypixel,
                         self._preferred_size_cache.ws_xpixel)
 
-        # Fast path: if both caches are populated (unless force=True), compute result from caches
-        if not force and self._xtsmgraphics_cache is not None and self._xtwinops_cache is not None:
-            # If XTSMGRAPHICS succeeded, use it
-            if self._xtsmgraphics_cache != (-1, -1):
-                return self._xtsmgraphics_cache
-            # Otherwise use XTWINOPS (even if it's (-1, -1))
-            return self._xtwinops_cache
-
-        # Try XTSMGRAPHICS first (unless it previously failed - sticky failure at (-1, -1))
-        # Even with force=True, skip XTSMGRAPHICS if it previously failed to avoid wasting timeout
+        # Try methods in order of reliability, as suggested by j4james,
+        # https://github.com/pexpect/ptyprocess/issues/79#issuecomment-3498498155
         stime = time.time()
-        if self._xtsmgraphics_cache is None or (force and self._xtsmgraphics_cache != (-1, -1)):
-            # Use half of remaining timeout, saving the other for XTWINOPS fallback
-            half_timeout = timeout / 2 if timeout is not None else None
-            result = self._get_xtsmgraphics(half_timeout)
-            self._xtsmgraphics_cache = result
-            # If XTSMGRAPHICS succeeded, use it
-            if result != (-1, -1):
-                return result
-        elif self._xtsmgraphics_cache != (-1, -1):
-            # Cache hit with successful value (not force mode)
-            return self._xtsmgraphics_cache
+        quarter_timeout = timeout / 4 if timeout is not None else None
 
-        # Fallback to XTWINOPS window pixel dimensions when:
-        # - XTSMGRAPHICS previously failed (sticky failure)
-        # - XTSMGRAPHICS just failed, using remaining time left
-        if force or self._xtwinops_cache is None:
-            result = self._get_xtwinops_window_size(_time_left(stime, timeout))
+        # 1. Try XTWINOPS 16t (character cell size) - most accurate
+        cell_result = self.get_cell_pixel_height_and_width(_time_left(stime, quarter_timeout), force)
+        if cell_result != (-1, -1):
+            cell_height, cell_width = cell_result
+            return (cell_height * self.height, cell_width * self.width)
+
+        # 2. Try XTWINOPS 14t (text area size) - widely supported
+        if self._xtwinops_cache is not None and not force:
+            result = self._xtwinops_cache
+        else:
+            result = self._get_xtwinops_window_size(_time_left(stime, quarter_timeout))
             self._xtwinops_cache = result
+        if result != (-1, -1):
             return result
-        return self._xtwinops_cache
+
+        # 3. Try TIOCSWINSZ pixel dimensions - immediately available but not often populated
+        if self.is_a_tty:
+            winsize = self._height_and_width()
+            if (0 < winsize.ws_ypixel <= 32000 and
+                    0 < winsize.ws_xpixel <= 32000):
+                return (winsize.ws_ypixel, winsize.ws_xpixel)
+
+        # 4. Last resort: XTSMGRAPHICS - least reliable
+        if self._xtsmgraphics_cache is not None and not force:
+            result = self._xtsmgraphics_cache
+        else:
+            result = self._get_xtsmgraphics(_time_left(stime, quarter_timeout))
+            self._xtsmgraphics_cache = result
+        if result != (-1, -1):
+            return result
+
+        # All methods failed
+        return (-1, -1)
 
     def get_sixel_colors(self, timeout: Optional[float] = 1.0,
                          force: bool = False) -> int:
@@ -1550,28 +1582,6 @@ class Terminal():
                 self._xtsmgraphics_colors_cache = 256
 
         return self._xtsmgraphics_colors_cache
-
-    def get_cell_height_and_width(self, timeout: Optional[float] = 1.0,
-                                  force: bool = False) -> Tuple[int, int]:
-        """
-        Query character cell pixel dimensions (XTWINOPS).
-
-        Returns the height and width in pixels of a single character cell.
-
-        When :attr:`is_a_tty` is False, no sequences are transmitted or response
-        awaited, and ``(-1, -1)`` is returned without inquiry.
-
-        :arg float timeout: Timeout in seconds for the query
-        :arg bool force: Bypass cache and re-query the terminal
-        :rtype: tuple
-        :returns: ``(height, width)`` in pixels, or ``(-1, -1)`` if unsupported/timeout
-        """
-        if self._xtwinops_cell_cache is not None and not force:
-            return self._xtwinops_cell_cache
-
-        result = self._get_xtwinops_cell_size(timeout)
-        self._xtwinops_cell_cache = result
-        return result
 
     def _get_xtwinops_window_size(self, timeout: Optional[float]) -> Tuple[int, int]:
         # Query XTWINOPS 14t for window size: ESC[14t
@@ -2702,15 +2712,3 @@ class WINSZ(collections.namedtuple('WINSZ', (
 #:    setupterm() for each terminal, and saving and restoring cur_term, it
 #:    is possible for a program to use two or more terminals at once."
 #:
-#: However, if you study Python's ``./Modules/_cursesmodule.c``, you'll find::
-#:
-#:   if (!initialised_setupterm && setupterm(termstr,fd,&err) == ERR) {
-#:
-#: Python - perhaps wrongly - will not allow for re-initialisation of new
-#: terminals through :func:`curses.setupterm`, so the value of cur_term cannot
-#: be changed once set: subsequent calls to :func:`curses.setupterm` have no
-#: effect.
-#:
-#: Therefore, the :attr:`Terminal.kind` of each :class:`Terminal` is
-#: essentially a singleton. This global variable reflects that, and a warning
-#: is emitted if somebody expects otherwise.
