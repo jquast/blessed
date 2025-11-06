@@ -1483,11 +1483,14 @@ class Terminal():
         Returns the maximum height and width in pixels for sixel graphics
         rendering. Detection order (from most to least reliable):
 
-        1. In-Band resize notifications when enabled.
-        2. XTWINOPS 16t (CSI 16 t) - Character cell size, multiplied by rows/cols
-        3. XTWINOPS 14t (CSI 14 t) - Text area size in pixels
-        4. TIOCSWINSZ - System ioctl pixel dimensions
-        5. XTSMGRAPHICS - Sixel graphics query (least reliable)
+        1. XTWINOPS 16t (CSI 16 t) - Character cell size, multiplied by rows/cols
+        2. XTWINOPS 14t (CSI 14 t) - Text area size in pixels
+        3. XTSMGRAPHICS - Sixel graphics query
+        4. TIOCSWINSZ / In-band resize - System ioctl / event pixel dimensions
+
+        The cell-based calculation (method 1) is preferred because it accounts
+        for the actual drawable text area, excluding window margins and
+        decorations.
 
         When :attr:`is_a_tty` is False, no sequences are transmitted or response
         awaited, and ``(-1, -1)`` is returned without inquiry.
@@ -1497,16 +1500,7 @@ class Terminal():
         :rtype: tuple
         :returns: ``(height, width)`` in pixels, or ``(-1, -1)`` if unsupported/timeout
         """
-        # Use preferred size cache (from in-band resize notifications) if available
-        if not force and self._preferred_size_cache is not None:
-            # Extract pixel dimensions from preferred cache
-            # Return them if they're non-zero (terminal supports pixel reporting)
-            if (self._preferred_size_cache.ws_ypixel and
-                    self._preferred_size_cache.ws_xpixel):
-                return (self._preferred_size_cache.ws_ypixel,
-                        self._preferred_size_cache.ws_xpixel)
-
-        # Try methods in order of reliability, as suggested by j4james,
+        # Try methods in order of reliability, as suggested by @j4james,
         # https://github.com/pexpect/ptyprocess/issues/79#issuecomment-3498498155
         # Split timeout evenly across the 3 query methods (16t, 14t, XTSMGRAPHICS)
         # for the worst-case scenario that all three methods timeout.
@@ -1536,14 +1530,7 @@ class Terminal():
         if result != (-1, -1):
             return result
 
-        # 3. Try TIOCSWINSZ pixel dimensions - immediately available but not often populated
-        if self.is_a_tty:
-            winsize = self._height_and_width()
-            if (0 < winsize.ws_ypixel <= 32000 and
-                    0 < winsize.ws_xpixel <= 32000):
-                return (winsize.ws_ypixel, winsize.ws_xpixel)
-
-        # 4. Last resort: XTSMGRAPHICS - least reliable
+        # 3. Try XTSMGRAPHICS - sixel-specific query
         # Sticky failure: don't re-query if previously failed, unless force=True
         if self._xtsmgraphics_cache == (-1, -1) and not force:
             result = (-1, -1)
@@ -1554,6 +1541,21 @@ class Terminal():
             self._xtsmgraphics_cache = result
         if result != (-1, -1):
             return result
+
+        # 4. Try TIOCSWINSZ pixel dimensions or cached in-band resize dimensions
+        # Check preferred size cache (from in-band resize notifications) if available
+        if not force and self._preferred_size_cache is not None:
+            if (self._preferred_size_cache.ws_ypixel and
+                    self._preferred_size_cache.ws_xpixel):
+                return (self._preferred_size_cache.ws_ypixel,
+                        self._preferred_size_cache.ws_xpixel)
+
+        # Fallback to direct TIOCSWINSZ query
+        if self.is_a_tty:
+            winsize = self._height_and_width()
+            if (0 < winsize.ws_ypixel <= 32000 and
+                    0 < winsize.ws_xpixel <= 32000):
+                return (winsize.ws_ypixel, winsize.ws_xpixel)
 
         # All methods failed
         return (-1, -1)

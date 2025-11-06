@@ -6,10 +6,22 @@ method. This means that blessed can measure, right-align, center, truncate, or w
 own output!
 
 The :attr:`~.Terminal.height` and :attr:`~.Terminal.width` properties always provide a current
-readout of the size of the window:
+readout of the size of the window in character cells:
 
     >>> term.height, term.width
     (34, 102)
+
+The :attr:`~.Terminal.pixel_height` and :attr:`~.Terminal.pixel_width` properties provide the
+window size in pixels when available:
+
+    >>> term.pixel_height, term.pixel_width
+    (1080, 1920)
+
+.. note::
+
+   For sixel graphics, use :meth:`~.Terminal.get_sixel_height_and_width` instead,
+   which returns the actual drawable area by accounting for margins. See
+   :doc:`sixel` for details.
 
 By combining the measure of the printable width of strings containing sequences with the terminal
 width, the :meth:`~.Terminal.center`, :meth:`~.Terminal.ljust`, :meth:`~.Terminal.rjust`,

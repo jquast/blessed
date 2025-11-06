@@ -43,6 +43,15 @@ The returned dimensions represent the maximum height and width in pixels for
 sixel graphics rendering. If the query times out or fails, ``(-1, -1)`` is
 returned.
 
+.. note::
+
+   The sixel area dimensions may differ from window pixel dimensions reported
+   by :attr:`~.Terminal.pixel_height` and :attr:`~.Terminal.pixel_width`.
+
+   Window pixel dimensions from :attr:`~.Terminal.pixel_height` and
+   :attr:`~.Terminal.pixel_width` may include margins and window decorations,
+   reporting values too large to contain an image.
+
 Cell Dimensions
 ---------------
 

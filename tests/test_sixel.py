@@ -583,12 +583,16 @@ def test_window_cache_return_when_cell_query_fails():
 
 
 def test_preferred_size_cache_path():
-    """Test get_sixel_height_and_width returns preferred_size_cache when available."""
+    """Test get_sixel_height_and_width falls back to preferred_size_cache as last resort."""
     @as_subprocess
     def child():
         from blessed.terminal import WINSZ
         term = TestTerminal()
 
+        # Pre-cache failures for methods 1-3 so it falls through to method 4
+        term._xtwinops_cell_cache = (-1, -1)
+        term._xtwinops_cache = (-1, -1)
+        term._xtsmgraphics_cache = (-1, -1)
         term._preferred_size_cache = WINSZ(ws_row=24, ws_col=80, ws_xpixel=1920, ws_ypixel=1080)
 
         result = term.get_sixel_height_and_width(timeout=0.1)
