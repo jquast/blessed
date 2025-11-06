@@ -31,13 +31,13 @@ class DecModeManager:
         self.available_modes: Dict[DecPrivateMode, bool] = {}
         self.active_contexts: Dict[DecPrivateMode, Any] = {}
 
-    def probe(self, timeout: float = 1.0) -> List[str]:
+    def probe(self) -> List[str]:
         """Probe terminal for DEC mode support and return log messages."""
         messages = ["Checking DEC Private Mode status:"]
 
         for mode in self.test_modes:
             mode = DecPrivateMode(mode)
-            response = self.term.get_dec_mode(mode, timeout=timeout)
+            response = self.term.get_dec_mode(mode)
 
             if not response.supported:
                 messages.append(f'{mode}: no support')
@@ -116,9 +116,9 @@ class KittyKeyboardManager:
         self.active_context: Optional[Any] = None
         self.flag_masks = [1, 2, 4, 8, 16]
 
-    def probe(self, timeout: float = 1.0) -> Tuple[bool, Optional[str], Optional[str]]:
+    def probe(self) -> Tuple[bool, Optional[str], Optional[str]]:
         """Probe kitty keyboard support."""
-        self.kitty_flags = self.term.get_kitty_keyboard_state(timeout=timeout)
+        self.kitty_flags = self.term.get_kitty_keyboard_state()
 
         if self.kitty_flags is None:
             return ["Kitty Keyboard Protocol not supported!"]
@@ -185,9 +185,9 @@ class MouseModeManager:
         self.report_pixels: bool = False
         self.mode_names = ['drag', 'motion', 'pixels']
 
-    def probe(self, timeout: float = 1.0) -> List[str]:
+    def probe(self) -> List[str]:
         """Probe terminal for mouse support and return log messages."""
-        self.supported = self.term.does_mouse(timeout=timeout)
+        self.supported = self.term.does_mouse()
         if self.supported:
             return ["Mouse support detected!"]
         return ["Mouse support not available!"]
@@ -400,13 +400,13 @@ def main():
 
     # Probe terminal capabilities
     dec_manager = DecModeManager(term, test_modes)
-    formatted_events.extend(dec_manager.probe(timeout=1.0))
+    formatted_events.extend(dec_manager.probe())
 
     kitty_manager = KittyKeyboardManager(term)
-    formatted_events.extend(kitty_manager.probe(timeout=1.0))
+    formatted_events.extend(kitty_manager.probe())
 
     mouse_manager = MouseModeManager(term)
-    formatted_events.extend(mouse_manager.probe(timeout=1.0))
+    formatted_events.extend(mouse_manager.probe())
 
     # Ensure clean input state
     inp = term.flushinp(0.1)

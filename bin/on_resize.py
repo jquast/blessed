@@ -11,8 +11,8 @@ def on_resize():
           end='', flush=True)
 
 
-if not term.does_inband_resize(timeout=0.5):
-    print('IN_BAND_WINDOW_RESIZE not supported on this terminal')
+if not term.does_inband_resize():
+    print('In-band Window Resize not supported on this terminal')
     import sys
     if sys.platform != 'win32':
         import signal
@@ -20,6 +20,8 @@ if not term.does_inband_resize(timeout=0.5):
         def _on_resize(*args):
             on_resize()
         signal.signal(signal.SIGWINCH, _on_resize)
+    else:
+        print('Resizing not supported on this platform')
 
 with term.cbreak(), term.notify_on_resize():
     print("press 'q' to quit.")

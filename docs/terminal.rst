@@ -110,15 +110,13 @@ applications to display inline images directly in the terminal.
 You can check whether your terminal supports sixel graphics using the
 :meth:`~.Terminal.does_sixel` method:
 
-    >>> if term.does_sixel(timeout=1.0):
+    >>> if term.does_sixel():
     ...     display_sixel_image()
     ... else:
     ...     display_text_fallback()
 
-.. note:: Always specify a ``timeout`` argument (e.g., ``1.0`` seconds) when calling
-    :meth:`~.Terminal.does_sixel` to avoid blocking indefinitely. This is especially
-    important in CI/build environments or non-interactive contexts where the terminal
-    may not respond to capability queries.
+Default ``timeout`` argument of 1 second is used to avoid blocking indefinitely
+when the terminal fails to respond to DA1 queries.
 
 Terminal Software Version
 -------------------------

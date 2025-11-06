@@ -2,6 +2,9 @@
 
 Version History
 ===============
+*next*
+  * bugfix: default argument ``timeout=None`` to ``timeout=1`` in methods
+    for automatic response, preventing stall on "dumb" terminals :ghpull:`317`
 
 1.23
   * introduced: Environment values FORCE_COLOR_, CLICOLOR_FORCE_, and NO_COLOR_ overrides

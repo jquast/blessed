@@ -840,7 +840,7 @@ class Terminal():
         match = self._query_response('\x1b]11;?\x07', RE_GET_BGCOLOR_RESPONSE, timeout)
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
 
-    def get_device_attributes(self, timeout: Optional[float] = None,
+    def get_device_attributes(self, timeout: Optional[float] = 1,
                               force: bool = False) -> Optional[DeviceAttribute]:
         """
         Query the terminal's Device Attributes (DA1).
@@ -901,7 +901,7 @@ class Terminal():
 
         return result
 
-    def get_software_version(self, timeout: Optional[float] = None,
+    def get_software_version(self, timeout: Optional[float] = 1,
                              force: bool = False) -> Optional[SoftwareVersion]:
         """
         Query the terminal's software name and version using XTVERSION.
@@ -956,7 +956,7 @@ class Terminal():
         self._software_version_cache = SoftwareVersion.from_match(match)
         return self._software_version_cache
 
-    def does_sixel(self, timeout: Optional[float] = 1.0, force: bool = False) -> bool:
+    def does_sixel(self, timeout: Optional[float] = 1, force: bool = False) -> bool:
         """
         Query whether the terminal supports sixel graphics.
 
@@ -1078,7 +1078,7 @@ class Terminal():
 
     @contextlib.contextmanager
     def dec_modes_enabled(self, *modes: Union[int, _DecPrivateMode],
-                          timeout: Optional[float] = None) -> Generator[None, None, None]:
+                          timeout: Optional[float] = 1) -> Generator[None, None, None]:
         """
         Context manager for temporarily enabling DEC Private Modes.
 
@@ -1129,7 +1129,7 @@ class Terminal():
 
     @contextlib.contextmanager
     def dec_modes_disabled(self, *modes: Union[int, _DecPrivateMode],
-                           timeout: Optional[float] = None) -> Generator[None, None, None]:
+                           timeout: Optional[float] = 1) -> Generator[None, None, None]:
         """
         Context manager for temporarily disabling DEC Private Modes.
 
@@ -1452,7 +1452,7 @@ class Terminal():
         for mode_num in mode_numbers:
             self._dec_mode_cache[mode_num] = DecModeResponse.RESET
 
-    def get_sixel_height_and_width(self, timeout: Optional[float] = 1.0,
+    def get_sixel_height_and_width(self, timeout: Optional[float] = 1,
                                    force: bool = False) -> Tuple[int, int]:
         # pylint: disable=too-many-return-statements
         """
@@ -1513,7 +1513,7 @@ class Terminal():
             return result
         return self._xtwinops_cache
 
-    def get_sixel_colors(self, timeout: Optional[float] = 1.0,
+    def get_sixel_colors(self, timeout: Optional[float] = 1,
                          force: bool = False) -> int:
         """
         Query number of sixel color registers (XTSMGRAPHICS).
@@ -1551,7 +1551,7 @@ class Terminal():
 
         return self._xtsmgraphics_colors_cache
 
-    def get_cell_height_and_width(self, timeout: Optional[float] = 1.0,
+    def get_cell_height_and_width(self, timeout: Optional[float] = 1,
                                   force: bool = False) -> Tuple[int, int]:
         """
         Query character cell pixel dimensions (XTWINOPS).
@@ -1627,7 +1627,7 @@ class Terminal():
 
         return int(match.group(1))
 
-    def get_kitty_keyboard_state(self, timeout: Optional[float] = None,
+    def get_kitty_keyboard_state(self, timeout: Optional[float] = 1,
                                  force: bool = False) -> Optional[KittyKeyboardProtocol]:
         """
         Query the current Kitty keyboard protocol flags.
@@ -1754,7 +1754,7 @@ class Terminal():
     def enable_kitty_keyboard(self, *, disambiguate: bool = True, report_events: bool = False,
                               report_alternates: bool = False, report_all_keys: bool = False,
                               report_text: bool = False, mode: int = 1,
-                              timeout: Optional[float] = None,
+                              timeout: Optional[float] = 1,
                               force: bool = False) -> Generator[None, None, None]:
         """
         Context manager that enables Kitty keyboard protocol features.

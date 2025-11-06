@@ -36,7 +36,7 @@ normally even on terminals that don't support specific features.
 Timeout Behavior
 ----------------
 
-All DEC mode context managers use a default timeout of 1 second when querying
+All DEC mode context managers use a default ``timeout`` of 1 second when querying
 mode support. This timeout is designed to handle "dumb" terminals that don't
 support DEC mode queries and won't respond.
 
@@ -82,8 +82,9 @@ application to different terminal capabilities:
    :language: python
    :linenos:
 
-Here, a 1-second ``timeout`` value is used. If a Terminal fails to respond in
-this amount of time, the special property ``failed`` becomes True.
+The ``timeout`` value is unspecified and defaults to 1 second. If a Terminal
+fails to respond in this amount of time, the special property ``failed`` becomes
+``True``.
 
 The :class:`~blessed.dec_modes.DecModeResponse` object provides helper properties:
 
@@ -108,7 +109,7 @@ The recommended way to work with modes is through context managers:
 
 These context managers:
 
-1. Query the Terminal's support for a mode with optional timeout
+1. Query the Terminal's support for a mode within given timeout
 2. Change the mode if allowed by negotiation
 3. Restore the original state on exit if changed
 4. Handle unsupported modes gracefully
