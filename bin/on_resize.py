@@ -1,34 +1,47 @@
 #!/usr/bin/env python
+import threading
 from blessed import Terminal
 
 term = Terminal()
 
+_resize_pending = threading.Event()
 
-def on_resize():
+
+def on_resize(*args):
+    _resize_pending.set()
+
+
+def display_size(term):
+    # conditionally refresh sixel size when enabled
+    sixel_height, sixel_width = 0, 0
+    if term.does_sixel():
+        sixel_height, sixel_width = term.get_sixel_height_and_width(force=True)
     print()
     print(f'height={term.height}, width={term.width}, ' +
-          f'pixel_height={term.pixel_height}, pixel_width={term.pixel_width}',
+          f'pixel_height={term.pixel_height}, pixel_width={term.pixel_width}, ' +
+          f'sixel_height={sixel_height}, sixel_width={sixel_width}',
           end='', flush=True)
 
 
-if not term.does_inband_resize(timeout=0.5):
+if not term.does_inband_resize():
     print('IN_BAND_WINDOW_RESIZE not supported on this terminal')
     import sys
     if sys.platform != 'win32':
         import signal
-
-        def _on_resize(*args):
-            on_resize()
-        signal.signal(signal.SIGWINCH, _on_resize)
+        signal.signal(signal.SIGWINCH, on_resize)
 
 with term.cbreak(), term.notify_on_resize():
     print("press 'q' to quit.")
-    # display initial size
-    on_resize()
+    display_size(term)
+
     while True:
-        inp = term.inkey()
+        inp = term.inkey(timeout=0.1)
+
         if inp == 'q':
             break
-        # capture in-band resize events
+
         if inp.name == 'RESIZE_EVENT':
-            on_resize()
+            _resize_pending.set()
+        elif _resize_pending.is_set():
+            _resize_pending.clear()
+            display_size(term)

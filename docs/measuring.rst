@@ -97,14 +97,44 @@ This method is preferred because it:
 - Delivers resize events in-band with other input
 - Automatically caches dimensions for fast access
 
-Complete example with fallback
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Combined with signals
+~~~~~~~~~~~~~~~~~~~~~
 
 The following example demonstrates checking for support, using in-band resize notifications when
-available, and falling back to SIGWINCH on Unix systems:
+available, but **falling back to SIGWINCH on Unix systems**:
 
 .. literalinclude:: ../bin/on_resize.py
    :language: python
+
+Make note of these designs:
+
+1. **Signal handlers only set a flag**: The ``on_resize()`` signal handler only calls
+   ``_resize_pending.set()`` and does nothing else. Signal handlers should never
+   perform I/O operations, terminal queries, or other complex work, because
+   these callbacks can occur *at any time* in your code, even part-way through
+   drawing, for example.
+
+2. **Main loop processes events**: The main event loop checks if
+   ``_resize_pending.is_set()`` periodically, every 100ms by timed input delay,
+   ``inkey(timeout=0.1)`` to aides with debouncing.
+
+3. **Signal debouncing**: When signals are received, ``_resize_pending.set()``
+   is set, and main loop displays only one size notification for any number
+   of signals received within 100ms.
+
+4. **Input debouncing**: When input is received through
+   :meth:`~.Terminal.inkey` method as ``RESIZE_EVENT``` for terminals supporting
+   :meth:`~Terminal.notify_on_resize`, a pending event is set but it is not
+   immediately processed -- another 100ms delay is incurred, effectively
+   de-bouncing rapidly received resize events, there.
+
+This pattern avoids race conditions. Although Python's GIL may provide some
+protection, signal handlers can still interrupt code at inconvenient times, and
+doing complex work in handlers can lead to subtle bugs.
+
+Note the use of ``force=True`` when calling :meth:`~.Terminal.get_sixel_height_and_width`, the
+return value is cached, so ``force=True`` ensures updated dimensions are retrieved after a resize
+event. See :doc:`sixel` for more on caching behavior.
 
 SIGWINCH (fallback for older terminals)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
