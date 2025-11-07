@@ -196,3 +196,41 @@ def test_greedy_join_with_cojoining():
         assert result == ['ca', 'fe\u0301', '-l', 'at', 'te']
 
     child()
+
+
+def test_placeholder():
+    """ENsure placeholder behavior matches stdlib"""
+
+    @as_subprocess
+    def child():
+        term = TestTerminal()
+        text = 'The quick brown fox jumps over the lazy dog'
+        kwargs = {'width': 1, 'max_lines': 3, 'placeholder': '...'}
+
+        try:
+            textwrap.wrap(text, **kwargs)
+        except Exception as e:
+            stdlib_exc = e
+        else:
+            stdlib_exc = None
+
+        with pytest.raises(stdlib_exc.__class__) as exc:
+            term.wrap(text, **kwargs)
+        assert exc.value.args == stdlib_exc.args
+
+        kwargs = {'width': 10, 'max_lines': 3, 'placeholder': '...'}
+        assert term.wrap(text, **kwargs) == textwrap.wrap(text, **kwargs)
+
+        text = '1234567890 1234567890 extra'
+        kwargs = {'width': 10, 'max_lines': 2, 'placeholder': '...'}
+        assert term.wrap(text, **kwargs) == textwrap.wrap(text, **kwargs)
+
+        text = '1234567890 1234567890'
+        kwargs = {'width': 10, 'max_lines': 1, 'placeholder': '...'}
+        assert term.wrap(text, **kwargs) == textwrap.wrap(text, **kwargs)
+
+        text = 'short 1234567890 extra'
+        kwargs = {'width': 10, 'max_lines': 2, 'placeholder': '...'}
+        assert term.wrap(text, **kwargs) == textwrap.wrap(text, **kwargs)
+
+    child()
