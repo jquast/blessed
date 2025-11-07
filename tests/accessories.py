@@ -330,7 +330,9 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
     if test_name is None:
         test_name = getattr(child_func, '__name__', 'pty_test')
 
-    pid, master_fd = pty_module.fork()
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        pid, master_fd = pty.fork()  # pylint: disable=possibly-used-before-assignment
 
     # Set PTY window size in parent before child starts reading
     if pid != 0:
