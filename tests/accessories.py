@@ -317,7 +317,9 @@ def pty_test(child_func, parent_func=None, test_name=None):
     if test_name is None:
         test_name = getattr(child_func, '__name__', 'pty_test')
 
-    pid, master_fd = pty_module.fork()
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        pid, master_fd = pty.fork()  # pylint: disable=possibly-used-before-assignment
 
     if pid == 0:  # Child process
         cov = init_subproc_coverage(test_name)
