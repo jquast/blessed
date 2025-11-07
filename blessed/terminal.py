@@ -79,7 +79,7 @@ else:
         warnings.warn(_MSG_NOSUPPORT)
         HAS_TTY = False  # pylint: disable=invalid-name
 
-_CUR_TERM = None  # See comments at end of file pylint: disable=invalid-name
+_CUR_TERM = None  # See comments at end of file
 RE_GET_FGCOLOR_RESPONSE = re.compile(
     '\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
 RE_GET_BGCOLOR_RESPONSE = re.compile(
@@ -1454,7 +1454,6 @@ class Terminal():
 
     def get_sixel_height_and_width(self, timeout: Optional[float] = 1.0,
                                    force: bool = False) -> Tuple[int, int]:
-        # pylint: disable=too-many-return-statements
         """
         Query sixel graphics pixel dimensions.
 

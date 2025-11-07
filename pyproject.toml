@@ -108,7 +108,7 @@ max-locals = 15
 max-module-lines = 2000
 max-parents = 7
 max-public-methods = 20
-max-returns = 6
+max-returns = 7
 max-statements = 50
 
 [tool.pylint.similarities]

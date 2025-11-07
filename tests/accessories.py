@@ -275,7 +275,7 @@ def unicode_parm(cap, *parms):
     return ''
 
 
-def pty_test(child_func, parent_func=None, test_name=None):
+def pty_test(child_func, parent_func=None, test_name=None):  # pylint: disable=too-many-statements
     """
     Wrapper for PTY-based tests to reduce boilerplate.
 
@@ -312,14 +312,12 @@ def pty_test(child_func, parent_func=None, test_name=None):
         result = child_func(term)
         return result.decode('utf-8') if isinstance(result, bytes) else (result or '')
 
-    import pty as pty_module  # pylint: disable=import-outside-toplevel
-
     if test_name is None:
         test_name = getattr(child_func, '__name__', 'pty_test')
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=DeprecationWarning)
-        pid, master_fd = pty.fork()  # pylint: disable=possibly-used-before-assignment
+        pid, master_fd = pty.fork()
 
     if pid == 0:  # Child process
         cov = init_subproc_coverage(test_name)
