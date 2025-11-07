@@ -325,8 +325,6 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
         result = child_func(term)
         return result.decode('utf-8') if isinstance(result, bytes) else (result or '')
 
-    import pty as pty_module  # pylint: disable=import-outside-toplevel
-
     if test_name is None:
         test_name = getattr(child_func, '__name__', 'pty_test')
 

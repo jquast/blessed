@@ -209,7 +209,7 @@ def test_placeholder():
 
         try:
             textwrap.wrap(text, **kwargs)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             stdlib_exc = e
         else:
             stdlib_exc = None
