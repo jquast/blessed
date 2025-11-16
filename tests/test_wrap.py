@@ -80,7 +80,7 @@ def test_SequenceWrapper(many_columns, kwargs):
         # https://github.com/python/cpython/issues/140627
         if (
             kwargs.get('drop_whitespace') and
-            sys.version_info[:2] < (3, 16) and
+            sys.version_info[:2] < (3, 15) and
             not internal_wrapped[0].strip()
         ):
             internal_wrapped = internal_wrapped[1:]
