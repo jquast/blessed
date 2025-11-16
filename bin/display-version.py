@@ -6,7 +6,7 @@ term = Terminal()
 
 print('Checking software version (XTVERSION) ...', end='', flush=True)
 
-sv = term.get_software_version(timeout=1.0)
+sv = term.get_software_version()
 
 if sv is None:
     print('No response.')
