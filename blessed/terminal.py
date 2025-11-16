@@ -263,7 +263,7 @@ class Terminal():
         self._xtwinops_cache: Optional[Tuple[int, int]] = None
         # Cache for get_sixel_colors() - stores color count or -1
         self._xtsmgraphics_colors_cache: Optional[int] = None
-        # Cache for get_cell_pixel_height_and_width() - (height, width) or (-1, -1)
+        # Cache for get_cell_height_and_width() - (height, width) or (-1, -1)
         self._xtwinops_cell_cache: Optional[Tuple[int, int]] = None
 
         # Cache for in-band resize notifications (mode 2048)
@@ -1457,7 +1457,7 @@ class Terminal():
         for mode_num in mode_numbers:
             self._dec_mode_cache[mode_num] = DecModeResponse.RESET
 
-    def get_cell_pixel_height_and_width(self, timeout: Optional[float] = 1.0,
+    def get_cell_height_and_width(self, timeout: Optional[float] = 1.0,
                                         force: bool = False) -> Tuple[int, int]:
         """
         Query character cell pixel dimensions (XTWINOPS).
@@ -1519,7 +1519,7 @@ class Terminal():
         elif self._xtwinops_cell_cache is not None and not force:
             cell_result = self._xtwinops_cell_cache
         else:
-            cell_result = self.get_cell_pixel_height_and_width(third_timeout, force)
+            cell_result = self.get_cell_height_and_width(third_timeout, force)
         if cell_result != (-1, -1):
             cell_height, cell_width = cell_result
             return (cell_height * self.height, cell_width * self.width)

@@ -56,13 +56,13 @@ Cell Dimensions
 ---------------
 
 Get the pixel dimensions of a single character cell using
-:meth:`~Terminal.get_cell_pixel_height_and_width`:
+:meth:`~Terminal.get_cell_height_and_width`:
 
 .. code-block:: python
 
     term = Terminal()
 
-    cell_height, cell_width = term.get_cell_pixel_height_and_width()
+    cell_height, cell_width = term.get_cell_height_and_width()
     if (cell_height, cell_width) != (-1, -1):
         print(f"Character cell size: {cell_width}x{cell_height} pixels")
         # Useful for pixel-perfect positioning of graphics

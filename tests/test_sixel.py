@@ -85,51 +85,51 @@ def test_does_sixel_not_a_tty():
     child()
 
 
-def test_get_cell_pixel_height_and_width_success():
-    """get_cell_pixel_height_and_width returns expected tuple with valid response."""
+def test_get_cell_height_and_width_success():
+    """get_cell_height_and_width returns expected tuple with valid response."""
     def child(term):
         term.ungetch('\x1b[6;16;8t')
-        result = term.get_cell_pixel_height_and_width(timeout=0.01)
+        result = term.get_cell_height_and_width(timeout=0.01)
         assert isinstance(result, tuple)
         assert len(result) == 2
         assert result == (16, 8)
         return b'OK'
 
     output = pty_test(child, parent_func=None,
-                      test_name='test_get_cell_pixel_height_and_width_success')
+                      test_name='test_get_cell_height_and_width_success')
     assert 'OK' in output
 
 
-def test_get_cell_pixel_height_and_width_timeout():
-    """get_cell_pixel_height_and_width returns (-1, -1) on timeout."""
+def test_get_cell_height_and_width_timeout():
+    """get_cell_height_and_width returns (-1, -1) on timeout."""
     def child(term):
-        result = term.get_cell_pixel_height_and_width(timeout=0.01)
+        result = term.get_cell_height_and_width(timeout=0.01)
         assert isinstance(result, tuple)
         assert len(result) == 2
         assert result == (-1, -1)
         return b'OK'
 
     output = pty_test(child, parent_func=None,
-                      test_name='test_get_cell_pixel_height_and_width_timeout')
+                      test_name='test_get_cell_height_and_width_timeout')
     assert 'OK' in output
 
 
-def test_get_cell_pixel_height_and_width_caching():
-    """get_cell_pixel_height_and_width caches results unless force=True."""
+def test_get_cell_height_and_width_caching():
+    """get_cell_height_and_width caches results unless force=True."""
     def child(term):
         term.ungetch('\x1b[6;20;10t')
-        result1 = term.get_cell_pixel_height_and_width(timeout=0.01)
+        result1 = term.get_cell_height_and_width(timeout=0.01)
         assert result1 == (20, 10)
 
-        result2 = term.get_cell_pixel_height_and_width(timeout=0.01)
+        result2 = term.get_cell_height_and_width(timeout=0.01)
         assert result2 == (20, 10)
 
-        result3 = term.get_cell_pixel_height_and_width(timeout=0.01, force=True)
+        result3 = term.get_cell_height_and_width(timeout=0.01, force=True)
         assert result3 == (-1, -1)
         return b'OK'
 
     output = pty_test(child, parent_func=None,
-                      test_name='test_get_cell_pixel_height_and_width_caching')
+                      test_name='test_get_cell_height_and_width_caching')
     assert 'OK' in output
 
 
