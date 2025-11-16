@@ -43,17 +43,26 @@ The returned dimensions represent the maximum height and width in pixels for
 sixel graphics rendering. If the query times out or fails, ``(-1, -1)`` is
 returned.
 
+.. note::
+
+   The sixel area dimensions may differ from window pixel dimensions reported
+   by :attr:`~.Terminal.pixel_height` and :attr:`~.Terminal.pixel_width`.
+
+   Window pixel dimensions from :attr:`~.Terminal.pixel_height` and
+   :attr:`~.Terminal.pixel_width` may include margins and window decorations,
+   reporting values too large to contain an image.
+
 Cell Dimensions
 ---------------
 
 Get the pixel dimensions of a single character cell using
-:meth:`~Terminal.get_cell_pixel_height_and_width`:
+:meth:`~Terminal.get_cell_height_and_width`:
 
 .. code-block:: python
 
     term = Terminal()
 
-    cell_height, cell_width = term.get_cell_pixel_height_and_width()
+    cell_height, cell_width = term.get_cell_height_and_width()
     if (cell_height, cell_width) != (-1, -1):
         print(f"Character cell size: {cell_width}x{cell_height} pixels")
         # Useful for pixel-perfect positioning of graphics
@@ -97,8 +106,9 @@ received, that value is cached and always returned without further query unless
 
 When In-band resizing is used, the return values are updated automatically.
 
-Any method used to determine window size changes can be used to "force" a new
-lookup and bypassing the cache:
+Bypassing the cache with ``force=True`` is recommended when window dimensions
+change, such as when handling resize events. This ensures that sixel graphics
+dimensions are re-queried to reflect the new terminal size:
 
 .. code-block:: python
 
@@ -112,8 +122,19 @@ lookup and bypassing the cache:
     height2, width2 = term.get_sixel_height_and_width()
     assert width2, height2 == width1, height2
 
-    # Force a fresh inquiry,
-    height, width = term.get_sixel_height_and_width(force=True)
+.. note::
+
+   When handling window resize events (via :meth:`~.Terminal.notify_on_resize`
+   or SIGWINCH), use ``force=True`` to **re-query** sixel dimensions, avoiding
+   the last known cached value:
+
+   .. code-block:: python
+
+       def on_resize(term):
+           # Re-query sixel dimensions after resize
+           height, width = term.get_sixel_height_and_width(force=True)
+
+   See :doc:`measuring` for a complete example.
 
 
 Complete Workflow

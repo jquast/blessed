@@ -89,7 +89,7 @@ We can determine the cursor's current position at anytime using
 coordinates ``(-1, -1)`` if no response was received in time.
 
 This uses a kind of "answer back" sequence that *all* terminal emulators
-automatically respond to. 
+automatically respond to.
 
     >>> term.get_location()
     (32, 0)

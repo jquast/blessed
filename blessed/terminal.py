@@ -985,7 +985,7 @@ class Terminal():
         return da.supports_sixel if da is not None else False
 
     def get_dec_mode(self, mode: Union[int, _DecPrivateMode],
-                     timeout: float = 1.0, force: bool = False) -> DecModeResponse:
+                     timeout: float = 1, force: bool = False) -> DecModeResponse:
         """
         Query the state of a DEC Private Mode (DECRQM).
 
@@ -1459,64 +1459,87 @@ class Terminal():
 
     def get_sixel_height_and_width(self, timeout: Optional[float] = 1,
                                    force: bool = False) -> Tuple[int, int]:
-        # pylint: disable=too-many-return-statements
+        # pylint: disable=too-complex,too-many-branches
         """
         Query sixel graphics pixel dimensions.
 
         Returns the maximum height and width in pixels for sixel graphics
-        rendering. Tries XTSMGRAPHICS first, then validates or falls back to
-        XTWINOPS window size query if the terminal doesn't support XTSMGRAPHICS
-        or reports unrealistic dimensions.
+        rendering. Detection order (from most to least reliable):
+
+        1. XTWINOPS 16t (CSI 16 t) - Character cell size, multiplied by rows/cols
+        2. XTWINOPS 14t (CSI 14 t) - Text area size in pixels
+        3. XTSMGRAPHICS - Sixel graphics query
+        4. TIOCSWINSZ / In-band resize - System ioctl / event pixel dimensions
+
+        The cell-based calculation (method 1) is preferred because it accounts
+        for the actual drawable text area, excluding window margins and
+        decorations.
 
         When :attr:`is_a_tty` is False, no sequences are transmitted or response
         awaited, and ``(-1, -1)`` is returned without inquiry.
 
-        :arg float timeout: Timeout in seconds for both possible queries
+        :arg float timeout: Timeout in seconds for queries
         :arg bool force: Bypass cache and re-query the terminal
         :rtype: tuple
         :returns: ``(height, width)`` in pixels, or ``(-1, -1)`` if unsupported/timeout
         """
-        # Use preferred size cache from in-band resize notifications if available
-        # (unless force=True which requires re-querying)
+        # Try methods in order of reliability, as suggested by @j4james,
+        # https://github.com/pexpect/ptyprocess/issues/79#issuecomment-3498498155
+        # Split timeout evenly across the 3 query methods (16t, 14t, XTSMGRAPHICS)
+        # for the worst-case scenario that all three methods timeout.
+        third_timeout = timeout / 3 if timeout is not None else None
+
+        # 1. Try XTWINOPS 16t (character cell size) - most accurate
+        # Sticky failure: don't re-query if previously failed, unless force=True
+        if self._xtwinops_cell_cache == (-1, -1) and not force:
+            cell_result = (-1, -1)
+        elif self._xtwinops_cell_cache is not None and not force:
+            cell_result = self._xtwinops_cell_cache
+        else:
+            cell_result = self.get_cell_height_and_width(third_timeout, force)
+        if cell_result != (-1, -1):
+            cell_height, cell_width = cell_result
+            return (cell_height * self.height, cell_width * self.width)
+
+        # 2. Try XTWINOPS 14t (text area size) - widely supported
+        # Sticky failure: don't re-query if previously failed, unless force=True
+        if self._xtwinops_cache == (-1, -1) and not force:
+            result = (-1, -1)
+        elif self._xtwinops_cache is not None and not force:
+            result = self._xtwinops_cache
+        else:
+            result = self._xtwinops_cache = self._get_xtwinops_window_size(third_timeout)
+        if result != (-1, -1):
+            return result
+
+        # 3. Try XTSMGRAPHICS - sixel-specific query
+        # Sticky failure: don't re-query if previously failed, unless force=True
+        if self._xtsmgraphics_cache == (-1, -1) and not force:
+            result = (-1, -1)
+        elif self._xtsmgraphics_cache is not None and not force:
+            result = self._xtsmgraphics_cache
+        else:
+            result = self._xtsmgraphics_cache = self._get_xtsmgraphics(third_timeout)
+        if result != (-1, -1):
+            return result
+
+        # 4. Try TIOCSWINSZ pixel dimensions or cached in-band resize dimensions
+        # Check preferred size cache (from in-band resize notifications) if available
         if not force and self._preferred_size_cache is not None:
-            # Extract pixel dimensions from preferred cache
-            # Return them if they're non-zero (terminal supports pixel reporting)
             if (self._preferred_size_cache.ws_ypixel and
                     self._preferred_size_cache.ws_xpixel):
                 return (self._preferred_size_cache.ws_ypixel,
                         self._preferred_size_cache.ws_xpixel)
 
-        # Fast path: if both caches are populated (unless force=True), compute result from caches
-        if not force and self._xtsmgraphics_cache is not None and self._xtwinops_cache is not None:
-            # If XTSMGRAPHICS succeeded, use it
-            if self._xtsmgraphics_cache != (-1, -1):
-                return self._xtsmgraphics_cache
-            # Otherwise use XTWINOPS (even if it's (-1, -1))
-            return self._xtwinops_cache
+        # Fallback to direct TIOCSWINSZ query
+        if self.is_a_tty:
+            winsize = self._height_and_width()
+            if (0 < winsize.ws_ypixel <= 32000 and
+                    0 < winsize.ws_xpixel <= 32000):
+                return (winsize.ws_ypixel, winsize.ws_xpixel)
 
-        # Try XTSMGRAPHICS first (unless it previously failed - sticky failure at (-1, -1))
-        # Even with force=True, skip XTSMGRAPHICS if it previously failed to avoid wasting timeout
-        stime = time.time()
-        if self._xtsmgraphics_cache is None or (force and self._xtsmgraphics_cache != (-1, -1)):
-            # Use half of remaining timeout, saving the other for XTWINOPS fallback
-            half_timeout = timeout / 2 if timeout is not None else None
-            result = self._get_xtsmgraphics(half_timeout)
-            self._xtsmgraphics_cache = result
-            # If XTSMGRAPHICS succeeded, use it
-            if result != (-1, -1):
-                return result
-        elif self._xtsmgraphics_cache != (-1, -1):
-            # Cache hit with successful value (not force mode)
-            return self._xtsmgraphics_cache
-
-        # Fallback to XTWINOPS window pixel dimensions when:
-        # - XTSMGRAPHICS previously failed (sticky failure)
-        # - XTSMGRAPHICS just failed, using remaining time left
-        if force or self._xtwinops_cache is None:
-            result = self._get_xtwinops_window_size(_time_left(stime, timeout))
-            self._xtwinops_cache = result
-            return result
-        return self._xtwinops_cache
+        # All methods failed
+        return (-1, -1)
 
     def get_sixel_colors(self, timeout: Optional[float] = 1,
                          force: bool = False) -> int:

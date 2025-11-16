@@ -292,6 +292,7 @@ class Keystroke(str):
 
         Returns name like 'KEY_CTRL_ALT_A', 'KEY_ALT_SHIFT_5', 'KEY_CTRL_J_RELEASED', etc.
         """
+        # pylint: disable=too-many-return-statements
         if self._mode != DecPrivateMode.SpecialInternalKitty:
             return None
 
@@ -886,6 +887,7 @@ class Keystroke(str):
         Handles Alt+printable, Alt-only special keys, and Ctrl+Alt sequences. Returns the base
         character or empty string for application keys.
         """
+        # pylint: disable=too-many-return-statements
         if not self._is_escape_sequence():
             return None
 
