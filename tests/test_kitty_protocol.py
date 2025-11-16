@@ -1493,21 +1493,21 @@ def test_kitty_keyboard_protocol_equality_with_protocol():
     proto2 = KittyKeyboardProtocol(15)
     proto3 = KittyKeyboardProtocol(7)
     assert proto1 == proto2
-    assert not (proto1 == proto3)
+    assert proto1 != proto3
 
 
 def test_kitty_keyboard_protocol_equality_with_int():
     """Test __eq__ with int values."""
     protocol = KittyKeyboardProtocol(15)
     assert protocol == 15
-    assert not (protocol == 7)
+    assert protocol != 7
 
 
 def test_kitty_keyboard_protocol_equality_with_other_types():
     """Test __eq__ with types that are neither KittyKeyboardProtocol nor int."""
     protocol = KittyKeyboardProtocol(15)
-    assert not (protocol == "15")
-    assert not (protocol == 15.0)
-    assert not (protocol == None)
-    assert not (protocol == [15])
-    assert not (protocol == {'value': 15})
+    assert protocol != "15"
+    assert protocol != 15.0
+    assert protocol is not None
+    assert protocol != [15]
+    assert protocol != {'value': 15}
