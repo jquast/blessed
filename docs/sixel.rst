@@ -122,9 +122,6 @@ dimensions are re-queried to reflect the new terminal size:
     height2, width2 = term.get_sixel_height_and_width()
     assert width2, height2 == width1, height2
 
-    # Force a fresh inquiry,
-    height, width = term.get_sixel_height_and_width(force=True)
-
 .. note::
 
    When handling window resize events (via :meth:`~.Terminal.notify_on_resize`
