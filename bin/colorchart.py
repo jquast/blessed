@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Utility to show X11 colors in 24-bit and downconverted to 256, 16, and 8 colors.
 
@@ -45,7 +44,7 @@ def draw_chart(term):
         chart = ''
         for noc in (1 << 24, 256, 16, 8):
             term.number_of_colors = noc
-            chart += getattr(term, color[1])(u'█')
+            chart += getattr(term, color[1])('█')
 
         if line_len + 5 > width:
             line += '\n'
