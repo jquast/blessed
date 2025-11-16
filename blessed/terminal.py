@@ -985,7 +985,7 @@ class Terminal():
         return da.supports_sixel if da is not None else False
 
     def get_dec_mode(self, mode: Union[int, _DecPrivateMode],
-                     timeout: float = 1.0, force: bool = False) -> DecModeResponse:
+                     timeout: float = 1, force: bool = False) -> DecModeResponse:
         """
         Query the state of a DEC Private Mode (DECRQM).
 
@@ -1457,29 +1457,6 @@ class Terminal():
         for mode_num in mode_numbers:
             self._dec_mode_cache[mode_num] = DecModeResponse.RESET
 
-    def get_cell_height_and_width(self, timeout: Optional[float] = 1.0,
-                                        force: bool = False) -> Tuple[int, int]:
-        """
-        Query character cell pixel dimensions (XTWINOPS).
-
-        Returns the height and width in pixels of a single character cell.
-
-        When :attr:`is_a_tty` is False, no sequences are transmitted or response
-        awaited, and ``(-1, -1)`` is returned without inquiry.
-
-        :arg float timeout: Timeout in seconds for the query
-        :arg float force: Bypass cache and re-query the terminal
-        :rtype: tuple
-        :returns: ``(height, width)`` in pixels, or ``(-1, -1)`` if unsupported/timeout
-        """
-        if self._xtwinops_cell_cache is not None and not force:
-            return self._xtwinops_cell_cache
-
-        result = self._get_xtwinops_cell_size(timeout)
-        self._xtwinops_cell_cache = result
-        return result
-
-
     def get_sixel_height_and_width(self, timeout: Optional[float] = 1,
                                    force: bool = False) -> Tuple[int, int]:
         # pylint: disable=too-many-return-statements
@@ -1601,6 +1578,28 @@ class Terminal():
                 self._xtsmgraphics_colors_cache = 256
 
         return self._xtsmgraphics_colors_cache
+
+    def get_cell_height_and_width(self, timeout: Optional[float] = 1,
+                                        force: bool = False) -> Tuple[int, int]:
+        """
+        Query character cell pixel dimensions (XTWINOPS).
+
+        Returns the height and width in pixels of a single character cell.
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response
+        awaited, and ``(-1, -1)`` is returned without inquiry.
+
+        :arg float timeout: Timeout in seconds for the query
+        :arg float force: Bypass cache and re-query the terminal
+        :rtype: tuple
+        :returns: ``(height, width)`` in pixels, or ``(-1, -1)`` if unsupported/timeout
+        """
+        if self._xtwinops_cell_cache is not None and not force:
+            return self._xtwinops_cell_cache
+
+        result = self._get_xtwinops_cell_size(timeout)
+        self._xtwinops_cell_cache = result
+        return result
 
     def _get_xtwinops_window_size(self, timeout: Optional[float]) -> Tuple[int, int]:
         # Query XTWINOPS 14t for window size: ESC[14t
