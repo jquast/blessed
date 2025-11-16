@@ -1580,7 +1580,7 @@ class Terminal():
         return self._xtsmgraphics_colors_cache
 
     def get_cell_height_and_width(self, timeout: Optional[float] = 1,
-                                        force: bool = False) -> Tuple[int, int]:
+                                  force: bool = False) -> Tuple[int, int]:
         """
         Query character cell pixel dimensions (XTWINOPS).
 
@@ -1590,7 +1590,7 @@ class Terminal():
         awaited, and ``(-1, -1)`` is returned without inquiry.
 
         :arg float timeout: Timeout in seconds for the query
-        :arg float force: Bypass cache and re-query the terminal
+        :arg bool force: Bypass cache and re-query the terminal
         :rtype: tuple
         :returns: ``(height, width)`` in pixels, or ``(-1, -1)`` if unsupported/timeout
         """
@@ -2730,3 +2730,15 @@ class WINSZ(collections.namedtuple('WINSZ', (
 #:    setupterm() for each terminal, and saving and restoring cur_term, it
 #:    is possible for a program to use two or more terminals at once."
 #:
+#: However, if you study Python's ``./Modules/_cursesmodule.c``, you'll find::
+#:
+#:   if (!initialised_setupterm && setupterm(termstr,fd,&err) == ERR) {
+#:
+#: Python - perhaps wrongly - will not allow for re-initialisation of new
+#: terminals through :func:`curses.setupterm`, so the value of cur_term cannot
+#: be changed once set: subsequent calls to :func:`curses.setupterm` have no
+#: effect.
+#:
+#: Therefore, the :attr:`Terminal.kind` of each :class:`Terminal` is
+#: essentially a singleton. This global variable reflects that, and a warning
+#: is emitted if somebody expects otherwise.
