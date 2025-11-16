@@ -681,13 +681,12 @@ def test_preferred_size_cache_with_partial_zero_pixels(ws_ypixel, ws_xpixel):
 
         # Since preferred_size_cache has partial zero, should fall through to TIOCSWINSZ
         # Mock TIOCSWINSZ to return valid dimensions
-        from blessed.terminal import WINSZ
         original_height_and_width = term._height_and_width
 
         def mock_height_and_width():
             orig = original_height_and_width()
             return WINSZ(ws_row=orig.ws_row, ws_col=orig.ws_col,
-                        ws_xpixel=1600, ws_ypixel=900)
+                         ws_xpixel=1600, ws_ypixel=900)
 
         term._height_and_width = mock_height_and_width
 
@@ -730,7 +729,7 @@ def test_tiocswinsz_path():
         def mock_height_and_width():
             orig = original_height_and_width()
             return WINSZ(ws_row=orig.ws_row, ws_col=orig.ws_col,
-                        ws_xpixel=1600, ws_ypixel=900)
+                         ws_xpixel=1600, ws_ypixel=900)
 
         term._height_and_width = mock_height_and_width
 
@@ -751,7 +750,7 @@ def test_tiocswinsz_invalid_dimensions():
         def mock_height_and_width():
             orig = original_height_and_width()
             return WINSZ(ws_row=orig.ws_row, ws_col=orig.ws_col,
-                        ws_xpixel=50000, ws_ypixel=0)  # Too large, zero
+                         ws_xpixel=50000, ws_ypixel=0)  # Too large, zero
 
         term._height_and_width = mock_height_and_width
 

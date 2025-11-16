@@ -314,7 +314,7 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
             assert output == 'x'
     """
     # pylint: disable=too-complex,too-many-branches,too-many-locals
-    # pylint: disable=missing-raises-doc,missing-type-doc
+    # pylint: disable=missing-raises-doc,missing-type-doc,too-many-statements
     if IS_WINDOWS:
         # On Windows, just run child_func directly without PTY
         term = TestTerminal()

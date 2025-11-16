@@ -1459,7 +1459,7 @@ class Terminal():
 
     def get_sixel_height_and_width(self, timeout: Optional[float] = 1,
                                    force: bool = False) -> Tuple[int, int]:
-        # pylint: disable=too-many-return-statements
+        # pylint: disable=too-complex,too-many-branches
         """
         Query sixel graphics pixel dimensions.
 

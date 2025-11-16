@@ -33,7 +33,6 @@ Example: '\x1b[?64;1;2;4c' = VT420 with 132-col, Printer, and Sixel support
 # std
 import time
 import io
-import re
 
 # 3rd party
 import pytest
