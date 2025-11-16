@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Module providing 'sequence awareness'."""
 # std imports
 import re
@@ -439,11 +438,16 @@ class Sequence(str):
             if self._term.caps_compiled.search(data) is None:
                 return str(data)
 
+            # pylint: disable-next=protected-access
+            caps = self._term._hdist_caps_named_compiled
+        else:
+            # pylint: disable-next=protected-access
+            caps = self._term._caps_named_compiled
+
         outp = ''
         last_end = 0
 
-        # pylint: disable-next=protected-access
-        for match in self._term._caps_named_compiled.finditer(data):
+        for match in caps.finditer(data):
 
             # Capture unmatched text between matched capabilities
             if match.start() > last_end:

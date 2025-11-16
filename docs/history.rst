@@ -3,8 +3,10 @@
 Version History
 ===============
 *next*
-  * Improve get_sixel_height_and_width and improve documentation on
-    window resize event handling :ghpull:`320`
+  * bugfix: get_sixel_height_and_width detection order and improve
+    documentation for window resize event handling :ghpull:`320`
+  * bugfix: default argument ``timeout=None`` to ``timeout=1`` in methods
+    for automatic response, preventing stall on "dumb" terminals :ghpull:`317`
 
 1.23
   * introduced: Environment values FORCE_COLOR_, CLICOLOR_FORCE_, and NO_COLOR_ overrides

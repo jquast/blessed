@@ -29,7 +29,6 @@ This is a simplified version of `resize.c
 <https://github.com/joejulian/xterm/blob/master/resize.c>`_ provided by the
 xterm package.
 """
-from __future__ import print_function
 
 # std imports
 import sys
@@ -78,8 +77,8 @@ def main():
             # existing environment values if it has to.
             lines, columns = term.height, term.width
 
-    print("COLUMNS={columns};\nLINES={lines};\nexport COLUMNS LINES;"
-          .format(columns=columns, lines=lines))
+    print(f"COLUMNS={columns};\nLINES={lines};\nexport COLUMNS LINES;"
+          )
 
 
 if __name__ == '__main__':

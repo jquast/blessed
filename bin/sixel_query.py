@@ -4,20 +4,20 @@ from blessed import Terminal
 term = Terminal()
 
 # Check for sixel support
-if not term.does_sixel(timeout=1.0):
+if not term.does_sixel():
     print("This terminal does not support sixel graphics")
 else:
     print("This terminal probably supports sixel graphics")
 
 # Get display dimensions
-height, width = term.get_sixel_height_and_width(timeout=1.0)
+height, width = term.get_sixel_height_and_width()
 if (height, width) == (-1, -1):
     print("Could not determine sixel dimensions")
 else:
     print(f"Sixel area: {width}x{height} (px)")
 
 # Get color support
-colors = term.get_sixel_colors(timeout=1.0)
+colors = term.get_sixel_colors()
 if colors == -1:
     print("Could not determine color support")
 else:

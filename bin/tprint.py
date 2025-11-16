@@ -7,7 +7,6 @@ For example:
 $ python tprint.py bold A rather bold statement.
 """
 # std
-from __future__ import print_function
 
 # std imports
 import argparse

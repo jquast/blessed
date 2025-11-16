@@ -69,7 +69,7 @@ notifications (DEC mode 2048):
 
     term = Terminal()
 
-    if term.does_inband_resize(timeout=0.5):
+    if term.does_inband_resize():
         print('In-band resize notifications are supported!')
     else:
         print('Falling back to SIGWINCH or polling')

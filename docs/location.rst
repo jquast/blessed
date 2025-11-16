@@ -84,11 +84,12 @@ it without any arguments at all to restore the cursor location:
 Finding The Cursor
 ------------------
 
-We can determine the cursor's current position at anytime using :meth:`~.get_location`.
+We can determine the cursor's current position at anytime using
+:meth:`~.get_location`. The default ``timeout`` value of 1 second will return
+coordinates ``(-1, -1)`` if no response was received in time.
 
-This uses a kind of "answer back" sequence that your terminal emulator responds to.  Because the
-terminal may not respond, or may take some time to respond, the :paramref:`~.get_location.timeout`
-keyword argument can be specified to return coordinates (-1, -1) after a blocking timeout:
+This uses a kind of "answer back" sequence that *all* terminal emulators
+automatically respond to. 
 
     >>> term.get_location()
     (32, 0)

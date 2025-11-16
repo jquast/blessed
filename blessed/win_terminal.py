@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
 """Module containing Windows version of :class:`Terminal`."""
 
-from __future__ import absolute_import
 
 # std imports
 import time

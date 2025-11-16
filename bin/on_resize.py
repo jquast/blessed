@@ -24,7 +24,7 @@ def display_size(term):
 
 
 if not term.does_inband_resize():
-    print('IN_BAND_WINDOW_RESIZE not supported on this terminal')
+    print('In-band Window Resize not supported on this terminal')
     import sys
     if sys.platform != 'win32':
         import signal

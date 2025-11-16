@@ -385,6 +385,11 @@ class Terminal():
             cap.pattern for cap in self.caps.values()
             if cap.name not in CAPABILITIES_HORIZONTAL_DISTANCE)
         )
+        # Used with padd() to iterate horizontal caps
+        self._hdist_caps_named_compiled = re.compile('|'.join(
+            cap.named_pattern for cap in self.caps.values()
+            if cap.name in CAPABILITIES_HORIZONTAL_DISTANCE)
+        )
         # for tokenizer, the '.lastgroup' is the primary lookup key for
         # 'self.caps', unless 'MISMATCH'; then it is an unmatched character.
         self._caps_compiled_any = re.compile(
@@ -615,7 +620,7 @@ class Terminal():
             try:
                 if fd is not None:
                     return self._winsize(fd)
-            except (IOError, OSError, ValueError, TypeError):  # pylint: disable=overlapping-except
+            except (OSError, ValueError, TypeError):
                 pass
 
         return WINSZ(ws_row=int(os.getenv('LINES', '25')),
@@ -840,7 +845,7 @@ class Terminal():
         match = self._query_response('\x1b]11;?\x07', RE_GET_BGCOLOR_RESPONSE, timeout)
         return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
 
-    def get_device_attributes(self, timeout: Optional[float] = None,
+    def get_device_attributes(self, timeout: Optional[float] = 1,
                               force: bool = False) -> Optional[DeviceAttribute]:
         """
         Query the terminal's Device Attributes (DA1).
@@ -901,7 +906,7 @@ class Terminal():
 
         return result
 
-    def get_software_version(self, timeout: Optional[float] = None,
+    def get_software_version(self, timeout: Optional[float] = 1,
                              force: bool = False) -> Optional[SoftwareVersion]:
         """
         Query the terminal's software name and version using XTVERSION.
@@ -956,7 +961,7 @@ class Terminal():
         self._software_version_cache = SoftwareVersion.from_match(match)
         return self._software_version_cache
 
-    def does_sixel(self, timeout: Optional[float] = 1.0, force: bool = False) -> bool:
+    def does_sixel(self, timeout: Optional[float] = 1, force: bool = False) -> bool:
         """
         Query whether the terminal supports sixel graphics.
 
@@ -1078,7 +1083,7 @@ class Terminal():
 
     @contextlib.contextmanager
     def dec_modes_enabled(self, *modes: Union[int, _DecPrivateMode],
-                          timeout: Optional[float] = None) -> Generator[None, None, None]:
+                          timeout: Optional[float] = 1) -> Generator[None, None, None]:
         """
         Context manager for temporarily enabling DEC Private Modes.
 
@@ -1129,7 +1134,7 @@ class Terminal():
 
     @contextlib.contextmanager
     def dec_modes_disabled(self, *modes: Union[int, _DecPrivateMode],
-                           timeout: Optional[float] = None) -> Generator[None, None, None]:
+                           timeout: Optional[float] = 1) -> Generator[None, None, None]:
         """
         Context manager for temporarily disabling DEC Private Modes.
 
@@ -1474,7 +1479,8 @@ class Terminal():
         self._xtwinops_cell_cache = result
         return result
 
-    def get_sixel_height_and_width(self, timeout: Optional[float] = 1.0,
+
+    def get_sixel_height_and_width(self, timeout: Optional[float] = 1,
                                    force: bool = False) -> Tuple[int, int]:
         # pylint: disable=too-many-return-statements
         """
@@ -1558,7 +1564,7 @@ class Terminal():
         # All methods failed
         return (-1, -1)
 
-    def get_sixel_colors(self, timeout: Optional[float] = 1.0,
+    def get_sixel_colors(self, timeout: Optional[float] = 1,
                          force: bool = False) -> int:
         """
         Query number of sixel color registers (XTSMGRAPHICS).
@@ -1650,7 +1656,7 @@ class Terminal():
 
         return int(match.group(1))
 
-    def get_kitty_keyboard_state(self, timeout: Optional[float] = None,
+    def get_kitty_keyboard_state(self, timeout: Optional[float] = 1,
                                  force: bool = False) -> Optional[KittyKeyboardProtocol]:
         """
         Query the current Kitty keyboard protocol flags.
@@ -1777,7 +1783,7 @@ class Terminal():
     def enable_kitty_keyboard(self, *, disambiguate: bool = True, report_events: bool = False,
                               report_alternates: bool = False, report_all_keys: bool = False,
                               report_text: bool = False, mode: int = 1,
-                              timeout: Optional[float] = None,
+                              timeout: Optional[float] = 1,
                               force: bool = False) -> Generator[None, None, None]:
         """
         Context manager that enables Kitty keyboard protocol features.

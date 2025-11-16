@@ -129,11 +129,11 @@ The :meth:`~blessed.Terminal.mouse_enabled` context manager enables the appropri
 
 :meth:`~blessed.Terminal.mouse_enabled` accepts these keyword-only parameters:
 
-* ``clicks=True`` - Enable basic click reporting (default)
-* ``report_drag=False`` - Report motion while a button is held
-* ``report_motion=False`` - Report all mouse movement
-* ``report_pixels=False`` - Report position in pixels instead of cells
-* ``timeout=1.0`` - Timeout for mode queries in seconds
+* ``clicks=True`` - Enable basic click reporting (default).
+* ``report_drag=False`` - Report motion while a button is held.
+* ``report_motion=False`` - Report all mouse movement.
+* ``report_pixels=False`` - Report position in pixels instead of cells.
+* ``timeout=1.0`` - Timeout for mode queries, in seconds.
 
 **Parameter Precedence**
 
