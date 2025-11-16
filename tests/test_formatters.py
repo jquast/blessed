@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests string formatting functions."""
 # std imports
 import pickle
