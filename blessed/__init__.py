@@ -13,4 +13,4 @@ else:
     from blessed.terminal import Terminal  # type: ignore
 
 __all__ = ('Terminal',)
-__version__ = "1.24.0"
+__version__ = "1.25.0"

@@ -2,6 +2,10 @@
 
 Version History
 ===============
+1.25
+  * bugfix: The fix in 1.20 got reverted in release in 1.23
+    by :ghpull:`306`, this release re-applies the fix, :ghpull:`326`.
+
 1.24
   * bugfix: :meth:`blessed.Terminal`get_sixel_height_and_width` detection order
     and improve documentation for window resize event handling :ghpull:`320`
