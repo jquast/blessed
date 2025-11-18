@@ -1183,10 +1183,12 @@ def get_keyboard_codes() -> Dict[int, str]:
     keycodes = OrderedDict(get_curses_keycodes())
     keycodes.update(CURSES_KEYCODE_OVERRIDE_MIXIN)
 
-    # merge in homemade KEY_TAB, KEY_KP_*, KEY_MENU added to our module space
+    # Merge in homemade KEY_TAB, KEY_KP_*, KEY_MENU added to our module space
     # Exclude *_PUA constants since they're internal implementation details
-    # that will be remapped via KITTY_PUA_KEYCODE_OVERRIDE_MIXIN
-    keycodes.update((k, v) for k, v in globals().items()
+    # that will be remapped via KITTY_PUA_KEYCODE_OVERRIDE_MIXIN.
+    # Make sure to copy globals() since other threads might create or 
+    # destroy globals while we iterate.
+    keycodes.update((k, v) for k, v in globals().copy().items()
                     if k.startswith('KEY_') and not k.endswith('_PUA'))
 
     # Apply PUA keycode overrides to strip _PUA suffix from names
