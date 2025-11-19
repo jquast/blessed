@@ -1,7 +1,9 @@
 """Sub-module providing sequence-formatting functions."""
+from __future__ import annotations
+
 # std imports
 import platform
-from typing import TYPE_CHECKING, Set, Dict, List, Type, Tuple, Union, TypeVar, Callable, Optional
+from typing import TYPE_CHECKING, Set, Dict, List, Tuple, Union, Callable, Optional
 
 # local
 from blessed.colorspace import CGA_COLORS, X11_COLORNAMES_TO_RGB
@@ -9,8 +11,6 @@ from blessed.colorspace import CGA_COLORS, X11_COLORNAMES_TO_RGB
 if TYPE_CHECKING:  # pragma: no cover
     # local
     from blessed.terminal import Terminal
-
-_T = TypeVar("_T")
 
 # isort: off
 # curses
@@ -65,7 +65,8 @@ class ParameterizingString(str):
         '\x1b[91mcolor #9\x1b(B\x1b[m'
     """
 
-    def __new__(cls: Type[_T], cap: str, normal: str = '', name: str = '<not specified>') -> _T:
+    def __new__(cls, cap: str, normal: str = '',
+                name: str = '<not specified>') -> ParameterizingString:
         """
         Class constructor accepting 3 positional arguments.
 
@@ -140,8 +141,8 @@ class ParameterizingProxyString(str):
         '\x1b[10G'
     """
 
-    def __new__(cls: Type[_T], fmt_pair: Tuple[str, Callable[..., Tuple[object, ...]]],
-                normal: str = '', name: str = '<not specified>') -> _T:
+    def __new__(cls, fmt_pair: Tuple[str, Callable[..., Tuple[object, ...]]],
+                normal: str = '', name: str = '<not specified>') -> ParameterizingProxyString:
         """
         Class constructor accepting 4 positional arguments.
 
@@ -193,7 +194,7 @@ class FormattingString(str):
         '\x1b[94mBig Blue\x1b(B\x1b[m'
     """
 
-    def __new__(cls: Type[_T], sequence: str, normal: str = '') -> _T:
+    def __new__(cls, sequence: str, normal: str = '') -> FormattingString:
         """
         Class constructor accepting 2 positional arguments.
 
@@ -252,7 +253,8 @@ class FormattingOtherString(str):
         '\x1b[C'
     """
 
-    def __new__(cls: Type[_T], direct: ParameterizingString, target: ParameterizingString) -> _T:
+    def __new__(cls, direct: ParameterizingString,
+                target: ParameterizingString) -> FormattingOtherString:
         """
         Class constructor accepting 2 positional arguments.
 
@@ -280,7 +282,7 @@ class NullCallableString(str):
     unicode that may also act as a callable.
     """
 
-    def __new__(cls: Type[_T]) -> _T:
+    def __new__(cls) -> NullCallableString:
         """Class constructor."""
         return str.__new__(cls, '')
 

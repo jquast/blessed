@@ -1,4 +1,6 @@
 """Module providing 'sequence awareness'."""
+from __future__ import annotations
+
 # std imports
 import re
 import sys
@@ -16,7 +18,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from blessed.terminal import Terminal
 
 # std imports
-from typing import List, Type, Tuple, Pattern, TypeVar, Iterator, Optional
+from typing import List, Tuple, Pattern, Iterator, Optional
 
 # SupportsIndex was added in Python 3.8
 if sys.version_info >= (3, 8):
@@ -24,8 +26,6 @@ if sys.version_info >= (3, 8):
     from typing import SupportsIndex
 else:
     SupportsIndex = int
-
-_T = TypeVar("_T")
 
 __all__ = ('Sequence', 'SequenceTextWrapper', 'iter_parse', 'measure_length')
 
@@ -155,7 +155,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         self.term = term
         textwrap.TextWrapper.__init__(self, width, **kwargs)
 
-    def _wrap_chunks(self, chunks):    # type: ignore[no-untyped-def]
+    def _wrap_chunks(self, chunks: List[str]) -> List[str]:
         """
         Sequence-aware variant of :meth:`textwrap.TextWrapper._wrap_chunks`.
 
@@ -199,8 +199,8 @@ class SequenceTextWrapper(textwrap.TextWrapper):
                 lines.append(f'{indent}{"".join(cur_line)}')
         return lines
 
-    def _handle_long_word(self,  # type: ignore[no-untyped-def]
-                          reversed_chunks, cur_line, cur_len, width):
+    def _handle_long_word(self, reversed_chunks: List[str], cur_line: List[str],
+                          cur_len: int, width: int) -> None:
         """
         Sequence-aware :meth:`textwrap.TextWrapper._handle_long_word`.
 
@@ -267,7 +267,7 @@ class Sequence(str):
     :meth:`ljust`, :meth:`center`, and :meth:`length`.
     """
 
-    def __new__(cls: Type[_T], sequence_text: str, term: 'Terminal') -> _T:
+    def __new__(cls, sequence_text: str, term: 'Terminal') -> Sequence:
         """
         Class constructor.
 

@@ -559,7 +559,7 @@ class Terminal():
         return self._height_and_width().ws_xpixel
 
     @staticmethod
-    def _winsize(fd):  # type: ignore[no-untyped-def]
+    def _winsize(fd: int) -> "WINSZ":
         """
         Return named tuple describing size of the terminal by ``fd``.
 

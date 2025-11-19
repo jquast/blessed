@@ -10,7 +10,7 @@ import platform as _platform
 if _platform.system() == 'Windows':
     from blessed.win_terminal import Terminal
 else:
-    from blessed.terminal import Terminal  # type: ignore
+    from blessed.terminal import Terminal  # type: ignore[assignment]
 
 __all__ = ('Terminal',)
 __version__ = "1.25.0"
