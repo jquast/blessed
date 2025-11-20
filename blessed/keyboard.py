@@ -81,7 +81,7 @@ RE_PATTERN_RESIZE = re.compile(r'\x1b\[48;(?P<height_chars>\d+);(?P<width_chars>
                                r';(?P<height_pixels>\d+);(?P<width_pixels>\d+)t')
 
 # DEC event pattern container
-DECEventPattern = functools.namedtuple("DEC_EVENT_PATTERN", ["mode", "pattern"])
+DECEventPattern = namedtuple("DECEventPattern", ["mode", "pattern"])
 
 # DEC event patterns - compiled regexes with metadata of the 'mode' that
 # triggered it, this prevents searching for bracketed paste or mouse modes
@@ -1186,7 +1186,7 @@ def get_keyboard_codes() -> Dict[int, str]:
     # Merge in homemade KEY_TAB, KEY_KP_*, KEY_MENU added to our module space
     # Exclude *_PUA constants since they're internal implementation details
     # that will be remapped via KITTY_PUA_KEYCODE_OVERRIDE_MIXIN.
-    # Make sure to copy globals() since other threads might create or 
+    # Make sure to copy globals() since other threads might create or
     # destroy globals while we iterate.
     keycodes.update((k, v) for k, v in globals().copy().items()
                     if k.startswith('KEY_') and not k.endswith('_PUA'))
