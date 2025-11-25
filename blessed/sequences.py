@@ -378,8 +378,7 @@ class Sequence(str):
             as ``term.clear`` will not give accurate returns, it is not
             considered lengthy (a length of 0).
         """
-        # because control characters may return -1, "clip" their length to 0.
-        return sum(max(wcwidth(w_char), 0) for w_char in self.padd(strip=True))
+        return sum(wcwidth(w_char) for w_char in self.padd(strip=True))
 
     def strip(self, chars: Optional[str] = None) -> str:
         """
