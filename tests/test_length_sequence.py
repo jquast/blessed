@@ -287,6 +287,9 @@ def test_sequence_length(all_terms):
         assert term.length('x\b') == 0
         assert term.strip('x\b') == ''
 
+        # characters where wcwidth returns -1
+        assert term.length('\x00\x01\x02\x03\x04\x05') == 0
+
         # XXX why are some terminals width of 9 here ??
         assert term.length('\t') in {8, 9}
         assert term.strip('\t') == ''
