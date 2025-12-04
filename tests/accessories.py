@@ -8,6 +8,7 @@ import traceback
 import contextlib
 import time
 import signal
+import warnings
 
 # local
 from blessed import Terminal
@@ -92,7 +93,10 @@ class as_subprocess():  # pylint: disable=too-few-public-methods
             return
 
         pid_testrunner = os.getpid()
-        pid, master_fd = pty.fork()  # pylint: disable=possibly-used-before-assignment
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=DeprecationWarning)
+            pid, master_fd = pty.fork()  # pylint: disable=possibly-used-before-assignment
+
         if pid == self._CHILD_PID:
             # child process executes function, raises exception
             # if failed, causing a non-zero exit code, using the
@@ -321,12 +325,12 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
         result = child_func(term)
         return result.decode('utf-8') if isinstance(result, bytes) else (result or '')
 
-    import pty as pty_module  # pylint: disable=import-outside-toplevel
-
     if test_name is None:
         test_name = getattr(child_func, '__name__', 'pty_test')
 
-    pid, master_fd = pty_module.fork()
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        pid, master_fd = pty.fork()  # pylint: disable=possibly-used-before-assignment
 
     # Set PTY window size in parent before child starts reading
     if pid != 0:

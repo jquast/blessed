@@ -1,6 +1,7 @@
 """Tests for Terminal.wrap()"""
 
 # std imports
+import sys
 import textwrap
 
 # 3rd party
@@ -19,6 +20,10 @@ TEXTWRAP_KEYWORD_COMBINATIONS = [
     {'break_long_words': True, 'drop_whitespace': True, 'subsequent_indent': ''},
     {'break_long_words': True, 'drop_whitespace': False, 'subsequent_indent': ' '},
     {'break_long_words': True, 'drop_whitespace': True, 'subsequent_indent': ' '},
+    {
+        'break_long_words': True, 'drop_whitespace': False,
+        'subsequent_indent': '', 'max_lines': 4, 'placeholder': '~',
+    },
 ]
 if TEST_QUICK:
     # test only one feature: everything on
@@ -70,6 +75,18 @@ def test_SequenceWrapper(many_columns, kwargs):
         internal_wrapped = textwrap.wrap(pgraph, width=width, **kwargs)
         my_wrapped = term.wrap(pgraph, width=width, **kwargs)
         my_wrapped_colored = term.wrap(pgraph_colored, width=width, **kwargs)
+
+        # Older versions of textwrap could leave a preceding all whitespace line
+        # https://github.com/python/cpython/issues/140627
+        if (
+            kwargs.get('drop_whitespace') and
+            sys.version_info[:2] < (3, 15) and
+            not internal_wrapped[0].strip()
+        ):
+            internal_wrapped = internal_wrapped[1:]
+            # # This also means any subsequent indent got applied to the first line
+            if kwargs.get('subsequent_indent'):
+                internal_wrapped[0] = internal_wrapped[0][len(kwargs['subsequent_indent']):]
 
         # ensure we textwrap ascii the same as python
         assert internal_wrapped == my_wrapped
@@ -177,5 +194,43 @@ def test_greedy_join_with_cojoining():
         assert result == ['caf', 'e\u0301-l', 'att', 'e']
         result = term.wrap(given, 2)
         assert result == ['ca', 'fe\u0301', '-l', 'at', 'te']
+
+    child()
+
+
+def test_placeholder():
+    """ENsure placeholder behavior matches stdlib"""
+
+    @as_subprocess
+    def child():
+        term = TestTerminal()
+        text = 'The quick brown fox jumps over the lazy dog'
+        kwargs = {'width': 1, 'max_lines': 3, 'placeholder': '...'}
+
+        try:
+            textwrap.wrap(text, **kwargs)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            stdlib_exc = e
+        else:
+            stdlib_exc = None
+
+        with pytest.raises(stdlib_exc.__class__) as exc:
+            term.wrap(text, **kwargs)
+        assert exc.value.args == stdlib_exc.args
+
+        kwargs = {'width': 10, 'max_lines': 3, 'placeholder': '...'}
+        assert term.wrap(text, **kwargs) == textwrap.wrap(text, **kwargs)
+
+        text = '1234567890 1234567890 extra'
+        kwargs = {'width': 10, 'max_lines': 2, 'placeholder': '...'}
+        assert term.wrap(text, **kwargs) == textwrap.wrap(text, **kwargs)
+
+        text = '1234567890 1234567890'
+        kwargs = {'width': 10, 'max_lines': 1, 'placeholder': '...'}
+        assert term.wrap(text, **kwargs) == textwrap.wrap(text, **kwargs)
+
+        text = 'short 1234567890 extra'
+        kwargs = {'width': 10, 'max_lines': 2, 'placeholder': '...'}
+        assert term.wrap(text, **kwargs) == textwrap.wrap(text, **kwargs)
 
     child()

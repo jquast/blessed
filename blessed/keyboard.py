@@ -2058,7 +2058,7 @@ KITTY_PUA_KEYCODE_OVERRIDE_MIXIN = (
 #: escape sequences.  This is too long for modern applications, so we set it to
 #: 350ms, or 0.35 seconds. It is still a bit conservative, for remote telnet or
 #: ssh servers, for example.
-DEFAULT_ESCDELAY = 0.35  # pylint: disable=invalid-name
+DEFAULT_ESCDELAY = 0.35
 
 
 def _reinit_escdelay() -> None:

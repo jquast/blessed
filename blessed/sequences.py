@@ -155,6 +155,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         self.term = term
         textwrap.TextWrapper.__init__(self, width, **kwargs)
 
+    # pylint: disable-next=too-complex,too-many-branches
     def _wrap_chunks(self, chunks: List[str]) -> List[str]:
         """
         Sequence-aware variant of :meth:`textwrap.TextWrapper._wrap_chunks`.
@@ -174,29 +175,82 @@ class SequenceTextWrapper(textwrap.TextWrapper):
                 f"invalid width {self.width!r}({type(self.width)!r}) (must be integer > 0)"
             )
 
+        if self.max_lines is not None:
+            indent = self.subsequent_indent if self.max_lines > 1 else self.initial_indent
+            if len(indent) + len(self.placeholder.lstrip()) > self.width:
+                raise ValueError("placeholder too large for max width")
+
         term = self.term
-        drop_whitespace = not hasattr(self, 'drop_whitespace'
-                                      ) or self.drop_whitespace
+
+        # Arrange in reverse order so items can be efficiently popped from a stack of chucks.
         chunks.reverse()
-        while chunks:
-            cur_line: List[str] = []
-            cur_len = 0
+        while chunks:  # pylint: disable=too-many-nested-blocks
+
+            cur_line = []  # Current line.
+            cur_len = 0  # Length of all the chunks in cur_line
+
+            # Figure out which static string will prefix this line.
             indent = self.subsequent_indent if lines else self.initial_indent
+            # Maximum width for this line.
             width = self.width - len(indent)
-            if drop_whitespace and lines and not Sequence(chunks[-1], term).strip():
+
+            # First chunk on line is whitespace -- drop it, unless this
+            # is the very beginning of the text (ie. no lines started yet).
+            if self.drop_whitespace and lines and not Sequence(chunks[-1], term).strip():
                 del chunks[-1]
+
             while chunks:
                 chunk_len = Sequence(chunks[-1], term).length()
                 if cur_len + chunk_len > width:
-                    if chunk_len > width:
-                        self._handle_long_word(chunks, cur_line, cur_len, width)
                     break
+
                 cur_line.append(chunks.pop())
                 cur_len += chunk_len
-            if drop_whitespace and (cur_line and not Sequence(cur_line[-1], term).strip()):
-                del cur_line[-1]
+
+            # The current line is full, and the next chunk is too big to fit on *any* line
+            if chunks and Sequence(chunks[-1], term).length() > width:
+                self._handle_long_word(chunks, cur_line, cur_len, width)
+                cur_len = sum(Sequence(chunk, term).length() for chunk in cur_line)
+
+            # If the last chunk on this line is all whitespace, drop it.
+            if self.drop_whitespace and cur_line:
+                chunk = Sequence(cur_line[-1], term)
+                if not chunk.strip():
+                    cur_len -= chunk.length()
+                    del cur_line[-1]
+
             if cur_line:
-                lines.append(f'{indent}{"".join(cur_line)}')
+                if (  # pylint: disable=too-many-boolean-expressions
+                    self.max_lines is None
+                    or len(lines) + 1 < self.max_lines
+                    or (
+                        not chunks
+                        or self.drop_whitespace
+                        and len(chunks) == 1
+                        and not chunks[0].strip()
+                    )
+                    and cur_len <= width
+                ):
+                    lines.append(indent + ''.join(cur_line))
+
+                else:
+                    while cur_line:
+                        chunk = Sequence(cur_line[-1], term)
+                        if (chunk.strip() and cur_len + len(self.placeholder) <= width):
+                            cur_line.append(self.placeholder)
+                            lines.append(indent + ''.join(cur_line))
+                            break
+                        cur_len -= chunk.length()
+                        del cur_line[-1]
+                    else:
+                        if lines:
+                            prev_line = lines[-1].rstrip()
+                            if len(prev_line) + len(self.placeholder) <= self.width:
+                                lines[-1] = prev_line + self.placeholder
+                                break
+                        lines.append(indent + self.placeholder.lstrip())
+                    break
+
         return lines
 
     def _handle_long_word(self, reversed_chunks: List[str], cur_line: List[str],
@@ -223,7 +277,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         # If we're allowed to break long words, then do so: put as much
         # of the next chunk onto the current line as will fit.
 
-        if self.break_long_words:
+        if self.break_long_words and space_left > 0:
             term = self.term
             chunk = reversed_chunks[-1]
             idx = nxt = seq_length = 0
