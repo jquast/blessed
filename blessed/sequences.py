@@ -332,7 +332,9 @@ class SequenceTextWrapper(textwrap.TextWrapper):
             term = self.term
             chunk = reversed_chunks[-1]
             idx = nxt = seq_length = 0
-            for text, _ in iter_parse(term, chunk):
+            last_hyphen_idx = 0
+            last_hyphen_had_nonhyphens = False
+            for text, cap in iter_parse(term, chunk):
                 nxt += len(text)
                 seq_length += Sequence(text, term).length()
                 if seq_length > space_left:
@@ -344,6 +346,16 @@ class SequenceTextWrapper(textwrap.TextWrapper):
                     else:
                         break
                 idx = nxt
+                # Track hyphen positions for break_on_hyphens
+                if cap is None and text == '-' and last_hyphen_had_nonhyphens:
+                    last_hyphen_idx = nxt
+                elif cap is None and text != '-':
+                    last_hyphen_had_nonhyphens = True
+
+            # If break_on_hyphens is enabled, prefer breaking after last hyphen
+            if self.break_on_hyphens and last_hyphen_idx > 0:
+                idx = last_hyphen_idx
+
             cur_line.append(chunk[:idx])
             reversed_chunks[-1] = chunk[idx:]
 

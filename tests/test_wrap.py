@@ -189,13 +189,14 @@ def test_greedy_join_with_cojoining():
     def child():
         term = TestTerminal()
         given = 'cafe\u0301-latte'
-        result = term.wrap(given, 5)
+        # Use break_on_hyphens=False to test combining character handling
+        result = term.wrap(given, 5, break_on_hyphens=False)
         assert result == ['cafe\u0301-', 'latte']
-        result = term.wrap(given, 4)
+        result = term.wrap(given, 4, break_on_hyphens=False)
         assert result == ['cafe\u0301', '-lat', 'te']
-        result = term.wrap(given, 3)
+        result = term.wrap(given, 3, break_on_hyphens=False)
         assert result == ['caf', 'e\u0301-l', 'att', 'e']
-        result = term.wrap(given, 2)
+        result = term.wrap(given, 2, break_on_hyphens=False)
         assert result == ['ca', 'fe\u0301', '-l', 'at', 'te']
 
     child()
@@ -235,6 +236,25 @@ def test_placeholder():
         text = 'short 1234567890 extra'
         kwargs = {'width': 10, 'max_lines': 2, 'placeholder': '...'}
         assert term.wrap(text, **kwargs) == textwrap.wrap(text, **kwargs)
+
+    child()
+
+
+def test_break_on_hyphens_in_handle_long_word():
+    """Test break_on_hyphens is respected in _handle_long_word()."""
+    @as_subprocess
+    def child():
+        term = TestTerminal()
+
+        # Edge case: word forces _handle_long_word() to break it
+        text = 'a-b-c-d'
+        width = 3
+
+        result = term.wrap(text, width=width, break_on_hyphens=True)
+        assert result == ['a-', 'b-', 'c-d']
+
+        result = term.wrap(text, width=width, break_on_hyphens=False)
+        assert result == ['a-b', '-c-', 'd']
 
     child()
 
