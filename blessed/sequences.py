@@ -208,7 +208,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
                 cur_len += chunk_len
 
             # The current line is full, and the next chunk is too big to fit on *any* line
-            if chunks and Sequence(chunks[-1], term).length() > width:
+            if chunks and chunk_len > width:
                 self._handle_long_word(chunks, cur_line, cur_len, width)
                 cur_len = sum(Sequence(chunk, term).length() for chunk in cur_line)
 
