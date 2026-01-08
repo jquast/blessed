@@ -20,24 +20,39 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version:  ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.14']
+        python-version:  ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
         test_quick: [1]
 
         include:
-          - python-version: '3.13'
-            label: Linting
-            toxenv: docformatter_check,flake8,flake8_tests,isort_check,mypy,sphinx,pydocstyle,pylint,pylint_tests,codespell
-            os-deps:
-              - enchant-2
-
+          # exceptions .. first, to run "full tests for 3.13 and 3.14 (slower)
           - python-version: '3.13'
             test_keyboard: 1
             test_raw: 1
             test_quick: 0
 
+          - python-version: '3.14'
+            test_keyboard: 1
+            test_raw: 1
+            test_quick: 0
+
+          # then, to run docformatter, only, on 3.13, https://github.com/PyCQA/docformatter/issues/327
           - python-version: '3.13'
+            label: docformatter
+            toxenv: docformatter_check
+            os-deps:
+              - enchant-2
+
+          # all other linting tools in 3.14,
+          - python-version: '3.14'
+            label: Linting
+            toxenv: flake8,flake8_tests,isort_check,mypy,sphinx,pydocstyle,pylint,pylint_tests,codespell
+
+          # windows testing,
+          - python-version: '3.14'
             os: windows-latest
             test_quick: 0
+
+          # python release candidate testing
           - python-version: '3.15'
             container: 'python:3.15-rc'
             optional: true
@@ -68,7 +83,7 @@ jobs:
         run: tox
 
       - name: Upload to Codecov
-        if: ${{ matrix.label != 'linting' }}
+        if: ${{ matrix.label != 'Linting' && matrix.label != 'docformatter' }}
         uses: codecov/codecov-action@v5
         with:
           verbose: true

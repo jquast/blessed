@@ -1688,7 +1688,6 @@ class Terminal():
         :rtype: KittyKeyboardProtocol or None
         :returns: KittyKeyboardProtocol instance with current flags, or None if unsupported/timeout
         """
-        # pylint: disable=too-many-return-statements
         # This method uses a boundary detection approach on the first query to quickly
         # determine terminal capabilities by sending both Kitty keyboard and Device
         # Attributes (DA1) queries simultaneously, as suggested by Kitty,
