@@ -162,6 +162,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         This method ensures that terminal escape sequences don't interfere with the text splitting
         logic, particularly for hyphen-based word breaking.
         """
+        # pylint: disable=too-many-locals
         term = self.term
 
         # Build a mapping from stripped text positions to original text positions
@@ -185,6 +186,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         stripped_to_original.append(original_pos)
 
         # Use parent's _split on the stripped text
+        # pylint:disable=protected-access
         stripped_chunks = textwrap.TextWrapper._split(self, stripped_text)
 
         # Map the chunks back to the original text with sequences

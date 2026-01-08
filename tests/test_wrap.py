@@ -259,6 +259,7 @@ def test_break_on_hyphens_in_handle_long_word():
     child()
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="break_on_hyphens behavior differs")
 def test_break_on_hyphens():
     """Test break_on_hyphens behavior matches stdlib for hyphenated words."""
     @as_subprocess
@@ -292,7 +293,8 @@ def test_break_on_hyphens():
             for break_hyphens in [True, False]:
                 expected = textwrap.wrap(text, width=width, break_on_hyphens=break_hyphens)
                 result_plain = term.wrap(text, width=width, break_on_hyphens=break_hyphens)
-                result_colored = term.wrap(text_colored, width=width, break_on_hyphens=break_hyphens)
+                result_colored = term.wrap(
+                        text_colored, width=width, break_on_hyphens=break_hyphens)
                 result_stripped = [term.strip_seqs(line) for line in result_colored]
 
                 # Plain text should match stdlib exactly

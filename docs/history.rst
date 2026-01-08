@@ -4,7 +4,10 @@ Version History
 ===============
 
 *next release*
-  * improved: performance of Terminal.wrap(), :ghpull:`331`.
+  * improved: performance of :meth:`Terminal.wrap`, :ghpull:`331` by
+    :ghuser:`grayjk`.
+  * improved: add :meth:`Terminal.wrap` break_on_hyphen support to match
+    behavior of :func:`textwrap.wrap` by :ghuser:`ps06756`.
 
 1.25
   * bugfix: The "Copy globals" fix in 1.20 got reverted in release in 1.23
