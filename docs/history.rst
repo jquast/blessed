@@ -2,6 +2,10 @@
 
 Version History
 ===============
+
+*next release*
+  * improved: performance of Terminal.wrap(), :ghpull:`331`.
+
 1.25
   * bugfix: The "Copy globals" fix in 1.20 got reverted in release in 1.23
     by :ghpull:`306`, this release re-applies the fix, :ghpull:`326`.

@@ -186,7 +186,7 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         chunks.reverse()
         while chunks:  # pylint: disable=too-many-nested-blocks
 
-            cur_line = []  # Current line.
+            cur_line: List[str] = []  # Current line.
             cur_len = 0  # Length of all the chunks in cur_line
 
             # Figure out which static string will prefix this line.
