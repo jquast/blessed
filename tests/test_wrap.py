@@ -293,8 +293,8 @@ def test_break_on_hyphens():
             for break_hyphens in [True, False]:
                 expected = textwrap.wrap(text, width=width, break_on_hyphens=break_hyphens)
                 result_plain = term.wrap(text, width=width, break_on_hyphens=break_hyphens)
-                result_colored = term.wrap(
-                        text_colored, width=width, break_on_hyphens=break_hyphens)
+                result_colored = term.wrap(text_colored,
+                                           width=width, break_on_hyphens=break_hyphens)
                 result_stripped = [term.strip_seqs(line) for line in result_colored]
 
                 # Plain text should match stdlib exactly
