@@ -333,7 +333,7 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=DeprecationWarning)
-        pid, master_fd = pty.fork()  # pylint: disable=possibly-used-before-assignment
+        pid, master_fd = pty.fork()
 
     # Set PTY window size in parent before child starts reading
     if pid != 0:
