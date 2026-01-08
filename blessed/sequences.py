@@ -349,10 +349,12 @@ class SequenceTextWrapper(textwrap.TextWrapper):
                         break
                 idx = nxt
                 # Track hyphen positions for break_on_hyphens
-                if cap is None and text == '-' and last_hyphen_had_nonhyphens:
-                    last_hyphen_idx = nxt
-                elif cap is None and text != '-':
-                    last_hyphen_had_nonhyphens = True
+                if cap is None:
+                    if text == '-':
+                        if last_hyphen_had_nonhyphens:
+                            last_hyphen_idx = nxt
+                    else:
+                        last_hyphen_had_nonhyphens = True
 
             # If break_on_hyphens is enabled, prefer breaking after last hyphen
             if self.break_on_hyphens and last_hyphen_idx > 0:

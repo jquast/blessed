@@ -6,7 +6,7 @@ Version History
 *next release*
   * improved: performance of :meth:`Terminal.wrap`, :ghpull:`331` by
     :ghuser:`grayjk`.
-  * improved: add :meth:`Terminal.wrap` break_on_hyphen support to match
+  * improved: add :meth:`Terminal.wrap` break_on_hyphen support matching
     behavior of :func:`textwrap.wrap` by :ghuser:`ps06756`.
 
 1.25
