@@ -201,16 +201,18 @@ class SequenceTextWrapper(textwrap.TextWrapper):
 
             while chunks:
                 chunk_len = Sequence(chunks[-1], term).length()
+
+                # The current line is full, and the next chunk is too big to fit on *any* line
+                if chunk_len > width:
+                    self._handle_long_word(chunks, cur_line, cur_len, width)
+                    cur_len = sum(Sequence(chunk, term).length() for chunk in cur_line)
+                    break
+
                 if cur_len + chunk_len > width:
                     break
 
                 cur_line.append(chunks.pop())
                 cur_len += chunk_len
-
-            # The current line is full, and the next chunk is too big to fit on *any* line
-            if chunks and Sequence(chunks[-1], term).length() > width:
-                self._handle_long_word(chunks, cur_line, cur_len, width)
-                cur_len = sum(Sequence(chunk, term).length() for chunk in cur_line)
 
             # If the last chunk on this line is all whitespace, drop it.
             if self.drop_whitespace and cur_line:
