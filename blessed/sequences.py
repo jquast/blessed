@@ -155,6 +155,57 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         self.term = term
         textwrap.TextWrapper.__init__(self, width, **kwargs)
 
+    def _split(self, text: str) -> List[str]:
+        """
+        Sequence-aware variant of :meth:`textwrap.TextWrapper._split`.
+
+        This method ensures that terminal escape sequences don't interfere with the text splitting
+        logic, particularly for hyphen-based word breaking.
+        """
+        # pylint: disable=too-many-locals
+        term = self.term
+
+        # Build a mapping from stripped text positions to original text positions
+        # and extract the stripped (sequence-free) text
+        stripped_to_original: List[int] = []
+        stripped_text = ''
+        original_pos = 0
+
+        for segment, capability in iter_parse(term, text):
+            if capability is None:
+                # This is regular text, not a sequence
+                for char in segment:
+                    stripped_to_original.append(original_pos)
+                    stripped_text += char
+                    original_pos += 1
+            else:
+                # This is an escape sequence, skip it in stripped text
+                original_pos += len(segment)
+
+        # Add sentinel for end position
+        stripped_to_original.append(original_pos)
+
+        # Use parent's _split on the stripped text
+        # pylint:disable=protected-access
+        stripped_chunks = textwrap.TextWrapper._split(self, stripped_text)
+
+        # Map the chunks back to the original text with sequences
+        result: List[str] = []
+        stripped_pos = 0
+
+        for chunk in stripped_chunks:
+            chunk_len = len(chunk)
+
+            # Find the start and end positions in the original text
+            start_orig = stripped_to_original[stripped_pos]
+            end_orig = stripped_to_original[stripped_pos + chunk_len]
+
+            # Extract the corresponding portion from the original text
+            result.append(text[start_orig:end_orig])
+            stripped_pos += chunk_len
+
+        return result
+
     # pylint: disable-next=too-complex,too-many-branches
     def _wrap_chunks(self, chunks: List[str]) -> List[str]:
         """
@@ -283,7 +334,9 @@ class SequenceTextWrapper(textwrap.TextWrapper):
             term = self.term
             chunk = reversed_chunks[-1]
             idx = nxt = seq_length = 0
-            for text, _ in iter_parse(term, chunk):
+            last_hyphen_idx = 0
+            last_hyphen_had_nonhyphens = False
+            for text, cap in iter_parse(term, chunk):
                 nxt += len(text)
                 seq_length += Sequence(text, term).length()
                 if seq_length > space_left:
@@ -295,6 +348,18 @@ class SequenceTextWrapper(textwrap.TextWrapper):
                     else:
                         break
                 idx = nxt
+                # Track hyphen positions for break_on_hyphens
+                if cap is None:
+                    if text == '-':
+                        if last_hyphen_had_nonhyphens:
+                            last_hyphen_idx = nxt
+                    else:
+                        last_hyphen_had_nonhyphens = True
+
+            # If break_on_hyphens is enabled, prefer breaking after last hyphen
+            if self.break_on_hyphens and last_hyphen_idx > 0:
+                idx = last_hyphen_idx
+
             cur_line.append(chunk[:idx])
             reversed_chunks[-1] = chunk[idx:]
 
