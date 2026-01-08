@@ -16,7 +16,8 @@ from .accessories import (
     TestTerminal,
     as_subprocess,
     read_until_semaphore,
-    pty_test
+    pty_test,
+    PCT_MAXWAIT_KEYSTROKE,
 )
 
 pytestmark = pytest.mark.skipif(
@@ -263,11 +264,14 @@ def test_sixel_height_and_width_fallback_to_xtwinops():
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_sixel_height_and_width_both_timeout():
     """Test sixel height and width returns (-1, -1) when all methods timeout."""
+
+    timeout = 1.0
+
     def child(term):
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            height, width = term.get_sixel_height_and_width(timeout=1.0, force=True)
+            height, width = term.get_sixel_height_and_width(timeout=timeout, force=True)
             duration_s = time.time() - stime
             result = f'{height}x{width}|{duration_s:.2f}'
             return result.encode('utf-8')
@@ -277,12 +281,12 @@ def test_sixel_height_and_width_both_timeout():
         # Read and discard first query (XTWINOPS 16t)
         os.read(master_fd, 100)
         # Wait for first timeout, then read XTWINOPS 14t query
-        time.sleep(0.36)  # timeout/3, add a bit
+        time.sleep(timeout * .36)  # timeout/3, add a bit
         os.read(master_fd, 100)  # Read XTWINOPS 14t query
         # Wait for second timeout, read XTSMGRAPHICS query
-        time.sleep(0.36)
+        time.sleep(timeout * .36)
         os.read(master_fd, 100)  # Read XTSMGRAPHICS query
-        # Don't respond - let all timeout (TIOCSWINSZ doesn't send query)
+        # Don't respond - cause condition that all queries timeout
 
     stime = time.time()
     output = pty_test(child, parent, 'test_sixel_height_and_width_both_timeout')
@@ -290,8 +294,8 @@ def test_sixel_height_and_width_both_timeout():
 
     assert dimensions == '-1x-1'
     # Should take around timeout/3 * 3 = 1.0s for the three queries
-    assert 0.90 <= float(duration) <= 1.15
-    assert math.floor(time.time() - stime) <= 1.0
+    assert 0.90 <= float(duration) <= timeout * PCT_MAXWAIT_KEYSTROKE
+    assert math.floor(time.time() - stime) <= timeout * PCT_MAXWAIT_KEYSTROKE
 
 
 @pytest.mark.parametrize('method_name,ungetch_response,expected_result,expected_failure', [
