@@ -915,4 +915,5 @@ def test_esc_delay_incomplete_known_sequence():
     # (the \x1b[ part) after esc_delay, with the rest in remaining
     assert keystroke == 'CSI'
     assert remaining == repr('15 ... never completes!')
-    assert int(100 * esc_delay * 0.95) <= int(duration_ms) <= int(100 * esc_delay * PCT_MAXWAIT_KEYSTROKE)
+    assert (int(100 * esc_delay * 0.95) <= int(duration_ms) <=
+            int(100 * esc_delay * PCT_MAXWAIT_KEYSTROKE))
