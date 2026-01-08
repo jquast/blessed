@@ -83,7 +83,7 @@ jobs:
         run: tox
 
       - name: Upload to Codecov
-        if: ${{ matrix.label != 'linting' }}
+        if: ${{ matrix.label != 'Linting' && matrix.label != 'docformatter' }}
         uses: codecov/codecov-action@v5
         with:
           verbose: true
