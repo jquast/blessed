@@ -195,8 +195,6 @@ class SequenceTextWrapper(textwrap.TextWrapper):
 
         for chunk in stripped_chunks:
             chunk_len = len(chunk)
-            if chunk_len == 0:
-                continue
 
             # Find the start and end positions in the original text
             start_orig = stripped_to_original[stripped_pos]
