@@ -24,7 +24,8 @@ from .accessories import (SEMAPHORE,
                           read_until_eof,
                           read_until_semaphore,
                           init_subproc_coverage,
-                          pty_test)
+                          pty_test,
+                          PCT_MAXWAIT_KEYSTROKE)
 
 got_sigwinch = False
 
@@ -877,7 +878,7 @@ def test_esc_delay_long_sequence_prefix_slow_complete():
     # Duration should be at least the time to receive all bytes, but faster than full esc_delay
     # (since we recognize the complete pattern before the delay expires)
     assert (int(100 * interval * len(sequence) * 0.95) <= int(duration_ms) <=
-            int(100 * esc_delay * 1.1))
+            int(100 * esc_delay * PCT_MAXWAIT_KEYSTROKE))
 
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
@@ -914,4 +915,5 @@ def test_esc_delay_incomplete_known_sequence():
     # (the \x1b[ part) after esc_delay, with the rest in remaining
     assert keystroke == 'CSI'
     assert remaining == repr('15 ... never completes!')
-    assert int(100 * esc_delay * 0.95) <= int(duration_ms) <= int(100 * esc_delay * 1.1)
+    assert (int(100 * esc_delay * 0.95) <= int(duration_ms) <=
+            int(100 * esc_delay * PCT_MAXWAIT_KEYSTROKE))

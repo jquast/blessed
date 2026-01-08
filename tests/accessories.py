@@ -26,6 +26,9 @@ else:
     import termios
 
 MAX_SUBPROC_TIME_SECONDS = 2  # no test should ever take over 2 seconds
+# extra time given for timeout-related tests for CI/slow machines, by percent
+PCT_MAXWAIT_KEYSTROKE = 1.2
+
 test_kind = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
 
 
@@ -330,7 +333,7 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=DeprecationWarning)
-        pid, master_fd = pty.fork()  # pylint: disable=possibly-used-before-assignment
+        pid, master_fd = pty.fork()
 
     # Set PTY window size in parent before child starts reading
     if pid != 0:
