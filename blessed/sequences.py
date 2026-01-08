@@ -159,8 +159,8 @@ class SequenceTextWrapper(textwrap.TextWrapper):
         """
         Sequence-aware variant of :meth:`textwrap.TextWrapper._split`.
 
-        This method ensures that terminal escape sequences don't interfere with
-        the text splitting logic, particularly for hyphen-based word breaking.
+        This method ensures that terminal escape sequences don't interfere with the text splitting
+        logic, particularly for hyphen-based word breaking.
         """
         term = self.term
 
