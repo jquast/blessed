@@ -894,10 +894,10 @@ class Terminal():
         Convenience wrapper combining :meth:`get_fgcolor` and
         :func:`~blessed.colorspace.rgb_to_hex`.
         """
-        r, g, b = self.get_fgcolor(timeout=timeout, bits=8)
-        if (r, g, b) == (-1, -1, -1):
+        rgb = self.get_fgcolor(timeout=timeout, bits=8)
+        if rgb == (-1, -1, -1):
             return ''
-        return rgb_to_hex(r, g, b, maybe_short=maybe_short)
+        return rgb_to_hex(*rgb, maybe_short=maybe_short)
 
     def get_bgcolor_hex(self, timeout: float = 1, maybe_short: bool = False) -> str:
         """
