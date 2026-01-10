@@ -805,7 +805,10 @@ class Terminal():
 
     def get_fgcolor(self, timeout: float = 1, bits: int = 16) -> Tuple[int, int, int]:
         """
-        Return tuple (r, g, b) of foreground color.
+        Return tuple (r, g, b) of default foreground color.
+
+        This returns the terminal's default color for uncolored text, not any
+        currently active color set by escape sequences.
 
         When :attr:`is_a_tty` is False, no sequences are transmitted or response
         awaited, and the value ``(-1, -1, -1)`` is returned without inquiry.
@@ -844,7 +847,10 @@ class Terminal():
 
     def get_bgcolor(self, timeout: float = 1, bits: int = 16) -> Tuple[int, int, int]:
         """
-        Return tuple (r, g, b) of background color.
+        Return tuple (r, g, b) of default background color.
+
+        This returns the terminal's default background color, not any currently
+        active color set by escape sequences.
 
         When :attr:`is_a_tty` is False, no sequences are transmitted or response
         awaited, and the value ``(-1, -1, -1)`` is returned without inquiry.
@@ -883,7 +889,7 @@ class Terminal():
 
     def get_fgcolor_hex(self, timeout: float = 1, maybe_short: bool = False) -> str:
         """
-        Return foreground color as hex string.
+        Return default foreground color as hex string.
 
         :arg float timeout: Return after time elapsed in seconds with empty string
             if the remote end did not respond.
@@ -901,7 +907,7 @@ class Terminal():
 
     def get_bgcolor_hex(self, timeout: float = 1, maybe_short: bool = False) -> str:
         """
-        Return background color as hex string.
+        Return default background color as hex string.
 
         :arg float timeout: Return after time elapsed in seconds with empty string
             if the remote end did not respond.

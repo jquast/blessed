@@ -75,10 +75,11 @@ These methods accept multiple hex formats, and the ``#`` prefix is optional:
 Querying Terminal Colors
 -------------------------
 
-You can query the terminal's current foreground and background colors using
+You can query the terminal's default foreground and background colors using
 :meth:`~.Terminal.get_fgcolor` and :meth:`~.Terminal.get_bgcolor`, or use
 :meth:`~.Terminal.get_fgcolor_hex` and :meth:`~.Terminal.get_bgcolor_hex` for
-hex string output:
+hex string output. These return the colors used for default, uncolored text -
+not any currently active color set by escape sequences:
 
 .. literalinclude:: ../bin/color_query.py
    :language: python
