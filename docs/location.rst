@@ -108,3 +108,18 @@ Produces output, ``(12, 12)``
 Although this wouldn't be suggested in most applications because of its latency, it certainly
 simplifies many applications, and, can also be timed, to make a determination of the round-trip
 time, perhaps even the bandwidth constraints, of a remote terminal!
+
+Scroll Region
+-------------
+
+A **scroll region** restricts scrolling to a portion of the screen. When text scrolls within the
+region, content outside the region remains fixed. This is the mechanism behind interfaces like
+:linuxman:`less(1)`, or irc chat clients, where new messages scroll while an input area stays in
+place.
+
+A :func:`contextlib.contextmanager`, :meth:`~.Terminal.scroll_region` is provided to set a scrolling
+region on entry and restore to full screen region on exit:
+
+.. literalinclude:: ../bin/scroll_region.py
+   :language: python
+   :lines: 2-
