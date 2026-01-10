@@ -571,3 +571,12 @@ def test_query_methods_respect_does_styling_and_is_a_tty(force_styling, is_a_tty
         assert stream.getvalue() == ''
 
     child()
+
+
+def test_get_fgcolor_bgcolor_invalid_bits():
+    """Test get_fg/bgcolor raises ValueError for invalid bits parameter."""
+    term = TestTerminal(stream=StringIO())
+    with pytest.raises(ValueError, match=r"bits must be 8 or 16, got 24"):
+        term.get_fgcolor(bits=24)
+    with pytest.raises(ValueError, match=r"bits must be 8 or 16, got 32"):
+        term.get_bgcolor(bits=32)
