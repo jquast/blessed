@@ -399,6 +399,9 @@ def test_yield_hidden_cursor(all_terms):
     child(all_terms)
 
 
+@pytest.mark.skipif(IS_WINDOWS, reason="windows lacks disable_line_wrap capability")
+# see https://github.com/Rockhopper-Technologies/jinxed/blob/main/jinxed/terminfo/vtwin10.py
+# "Removed - These do not appear to be supported" for rmam + smam
 def test_yield_no_line_wrap():
     """Ensure ``no_line_wrap()`` writes disable and enable VT100 line wrap sequence."""
     @as_subprocess
