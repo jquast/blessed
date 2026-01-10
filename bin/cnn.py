@@ -45,7 +45,7 @@ def main():
                 text = term.bright_black('[view]')
                 url = cnn_url + a_href.get('href')
                 line = line.replace('[view]', term.link(url=url, text=text, url_id=line_num))
-            print(' ' * (term.width//8) + line.rstrip())
+            print(' ' * (term.width // 8) + line.rstrip())
             line_num += 1
         if line_num > term.height - 6:
             break

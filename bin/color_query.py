@@ -4,18 +4,11 @@ from blessed import Terminal
 
 term = Terminal()
 
-# Get foreground color
-r, g, b = term.get_fgcolor()
-if (r, g, b) != (-1, -1, -1):
-    print(f"Foreground color: RGB({r}, {g}, {b})")
-    print(f"  Hex: #{r:04x}{g:04x}{b:04x}")
-else:
-    print("Could not determine foreground color")
+fg_hex = term.get_fgcolor_hex()
+bg_hex = term.get_bgcolor_hex()
 
-# Get background color
-r, g, b = term.get_bgcolor()
-if (r, g, b) != (-1, -1, -1):
-    print(f"Background color: RGB({r}, {g}, {b})")
-    print(f"  Hex: #{r:04x}{g:04x}{b:04x}")
-else:
-    print("Could not determine background color")
+bg_rgb = term.get_bgcolor(bits=8)
+fg_rgb = term.get_fgcolor(bits=8)
+
+print(f"Foreground {fg_hex} {fg_rgb}")
+print(f"Background {bg_hex} {bg_rgb}")
