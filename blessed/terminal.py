@@ -829,14 +829,11 @@ class Terminal():
 
         .. note::
 
-            Terminals respond with 16-bit color values per the XParseColor
-            specification. For most uses, 8-bit values are preferred::
+            The default return value is 16-bit, matching the XParseColor specification of the
+            underlying protocol. For most uses, 8-bit values are preferred::
 
                 rgb = term.get_fgcolor(bits=8)
-                term.color_rgb(*rgb)  # Round-trip to set same color
-
-            See :func:`~blessed.colorspace.xparse_color` for details on how
-            terminal color responses are scaled.
+                term.color_rgb(*rgb)  # reset foreground to default
         """
         if bits not in (8, 16):
             raise ValueError(f"bits must be 8 or 16, got {bits}")
@@ -871,14 +868,11 @@ class Terminal():
 
         .. note::
 
-            Terminals respond with 16-bit color values per the XParseColor
-            specification. For most uses, 8-bit values are preferred::
+            The default return value is 16-bit, matching the XParseColor specification of the
+            underlying protocol. For most uses, 8-bit values are preferred::
 
                 rgb = term.get_bgcolor(bits=8)
-                term.on_color_rgb(*rgb)  # Round-trip to set same color
-
-            See :func:`~blessed.colorspace.xparse_color` for details on how
-            terminal color responses are scaled.
+                term.on_color_rgb(*rgb)  # reset background to default
         """
         if bits not in (8, 16):
             raise ValueError(f"bits must be 8 or 16, got {bits}")
