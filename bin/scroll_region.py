@@ -18,6 +18,6 @@ with term.fullscreen(), term.cbreak():
         # Print text within scrolling region
         print(term.move_yx(1, 0), end='')
         for line_num in range(1000):
-            print(f'\n{line_num:4d}: Lorem ipsum dolor sit amet, consectetur adipiscing elit.', end='')
+            print(f'\n{line_num:4d}: Lorem ipsum dolor sit amet.', end='')
             if term.inkey(0.01):
                 break
