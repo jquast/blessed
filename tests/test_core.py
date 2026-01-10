@@ -399,6 +399,22 @@ def test_yield_hidden_cursor(all_terms):
     child(all_terms)
 
 
+def test_yield_no_line_wrap():
+    """Ensure ``no_line_wrap()`` writes disable and enable VT100 line wrap sequence."""
+    @as_subprocess
+    def child():
+        t = TestTerminal(stream=StringIO(), force_styling=True, kind='xterm')
+        with t.no_line_wrap():
+            pass
+        result = t.stream.getvalue()
+        assert t.disable_line_wrap and t.enable_line_wrap
+        assert result == t.disable_line_wrap + t.enable_line_wrap
+        assert result == t.rmam  + t.smam
+        assert result == '\x1b[?7l' + '\x1b[?7h'
+
+    child()
+
+
 @pytest.mark.skipif(IS_WINDOWS, reason="windows doesn't work like this")
 def test_no_preferredencoding_fallback():
     """Ensure empty preferredencoding value defaults to ascii."""
