@@ -477,7 +477,8 @@ class Sequence(str):
         skip_next_measure = False
 
         # Retain all text until non-cap width reaches desired width
-        for text, cap in iter_parse(self._term, self.padd()):
+        parsed_seq = iter_parse(self._term, self.padd())
+        for text, cap in parsed_seq:
             if not cap:
                 # ZWJ: include in output, skip measuring (0) and next char (also 0)
                 if text == '\u200D':
@@ -509,7 +510,10 @@ class Sequence(str):
             # append character and continue measuring
             output += text
 
-        # Return with remaining caps appended
+        # Return with any remaining caps appended, this is for the purpose of
+        # retaining changes of color/etc, even if the text that it preceded cannot fit,
+        # it is usually desirable to process all capabilities, such as a long string
+        # ending with a resetting '\x1b[0m' !
         return f'{output}{"".join(text for text, cap in parsed_seq if cap)}'
 
     def length(self) -> int:
