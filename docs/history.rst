@@ -8,6 +8,9 @@ Version History
     :ghuser:`grayjk`.
   * improved: add :meth:`Terminal.wrap` break_on_hyphen support matching
     behavior of :func:`textwrap.wrap` by :ghuser:`ps06756`.
+  * bugfix: :meth:`Terminal.center`, :meth:`Terminal.wrap()`, and related methods fixed
+    for emojis containing Zero Width Joiner (`\u200D`) or Variation Selector-16 (`\uFE0F`),
+    :ghpull:`338`
 
 1.25
   * bugfix: The "Copy globals" fix in 1.20 got reverted in release in 1.23

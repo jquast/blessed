@@ -9,7 +9,9 @@ import textwrap
 from typing import TYPE_CHECKING
 
 # 3rd party
-from wcwidth import wcwidth
+from wcwidth import wcwidth, wcswidth
+from wcwidth.wcwidth import _bisearch
+from wcwidth.table_vs16 import VS16_NARROW_TO_WIDE
 
 # local
 from blessed._capabilities import CAPABILITIES_CAUSE_MOVEMENT, CAPABILITIES_HORIZONTAL_DISTANCE
@@ -28,6 +30,15 @@ else:
     SupportsIndex = int
 
 __all__ = ('Sequence', 'SequenceTextWrapper', 'iter_parse', 'measure_length')
+
+# Translation table to remove C0 and C1 control characters.
+# These cause wcswidth() to return -1, but should be ignored for width calculation
+# since terminal sequences are already stripped before measurement.
+_CONTROL_CHAR_TABLE = str.maketrans('', '', (
+    ''.join(chr(c) for c in range(0x00, 0x20)) +  # C0: U+0000-U+001F
+    '\x7f' +                                      # DEL
+    ''.join(chr(c) for c in range(0x80, 0xA0))    # C1: U+0080-U+009F
+))
 
 
 class Termcap():
@@ -456,18 +467,46 @@ class Sequence(str):
         :rtype: str
         :returns: String truncated to at most ``width`` printable characters.
         """
+        # This is a *modified copy* of wcwidth.wcswidth, modified for this
+        # forward-looking "trim" function, and interleaved with our own
+        # iter_parse() function.
         output = ""
         current_width = 0
         target_width = width.__index__()
-        parsed_seq = iter_parse(self._term, self.padd())
+        last_measured_char = None
+        skip_next_measure = False
 
         # Retain all text until non-cap width reaches desired width
-        for text, cap in parsed_seq:
+        for text, cap in iter_parse(self._term, self.padd()):
             if not cap:
-                # use wcwidth clipped to 0 because it can sometimes return -1
-                current_width += max(wcwidth(text), 0)
+                # ZWJ: include in output, skip measuring (0) and next char (also 0)
+                if text == '\u200D':
+                    skip_next_measure = True
+                    output += text
+                    continue
+                # After ZWJ: include but don't measure (0, matches wcswidth behavior)
+                if skip_next_measure:
+                    skip_next_measure = False
+                    output += text
+                    continue
+                # VS-16: may add +1 to width
+                if text == '\uFE0F' and last_measured_char:
+                    current_width += _bisearch(
+                        ord(last_measured_char), VS16_NARROW_TO_WIDE["9.0.0"])
+                    last_measured_char = None
+                    if current_width > target_width:
+                        break
+                    output += text
+                    continue
+                # all other cases: measure by wcwidth(), (clipped to 0 for control chars)
+                wcw = wcwidth(text)
+                if wcw > 0:
+                    last_measured_char = text
+                current_width += max(wcw, 0)
+                # we have reached the desired length -- break before appending
                 if current_width > target_width:
                     break
+            # append character and continue measuring
             output += text
 
         # Return with remaining caps appended
@@ -499,8 +538,10 @@ class Sequence(str):
             as ``term.clear`` will not give accurate returns, it is not
             considered lengthy (a length of 0).
         """
-        # because control characters may return -1, "clip" their length to 0.
-        return sum(max(wcwidth(w_char), 0) for w_char in self.padd(strip=True))
+        # to allow use of wcswidth without erroneous -1 return value,
+        # _CONTROL_CHAR_TABLE is used to remove any remaining
+        # unhandled C0 or C1 control characters.
+        return wcswidth(self.padd(strip=True).translate(_CONTROL_CHAR_TABLE))
 
     def strip(self, chars: Optional[str] = None) -> str:
         """

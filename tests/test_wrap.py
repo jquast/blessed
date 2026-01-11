@@ -140,13 +140,12 @@ def test_east_asian_emojis_width_1():
         result = term.wrap('\u5973', 1)
         assert result == ['\u5973']
 
-        # much like test_length_with_zwj_is_wrong(), blessed gets ZWJ wrong when wrapping, also.
-        # In this case, each character gets its own line--even though '\u200D' is considered
-        # a width of 0, the next emoji is "too large to fit".
+        # ZWJ sequences are measured correctly: first emoji is width 2, ZWJ skips
+        # itself and the following character. Total width is 2.
         # RGI_Emoji_ZWJ_Sequence  ; family: woman, woman, girl, boy
         given = '\U0001F469\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466'
         result = term.wrap(given, 1)
-        assert result == list(given)
+        assert result == ['\U0001F469', '\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466']
 
         # in another example, two *narrow* characters, \u1100, "ᄀ" HANGUL
         # CHOSEONG KIYEOK (consonant) is joined with \u1161, "ᅡ" HANGUL
