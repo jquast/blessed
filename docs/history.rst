@@ -6,8 +6,10 @@ Version History
 *next release*
   * improved: performance of :meth:`Terminal.wrap`, :ghpull:`331` by
     :ghuser:`grayjk`.
-  * improved: add :meth:`Terminal.wrap` break_on_hyphen support matching
-    behavior of :func:`textwrap.wrap` by :ghuser:`ps06756`.
+  * improved: :meth:`Terminal.wrap` gets break_on_hyphen support, matching
+    behavior of :func:`textwrap.wrap` by :ghuser:`ps06756` in :ghpull:`330`.
+  * introduced: :meth:`Terminal.no_line_wrap`, context manager for attributes
+    ``disable_line_wrap`` and ``enable_line_wrap`` :ghpull:`337`.
 
 1.25
   * bugfix: The "Copy globals" fix in 1.20 got reverted in release in 1.23
