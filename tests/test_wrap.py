@@ -309,3 +309,17 @@ def test_break_on_hyphens():
                 )
 
     child()
+
+
+def test_wrap_leading_sequence_preserved():
+    """Leading escape sequence on first word should not be lost."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        # Color the first word - the leading sequence should be preserved
+        text = term.red('The') + ' quick brown fox'
+        result = term.wrap(text, width=20)
+        # First line should start with the red sequence
+        assert result[0].startswith('\x1b[')
+
+    child()

@@ -208,7 +208,8 @@ class SequenceTextWrapper(textwrap.TextWrapper):
             chunk_len = len(chunk)
 
             # Find the start and end positions in the original text
-            start_orig = stripped_to_original[stripped_pos]
+            # For first chunk, start from 0 to include any leading sequences
+            start_orig = 0 if stripped_pos == 0 else stripped_to_original[stripped_pos]
             end_orig = stripped_to_original[stripped_pos + chunk_len]
 
             # Extract the corresponding portion from the original text
