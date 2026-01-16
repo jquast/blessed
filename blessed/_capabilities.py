@@ -119,7 +119,7 @@ CAPABILITIES_RAW_MIXIN: typing.Dict[str, str] = {
 
 CAPABILITIES_ADDITIVES: typing.Dict[
     str, typing.Union[typing.Tuple[str, str, int], typing.Tuple[str, str]]] = {
-    'link': (rf'{_ESC}\]8;{_ANY_NOTESC};{_ANY_NOTESC}{_ESC}\\', 'link', 1),
+    'link': (rf'{_ESC}\]8;{_ANY_NOTESC};{_ANY_NOTESC}(?:{_ESC}\\|\x07)', 'link', 1),
     'color256': (rf'{_CSI}38;5;\d+m', 'color', 1),
     'on_color256': (rf'{_CSI}48;5;\d+m', 'on_color', 1),
     'color_rgb': (rf'{_CSI}38;2;\d+;\d+;\d+m', 'color_rgb', 3),

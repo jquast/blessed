@@ -323,3 +323,18 @@ def test_wrap_leading_sequence_preserved():
         assert result[0].startswith('\x1b[')
 
     child()
+
+
+@pytest.mark.parametrize("link", [
+    '\x1b]8;;url\x1b\\x\x1b]8;;\x1b\\',
+    '\x1b]8;;url\x07x\x1b]8;;\x07',
+])
+def test_wrap_hyperlink_osc8(link):
+    """Test wrap with OSC 8 hyperlinks using ST and BEL terminators."""
+    @as_subprocess
+    def child(link):
+        term = TestTerminal(force_styling=True)
+        result = term.wrap(link, width=10)
+        assert [term.strip_seqs(line) for line in result] == ['x']
+
+    child(link)
