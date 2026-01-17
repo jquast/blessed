@@ -141,21 +141,23 @@ def test_east_asian_emojis_width_1():
         assert result == ['\u5973']
 
         # ZWJ sequences are measured correctly: first emoji is width 2, ZWJ skips
-        # itself and the following character. Total width is 2.
+        # itself and the following character on repeat until end of sequence,
+        # Total width is 2.
         # RGI_Emoji_ZWJ_Sequence  ; family: woman, woman, girl, boy
         given = '\U0001F469\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466'
-        result = term.wrap(given, 1)
-        assert result == ['\U0001F469', '\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466']
+        result = term.wrap(given, 2)
+        assert result == ['\U0001F469\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466']
 
         # in another example, two *narrow* characters, \u1100, "ᄀ" HANGUL
         # CHOSEONG KIYEOK (consonant) is joined with \u1161, "ᅡ" HANGUL
         # JUNGSEONG A (vowel), to form a single *wide* character "가" HANGUL
-        # SYLLABLE GA. Ideally, a native speaker would rather have the cojoined
-        # wide character, and word-wrapping to a column width of '1' for any
-        # language that includes wide characters or emoji is a bit foolish!
-        given = '\u1100\u1161'
-        result = term.wrap(given, 1)
-        assert result == list(given)
+        # SYLLABLE GA.
+        # 
+        # This test isn't so great because a naive measurement accidentally
+        # gets it right, there are a number of sequences like that.
+        given = '\u1100\u1161\u1100\u1161'
+        result = term.wrap(given, 2)
+        assert result == [given[:2], given[2:]]
 
     child()
 
