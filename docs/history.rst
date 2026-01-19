@@ -3,7 +3,7 @@
 Version History
 ===============
 
-*next release*
+1.26
   * introduced: :meth:`Terminal.detect_ambiguous_width`, :ghpull:`339`.
   * introduced: :meth:`Terminal.no_line_wrap`, context manager for attributes
     ``disable_line_wrap`` and ``enable_line_wrap`` :ghpull:`337`.
