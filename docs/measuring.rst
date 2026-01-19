@@ -23,6 +23,9 @@ window size in pixels when available:
    which returns the actual drawable area by accounting for margins. See
    :doc:`sixel` for details.
 
+Alignment
+---------
+
 By combining the measure of the printable width of strings containing sequences with the terminal
 width, the :meth:`~.Terminal.center`, :meth:`~.Terminal.ljust`, :meth:`~.Terminal.rjust`,
 :meth:`~Terminal.truncate`, and :meth:`~Terminal.wrap` methods "just work" for strings that

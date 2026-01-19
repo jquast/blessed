@@ -139,6 +139,8 @@ class Terminal():
         'no_superscript': 'rsupm',
         'underline': 'smul',
         'no_underline': 'rmul',
+        'disable_line_wrap': 'rmam',
+        'enable_line_wrap': 'smam',
         'cursor_report': 'u6',
         'cursor_request': 'u7',
         'terminal_answerback': 'u8',
@@ -1969,6 +1971,31 @@ class Terminal():
             yield
         finally:
             self.stream.write(self.normal_cursor)
+            self.stream.flush()
+
+    @contextlib.contextmanager
+    def no_line_wrap(self) -> Generator[None, None, None]:
+        """
+        Context manager that disables line wrapping, enabling on exit.
+
+        Uses DEC Auto Wrap Mode (DECAWM) to control whether text reaching the
+        right edge wraps to the next line::
+
+            with term.no_line_wrap():
+                print(term.move_x(0) + 'x' * 200)  # Clips, doesn't wrap
+
+        On exit, line wrapping is unconditionally enabled as terminals should
+        prefer line-wrapping mode for normal operation.
+
+        .. note:: :meth:`no_line_wrap` calls cannot be nested: only one
+            should be entered at a time.
+        """
+        self.stream.write(self.disable_line_wrap)
+        self.stream.flush()
+        try:
+            yield
+        finally:
+            self.stream.write(self.enable_line_wrap)
             self.stream.flush()
 
     @contextlib.contextmanager
