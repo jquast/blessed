@@ -15,3 +15,4 @@ indent_size = tab
 indent_space = space
 trim_trailing_whitespace = true
 insert_final_newline = true
+max_line_length = 100
