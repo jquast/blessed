@@ -559,6 +559,34 @@ def test_get_location_timeout():
     child()
 
 
+@pytest.mark.parametrize('cpr1,cpr2,expected', [
+    ('\x1b[1;10R', '\x1b[1;11R', 1),
+    ('\x1b[1;10R', '\x1b[1;12R', 2),
+    ('\x1b[1;10R', '\x1b[1;10R', 1),
+    ('\x1b[1;10R', '\x1b[1;13R', 1),
+])
+def test_detect_ambiguous_width(cpr1, cpr2, expected):
+    """Test detect_ambiguous_width with various CPR responses."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
+        term.ungetch(cpr1)
+        term.ungetch(cpr2)
+        result = term.detect_ambiguous_width(timeout=0.1, fallback=1)
+        assert result == expected
+    child()
+
+
+def test_detect_ambiguous_width_not_a_tty():
+    """Test detect_ambiguous_width returns fallback when not a TTY."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=StringIO(), force_styling=True)
+        term._is_a_tty = False
+        assert term.detect_ambiguous_width(timeout=0.01, fallback=42) == 42
+    child()
+
+
 def test_get_fgcolor_0s():
     """0-second get_fgcolor call without response."""
     @as_subprocess

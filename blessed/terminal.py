@@ -984,6 +984,68 @@ class Terminal():
         da = self.get_device_attributes(timeout=timeout, force=force)
         return da.supports_sixel if da is not None else False
 
+    def detect_ambiguous_width(self, timeout: float = 1, fallback: int = 1) -> int:
+        r"""
+        Detect whether terminal renders ambiguous width characters as width 1 or 2.
+
+        East Asian ambiguous width characters can be rendered as either single (1) or double width
+        (2), depending on terminal settings. This method measures the actual rendered width by
+        printing a test character and querying the cursor position.  The character is drawn and
+        erased at the current cursor position.  The test character used is U+00A7 (SECTION SIGN), an
+        early Unicode character with East Asian Width property "Ambiguous".
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response awaited, and
+        ``fallback`` is returned without inquiry.
+
+        :arg float timeout: Timeout in seconds for any single cursor position response.
+        :arg int fallback: Value to return on timeout, invalid measurement, or not a tty.
+        :rtype: int
+        :returns: 1 for "Ambiguous width as narrow", 2 is "Ambiguous width as wide"
+
+        Example usage::
+
+            >>> term = Terminal()
+            >>> width = term.detect_ambiguous_width()
+            >>> if width == 2:
+            ...     # Terminal uses double-width for ambiguous characters
+            ...     pass
+        """
+        if not self.is_a_tty:
+            return fallback
+
+        stime = time.time()
+
+        # Save cursor position
+        self.stream.write(self.save)
+        self.stream.flush()
+
+        # Get initial column position
+        _, initial_col = self.get_location(timeout=_time_left(stime, timeout))
+        if initial_col == -1:
+            self.stream.write(self.restore)
+            self.stream.flush()
+            return fallback
+
+        # Print ambiguous width character (U+00A7 SECTION SIGN)
+        self.stream.write('\u00a7')
+        self.stream.flush()
+
+        # Get new column position
+        _, new_col = self.get_location(timeout=_time_left(stime, timeout))
+
+        # Clean up: restore cursor and overwrite the test character
+        self.stream.write(self.restore)
+        self.stream.write('  ')  # Two spaces to cover potential width-2 character
+        self.stream.write(self.restore)
+        self.stream.flush()
+
+        if new_col == -1:
+            return fallback
+
+        # Calculate rendered width
+        width = new_col - initial_col
+        return width if width in {1, 2} else fallback
+
     def get_dec_mode(self, mode: Union[int, _DecPrivateMode],
                      timeout: float = 1, force: bool = False) -> DecModeResponse:
         """
