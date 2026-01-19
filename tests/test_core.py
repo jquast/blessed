@@ -599,3 +599,12 @@ def test_scroll_region_context_manager_defaults():
 
     output = pty_test(child, rows=24, cols=80)
     assert output == '\x1b[1;24r\x1b[1;24r'
+
+
+def test_get_fgcolor_bgcolor_invalid_bits():
+    """Test get_fg/bgcolor raises ValueError for invalid bits parameter."""
+    term = TestTerminal(stream=StringIO())
+    with pytest.raises(ValueError, match=r"bits must be 8 or 16, got 24"):
+        term.get_fgcolor(bits=24)
+    with pytest.raises(ValueError, match=r"bits must be 8 or 16, got 32"):
+        term.get_bgcolor(bits=32)

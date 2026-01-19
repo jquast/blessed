@@ -39,6 +39,7 @@ def display_device_attributes(term):
         extension_desc = {
             1: "132 columns",
             2: "Printer port",
+            3: "ReGIS graphics",
             4: "Sixel graphics",
             6: "Selective erase",
             7: "DRCS (soft character set)",
@@ -46,14 +47,21 @@ def display_device_attributes(term):
             9: "NRCS (national replacement character sets)",
             12: "SCS extension (Serbian/Croatian/Slovakian)",
             15: "Technical character set",
+            16: "Locator port",
+            17: "Terminal state interrogation",
             18: "Windowing capability",
+            19: "Sessions capability",
             21: "Horizontal scrolling",
+            22: "ANSI color",
             23: "Greek extension",
             24: "Turkish extension",
+            28: "Rectangular editing",
+            29: "ANSI text locator",
             42: "ISO Latin-2 character set",
             44: "PCTerm",
             45: "Soft key map",
-            46: "ASCII emulation"
+            46: "ASCII emulation",
+            52: "OSC 52 clipboard",
         }
 
         print("  Extension details:")

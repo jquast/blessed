@@ -313,7 +313,7 @@ def test_256_vs_legacy_downconvert_compatibility():
 
 
 def test_rgb_downconvert_zero_colors():
-    """Test rgb_downconvert when number_of_colors == 0 returns color 7"""
+    """Test rgb_downconvert when number_of_colors == 0 returns color 7."""
     @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
@@ -328,4 +328,173 @@ def test_rgb_downconvert_zero_colors():
         assert t.rgb_downconvert(255, 255, 255) == 7
         assert t.rgb_downconvert(128, 64, 192) == 7
 
+    child()
+
+
+def test_hex_to_rgb():
+    """Test hex to RGB conversion across formats."""
+    from blessed.colorspace import hex_to_rgb
+
+    # 3-digit format (each digit doubled: a->aa, b->bb, c->cc)
+    assert hex_to_rgb('#abc') == (170, 187, 204)
+
+    # 6-digit format, with and without '#' prefix
+    assert hex_to_rgb('#5a05cb') == (90, 5, 203)
+    assert hex_to_rgb('5a05cb') == (90, 5, 203)
+
+    # 12-digit format (16-bit per channel, high byte kept)
+    assert hex_to_rgb('#28992c993499') == (40, 44, 52)
+
+
+def test_hex_to_rgb_invalid():
+    """Test invalid hex color raises ValueError."""
+    from blessed.colorspace import hex_to_rgb
+
+    with pytest.raises(ValueError):
+        hex_to_rgb('#gg')
+    with pytest.raises(ValueError):
+        hex_to_rgb('#12345')
+    with pytest.raises(ValueError):
+        hex_to_rgb('#1234567')
+
+
+def test_rgb_to_hex():
+    """Test RGB to hex conversion."""
+    from blessed.colorspace import rgb_to_hex
+
+    assert rgb_to_hex(90, 5, 203) == '#5a05cb'
+
+    # maybe_short: can shorten when digits repeat (aa->a, bb->b, cc->c)
+    assert rgb_to_hex(170, 187, 204, maybe_short=True) == '#abc'
+
+    # maybe_short: cannot shorten when digits don't repeat (cd != cc)
+    assert rgb_to_hex(170, 187, 205, maybe_short=True) == '#aabbcd'
+
+
+def test_xparse_color():
+    """Test XParseColor scaling for terminal color responses."""
+    from blessed.colorspace import xparse_color
+
+    # 4 hex digits (16-bit) - unchanged
+    assert xparse_color('e5e5') == 0xe5e5
+
+    # 2 hex digits (8-bit) - replicate 2x: 'e5' -> 'e5e5'
+    assert xparse_color('e5') == 0xe5e5
+
+    # 1 hex digit (4-bit) - replicate 4x: 'a' -> 'aaaa'
+    assert xparse_color('a') == 0xaaaa
+
+    # 3 hex digits (12-bit) - shift left 4, add top nibble: '123' -> '1230' | '1' -> '1231'
+    assert xparse_color('123') == 0x1231
+
+    # bits=8 conversion (lower byte discarded via >> 8): 'e599' -> 0xe5
+    assert xparse_color('e599', bits=8) == 0xe5
+
+
+def test_xparse_color_errors():
+    """Test xparse_color raises errors for invalid input."""
+    from blessed.colorspace import xparse_color
+
+    with pytest.raises(ValueError):
+        xparse_color('')
+
+    with pytest.raises(ValueError):
+        xparse_color('fffff')
+
+    with pytest.raises(ValueError):
+        xparse_color('ff', bits=32)
+
+
+def test_color_hex():
+    """Test color_hex with 3, 6, and 12 digit formats."""
+    @as_subprocess
+    def child():
+        t = TestTerminal(force_styling=True)
+        t.number_of_colors = 1 << 24
+        assert t.color_hex('#fff')('x') == f'\x1b[38;2;255;255;255mx{t.normal}'
+        assert t.color_hex('#ffffff')('x') == f'\x1b[38;2;255;255;255mx{t.normal}'
+        assert t.color_hex('#ffffffffffff')('x') == f'\x1b[38;2;255;255;255mx{t.normal}'
+        assert t.color_hex('#000')('x') == f'\x1b[38;2;0;0;0mx{t.normal}'
+        assert t.color_hex('#5a05cb')('x') == f'\x1b[38;2;90;5;203mx{t.normal}'
+    child()
+
+
+def test_on_color_hex():
+    """Test on_color_hex with 3, 6, and 12 digit formats."""
+    @as_subprocess
+    def child():
+        t = TestTerminal(force_styling=True)
+        t.number_of_colors = 1 << 24
+        assert t.on_color_hex('#000')('x') == f'\x1b[48;2;0;0;0mx{t.normal}'
+        assert t.on_color_hex('#000000')('x') == f'\x1b[48;2;0;0;0mx{t.normal}'
+        assert t.on_color_hex('#000000000000')('x') == f'\x1b[48;2;0;0;0mx{t.normal}'
+        assert t.on_color_hex('#fff')('x') == f'\x1b[48;2;255;255;255mx{t.normal}'
+    child()
+
+
+def test_get_fgcolor_hex():
+    """Test get_fgcolor_hex returns hex string."""
+    from io import StringIO
+
+    @as_subprocess
+    def child():
+        t = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
+        t.ungetch('\x1b]10;rgb:ffff/ffff/ffff\x07')
+        assert t.get_fgcolor_hex(timeout=0.01) == '#ffffff'
+
+        t.ungetch('\x1b]10;rgb:2828/2c2c/3434\x07')
+        assert t.get_fgcolor_hex(timeout=0.01) == '#282c34'
+
+        # XParseColor shorthand formats (1, 2, 3 hex digits)
+        t.ungetch('\x1b]10;rgb:f/f/f\x07')
+        assert t.get_fgcolor_hex(timeout=0.01) == '#ffffff'
+
+        t.ungetch('\x1b]10;rgb:e5/e5/e5\x07')
+        assert t.get_fgcolor_hex(timeout=0.01) == '#e5e5e5'
+
+        t.ungetch('\x1b]10;rgb:abc/abc/abc\x07')
+        assert t.get_fgcolor_hex(timeout=0.01) == '#ababab'
+    child()
+
+
+def test_get_fgcolor_hex_timeout():
+    """Test get_fgcolor_hex returns empty string on timeout."""
+    from io import StringIO
+
+    @as_subprocess
+    def child():
+        t = TestTerminal(stream=StringIO())
+        result = t.get_fgcolor_hex(timeout=0)
+        assert result == ''
+    child()
+
+
+def test_get_bgcolor_hex():
+    """Test get_bgcolor_hex returns hex string."""
+    from io import StringIO
+
+    @as_subprocess
+    def child():
+        t = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
+        t.ungetch('\x1b]11;rgb:2828/2c2c/3434\x07')
+        assert t.get_bgcolor_hex(timeout=0.01) == '#282c34'
+
+        t.ungetch('\x1b]11;rgb:aaaa/bbbb/cccc\x07')
+        assert t.get_bgcolor_hex(timeout=0.01, maybe_short=True) == '#abc'
+
+        # XParseColor shorthand: 3 digits have nibble wrap (abc -> abca -> ab)
+        t.ungetch('\x1b]11;rgb:abc/de0/123\x07')
+        assert t.get_bgcolor_hex(timeout=0.01) == '#abde12'
+    child()
+
+
+def test_get_bgcolor_hex_timeout():
+    """Test get_bgcolor_hex returns empty string on timeout."""
+    from io import StringIO
+
+    @as_subprocess
+    def child():
+        t = TestTerminal(stream=StringIO())
+        result = t.get_bgcolor_hex(timeout=0)
+        assert result == ''
     child()
