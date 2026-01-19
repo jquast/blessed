@@ -37,15 +37,14 @@ WIDE_VERSION_TESTS = (
 
 EMOJI_ZWJ_TESTS = (
     # First NEW ZWJ emoji sequence per Emoji version (11.0+)
-    ('11.0', '\U0001F9D1\u200D\U0001F91D\u200D\U0001F9D1'),  # people holding hands
-    ('12.0', '\U0001F9D1\u200D\U0001F9B0'),  # person: red hair
-    ('12.1', '\U0001F9D1\u200D\U0001F9BC'),  # person in motorized wheelchair
+    ('11.0', '\U0001F468\u200D\U0001F9B0'),  # man: red hair
+    ('12.0', '\U0001F9D1\u200D\U0001F91D\u200D\U0001F9D1'),  # people holding hands
+    ('12.1', '\U0001F9D1\u200D\U0001F33E'),  # farmer
     ('13.0', '\U0001F9D1\u200D\U0001F384'),  # mx claus
-    ('13.1', '\U0001F468\u200D\U0001F469\u200D\U0001F466\u200D\U0001F466'),  # family variant
-    ('14.0', '\U0001F9D1\u200D\U0001F37C'),  # person feeding baby
-    ('15.0', '\U0001F426\u200D\U0001F525'),  # phoenix (bird + ZWJ + fire)
-    ('15.1', '\U0001FAF1\U0001F3FB\u200D\U0001FAF2\U0001F3FC'),  # handshake
-    ('16.0', '\U0001F9D1\u200D\U0001F9D1\u200D\U0001F9D2'),  # family: adult, adult, child
+    ('13.1', '\u2764\uFE0F\u200D\U0001F525'),  # heart on fire
+    ('14.0', '\U0001FAF1\U0001F3FB\u200D\U0001FAF2\U0001F3FC'),  # handshake: light, medium-light
+    ('15.0', '\U0001F426\u200D\u2B1B'),  # black bird
+    ('15.1', '\U0001F3C3\u200D\u27A1\uFE0F'),  # person running facing right
 )
 
 VS16_TEST = '\u231A\uFE0F'  # watch + VS16

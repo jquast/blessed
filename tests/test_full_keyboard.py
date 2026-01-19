@@ -587,6 +587,36 @@ def test_detect_ambiguous_width_not_a_tty():
     child()
 
 
+def test_detect_ambiguous_width_first_timeout():
+    """Test detect_ambiguous_width returns fallback when first get_location times out."""
+    def child(term):
+        with term.cbreak():
+            result = term.detect_ambiguous_width(timeout=0.01, fallback=99)
+            return f'RESULT={result}'.encode('ascii')
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_detect_ambiguous_width_first_timeout')
+    assert 'RESULT=99' in output
+
+
+def test_detect_ambiguous_width_second_timeout():
+    """Test detect_ambiguous_width returns fallback when second get_location times out."""
+    def child(term):
+        os.write(sys.__stdout__.fileno(), SEMAPHORE)
+        with term.cbreak():
+            result = term.detect_ambiguous_width(timeout=0.1, fallback=77)
+            return f'RESULT={result}'.encode('ascii')
+
+    def parent(master_fd):
+        read_until_semaphore(master_fd, semaphore=RECV_SEMAPHORE)
+        time.sleep(0.01)
+        os.write(master_fd, b'\x1b[1;10R')
+
+    output = pty_test(child, parent,
+                      test_name='test_detect_ambiguous_width_second_timeout')
+    assert 'RESULT=77' in output
+
+
 def test_get_fgcolor_0s():
     """0-second get_fgcolor call without response."""
     @as_subprocess

@@ -8,7 +8,7 @@ Version History
     :ghuser:`grayjk`.
   * improved: add :meth:`Terminal.wrap` break_on_hyphen support matching
     behavior of :func:`textwrap.wrap` by :ghuser:`ps06756`.
-  * new: :meth:`Terminal.detect_ambiguous_width`, :ghpull:`XXX`.
+  * new: :meth:`Terminal.detect_ambiguous_width`, :ghpull:`339`.
 
 1.25
   * bugfix: The "Copy globals" fix in 1.20 got reverted in release in 1.23
