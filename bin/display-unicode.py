@@ -23,6 +23,7 @@ def measure_width(term, text, timeout=1):
 
 WIDE_VERSION_TESTS = (
     # First NEW wide character introduced in each Unicode version (9.0+)
+    # Source: https://unicode.org/Public/{version}/ucd/EastAsianWidth.txt
     ('9.0.0', '\u231A'),      # U+231A WATCH (first new wide in 9.0)
     ('10.0.0', '\u312E'),     # U+312E BOPOMOFO LETTER O WITH DOT ABOVE
     ('11.0.0', '\u312F'),     # U+312F BOPOMOFO LETTER NN
@@ -36,15 +37,22 @@ WIDE_VERSION_TESTS = (
 )
 
 EMOJI_ZWJ_TESTS = (
-    # First NEW ZWJ emoji sequence per Emoji version (11.0+)
-    ('11.0', '\U0001F468\u200D\U0001F9B0'),  # man: red hair
-    ('12.0', '\U0001F9D1\u200D\U0001F91D\u200D\U0001F9D1'),  # people holding hands
-    ('12.1', '\U0001F9D1\u200D\U0001F33E'),  # farmer
-    ('13.0', '\U0001F9D1\u200D\U0001F384'),  # mx claus
-    ('13.1', '\u2764\uFE0F\u200D\U0001F525'),  # heart on fire
-    ('14.0', '\U0001FAF1\U0001F3FB\u200D\U0001FAF2\U0001F3FC'),  # handshake: light, medium-light
-    ('15.0', '\U0001F426\u200D\u2B1B'),  # black bird
-    ('15.1', '\U0001F3C3\u200D\u27A1\uFE0F'),  # person running facing right
+    # First NEW ZWJ emoji sequence per Emoji version
+    # E1.0-E5.0: separate numbering from Unicode (use E prefix)
+    # E11.0+: synchronized with Unicode version (use v prefix)
+    # Exception: E13.1 was released with Unicode 13.0
+    # Source: https://unicode.org/Public/emoji/{version}/emoji-zwj-sequences.txt
+    ('E2.0', '\U0001F468\u200D\u2764\uFE0F\u200D\U0001F468'),  # couple with heart: man, man
+    ('E4.0', '\U0001F468\u200D\U0001F466'),  # family: man, boy
+    ('E5.0', '\U0001F9D6\u200D\u2640\uFE0F'),  # woman in steamy room
+    ('v11', '\U0001F468\u200D\U0001F9B0'),  # man: red hair
+    ('v12', '\U0001F9D1\u200D\U0001F91D\u200D\U0001F9D1'),  # people holding hands
+    ('v12.1', '\U0001F9D1\u200D\U0001F33E'),  # farmer
+    ('v13', '\U0001F9D1\u200D\U0001F384'),  # mx claus
+    ('v13.1', '\u2764\uFE0F\u200D\U0001F525'),  # heart on fire (E13.1 → Unicode 13.0)
+    ('v14', '\U0001FAF1\U0001F3FB\u200D\U0001FAF2\U0001F3FC'),  # handshake: light, medium-light
+    ('v15', '\U0001F426\u200D\u2B1B'),  # black bird
+    ('v15.1', '\U0001F3C3\u200D\u27A1\uFE0F'),  # person running facing right
 )
 
 VS16_TEST = '\u231A\uFE0F'  # watch + VS16
@@ -95,7 +103,7 @@ def main():
     print('- Emojis with ZWJ ', end='')
     zwj_ver = detect_zwj_version(term)
     if zwj_ver:
-        print(term.bold_green(f'supported (v{zwj_ver})'))
+        print(term.bold_green(f'supported ({zwj_ver})'))
     else:
         print(term.bold_red('not supported'))
 
