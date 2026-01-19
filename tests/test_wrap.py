@@ -152,7 +152,7 @@ def test_east_asian_emojis_width_1():
         # CHOSEONG KIYEOK (consonant) is joined with \u1161, "ᅡ" HANGUL
         # JUNGSEONG A (vowel), to form a single *wide* character "가" HANGUL
         # SYLLABLE GA.
-        # 
+        #
         # This test isn't so great because a naive measurement accidentally
         # gets it right, there are a number of sequences like that.
         given = '\u1100\u1161\u1100\u1161'
