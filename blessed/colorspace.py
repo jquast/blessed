@@ -21,6 +21,9 @@ __all__ = (
     'RGBColor',
     'RGB_256TABLE',
     'X11_COLORNAMES_TO_RGB',
+    'hex_to_rgb',
+    'rgb_to_hex',
+    'xparse_color',
 )
 
 CGA_COLORS: Set[str] = {'black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'}
@@ -31,6 +34,118 @@ class RGBColor(collections.namedtuple("RGBColor", ["red", "green", "blue"])):
 
     def __str__(self) -> str:
         return f'#{self.red:02x}{self.green:02x}{self.blue:02x}'
+
+
+def hex_to_rgb(hex_color: str) -> Tuple[int, int, int]:
+    """
+    Convert hex color to RGB tuple.
+
+    :arg str hex_color: Hex color string. Accepts 3-digit (``#RGB``), 6-digit
+        (``#RRGGBB``), or 12-digit (``#RRRRGGGGBBBB``, 16-bit per channel,
+        converted to 8-bit). The ``#`` prefix is optional.
+    :returns: Tuple (r, g, b) with 8-bit values (0-255).
+    :raises ValueError: If hex_color is not a valid hex color string.
+    """
+    hex_color = hex_color.lstrip('#')
+    length = len(hex_color)
+
+    if length not in (3, 6, 12):
+        raise ValueError(f"Invalid hex color length: {length} (expected 3, 6, or 12)")
+
+    if length == 3:
+        # 3-digit: #RGB -> expand each string digit
+        # eg ('f' -> 'ff' to 255)
+        r = int(hex_color[0] * 2, 16)
+        g = int(hex_color[1] * 2, 16)
+        b = int(hex_color[2] * 2, 16)
+    elif length == 6:
+        # 6-digit: #RRGGBB
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+    else:
+        # 12-digit: #RRRRGGGGBBBB (16-bit) -> convert to 8-bit
+        # eg ('ffff' -> 65536 # -> 256)
+        r = int(hex_color[0:4], 16) >> 8
+        g = int(hex_color[4:8], 16) >> 8
+        b = int(hex_color[8:12], 16) >> 8
+
+    return (r, g, b)
+
+
+def rgb_to_hex(red: int, green: int, blue: int, maybe_short: bool = False) -> str:
+    """
+    Convert RGB values to hex color string.
+
+    :arg int red: Red component (0-255).
+    :arg int green: Green component (0-255).
+    :arg int blue: Blue component (0-255).
+    :arg bool maybe_short: If True, return ``#RGB`` when possible.
+        Shortening is only possible when each component has repeating hex digits
+        (e.g., ``0xaa`` -> ``a``).
+    :returns: Hex color string in ``#RRGGBB`` format (or ``#RGB`` if maybe_short).
+    """
+    r_hex, g_hex, b_hex = f'{red:02x}', f'{green:02x}', f'{blue:02x}'
+
+    # Check if we can shorten to #RGB (each component is repeating digits)
+    if maybe_short and r_hex[0] == r_hex[1] and g_hex[0] == g_hex[1] and b_hex[0] == b_hex[1]:
+        return f'#{r_hex[0]}{g_hex[0]}{b_hex[0]}'
+
+    return f'#{r_hex}{g_hex}{b_hex}'
+
+
+def xparse_color(hex_component: str, bits: int = 16) -> int:
+    """
+    Scale a hex color component to 16-bit or 8-bit per XParseColor specification.
+
+    XParseColor is the X11 color parsing standard used by terminals when responding
+    to OSC 10/11 color queries. Each color component in the ``rgb:R/G/B`` response
+    can be 1-4 hex digits, representing 4-bit to 16-bit precision.
+
+    XParseColor uses **scaling** (bit replication) to expand shorter values to
+    16-bit. This differs from HTML/CSS shorthand which uses digit doubling:
+
+    - XParseColor ``rgb:`` format (scaling): ``f`` -> ``ffff``, ``0f`` -> ``0f0f``
+    - HTML/CSS shorthand (doubling): ``#f`` -> ``#ff``, ``#0f`` -> ``#0f``
+
+    Scaling examples:
+
+    - 1 hex digit (4-bit): ``f`` -> ``ffff`` (15 -> 65535)
+    - 2 hex digits (8-bit): ``e5`` -> ``e5e5`` (229 -> 58853)
+    - 3 hex digits (12-bit): ``abc`` -> ``abca`` (2748 -> 43978)
+    - 4 hex digits (16-bit): ``e5e5`` -> ``e5e5`` (unchanged)
+
+    :arg str hex_component: A single hex color component (1-4 hex digits).
+    :arg int bits: Output precision: 16 (default, 0-65535) or 8 (0-255).
+    :returns: Scaled integer value at the requested bit depth.
+    :raises ValueError: If hex_component length is not 1-4 or bits is invalid.
+    """
+    if bits not in (8, 16):
+        raise ValueError(f"bits must be 8 or 16, got {bits}")
+
+    n = len(hex_component)
+    value = int(hex_component, 16)
+
+    # Scale to 16-bit using XParseColor replication rules.
+    # Multiplication replicates the bit pattern: multiplying by 0x0101 is
+    # equivalent to (value << 8) | value, placing value at each byte position.
+    if n == 4:
+        value_16bit = value
+    elif n == 2:
+        # 8-bit to 16-bit: replicate 2 times (e5 -> e5e5)
+        value_16bit = value * 0x0101
+    elif n == 3:
+        # 12-bit to 16-bit: shift left 4, add top nibble (abc -> abca)
+        value_16bit = (value << 4) | (value >> 8)
+    elif n == 1:
+        # 4-bit to 16-bit: replicate 4 times (f -> ffff)
+        value_16bit = value * 0x1111
+    else:
+        raise ValueError(f"hex_component must be 1-4 characters, got {n}")
+
+    if bits == 8:
+        return value_16bit >> 8
+    return value_16bit
 
 
 #: X11 Color names to (XTerm-defined) RGB values from xorg-rgb/rgb.txt
