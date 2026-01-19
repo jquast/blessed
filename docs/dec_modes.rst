@@ -96,7 +96,7 @@ The :class:`~blessed.dec_modes.DecModeResponse` object provides helper propertie
 
 Query results are automatically cached. Use ``force=True`` to bypass the cache:
 
-Try the :ref:`display_modes.py` example program to detect and report all supported
+Try the :ref:`display-modes.py` example program to detect and report all supported
 sequences for a given terminal.
 
 Context Managers

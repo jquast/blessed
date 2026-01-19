@@ -148,14 +148,24 @@ https://github.com/jquast/blessed/blob/master/bin/x11_colorpicker.py
 This program shows all of the X11 colors, demonstrates a basic keyboard-interactive program and
 color selection, but is also a useful utility to pick colors!
 
-.. _display_modes.py:
+.. _display-modes.py:
 
-display_modes.py
+display-modes.py
 ----------------
-https://github.com/jquast/blessed/blob/master/bin/display_modes.py
+https://github.com/jquast/blessed/blob/master/bin/display-modes.py
 
 Detect and report all known DEC Private Modes supported by the Terminal and
 display a report.
+
+.. _display-unicode.py:
+
+display-unicode.py
+------------------
+https://github.com/jquast/blessed/blob/master/bin/display-unicode.py
+
+Basic Unicode detection support, for Wide characters, Emojis with ZWJ, Emojis with VS-16, and
+Ambiguous Width as Wide or Narrow by writing effects to the screen and measuring the cursor
+position.
 
 .. _strip.py:
 

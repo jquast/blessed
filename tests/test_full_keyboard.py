@@ -559,6 +559,64 @@ def test_get_location_timeout():
     child()
 
 
+@pytest.mark.parametrize('cpr1,cpr2,expected', [
+    ('\x1b[1;10R', '\x1b[1;11R', 1),
+    ('\x1b[1;10R', '\x1b[1;12R', 2),
+    ('\x1b[1;10R', '\x1b[1;10R', 1),
+    ('\x1b[1;10R', '\x1b[1;13R', 1),
+])
+def test_detect_ambiguous_width(cpr1, cpr2, expected):
+    """Test detect_ambiguous_width with various CPR responses."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
+        term.ungetch(cpr1)
+        term.ungetch(cpr2)
+        result = term.detect_ambiguous_width(timeout=0.1, fallback=1)
+        assert result == expected
+    child()
+
+
+def test_detect_ambiguous_width_not_a_tty():
+    """Test detect_ambiguous_width returns fallback when not a TTY."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=StringIO(), force_styling=True)
+        term._is_a_tty = False
+        assert term.detect_ambiguous_width(timeout=0.01, fallback=42) == 42
+    child()
+
+
+def test_detect_ambiguous_width_first_timeout():
+    """Test detect_ambiguous_width returns fallback when first get_location times out."""
+    def child(term):
+        with term.cbreak():
+            result = term.detect_ambiguous_width(timeout=0.01, fallback=99)
+            return f'RESULT={result}'.encode('ascii')
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_detect_ambiguous_width_first_timeout')
+    assert 'RESULT=99' in output
+
+
+def test_detect_ambiguous_width_second_timeout():
+    """Test detect_ambiguous_width returns fallback when second get_location times out."""
+    def child(term):
+        os.write(sys.__stdout__.fileno(), SEMAPHORE)
+        with term.cbreak():
+            result = term.detect_ambiguous_width(timeout=0.1, fallback=77)
+            return f'RESULT={result}'.encode('ascii')
+
+    def parent(master_fd):
+        read_until_semaphore(master_fd, semaphore=RECV_SEMAPHORE)
+        time.sleep(0.01)
+        os.write(master_fd, b'\x1b[1;10R')
+
+    output = pty_test(child, parent,
+                      test_name='test_detect_ambiguous_width_second_timeout')
+    assert 'RESULT=77' in output
+
+
 def test_get_fgcolor_0s():
     """0-second get_fgcolor call without response."""
     @as_subprocess

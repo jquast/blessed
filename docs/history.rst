@@ -4,17 +4,17 @@ Version History
 ===============
 
 *next release*
-  * improved: performance of :meth:`Terminal.wrap`, :ghpull:`331` by
-    :ghuser:`grayjk`.
+  * introduced: :meth:`Terminal.detect_ambiguous_width`, :ghpull:`339`.
+  * introduced: :meth:`Terminal.no_line_wrap`, context manager for attributes
+    ``disable_line_wrap`` and ``enable_line_wrap`` :ghpull:`337`.
+  * introduced: New methods :meth:`Terminal.color_hex` and :meth:`Terminal.on_color_hex` and bugfix
+    parsing of uncommon responses in :meth:`Terminal.get_fgcolor` and bgcolor, :ghpull:`335`.
+  * improved: performance of :meth:`Terminal.wrap`, :ghpull:`331` by :ghuser:`grayjk`.
   * improved: :meth:`Terminal.wrap` gets break_on_hyphen support, matching
     behavior of :func:`textwrap.wrap` by :ghuser:`ps06756` in :ghpull:`330`.
   * bugfix: for missing leading sequences in :meth:`Terminal.center`, :meth:`Terminal.wrap()`, add
     support for emojis containing Zero Width Joiner (`\u200D`) or Variation Selector-16 (`\uFE0F`),
     :ghpull:`338`
-  * introduced: :meth:`Terminal.no_line_wrap`, context manager for attributes
-    ``disable_line_wrap`` and ``enable_line_wrap`` :ghpull:`337`.
-  * introduced: New methods :meth:`Terminal.color_hex` and :meth:`Terminal.on_color_hex`.
-  * bugfix: Support parsing of uncommon responses in :meth:`Terminal.get_fgcolor` and bgcolor.
 
 1.25
   * bugfix: The "Copy globals" fix in 1.20 got reverted in release in 1.23
