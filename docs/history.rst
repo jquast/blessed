@@ -8,6 +8,9 @@ Version History
     :ghuser:`grayjk`.
   * improved: :meth:`Terminal.wrap` gets break_on_hyphen support, matching
     behavior of :func:`textwrap.wrap` by :ghuser:`ps06756` in :ghpull:`330`.
+  * bugfix: for missing leading sequences in :meth:`Terminal.center`, :meth:`Terminal.wrap()`, add
+    support for emojis containing Zero Width Joiner (`\u200D`) or Variation Selector-16 (`\uFE0F`),
+    :ghpull:`338`
   * introduced: :meth:`Terminal.no_line_wrap`, context manager for attributes
     ``disable_line_wrap`` and ``enable_line_wrap`` :ghpull:`337`.
   * introduced: New methods :meth:`Terminal.color_hex` and :meth:`Terminal.on_color_hex`.
