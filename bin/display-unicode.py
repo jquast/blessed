@@ -92,8 +92,8 @@ def main():
 
     print('- Wide characters ' + term.bold_green(f'supported (v{wide_ver})'))
 
-    zwj_ver = detect_zwj_version(term)
     print('- Emojis with ZWJ ', end='')
+    zwj_ver = detect_zwj_version(term)
     if zwj_ver:
         print(term.bold_green(f'supported (v{zwj_ver})'))
     else:
@@ -104,7 +104,6 @@ def main():
         print(term.bold_green('supported'))
     else:
         print(term.bold_red('not supported'))
-    vs16 = detect_vs16_support(term)
 
     ambig_txt = 'wide (2)' if term.detect_ambiguous_width() == 2 else 'narrow (1)'
     print(f'- Ambiguous width is {ambig_txt}')
