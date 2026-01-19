@@ -38,7 +38,7 @@ from .keyboard import (DEFAULT_ESCDELAY,
 from .dec_modes import DecPrivateMode as _DecPrivateMode
 from .dec_modes import DecModeResponse
 from .sequences import Termcap, Sequence, SequenceTextWrapper
-from .colorspace import RGB_256TABLE
+from .colorspace import RGB_256TABLE, hex_to_rgb, rgb_to_hex, xparse_color
 from .formatters import (COLORS,
                          COMPOUNDABLES,
                          FormattingString,
@@ -139,10 +139,13 @@ class Terminal():
         'no_superscript': 'rsupm',
         'underline': 'smul',
         'no_underline': 'rmul',
+        'disable_line_wrap': 'rmam',
+        'enable_line_wrap': 'smam',
         'cursor_report': 'u6',
         'cursor_request': 'u7',
         'terminal_answerback': 'u8',
         'terminal_enquire': 'u9',
+        'change_scroll_region': 'csr',
     }
 
     #: DEC Private Mode constants accessible via Terminal.DecPrivateMode or term.DecPrivateMode
@@ -803,47 +806,119 @@ class Terminal():
         # rather than crowbarring such logic into an exception handler.
         return -1, -1
 
-    def get_fgcolor(self, timeout: float = 1) -> Tuple[int, int, int]:
+    def get_fgcolor(self, timeout: float = 1, bits: int = 16) -> Tuple[int, int, int]:
         """
-        Return tuple (r, g, b) of foreground color.
+        Return tuple (r, g, b) of default foreground color.
+
+        This returns the terminal's default color for uncolored text, not any
+        currently active color set by escape sequences.
 
         When :attr:`is_a_tty` is False, no sequences are transmitted or response
         awaited, and the value ``(-1, -1, -1)`` is returned without inquiry.
 
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1, -1)``
             indicating that the remote end did not respond.
+        :arg int bits: Bits per channel: 16 (default, 0-65535, 48-bit total) or
+            8 (0-255, 24-bit total).
         :rtype: tuple
         :returns: foreground color as tuple in form of ``(r, g, b)``.  When a timeout is specified,
             always ensure the return value is checked for ``(-1, -1, -1)``.
+        :raises ValueError: When bits is not 8 or 16.
 
         The foreground color is determined by emitting an `OSC 10 color query
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
 
         See also :meth:`~.Terminal.get_bgcolor` for querying the background color.
-        """
-        match = self._query_response('\x1b]10;?\x07', RE_GET_FGCOLOR_RESPONSE, timeout)
-        return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
 
-    def get_bgcolor(self, timeout: float = 1) -> Tuple[int, int, int]:
+        .. note::
+
+            The default return value is 16-bit, matching the XParseColor specification of the
+            underlying protocol. For most uses, 8-bit values are preferred::
+
+                rgb = term.get_fgcolor(bits=8)
+                term.color_rgb(*rgb)  # reset foreground to default
         """
-        Return tuple (r, g, b) of background color.
+        if bits not in (8, 16):
+            raise ValueError(f"bits must be 8 or 16, got {bits}")
+        match = self._query_response('\x1b]10;?\x07', RE_GET_FGCOLOR_RESPONSE, timeout)
+        if not match:
+            return (-1, -1, -1)
+        return tuple(xparse_color(val, bits=bits) for val in match.groups())
+
+    def get_bgcolor(self, timeout: float = 1, bits: int = 16) -> Tuple[int, int, int]:
+        """
+        Return tuple (r, g, b) of default background color.
+
+        This returns the terminal's default background color, not any currently
+        active color set by escape sequences.
 
         When :attr:`is_a_tty` is False, no sequences are transmitted or response
         awaited, and the value ``(-1, -1, -1)`` is returned without inquiry.
 
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1, -1)``
             indicating that the remote end did not respond.
+        :arg int bits: Bits per channel: 16 (default, 0-65535, 48-bit total) or
+            8 (0-255, 24-bit total).
         :rtype: tuple
         :returns: background color as tuple in form of ``(r, g, b)``.  When a timeout is specified,
             always ensure the return value is checked for ``(-1, -1, -1)``.
+        :raises ValueError: If bits is not 8 or 16.
 
         The background color is determined by emitting an `OSC 11 color query
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands>`_.
 
         See also :meth:`~.Terminal.get_fgcolor` for querying the foreground color.
+
+        .. note::
+
+            The default return value is 16-bit, matching the XParseColor specification of the
+            underlying protocol. For most uses, 8-bit values are preferred::
+
+                rgb = term.get_bgcolor(bits=8)
+                term.on_color_rgb(*rgb)  # reset background to default
         """
+        if bits not in (8, 16):
+            raise ValueError(f"bits must be 8 or 16, got {bits}")
         match = self._query_response('\x1b]11;?\x07', RE_GET_BGCOLOR_RESPONSE, timeout)
-        return tuple(int(val, 16) for val in match.groups()) if match else (-1, -1, -1)
+        if not match:
+            return (-1, -1, -1)
+        return tuple(xparse_color(val, bits=bits) for val in match.groups())
+
+    def get_fgcolor_hex(self, timeout: float = 1, maybe_short: bool = False) -> str:
+        """
+        Return default foreground color as hex string.
+
+        :arg float timeout: Return after time elapsed in seconds with empty string
+            if the remote end did not respond.
+        :arg bool maybe_short: If True, return ``#RGB`` when possible.
+        :returns: Hex color string (``#RRGGBB`` or ``#RGB``), or empty string on
+            timeout or when :attr:`is_a_tty` is False.
+
+        Convenience wrapper combining :meth:`get_fgcolor` and
+        :func:`~blessed.colorspace.rgb_to_hex`.
+        """
+        rgb = self.get_fgcolor(timeout=timeout, bits=8)
+        if rgb == (-1, -1, -1):
+            return ''
+        return rgb_to_hex(*rgb, maybe_short=maybe_short)
+
+    def get_bgcolor_hex(self, timeout: float = 1, maybe_short: bool = False) -> str:
+        """
+        Return default background color as hex string.
+
+        :arg float timeout: Return after time elapsed in seconds with empty string
+            if the remote end did not respond.
+        :arg bool maybe_short: If True, return ``#RGB`` when possible.
+        :returns: Hex color string (``#RRGGBB`` or ``#RGB``), or empty string on
+            timeout or when :attr:`is_a_tty` is False.
+
+        Convenience wrapper combining :meth:`get_bgcolor` and
+        :func:`~blessed.colorspace.rgb_to_hex`.
+        """
+        rgb = self.get_bgcolor(timeout=timeout, bits=8)
+        if rgb == (-1, -1, -1):
+            return ''
+        return rgb_to_hex(*rgb, maybe_short=maybe_short)
 
     def get_device_attributes(self, timeout: Optional[float] = 1,
                               force: bool = False) -> Optional[DeviceAttribute]:
@@ -1960,6 +2035,71 @@ class Terminal():
             self.stream.write(self.normal_cursor)
             self.stream.flush()
 
+    @contextlib.contextmanager
+    def no_line_wrap(self) -> Generator[None, None, None]:
+        """
+        Context manager that disables line wrapping, enabling on exit.
+
+        Uses DEC Auto Wrap Mode (DECAWM) to control whether text reaching the
+        right edge wraps to the next line::
+
+            with term.no_line_wrap():
+                print(term.move_x(0) + 'x' * 200)  # Clips, doesn't wrap
+
+        On exit, line wrapping is unconditionally enabled as terminals should
+        prefer line-wrapping mode for normal operation.
+
+        .. note:: :meth:`no_line_wrap` calls cannot be nested: only one
+            should be entered at a time.
+        """
+        self.stream.write(self.disable_line_wrap)
+        self.stream.flush()
+        try:
+            yield
+        finally:
+            self.stream.write(self.enable_line_wrap)
+            self.stream.flush()
+
+    @contextlib.contextmanager
+    def scroll_region(self, top: int = 0,
+                      height: Optional[int] = None) -> Generator[None, None, None]:
+        """
+        Context manager that sets a scrolling region, resetting on exit.
+
+        :arg int top: Top row of the scrolling region (0-indexed). Defaults to 0.
+        :arg int height: Number of rows in the scrolling region. Defaults to
+            ``self.height - top`` (extending to the bottom of the screen).
+        :return: a context manager.
+        :rtype: Iterator
+
+        A scrolling region restricts scrolling to a portion of the screen. When text
+        scrolls within the region, content outside the region remains fixed. This is
+        useful for creating interfaces with fixed headers, footers, or status bars::
+
+            with term.fullscreen(), term.scroll_region(top=1, height=term.height - 2):
+                # row 0 and the last row remain fixed
+                # scrolling happens only in the middle region
+                for i in range(100):
+                    print(f'Line {i}')
+
+        The cursor position may be reset to the home position when the scroll region
+        changes. Use :meth:`move_yx` to reposition as needed after entering the
+        context.
+
+        .. note:: :meth:`scroll_region` calls cannot be nested: only one
+            should be entered at a time.
+        """
+        if height is None:
+            height = self.height - top
+        bottom = top + height - 1
+        self.stream.write(self.change_scroll_region(top, bottom))
+        self.stream.flush()
+        try:
+            yield
+        finally:
+            self.stream.write(self.change_scroll_region(0, self.height - 1))
+            self.stream.flush()
+
     def move_xy(self, x: int, y: int) -> str:
         """
         A callable string that moves the cursor to the given ``(x, y)`` screen coordinates.
@@ -2029,11 +2169,11 @@ class Terminal():
         """
         Provides callable formatting string to set foreground color to the specified RGB color.
 
-        :arg int red: RGB value of Red.
-        :arg int green: RGB value of Green.
-        :arg int blue: RGB value of Blue.
+        :arg int red: 8-bit RGB value of Red (0-255).
+        :arg int green: 8-bit RGB value of Green (0-255).
+        :arg int blue: 8-bit RGB value of Blue (0-255).
         :rtype: FormattingString
-        :returns: Callable string that sets the foreground color
+        :returns: Callable string that sets the foreground color.
 
         If the terminal does not support RGB color, the nearest supported
         color will be determined using :py:attr:`color_distance_algorithm`.
@@ -2046,6 +2186,22 @@ class Terminal():
         # color by approximation to 256 or 16-color terminals
         color_idx = self.rgb_downconvert(red, green, blue)
         return FormattingString(self._foreground_color(color_idx), self.normal)
+
+    def color_hex(self, hex_color: str) -> FormattingString:
+        """
+        Provides callable formatting string to set foreground color from hex.
+
+        :arg str hex_color: Hex color in ``#RGB``, ``#RRGGBB``, or ``#RRRRGGGGBBBB`` format.
+            The ``#`` prefix is optional.
+        :rtype: FormattingString
+        :returns: Callable string that sets the foreground color.
+
+        If the terminal does not support RGB color, the nearest supported
+        color will be determined using :py:attr:`color_distance_algorithm`.
+
+        See :func:`~blessed.colorspace.hex_to_rgb` for supported hex formats.
+        """
+        return self.color_rgb(*hex_to_rgb(hex_color))
 
     @property
     def on_color(self) -> Union[NullCallableString, ParameterizingString]:
@@ -2063,11 +2219,11 @@ class Terminal():
         """
         Provides callable formatting string to set background color to the specified RGB color.
 
-        :arg int red: RGB value of Red.
-        :arg int green: RGB value of Green.
-        :arg int blue: RGB value of Blue.
+        :arg int red: 8-bit RGB value of Red (0-255).
+        :arg int green: 8-bit RGB value of Green (0-255).
+        :arg int blue: 8-bit RGB value of Blue (0-255).
         :rtype: FormattingString
-        :returns: Callable string that sets the foreground color
+        :returns: Callable string that sets the background color.
 
         If the terminal does not support RGB color, the nearest supported
         color will be determined using :py:attr:`color_distance_algorithm`.
@@ -2078,6 +2234,22 @@ class Terminal():
 
         color_idx = self.rgb_downconvert(red, green, blue)
         return FormattingString(self._background_color(color_idx), self.normal)
+
+    def on_color_hex(self, hex_color: str) -> FormattingString:
+        """
+        Provides callable formatting string to set background color from hex.
+
+        :arg str hex_color: Hex color in ``#RGB``, ``#RRGGBB``, or ``#RRRRGGGGBBBB`` format.
+            The ``#`` prefix is optional.
+        :rtype: FormattingString
+        :returns: Callable string that sets the background color.
+
+        If the terminal does not support RGB color, the nearest supported
+        color will be determined using :py:attr:`color_distance_algorithm`.
+
+        See :func:`~blessed.colorspace.hex_to_rgb` for supported hex formats.
+        """
+        return self.on_color_rgb(*hex_to_rgb(hex_color))
 
     def formatter(self, value: str) -> Union[NullCallableString, FormattingString]:
         """

@@ -750,6 +750,49 @@ def test_truncate_default(all_terms):
     child(all_terms)
 
 
+def test_truncate_zwj_emoji(all_terms):
+    """Test truncate handles ZWJ emoji sequences."""
+    @as_subprocess
+    def child(kind):
+        # local
+        from blessed import Terminal
+        term = Terminal(kind)
+
+        # Family emoji: 👨 + ZWJ + 👩 + ZWJ + 👧 (wcswidth=2)
+        given_zwj = '\U0001F468\u200D\U0001F469\u200D\U0001F467'
+        given = given_zwj + 'ABCDEF'
+
+        # width 1: ZWJ emoji (width 2) doesn't fit
+        assert term.truncate(given, 1) == ''
+        # width 2: ZWJ emoji fits exactly
+        assert term.truncate(given, 2) == given_zwj
+        # width 5: ZWJ (2) + ABC (3) = 5
+        assert term.truncate(given, 5) == given_zwj + 'ABC'
+        # width 8: everything fits (2 + 6 = 8)
+        assert term.truncate(given, 8) == given
+
+    child(all_terms)
+
+
+def test_truncate_vs16_emoji(all_terms):
+    """Test truncate handles VS-16 emoji sequences."""
+    @as_subprocess
+    def child(kind):
+        # local
+        from blessed import Terminal
+        term = Terminal(kind)
+
+        # Heart ❤ (U+2764) + VS-16 has width 2; truncating to 1 strips VS-16,
+        # it has a "text-style" and is (controversially) considered width of 1
+        assert term.truncate('\u2764\uFE0F', 1) == '\u2764'
+        assert term.truncate('\u2764\uFE0F', 2) == '\u2764\uFE0F'
+        assert term.truncate('X\u2764\uFE0F', 1) == 'X'
+        assert term.truncate('X\u2764\uFE0F', 2) == 'X\u2764'
+        assert term.truncate('X\u2764\uFE0F', 3) == 'X\u2764\uFE0F'
+
+    child(all_terms)
+
+
 @pytest.mark.skipif(sys.version_info[:2] < (3, 8), reason="Only supported on Python >= 3.8")
 def test_supports_index(all_terms):
     """Ensure sequence formatting methods support objects with __index__()"""

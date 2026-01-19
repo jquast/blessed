@@ -293,6 +293,8 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
     """
     Wrapper for PTY-based tests to reduce boilerplate.
 
+    Note that TTY-alike behaviors, such as terminal window size does not work with Windows
+
     Handles the common pattern of forking a PTY, running test code in the child
     process with coverage tracking, and optionally running parent-side code.
 

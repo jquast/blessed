@@ -174,6 +174,29 @@ capabilities:
               term.center('press any key').rstrip())
         term.inkey()
 
+Line Wrap Control
+-----------------
+
+Terminals normally wrap text when reaching the right edge of the window. This context manager
+temporarily disables it.
+
+In the following example, the letter 'X' is displayed 3 times the width of the page, which would
+otherwise wrap and fill 3 lines. With line-wrapping disabled, the cursor stays at the last column
+and continuously "repaints" over the previous one until a newline is received, causing it to fill
+only 1 line.
+
+.. code-block:: python
+
+    with term.no_line_wrap():
+        print(term.move_x(0) + 'X' * (term.width * 3))
+
+You can use these sequences directly as attributes ``enable_line_wrap`` and ``disable_line_wrap``
+of :class:`~.Terminal`.
+
+.. code-block:: python
+
+    print(term.enable_line_wrap)
+
 Pipe Savvy
 ----------
 
