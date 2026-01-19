@@ -17,7 +17,7 @@ import pytest
 
 # local
 from .conftest import IS_WINDOWS
-from .accessories import TestTerminal, unicode_cap, as_subprocess
+from .accessories import TestTerminal, unicode_cap, as_subprocess, pty_test
 
 
 def test_export_only_Terminal():
@@ -571,6 +571,34 @@ def test_query_methods_respect_does_styling_and_is_a_tty(force_styling, is_a_tty
         assert stream.getvalue() == ''
 
     child()
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="PTY tests not supported on Windows")
+def test_scroll_region_context_manager():
+    """Test scroll_region context manager sets and resets scroll region."""
+    def child(term):
+        stream = io.StringIO()
+        term._stream = stream
+        with term.scroll_region(top=5, height=10):
+            pass
+        return stream.getvalue()
+
+    output = pty_test(child, rows=24, cols=80)
+    assert output == '\x1b[6;15r\x1b[1;24r'
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="PTY tests not supported on Windows")
+def test_scroll_region_context_manager_defaults():
+    """Test scroll_region context manager with default arguments."""
+    def child(term):
+        stream = io.StringIO()
+        term._stream = stream
+        with term.scroll_region():
+            pass
+        return stream.getvalue()
+
+    output = pty_test(child, rows=24, cols=80)
+    assert output == '\x1b[1;24r\x1b[1;24r'
 
 
 def test_get_fgcolor_bgcolor_invalid_bits():

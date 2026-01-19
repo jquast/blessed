@@ -143,6 +143,7 @@ class Terminal():
         'cursor_request': 'u7',
         'terminal_answerback': 'u8',
         'terminal_enquire': 'u9',
+        'change_scroll_region': 'csr',
     }
 
     #: DEC Private Mode constants accessible via Terminal.DecPrivateMode or term.DecPrivateMode
@@ -1968,6 +1969,46 @@ class Terminal():
             yield
         finally:
             self.stream.write(self.normal_cursor)
+            self.stream.flush()
+
+    @contextlib.contextmanager
+    def scroll_region(self, top: int = 0,
+                      height: Optional[int] = None) -> Generator[None, None, None]:
+        """
+        Context manager that sets a scrolling region, resetting on exit.
+
+        :arg int top: Top row of the scrolling region (0-indexed). Defaults to 0.
+        :arg int height: Number of rows in the scrolling region. Defaults to
+            ``self.height - top`` (extending to the bottom of the screen).
+        :return: a context manager.
+        :rtype: Iterator
+
+        A scrolling region restricts scrolling to a portion of the screen. When text
+        scrolls within the region, content outside the region remains fixed. This is
+        useful for creating interfaces with fixed headers, footers, or status bars::
+
+            with term.fullscreen(), term.scroll_region(top=1, height=term.height - 2):
+                # row 0 and the last row remain fixed
+                # scrolling happens only in the middle region
+                for i in range(100):
+                    print(f'Line {i}')
+
+        The cursor position may be reset to the home position when the scroll region
+        changes. Use :meth:`move_yx` to reposition as needed after entering the
+        context.
+
+        .. note:: :meth:`scroll_region` calls cannot be nested: only one
+            should be entered at a time.
+        """
+        if height is None:
+            height = self.height - top
+        bottom = top + height - 1
+        self.stream.write(self.change_scroll_region(top, bottom))
+        self.stream.flush()
+        try:
+            yield
+        finally:
+            self.stream.write(self.change_scroll_region(0, self.height - 1))
             self.stream.flush()
 
     def move_xy(self, x: int, y: int) -> str:

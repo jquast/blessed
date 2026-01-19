@@ -176,3 +176,12 @@ https://github.com/jquast/blessed/blob/master/bin/mouse_paint.py
 .. figure:: https://dxtz6bzwq9sxx.cloudfront.net/mouse_paint.gif
 
 This is a basic "paint" program using :ref:`mouse input` with the :ref:`report_motion` feature.
+
+.. _scroll_region.py:
+
+scroll_region.py
+----------------
+https://github.com/jquast/blessed/blob/master/bin/scroll_region.py
+
+This program demonstrates the :meth:`~.Terminal.scroll_region` context manager to create a
+scrollable area with a fixed header and status bar.
