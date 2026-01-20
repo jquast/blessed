@@ -1,9 +1,0 @@
-graft docs
-prune docs/_build
-global-exclude *.py[cod] __pycache__
-include LICENSE
-include version.json
-include *.txt
-include tox.ini
-recursive-include blessed py.typed
-recursive-include tests *.py *.ans

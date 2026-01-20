@@ -2,6 +2,20 @@
 requires = ['flit_core >=3.11,<4']
 build-backend = 'flit_core.buildapi'
 
+[tool.flit.sdist]
+include = [
+    'docs/',
+    'tests/',
+    'bin/',
+    '*.rst',
+    '*.txt',
+    'tox.ini',
+    'version.json',
+]
+exclude = [
+    'docs/_build/',
+]
+
 [project]
 name = 'blessed'
 description = """\
