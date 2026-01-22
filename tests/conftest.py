@@ -8,6 +8,16 @@ import subprocess
 # 3rd party
 import pytest
 
+try:
+    from pytest_codspeed import BenchmarkFixture  # noqa: F401  pylint: disable=unused-import
+except ImportError:
+    @pytest.fixture
+    def benchmark():
+        """No-op benchmark fixture for environments without pytest-codspeed."""
+        def _passthrough(func, *args, **kwargs):
+            return func(*args, **kwargs)
+        return _passthrough
+
 IS_WINDOWS = platform.system() == 'Windows'
 
 all_terms_params = 'xterm screen ansi vt220 rxvt cons25 linux'.split()
@@ -42,6 +52,13 @@ TEST_FULL = envvar_enabled('TEST_FULL')
 TEST_KEYBOARD = envvar_enabled('TEST_KEYBOARD')
 TEST_QUICK = envvar_enabled('TEST_QUICK')
 TEST_RAW = envvar_enabled('TEST_RAW')
+TEST_BENCHMARK = envvar_enabled('TEST_BENCHMARK')
+
+# Skip benchmark tests unless TEST_BENCHMARK is set - they instantiate Terminal
+# at module level which causes curses contamination in normal test runs
+collect_ignore = []
+if not TEST_BENCHMARK:
+    collect_ignore.append('test_benchmarks.py')
 
 
 if TEST_FULL:
@@ -81,6 +98,11 @@ def detect_curses_contamination(request):
     """
     if IS_WINDOWS:
         # Windows doesn't have the curses singleton limitation
+        yield
+        return
+
+    if TEST_BENCHMARK:
+        # Benchmark tests intentionally instantiate Terminal in parent process
         yield
         return
 
