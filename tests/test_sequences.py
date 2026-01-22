@@ -743,7 +743,6 @@ def test_truncate_default(all_terms):
     @as_subprocess
     def child(kind):
         # std imports
-        import sys
         import fcntl
         import struct
         import termios
