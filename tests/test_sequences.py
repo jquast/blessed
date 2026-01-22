@@ -9,7 +9,7 @@ import pytest
 
 # local
 from .conftest import IS_WINDOWS
-from .accessories import MockTigetstr, TestTerminal, unicode_cap, unicode_parm, as_subprocess
+from .accessories import MockTigetstr, TestTerminal, unicode_cap, unicode_parm, as_subprocess, pty_test
 
 try:
     # std imports
@@ -738,14 +738,9 @@ def test_truncate_padding(all_terms):
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="requires fcntl")
-def test_truncate_default(all_terms):
+def test_truncate_default():
     """Ensure that terminal.truncate functions with the default argument."""
-    @as_subprocess
-    def child(kind):
-        # local
-        from blessed import Terminal
-
-        term = Terminal(kind)
+    def child(term):
         assert term.width == 80
 
         test = f'Testing {term.red("attention ")}{term.blue("please.")}'
@@ -753,9 +748,7 @@ def test_truncate_default(all_terms):
         assert term.length(trunc) <= term.width
         assert term.truncate(term.red('x' * 1000)) == term.red('x' * term.width)
 
-    pty_test(child, all_terms, test_name='test_truncate_default')
- 
-    child(all_terms)
+    pty_test(child, parent_func=None, test_name='test_truncate_default')
 
 
 def test_truncate_zwj_emoji(all_terms):
