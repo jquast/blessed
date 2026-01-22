@@ -13,7 +13,6 @@ from wcwidth import ljust as wcwidth_ljust
 from wcwidth import rjust as wcwidth_rjust
 from wcwidth import width as wcwidth_width
 from wcwidth import center as wcwidth_center
-from wcwidth import wcwidth, wcswidth
 
 # local
 from blessed._capabilities import CAPABILITIES_CAUSE_MOVEMENT, CAPABILITIES_HORIZONTAL_DISTANCE
