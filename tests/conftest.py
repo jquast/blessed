@@ -52,6 +52,13 @@ TEST_FULL = envvar_enabled('TEST_FULL')
 TEST_KEYBOARD = envvar_enabled('TEST_KEYBOARD')
 TEST_QUICK = envvar_enabled('TEST_QUICK')
 TEST_RAW = envvar_enabled('TEST_RAW')
+TEST_BENCHMARK = envvar_enabled('TEST_BENCHMARK')
+
+# Skip benchmark tests unless TEST_BENCHMARK is set - they instantiate Terminal
+# at module level which causes curses contamination in normal test runs
+collect_ignore = []
+if not TEST_BENCHMARK:
+    collect_ignore.append('test_benchmarks.py')
 
 
 if TEST_FULL:
@@ -91,6 +98,11 @@ def detect_curses_contamination(request):
     """
     if IS_WINDOWS:
         # Windows doesn't have the curses singleton limitation
+        yield
+        return
+
+    if TEST_BENCHMARK:
+        # Benchmark tests intentionally instantiate Terminal in parent process
         yield
         return
 
