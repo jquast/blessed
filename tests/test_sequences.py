@@ -9,7 +9,8 @@ import pytest
 
 # local
 from .conftest import IS_WINDOWS
-from .accessories import MockTigetstr, TestTerminal, unicode_cap, unicode_parm, as_subprocess, pty_test
+from .accessories import (
+    MockTigetstr, TestTerminal, unicode_cap, unicode_parm, as_subprocess, pty_test)
 
 try:
     # std imports
