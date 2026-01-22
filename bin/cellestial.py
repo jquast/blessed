@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Cellestial: Interactive Cellular Automata Viewer."""
 import argparse
+import colorsys
 import math
 import multiprocessing
 import os
@@ -10,6 +11,7 @@ import sys
 import time
 
 from blessed import Terminal
+from blessed.colorspace import X11_COLORNAMES_TO_RGB, hex_to_rgb
 
 FULL_BLOCK, LEFT_HALF, RIGHT_HALF = '\u2588', '\u258C', '\u2590'
 INTERESTING_RULES = [18, 22, 26, 30, 45, 60, 75, 82, 86, 89, 90, 101, 102, 105, 109, 110,
@@ -22,6 +24,42 @@ for _b in range(1, 63):
     _u = sum((1 << i) for i in range(6) if _b & (1 << (5 - i)))
     SEXTANT[_b] = LEFT_HALF if _u == 21 else RIGHT_HALF if _u == 42 else chr(
         0x1FB00 + _u - 1 - sum(1 for x in (21, 42) if x < _u))
+
+def _parse_color(name):
+    """Parse color name or hex code to RGB tuple."""
+    name = name.lower().strip()
+    if name.startswith('#'):
+        return hex_to_rgb(name)
+    if name in X11_COLORNAMES_TO_RGB:
+        rgb = X11_COLORNAMES_TO_RGB[name]
+        return (rgb.red, rgb.green, rgb.blue)
+    raise ValueError(f"Unknown color: {name}")
+
+
+def _rgb_to_hsv(r, g, b):
+    """Convert RGB (0-255) to HSV (h: 0-1, s: 0-1, v: 0-1)."""
+    return colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+
+
+def _hsv_to_rgb(h, s, v):
+    """Convert HSV (0-1 each) to RGB (0-255 each)."""
+    r, g, b = colorsys.hsv_to_rgb(h, s, v)
+    return tuple(int(c * 255) for c in (r, g, b))
+
+
+def _interpolate_hsv(c1, c2, t, long_path=False):
+    """Interpolate between two RGB colors in HSV space."""
+    h1, s1, v1 = _rgb_to_hsv(*c1)
+    h2, s2, v2 = _rgb_to_hsv(*c2)
+    delta_h = h2 - h1
+    if not long_path and abs(delta_h) > 0.5:
+        delta_h += -1 if delta_h > 0 else 1
+    elif long_path and abs(delta_h) <= 0.5:
+        delta_h += -1 if delta_h > 0 else 1
+    h = (h1 + t * delta_h) % 1.0
+    s = s1 + t * (s2 - s1)
+    v = v1 + t * (v2 - v1)
+    return _hsv_to_rgb(h, s, v)
 
 
 def _generate_rule_data(args):
@@ -73,13 +111,14 @@ class CAEngine:
         self.width = 2 * max_rows - 1
 
     def get_sextant_line(self, rule, base_r):
+        """Return raw bytes for sextant line (each byte is 0-63 index)."""
         if rule not in self._cache:
             return None
         idx = base_r // 3
         sextants = self._cache[rule]
         if idx >= len(sextants):
             return None
-        return ''.join(SEXTANT[b] for b in sextants[idx])
+        return sextants[idx]
 
     def tick(self):
         self._results = [ar for ar in self._results if not self._collect(ar)]
@@ -162,7 +201,8 @@ class Pager:
     }
 
     def __init__(self, term, engine, autoscroll=False, rule_change_secs=60, rules=None,
-                 fullscreen=False, color='lightsteelblue2_on_midnightblue', default_state=False,
+                 fullscreen=False, fg_color1='lightsteelblue2', fg_color2='coral',
+                 bg_color='midnightblue', palette_path='short', default_state=False,
                  speed_range=(1, 100), oscillation_rate=30):
         self.term, self.engine, self.rule = term, engine, 30
         self.viewport_y = self.viewport_x = 0
@@ -173,8 +213,19 @@ class Pager:
         self._speed_min, self._speed_max = speed_range
         self._oscillation_rate = oscillation_rate
         self._last_drawn = (None, None, None, None, None)  # (y, x, rule, random_mode, loading)
-        self._color = getattr(term, color)
         self._rules = rules or INTERESTING_RULES
+        # Build 64-color palette via HSV interpolation
+        c1, c2 = _parse_color(fg_color1), _parse_color(fg_color2)
+        bg_rgb = _parse_color(bg_color)
+        long_path = palette_path == 'long'
+        bg_seq = term.on_color_rgb(*bg_rgb)
+        self._palette = [
+            term.color_rgb(*_interpolate_hsv(c1, c2, i / 63, long_path)) + bg_seq
+            for i in range(64)
+        ]
+        self._normal = term.normal
+        # For rule diagram, use a simple color with the background
+        self._ui_color = term.color_rgb(*c2) + bg_seq
         self._auto_angle = random.uniform(0, 2 * math.pi) if autoscroll else 0
         self._auto_xy, self._turn_timer = [0.0, 0.0], 0.0
         self._last_rule_change = self._last_frame = self._start_time = time.monotonic()
@@ -197,16 +248,29 @@ class Pager:
         self.rule = rule % 256
         self._dirty = self._refresh_all = True
 
+    def _colored_sextants(self, line_bytes):
+        """Generator yielding sextant chars with color escapes only on change."""
+        last = None
+        for b in line_bytes:
+            seq = self._palette[b]
+            if seq != last:
+                yield seq
+                last = seq
+            yield SEXTANT[b]
+        yield self._normal
+
     def _render_row(self, rule, base_r, viewport_x, width):
-        line = self.engine.get_sextant_line(rule, base_r)
-        if line is None:
+        """Render a row of sextants with HSV-interpolated colors."""
+        line_bytes = self.engine.get_sextant_line(rule, base_r)
+        if line_bytes is None:
             return None
-        return line[viewport_x // 2:viewport_x // 2 + width]
+        sliced = line_bytes[viewport_x // 2:viewport_x // 2 + width]
+        return ''.join(self._colored_sextants(sliced))
 
     def _draw_rule(self):
         t, rl = self.term, self.rule
         pad = ' ' * max(0, (t.width - 63) // 2)
-        c, n = self._color, t.normal
+        c, n = self._ui_color, self._normal
 
         def input_row(i):
             l, m, r = (FULL_BLOCK if i & b else ' ' for b in (4, 2, 1))
@@ -244,7 +308,7 @@ class Pager:
             else:
                 rows_data.append(row)
         for sy, row_data in enumerate(rows_data):
-            content = '.' * gw if row_data is None else self._color(row_data)
+            content = '.' * gw if row_data is None else row_data
             out.append(t.move_yx(start_y + sy, 0) + content)
         if self._loading:
             msg = ' please wait '
@@ -431,8 +495,14 @@ def main():
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     p.add_argument('--autoscroll', action='store_true', help='auto-pan mode')
     p.add_argument('--fullscreen', action='store_true', help='fullscreen mode (no UI)')
-    p.add_argument('--color', default='lightsteelblue2_on_midnightblue',
-                   help='color scheme (e.g. green_on_black)')
+    p.add_argument('--foreground-color1', default='mediumpurple2',
+                   help='foreground color for empty cells (X11 name or #hex)')
+    p.add_argument('--foreground-color2', default='goldenrod1',
+                   help='foreground color for filled cells (X11 name or #hex)')
+    p.add_argument('--background-color', default='black',
+                   help='background color (X11 name or #hex)')
+    p.add_argument('--palette-path', choices=['short', 'long'], default='short',
+                   help='hue interpolation path (short=direct, long=around)')
     p.add_argument('--width', type=int, default=1000, help='simulation width (max rows)')
     p.add_argument('--rule-change-seconds', type=float, default=20,
                    help='auto-change rule interval (0 to disable)')
@@ -446,12 +516,16 @@ def main():
                    help='seconds for one full speed oscillation cycle')
     a = p.parse_args()
     speed_range = tuple(int(x) for x in a.speed_range.split('-'))
-    Pager(term=Terminal(), engine=CAEngine(max_rows=a.width),
+    engine = CAEngine(max_rows=a.width)
+    Pager(term=Terminal(), engine=engine,
           autoscroll=a.autoscroll,
           rule_change_secs=a.rule_change_seconds,
           rules=a.rules or INTERESTING_RULES,
           fullscreen=a.fullscreen,
-          color=a.color,
+          fg_color1=a.foreground_color1,
+          fg_color2=a.foreground_color2,
+          bg_color=a.background_color,
+          palette_path=a.palette_path,
           default_state=a.default_state,
           speed_range=speed_range,
           oscillation_rate=a.oscillation_rate).run()
