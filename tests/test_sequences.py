@@ -742,16 +742,8 @@ def test_truncate_default(all_terms):
     """Ensure that terminal.truncate functions with the default argument."""
     @as_subprocess
     def child(kind):
-        # std imports
-        import fcntl
-        import struct
-        import termios
         # local
         from blessed import Terminal
-
-        # Set pty to a known width
-        val = struct.pack('HHHH', 25, 80, 0, 0)
-        fcntl.ioctl(sys.__stdout__.fileno(), termios.TIOCSWINSZ, val)
 
         term = Terminal(kind)
         assert term.width == 80
@@ -761,6 +753,8 @@ def test_truncate_default(all_terms):
         assert term.length(trunc) <= term.width
         assert term.truncate(term.red('x' * 1000)) == term.red('x' * term.width)
 
+    pty_test(child, all_terms, test_name='test_truncate_default')
+ 
     child(all_terms)
 
 
