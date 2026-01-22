@@ -35,7 +35,6 @@ classifiers = [
     'Operating System :: POSIX',
     'Operating System :: Microsoft :: Windows',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.7',
     'Programming Language :: Python :: 3.8',
     'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
@@ -58,7 +57,7 @@ license-files = ['LICENSE']
 keywords = ['terminal', 'sequences', 'tty', 'curses', 'ncurses', 'formatting',
             'style', 'color', 'console', 'keyboard', 'ansi', 'xterm']
 readme = 'docs/intro.rst'
-requires-python = '>=3.7'
+requires-python = '>=3.8'
 
 [project.optional-dependencies]
 docs = [

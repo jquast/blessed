@@ -13,14 +13,7 @@ import platform
 import warnings
 import contextlib
 import collections
-from typing import IO, Dict, List, Match, Tuple, Union, Optional, Generator
-
-# SupportsIndex was added in Python 3.8
-if sys.version_info >= (3, 8):
-    # std imports
-    from typing import SupportsIndex
-else:
-    SupportsIndex = int  # type: ignore
+from typing import IO, Dict, List, Match, Tuple, Union, Optional, Generator, SupportsIndex
 
 # local
 from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb

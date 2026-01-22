@@ -3,9 +3,8 @@ from __future__ import annotations
 
 # std imports
 import re
-import sys
 import textwrap
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Tuple, Pattern, Iterator, Optional, SupportsIndex
 
 # 3rd party
 from wcwidth import clip as wcwidth_clip
@@ -19,16 +18,6 @@ from blessed._capabilities import CAPABILITIES_CAUSE_MOVEMENT, CAPABILITIES_HORI
 
 if TYPE_CHECKING:  # pragma: no cover
     from blessed.terminal import Terminal
-
-# std imports
-from typing import List, Tuple, Pattern, Iterator, Optional
-
-# SupportsIndex was added in Python 3.8
-if sys.version_info >= (3, 8):
-    # std imports
-    from typing import SupportsIndex
-else:
-    SupportsIndex = int
 
 __all__ = ('Sequence', 'SequenceTextWrapper', 'iter_parse', 'measure_length')
 
