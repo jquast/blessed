@@ -30,6 +30,20 @@ demonstrates basic timed refresh of a bouncing terminal cell.
 
 .. _cnn.py:
 
+cellestial.py
+-------------
+https://github.com/jquast/blessed/blob/master/bin/cellestial.py
+
+.. figure:: https://dxtz6bzwq9sxx.cloudfront.net/demo_cellestial.gif
+
+This is an Elementary Cellular Automata browser, of the visualizations made popular by Stephen
+Wolfram. A popular "rule 30" is first displayed with random initial values and can be manipulated
+by hotkeys, or automatic viewing with arguments,
+
+::
+
+    bin/cellestial.py --autoscroll --fullscreen
+
 cnn.py
 -------------------
 https://github.com/jquast/blessed/blob/master/bin/cnn.py
