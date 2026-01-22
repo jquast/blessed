@@ -3,6 +3,9 @@
 Version History
 ===============
 
+1.27
+  * bugfix missing tests, bin, and docs folder in 1.26 release, :ghpull:`341`.
+
 1.26
   * introduced: :meth:`Terminal.detect_ambiguous_width`, :ghpull:`339`.
   * introduced: :meth:`Terminal.no_line_wrap`, context manager for attributes
