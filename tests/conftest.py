@@ -8,6 +8,16 @@ import subprocess
 # 3rd party
 import pytest
 
+try:
+    from pytest_codspeed import BenchmarkFixture  # noqa: F401  pylint: disable=unused-import
+except ImportError:
+    @pytest.fixture
+    def benchmark():
+        """No-op benchmark fixture for environments without pytest-codspeed."""
+        def _passthrough(func, *args, **kwargs):
+            return func(*args, **kwargs)
+        return _passthrough
+
 IS_WINDOWS = platform.system() == 'Windows'
 
 all_terms_params = 'xterm screen ansi vt220 rxvt cons25 linux'.split()
