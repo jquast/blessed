@@ -17,6 +17,7 @@ from wcwidth import center as wcwidth_center
 from blessed._capabilities import CAPABILITIES_CAUSE_MOVEMENT, CAPABILITIES_HORIZONTAL_DISTANCE
 
 if TYPE_CHECKING:  # pragma: no cover
+    # local
     from blessed.terminal import Terminal
 
 __all__ = ('Sequence', 'SequenceTextWrapper', 'iter_parse', 'measure_length')
@@ -439,12 +440,15 @@ class Sequence(str):
         Truncate a string in a sequence-aware manner.
 
         Any printable characters beyond ``width`` are removed, while all
-        sequences remain in place. Horizontal Sequences are first expanded
+        sequences remain in place. Horizontal sequences are first expanded
         by :meth:`padd`.
+
+        Wide characters (such as CJK or emoji) that would partially exceed
+        ``width`` are replaced with space padding to maintain exact width.
 
         :arg int width: The printable width to truncate the string to.
         :rtype: str
-        :returns: String truncated to at most ``width`` printable characters.
+        :returns: String truncated to exactly ``width`` printable characters.
         """
         # Use padd() to expand terminal-specific cursor movements to spaces,
         # then use wcwidth's clip() to truncate while preserving all sequences.
@@ -454,10 +458,9 @@ class Sequence(str):
         r"""
         Return the printable length of string containing sequences.
 
-        Strings containing ``term.left`` or ``\b`` will cause "overstrike",
-        but a length less than 0 is not ever returned. So ``_\b+`` is a
-        length of 1 (displays as ``+``), but ``\b`` alone is simply a
-        length of 0.
+        Returns the maximum horizontal cursor extent reached while processing
+        the string. Backspace and cursor-left movements do not reduce the
+        length below the maximum position reached.
 
         Some characters may consume more than one cell, mainly CJK (Chinese,
         Japanese, Korean) and Emojis and some kinds of symbols.
