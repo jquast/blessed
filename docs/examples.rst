@@ -37,7 +37,8 @@ https://github.com/jquast/blessed/blob/master/bin/cellestial.py
 .. note: animation using 3-pass pipeline,
 
       ffmpeg -i input.mp4 -vf "fps=12,scale=640:-1:flags=lanczos,palettegen" palette.png
-      ffmpeg -i input.mp4 -i palette.png -lavfi "fps=12,scale=640:-1:flags=lanczos[x];[x][1:v]paletteuse" -f gif output.gif
+      ffmpeg -i input.mp4 -i palette.png -f gif output.gif \
+        -lavfi "fps=12,scale=640:-1:flags=lanczos[x];[x][1:v]paletteuse"
       gifsicle --optimize=3 --lossy=50 output.gif > final.gif
 
 .. figure:: https://dxtz6bzwq9sxx.cloudfront.net/demo_cellestial.gif

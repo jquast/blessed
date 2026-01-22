@@ -25,6 +25,7 @@ for _b in range(1, 63):
     SEXTANT[_b] = LEFT_HALF if _u == 21 else RIGHT_HALF if _u == 42 else chr(
         0x1FB00 + _u - 1 - sum(1 for x in (21, 42) if x < _u))
 
+
 def _parse_color(name):
     """Parse color name or hex code to RGB tuple."""
     name = name.lower().strip()
@@ -325,7 +326,10 @@ class Pager:
             int((self._auto_angle % (2 * math.pi) + math.pi / 8) / (math.pi / 4)) % 8]
         auto = f' [{arrow}AUTO]' if self._autoscroll else ''
         rand = ' [RAND]' if self._random_mode else ''
-        left = f' Rule {self.rule} row:{self.viewport_y}-{end_y} col:{self.viewport_x}-{end_x}{auto}{rand} '
+        left = f' Rule {
+            self.rule} row:{
+            self.viewport_y}-{end_y} col:{
+            self.viewport_x}-{end_x}{auto}{rand} '
         right = ' ^C quit ^S auto ^F full '
         fill = t.width - len(left) - len(right)
         print(t.move_yx(y, 0) + left + '─' * max(0, fill) + right, end='', flush=True)
@@ -357,7 +361,8 @@ class Pager:
         # Oscillate speed in sine wave
         t = time.monotonic() - self._start_time
         phase = (t / self._oscillation_rate) * 2 * math.pi
-        speed = self._speed_min + (self._speed_max - self._speed_min) * (0.5 + 0.5 * math.sin(phase))
+        speed = self._speed_min + (self._speed_max - self._speed_min) * \
+            (0.5 + 0.5 * math.sin(phase))
         self._auto_xy[0] += math.cos(self._auto_angle) * speed * dt
         self._auto_xy[1] += math.sin(self._auto_angle) * speed * dt
         dx, dy = int(round(self._auto_xy[0])), int(round(self._auto_xy[1]))
@@ -427,8 +432,10 @@ class Pager:
             self._set_rule(self.rule ^ (1 << (int(inp) - 1)))
         elif inp in '][':
             delta = 1 if inp == ']' else -1
-            idx = (self._rules.index(self.rule) +
-                   delta) % len(self._rules) if self.rule in self._rules else (0 if delta > 0 else -1)
+            if self.rule in self._rules:
+                idx = (self._rules.index(self.rule) + delta) % len(self._rules)
+            else:
+                idx = 0 if delta > 0 else -1
             self._set_rule(self._rules[idx])
         elif inp in '{}':
             self._set_rule(self.rule + (1 if inp == '}' else -1))
@@ -458,7 +465,8 @@ class Pager:
         return False
 
     def run(self):
-        self.engine.start([self.rule] + [r for r in self._rules if r != self.rule], self._random_mode)
+        self.engine.start([self.rule] +
+                          [r for r in self._rules if r != self.rule], self._random_mode)
         if sys.platform != 'win32':
             signal.signal(signal.SIGWINCH, lambda *_: (setattr(self, '_dirty', True),
                           setattr(self, '_refresh_all', True)))
@@ -492,7 +500,7 @@ class Pager:
 def main():
     random.seed()
     p = argparse.ArgumentParser(description="Interactive Cellular Automata Viewer",
-                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+                                formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     p.add_argument('--autoscroll', action='store_true', help='auto-pan mode')
     p.add_argument('--fullscreen', action='store_true', help='fullscreen mode (no UI)')
     p.add_argument('--foreground-color1', default='mediumpurple2',
