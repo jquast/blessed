@@ -3,6 +3,11 @@
 Version History
 ===============
 
+*next release*
+  * improved: upgrade to wcwidth 0.3.1, improving performance of :meth:`Terminal.wrap`_,
+    :meth:`Terminal.ljust`_, and related functions, :ghpull:`344`.
+  * deprecated: Python 3.7 and earlier no longer supported. :ghpull:`344`.
+
 1.27
   * bugfix missing tests, bin, and docs folder in 1.26 release, :ghpull:`341`.
 
