@@ -410,7 +410,7 @@ class Sequence(str):
         :returns: String of ``text``, left-aligned by ``width``.
         :rtype: str
         """
-        return wcwidth_ljust(str(self), width.__index__(), fillchar, control_codes='ignore')
+        return wcwidth_ljust(self, width.__index__(), fillchar, control_codes='ignore')
 
     def rjust(self, width: SupportsIndex, fillchar: str = ' ') -> str:
         """
@@ -421,7 +421,7 @@ class Sequence(str):
         :returns: String of ``text``, right-aligned by ``width``.
         :rtype: str
         """
-        return wcwidth_rjust(str(self), width.__index__(), fillchar, control_codes='ignore')
+        return wcwidth_rjust(self, width.__index__(), fillchar, control_codes='ignore')
 
     def center(self, width: SupportsIndex, fillchar: str = ' ') -> str:
         """
@@ -432,7 +432,7 @@ class Sequence(str):
         :returns: String of ``text``, centered by ``width``.
         :rtype: str
         """
-        return wcwidth_center(str(self), width.__index__(), fillchar, control_codes='ignore')
+        return wcwidth_center(self, width.__index__(), fillchar, control_codes='ignore')
 
     def truncate(self, width: SupportsIndex) -> str:
         """
@@ -475,7 +475,7 @@ class Sequence(str):
             as ``term.clear`` will not give accurate returns, it is not
             considered lengthy (a length of 0).
         """
-        return wcwidth_width(str(self))
+        return wcwidth_width(self)
 
     def strip(self, chars: Optional[str] = None) -> str:
         """
