@@ -695,8 +695,10 @@ def test_truncate_wide_end(all_terms):
         # local
         from blessed import Terminal
         term = Terminal(kind)
-        test_string = "AB\uff23"  # ABＣ
-        assert term.truncate(test_string, 3) == "AB"
+        # ABＣ where Ｃ is width 2 - truncating to 3 fills with space
+        test_string = "AB\uff23"
+        assert term.truncate(test_string, 3) == "AB "
+        assert term.truncate(test_string, 4) == "AB\uff23"
 
     child(all_terms)
 
@@ -735,13 +737,26 @@ def test_truncate_padding(all_terms):
         child(all_terms)
 
 
+@pytest.mark.skipif(IS_WINDOWS, reason="requires fcntl")
 def test_truncate_default(all_terms):
     """Ensure that terminal.truncate functions with the default argument."""
     @as_subprocess
     def child(kind):
+        # std imports
+        import sys
+        import fcntl
+        import struct
+        import termios
         # local
         from blessed import Terminal
+
+        # Set pty to a known width
+        val = struct.pack('HHHH', 25, 80, 0, 0)
+        fcntl.ioctl(sys.__stdout__.fileno(), termios.TIOCSWINSZ, val)
+
         term = Terminal(kind)
+        assert term.width == 80
+
         test = f'Testing {term.red("attention ")}{term.blue("please.")}'
         trunc = term.truncate(test)
         assert term.length(trunc) <= term.width
@@ -762,8 +777,8 @@ def test_truncate_zwj_emoji(all_terms):
         given_zwj = '\U0001F468\u200D\U0001F469\u200D\U0001F467'
         given = given_zwj + 'ABCDEF'
 
-        # width 1: ZWJ emoji (width 2) doesn't fit
-        assert term.truncate(given, 1) == ''
+        # width 1: ZWJ emoji (width 2) doesn't fit, replaced with space
+        assert term.truncate(given, 1) == ' '
         # width 2: ZWJ emoji fits exactly
         assert term.truncate(given, 2) == given_zwj
         # width 5: ZWJ (2) + ABC (3) = 5
@@ -782,12 +797,12 @@ def test_truncate_vs16_emoji(all_terms):
         from blessed import Terminal
         term = Terminal(kind)
 
-        # Heart ❤ (U+2764) + VS-16 has width 2; truncating to 1 strips VS-16,
-        # it has a "text-style" and is (controversially) considered width of 1
-        assert term.truncate('\u2764\uFE0F', 1) == '\u2764'
+        # Heart ❤ (U+2764) + VS-16 has width 2; truncating to 1 fills with space
+        # since the grapheme cluster cannot be split
+        assert term.truncate('\u2764\uFE0F', 1) == ' '
         assert term.truncate('\u2764\uFE0F', 2) == '\u2764\uFE0F'
         assert term.truncate('X\u2764\uFE0F', 1) == 'X'
-        assert term.truncate('X\u2764\uFE0F', 2) == 'X\u2764'
+        assert term.truncate('X\u2764\uFE0F', 2) == 'X '
         assert term.truncate('X\u2764\uFE0F', 3) == 'X\u2764\uFE0F'
 
     child(all_terms)
