@@ -14,6 +14,7 @@ Welcome to Blessed documentation!
    dec_modes
    location
    measuring
+   sequences
    sixel
    examples
    api
