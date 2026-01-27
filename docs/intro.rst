@@ -38,9 +38,15 @@ Examples
 --------
 
 .. figure:: https://dxtz6bzwq9sxx.cloudfront.net/blessed_demo_intro.gif
-   :alt: Animations of x11-colorpicker.py, bounce.py, worms.py, and plasma.py
+   :alt: animations of x11-colorpicker.py, bounce.py, worms.py, and plasma.py
 
-   x11-colorpicker.py_, bounce.py_, worms.py_, and plasma.py_, from our repository.
+   x11-colorpicker.py_, bounce.py_, worms.py_, and plasma.py_ demonstration
+   programs from our repository.
+
+.. figure:: https://dxtz6bzwq9sxx.cloudfront.net/demo_cellestial.gif
+   :alt: colored and dimensional cellular automata in scrolling animation
+
+   cellestial.py_ demonstration program from our repository.
 
 Exemplary 3rd-party examples which use *blessed*,
 
@@ -54,11 +60,6 @@ Exemplary 3rd-party examples which use *blessed*,
 
    cursewords_ is "graphical" command line program for solving crossword puzzles in the terminal.
 
-.. figure:: https://dxtz6bzwq9sxx.cloudfront.net/demo_3rdparty_githeat.gif
-   :alt: Animation of 'githeat.interactive', using blessed repository at the time of capture.
-
-   GitHeat_ builds an interactive heatmap of git history.
-
 .. figure:: https://dxtz6bzwq9sxx.cloudfront.net/demo_3rdparty_dashing.gif
    :alt: Animations from 'Dashing' (By the author of Dashing, from their README)
 
@@ -68,11 +69,6 @@ Exemplary 3rd-party examples which use *blessed*,
    :alt: Animations from 'Enlighten' (By the author of Enlighten, from their README)
 
    Enlighten_ is a console progress bar library that allows simultaneous output without redirection.
-
-.. figure:: https://dxtz6bzwq9sxx.cloudfront.net/blessed_3rdparty_macht.gif
-   :alt: Demonstration of 'macht', a 2048 clone
-
-   macht_ is a clone of the (briefly popular) puzzle game, 2048.
 
 Requirements
 ------------
@@ -203,6 +199,7 @@ The same program with *Blessed* is simply:
 .. _bounce.py: https://blessed.readthedocs.io/en/stable/examples.html#bounce-py
 .. _worms.py: https://blessed.readthedocs.io/en/stable/examples.html#worms-py
 .. _plasma.py: https://blessed.readthedocs.io/en/stable/examples.html#plasma-py
+.. _cellestial.py: https://blessed.readthedocs.io/en/latest/examples.html#cellestial-py
 .. _Voltron: https://github.com/snare/voltron
 .. _cursewords: https://github.com/thisisparker/cursewords
 .. _GitHeat: https://github.com/AmmsA/Githeat
