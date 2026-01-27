@@ -281,7 +281,11 @@ def test_sequence_length(all_terms):
         # accounted for as a "length", as <x><move right 10><y>
         # will result in a printed column length of 12 (even
         # though columns 2-11 are non-destructive space
-        assert term.length('x\b') == 0
+
+        # NOTE: As of wcwidth 0.3.0, length() returns "maximum extent" rather
+        # than "effective length after destructive cursor movements". So 'x\b'
+        # returns 1 (cursor reached column 1) not 0 (cursor ended at column 0).
+        assert term.length('x\b') == 1
         assert term.strip('x\b') == ''
 
         # characters where wcwidth returns -1
@@ -291,11 +295,13 @@ def test_sequence_length(all_terms):
         assert term.length('\t') in {8, 9}
         assert term.strip('\t') == ''
 
-        assert term.length(f'_{term.move_left}') == 0
+        # NOTE: With wcwidth 0.3.0, these return "maximum extent" not "final position"
+        assert term.length(f'_{term.move_left}') == 1
         assert term.length(term.move_right) == 1
 
         if term.cub:
-            assert term.length(f'{"_" * 10}{term.cub(10)}') == 0
+            # cursor moved right 10, then back 10 - max extent was 10
+            assert term.length(f'{"_" * 10}{term.cub(10)}') == 10
 
         if term.cuf:
             assert term.length(term.cuf(10)) == 10

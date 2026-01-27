@@ -337,11 +337,20 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         pid, master_fd = pty.fork()
 
-    # Set PTY window size in parent before child starts reading
     if pid != 0:
+        # Parent: set up PTY before child proceeds
+        # Turn off echo first to prevent semaphore from appearing in output
+        attrs = termios.tcgetattr(master_fd)
+        attrs[3] = attrs[3] & ~termios.ECHO
+        termios.tcsetattr(master_fd, termios.TCSANOW, attrs)
+        # Set window size
         _setwinsize(master_fd, rows, cols)
+        # Signal child that setup is complete
+        os.write(master_fd, SEND_SEMAPHORE)
 
     if pid == 0:  # Child process
+        # Wait for parent to complete setup (window size, echo off, etc.)
+        read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         cov = init_subproc_coverage(test_name)
         try:
             term = TestTerminal()
@@ -370,11 +379,10 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
             cov.save()
         os._exit(0)
 
-    # Parent process
-    with echo_off(master_fd):
-        if parent_func is not None:
-            parent_func(master_fd)
-        output = read_until_eof(master_fd)
+    # Parent process - echo is already off from above
+    if parent_func is not None:
+        parent_func(master_fd)
+    output = read_until_eof(master_fd)
 
     # Use non-blocking wait with timeout to detect hung child processes
     timeout = 5.0  # 5 second timeout

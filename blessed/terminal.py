@@ -13,14 +13,7 @@ import platform
 import warnings
 import contextlib
 import collections
-from typing import IO, Dict, List, Match, Tuple, Union, Optional, Generator
-
-# SupportsIndex was added in Python 3.8
-if sys.version_info >= (3, 8):
-    # std imports
-    from typing import SupportsIndex
-else:
-    SupportsIndex = int  # type: ignore
+from typing import IO, Dict, List, Match, Tuple, Union, Optional, Generator, SupportsIndex
 
 # local
 from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
@@ -2481,12 +2474,16 @@ class Terminal():
 
     def truncate(self, text: str, width: Optional[SupportsIndex] = None) -> str:
         r"""
-        Truncate ``text`` to maximum ``width`` printable characters, retaining terminal sequences.
+        Truncate ``text`` to ``width`` printable characters, retaining terminal sequences.
+
+        Wide characters (such as CJK or emoji) that would partially exceed
+        ``width`` are replaced with space padding to maintain exact width.
 
         :arg str text: Text to truncate
-        :arg int width: The maximum width to truncate it to
+        :arg int width: The width to truncate to. If unspecified, the whole
+            width of the terminal is used.
         :rtype: str
-        :returns: ``text`` truncated to at most ``width`` printable characters
+        :returns: ``text`` truncated to exactly ``width`` printable characters
 
         >>> term.truncate('xyz\x1b[0;3m', 2)
         'xy\x1b[0;3m'
@@ -2499,10 +2496,13 @@ class Terminal():
         """
         Return printable length of a string containing sequences.
 
+        Returns the maximum horizontal cursor extent reached while processing
+        the string. Backspace and cursor-left movements do not reduce the
+        length below the maximum position reached.
+
         :arg str text: String to measure. May contain terminal sequences.
         :rtype: int
-        :returns: The number of terminal character cells the string will occupy
-            when printed
+        :returns: The maximum terminal character cell position reached
 
         Wide characters that consume 2 character cells are supported:
 

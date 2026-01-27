@@ -9,7 +9,8 @@ import pytest
 
 # local
 from .conftest import IS_WINDOWS
-from .accessories import MockTigetstr, TestTerminal, unicode_cap, unicode_parm, as_subprocess
+from .accessories import (
+    MockTigetstr, TestTerminal, unicode_cap, unicode_parm, as_subprocess, pty_test)
 
 try:
     # std imports
@@ -678,12 +679,11 @@ def test_truncate(all_terms):
             test_l = term.length(term.truncate(test_string, i))
             assert test_l == len(stripped_string[:i])
 
-        test_nogood = (
-            f'{term.red("Testing")} {term.yellow("makes")} {term.green("me")} '
-            f'{term.blue("feel")} {term.indigo("")}{term.normal}'
-        )
-        trunc = term.truncate(test_string, term.length(test_string) - len("good"))
-        assert trunc == test_nogood
+        # Verify truncating removes "good" - check length and visible content
+        target_width = term.length(test_string) - len("good")
+        trunc = term.truncate(test_string, target_width)
+        assert term.length(trunc) == target_width
+        assert term.strip_seqs(trunc) == "Testing makes me feel "
 
     child(all_terms)
 
@@ -695,28 +695,33 @@ def test_truncate_wide_end(all_terms):
         # local
         from blessed import Terminal
         term = Terminal(kind)
-        test_string = "AB\uff23"  # ABＣ
-        assert term.truncate(test_string, 3) == "AB"
+        # ABＣ where Ｃ is width 2 - truncating to 3 fills with space
+        test_string = "AB\uff23"
+        assert term.truncate(test_string, 3) == "AB "
+        assert term.truncate(test_string, 4) == "AB\uff23"
 
     child(all_terms)
 
 
 def test_truncate_wcwidth_clipping(all_terms):
-    """Ensure that terminal.truncate has the correct behaviour for wide characters."""
+    """Ensure that terminal.truncate has the correct behaviour for control characters."""
     @as_subprocess
     def child(kind):
         # local
         from blessed import Terminal
         term = Terminal(kind)
         assert term.truncate("", 4) == ""
+        # Control character \x01 has zero width
         test_string = term.blue("one\x01two")
-        assert term.truncate(test_string, 4) == term.blue("one\x01t")
+        trunc = term.truncate(test_string, 4)
+        assert term.length(trunc) == 4
+        assert term.strip_seqs(trunc) == "one\x01t"
 
     child(all_terms)
 
 
 def test_truncate_padding(all_terms):
-    """Ensure that terminal.truncate has the correct behaviour for wide characters."""
+    """Ensure that terminal.truncate correctly handles cursor movement sequences."""
     @as_subprocess
     def child(kind):
         # local
@@ -725,29 +730,36 @@ def test_truncate_padding(all_terms):
 
         if term.move_right(5):
             test_right_string = term.blue(f"one{term.move_right(5)}two")
-            assert term.truncate(test_right_string, 9) == term.blue("one     t")
+            trunc = term.truncate(test_right_string, 9)
+            assert term.length(trunc) == 9
+            assert term.strip_seqs(trunc) == "one     t"
 
         test_bs_string = term.blue("one\b\b\btwo")
-        assert term.truncate(test_bs_string, 3) == term.blue("two")
+        trunc_bs = term.truncate(test_bs_string, 3)
+        assert term.length(trunc_bs) == 3
+        assert term.strip_seqs(trunc_bs) == "two"
 
     if all_terms != 'vtwin10':
         # padding doesn't work the same on windows !
         child(all_terms)
 
 
-def test_truncate_default(all_terms):
+@pytest.mark.skipif(IS_WINDOWS, reason="requires fcntl")
+def test_truncate_default():
     """Ensure that terminal.truncate functions with the default argument."""
-    @as_subprocess
-    def child(kind):
-        # local
-        from blessed import Terminal
-        term = Terminal(kind)
+    def child(term):
+        assert term.width == 80
+
         test = f'Testing {term.red("attention ")}{term.blue("please.")}'
         trunc = term.truncate(test)
         assert term.length(trunc) <= term.width
-        assert term.truncate(term.red('x' * 1000)) == term.red('x' * term.width)
 
-    child(all_terms)
+        # Verify truncation to terminal width with SGR propagation
+        trunc_long = term.truncate(term.red('x' * 1000))
+        assert term.length(trunc_long) == term.width
+        assert term.strip_seqs(trunc_long) == 'x' * term.width
+
+    pty_test(child, parent_func=None, test_name='test_truncate_default')
 
 
 def test_truncate_zwj_emoji(all_terms):
@@ -762,8 +774,8 @@ def test_truncate_zwj_emoji(all_terms):
         given_zwj = '\U0001F468\u200D\U0001F469\u200D\U0001F467'
         given = given_zwj + 'ABCDEF'
 
-        # width 1: ZWJ emoji (width 2) doesn't fit
-        assert term.truncate(given, 1) == ''
+        # width 1: ZWJ emoji (width 2) doesn't fit, replaced with space
+        assert term.truncate(given, 1) == ' '
         # width 2: ZWJ emoji fits exactly
         assert term.truncate(given, 2) == given_zwj
         # width 5: ZWJ (2) + ABC (3) = 5
@@ -782,12 +794,12 @@ def test_truncate_vs16_emoji(all_terms):
         from blessed import Terminal
         term = Terminal(kind)
 
-        # Heart ❤ (U+2764) + VS-16 has width 2; truncating to 1 strips VS-16,
-        # it has a "text-style" and is (controversially) considered width of 1
-        assert term.truncate('\u2764\uFE0F', 1) == '\u2764'
+        # Heart ❤ (U+2764) + VS-16 has width 2; truncating to 1 fills with space
+        # since the grapheme cluster cannot be split
+        assert term.truncate('\u2764\uFE0F', 1) == ' '
         assert term.truncate('\u2764\uFE0F', 2) == '\u2764\uFE0F'
         assert term.truncate('X\u2764\uFE0F', 1) == 'X'
-        assert term.truncate('X\u2764\uFE0F', 2) == 'X\u2764'
+        assert term.truncate('X\u2764\uFE0F', 2) == 'X '
         assert term.truncate('X\u2764\uFE0F', 3) == 'X\u2764\uFE0F'
 
     child(all_terms)

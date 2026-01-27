@@ -3,31 +3,22 @@ from __future__ import annotations
 
 # std imports
 import re
-import sys
-import math
 import textwrap
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Tuple, Pattern, Iterator, Optional, SupportsIndex
 
 # 3rd party
-from wcwidth import wcwidth, wcswidth
-from wcwidth.wcwidth import _bisearch
-from wcwidth.table_vs16 import VS16_NARROW_TO_WIDE
+from wcwidth import clip as wcwidth_clip
+from wcwidth import ljust as wcwidth_ljust
+from wcwidth import rjust as wcwidth_rjust
+from wcwidth import width as wcwidth_width
+from wcwidth import center as wcwidth_center
 
 # local
 from blessed._capabilities import CAPABILITIES_CAUSE_MOVEMENT, CAPABILITIES_HORIZONTAL_DISTANCE
 
 if TYPE_CHECKING:  # pragma: no cover
+    # local
     from blessed.terminal import Terminal
-
-# std imports
-from typing import List, Tuple, Pattern, Iterator, Optional
-
-# SupportsIndex was added in Python 3.8
-if sys.version_info >= (3, 8):
-    # std imports
-    from typing import SupportsIndex
-else:
-    SupportsIndex = int
 
 __all__ = ('Sequence', 'SequenceTextWrapper', 'iter_parse', 'measure_length')
 
@@ -415,120 +406,68 @@ class Sequence(str):
         """
         Return string containing sequences, left-adjusted.
 
-        :arg int width: Total width given to left-adjust ``text``.  If
-            unspecified, the width of the attached terminal is used (default).
+        :arg int width: Total width given to left-adjust ``text``.
         :arg str fillchar: String for padding right-of ``text``.
         :returns: String of ``text``, left-aligned by ``width``.
         :rtype: str
         """
-        rightside = fillchar * int(
-            (max(0.0, float(width.__index__() - self.length()))) / float(len(fillchar)))
-        return ''.join((self, rightside))
+        return wcwidth_ljust(self, width.__index__(), fillchar, control_codes='ignore')
 
     def rjust(self, width: SupportsIndex, fillchar: str = ' ') -> str:
         """
         Return string containing sequences, right-adjusted.
 
-        :arg int width: Total width given to right-adjust ``text``.  If
-            unspecified, the width of the attached terminal is used (default).
+        :arg int width: Total width given to right-adjust ``text``.
         :arg str fillchar: String for padding left-of ``text``.
         :returns: String of ``text``, right-aligned by ``width``.
         :rtype: str
         """
-        leftside = fillchar * int(
-            (max(0.0, float(width.__index__() - self.length()))) / float(len(fillchar)))
-        return ''.join((leftside, self))
+        return wcwidth_rjust(self, width.__index__(), fillchar, control_codes='ignore')
 
     def center(self, width: SupportsIndex, fillchar: str = ' ') -> str:
         """
         Return string containing sequences, centered.
 
-        :arg int width: Total width given to center ``text``.  If
-            unspecified, the width of the attached terminal is used (default).
+        :arg int width: Total width given to center ``text``.
         :arg str fillchar: String for padding left and right-of ``text``.
         :returns: String of ``text``, centered by ``width``.
         :rtype: str
         """
-        split = max(0.0, float(width.__index__()) - self.length()) / 2
-        leftside = fillchar * int(
-            (max(0.0, math.floor(split))) / float(len(fillchar)))
-        rightside = fillchar * int(
-            (max(0.0, math.ceil(split))) / float(len(fillchar)))
-        return ''.join((leftside, self, rightside))
+        return wcwidth_center(self, width.__index__(), fillchar, control_codes='ignore')
 
     def truncate(self, width: SupportsIndex) -> str:
         """
         Truncate a string in a sequence-aware manner.
 
         Any printable characters beyond ``width`` are removed, while all
-        sequences remain in place. Horizontal Sequences are first expanded
+        sequences remain in place. Horizontal sequences are first expanded
         by :meth:`padd`.
+
+        Wide characters (such as CJK or emoji) that would partially exceed
+        ``width`` are replaced with space padding to maintain exact width.
+
+        SGR (terminal styling) sequences are propagated: the result begins
+        with any active style at the start position and ends with a reset
+        sequence if styles were active.
 
         :arg int width: The printable width to truncate the string to.
         :rtype: str
-        :returns: String truncated to at most ``width`` printable characters.
+        :returns: String truncated to exactly ``width`` printable characters.
         """
-        # This is a *modified copy* of wcwidth.wcswidth, modified for this
-        # forward-looking "trim" function, and interleaved with our own
-        # iter_parse() function.
-        output = ""
-        current_width = 0
-        target_width = width.__index__()
-        last_measured_char = None
-        skip_next_measure = False
-
-        # Retain all text until non-cap width reaches desired width
-        parsed_seq = iter_parse(self._term, self.padd())
-        for text, cap in parsed_seq:
-            if not cap:
-                # ZWJ: include in output, skip measuring (0) and next char (also 0)
-                if text == '\u200D':
-                    skip_next_measure = True
-                    output += text
-                    continue
-                # After ZWJ: include but don't measure (0, matches wcswidth behavior)
-                if skip_next_measure:
-                    skip_next_measure = False
-                    output += text
-                    continue
-                # VS-16: may add +1 to width
-                if text == '\uFE0F' and last_measured_char:
-                    current_width += _bisearch(
-                        ord(last_measured_char), VS16_NARROW_TO_WIDE["9.0.0"])
-                    last_measured_char = None
-                    if current_width > target_width:
-                        break
-                    output += text
-                    continue
-                # all other cases: measure by wcwidth(), (clipped to 0 for control chars)
-                wcw = wcwidth(text)
-                if wcw > 0:
-                    last_measured_char = text
-                current_width += max(wcw, 0)
-                # we have reached the desired length -- break before appending
-                if current_width > target_width:
-                    break
-            # append character and continue measuring
-            output += text
-
-        # Return with any remaining caps appended, this is for the purpose of
-        # retaining changes of color/etc, even if the text that it preceded cannot fit,
-        # it is usually desirable to process all capabilities, such as a long string
-        # ending with a resetting '\x1b[0m' !
-        return f'{output}{"".join(text for text, cap in parsed_seq if cap)}'
+        # Use padd() to expand terminal-specific cursor movements to spaces,
+        # then use wcwidth's clip() to truncate while preserving all sequences.
+        return wcwidth_clip(self.padd(), 0, width.__index__())
 
     def length(self) -> int:
         r"""
         Return the printable length of string containing sequences.
 
-        Strings containing ``term.left`` or ``\b`` will cause "overstrike",
-        but a length less than 0 is not ever returned. So ``_\b+`` is a
-        length of 1 (displays as ``+``), but ``\b`` alone is simply a
-        length of 0.
+        Returns the maximum horizontal cursor extent reached while processing
+        the string. Backspace and cursor-left movements do not reduce the
+        length below the maximum position reached.
 
-        Some characters may consume more than one cell, mainly those CJK
-        Unified Ideographs (Chinese, Japanese, Korean) defined by Unicode
-        as half or full-width characters.
+        Some characters may consume more than one cell, mainly CJK (Chinese,
+        Japanese, Korean) and Emojis and some kinds of symbols.
 
         For example:
 
@@ -543,10 +482,7 @@ class Sequence(str):
             as ``term.clear`` will not give accurate returns, it is not
             considered lengthy (a length of 0).
         """
-        # to allow use of wcswidth without erroneous -1 return value,
-        # _CONTROL_CHAR_TABLE is used to remove any remaining
-        # unhandled C0 or C1 control characters.
-        return wcswidth(self.padd(strip=True).translate(_CONTROL_CHAR_TABLE))
+        return wcwidth_width(self)
 
     def strip(self, chars: Optional[str] = None) -> str:
         """
