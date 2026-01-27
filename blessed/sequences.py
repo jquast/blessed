@@ -446,6 +446,10 @@ class Sequence(str):
         Wide characters (such as CJK or emoji) that would partially exceed
         ``width`` are replaced with space padding to maintain exact width.
 
+        SGR (terminal styling) sequences are propagated: the result begins
+        with any active style at the start position and ends with a reset
+        sequence if styles were active.
+
         :arg int width: The printable width to truncate the string to.
         :rtype: str
         :returns: String truncated to exactly ``width`` printable characters.
