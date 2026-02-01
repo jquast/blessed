@@ -2,25 +2,13 @@
 
 
 # std imports
-import contextlib
-import ctypes
-from ctypes import wintypes
-import msvcrt  # pylint: disable=import-error
 import time
+import msvcrt  # pylint: disable=import-error
+import contextlib
 from typing import Optional, Generator
 
 # 3rd party
 from jinxed import win32  # pylint: disable=import-error
-
-# Windows API for efficient waiting (like select() on Unix)
-_kernel32 = ctypes.windll.kernel32
-_WaitForSingleObject = _kernel32.WaitForSingleObject
-_WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
-_WaitForSingleObject.restype = wintypes.DWORD
-_WAIT_OBJECT_0 = 0x00000000
-_WAIT_TIMEOUT = 0x00000102
-_WAIT_FAILED = 0xFFFFFFFF
-_INFINITE = 0xFFFFFFFF
 
 # local
 from .terminal import WINSZ
@@ -79,39 +67,30 @@ class Terminal(_Terminal):
 
         # Get the console input handle for WaitForSingleObject
         if self._keyboard_fd is not None:
-            handle = wintypes.HANDLE(msvcrt.get_osfhandle(self._keyboard_fd))
+            handle = msvcrt.get_osfhandle(self._keyboard_fd)
             # Convert timeout to milliseconds for Windows API
             if timeout is None:
-                wait_ms = _INFINITE
+                wait_ms = win32.INFINITE
             elif timeout <= 0:
                 return False  # Non-blocking, already checked above
             else:
                 wait_ms = int(timeout * 1000)
 
             # Efficient wait using Windows API (like select() on Unix)
-            result = _WaitForSingleObject(handle, wait_ms)
-            if result == _WAIT_FAILED:
-                # Fallback to polling on error
-                return self._kbhit_poll(timeout)
-            if result == _WAIT_OBJECT_0:
+            result = win32.wait_for_single_object(handle, wait_ms)
+            if result == win32.WAIT_OBJECT_0:
                 return msvcrt.kbhit()  # Double-check after wait
-            if result == _WAIT_TIMEOUT:
-                return False
-            return False  # Unexpected return value
+            return False
         else:
             # Fallback to polling if no keyboard fd
-            return self._kbhit_poll(timeout)
-
-    def _kbhit_poll(self, timeout: Optional[float]) -> bool:
-        """Fallback polling implementation for kbhit."""
-        end = time.time() + (timeout or 0)
-        while True:
-            if msvcrt.kbhit():
-                return True
-            if timeout is not None and end < time.time():
-                break
-            time.sleep(0.01)
-        return False
+            end = time.time() + (timeout or 0)
+            while True:
+                if msvcrt.kbhit():
+                    return True
+                if timeout is not None and end < time.time():
+                    break
+                time.sleep(0.001)
+            return False
 
     @staticmethod
     def _winsize(fd: int) -> WINSZ:
