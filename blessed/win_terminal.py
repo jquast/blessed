@@ -2,6 +2,7 @@
 
 
 # std imports
+import time
 import msvcrt  # pylint: disable=import-error
 import contextlib
 from typing import Optional, Generator
@@ -60,7 +61,36 @@ class Terminal(_Terminal):
         :returns: True if a keypress is awaiting to be read on the keyboard
             attached to this terminal.
         """
-        return win32.kbhit(self._keyboard_fd, timeout)
+        # Quick check first - if data is already available, return immediately
+        if msvcrt.kbhit():
+            return True
+
+        # Get the console input handle for WaitForSingleObject
+        if self._keyboard_fd is not None:
+            handle = msvcrt.get_osfhandle(self._keyboard_fd)
+            # Convert timeout to milliseconds for Windows API
+            if timeout is None:
+                wait_ms = win32.INFINITE
+            elif timeout <= 0:
+                return False  # Non-blocking, already checked above
+            else:
+                wait_ms = int(timeout * 1000)
+
+            # Efficient wait using Windows API (like select() on Unix)
+            result = win32.wait_for_single_object(handle, wait_ms)
+            if result == win32.WAIT_OBJECT_0:
+                return msvcrt.kbhit()  # Double-check after wait
+            return False
+        else:
+            # Fallback to polling if no keyboard fd
+            end = time.time() + (timeout or 0)
+            while True:
+                if msvcrt.kbhit():
+                    return True
+                if timeout is not None and end < time.time():
+                    break
+                time.sleep(0.001)
+            return False
 
     @staticmethod
     def _winsize(fd: int) -> WINSZ:
