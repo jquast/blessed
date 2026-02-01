@@ -1854,8 +1854,15 @@ class Terminal():
             # - Dumb terminals: respond to neither
             boundary_query = '\x1b[?u\x1b[c'
 
-            # Use a simple pattern that captures the full response
-            boundary_pattern = re.compile('(.+)', re.DOTALL)
+            # Use a specific pattern matching the expected kitty or DA1 response.
+            # A catch-all like (.+) would match prematurely because _read_until
+            # uses inkey() internally, and resolve_sequence() treats unrecognized
+            # CSI sequences (like \x1b[?0u) as a bare KEY_ESCAPE — causing (.+)
+            # to match on that single character before the full response arrives.
+            boundary_pattern = re.compile(
+                r'(?P<kitty>\x1b\[\?(?P<flags>[0-9]*)u)'
+                r'|(?P<da1>\x1b\[\?[0-9]+(?:;[0-9]+)*c)'
+            )
 
             match = self._query_response(boundary_query, boundary_pattern, timeout)
 
@@ -1867,34 +1874,20 @@ class Terminal():
                     self._kitty_kb_first_query_failed = True
                 return None
 
-            response_text = match.group(1)
-
-            # Check for Kitty keyboard response first
-            kitty_pattern = re.compile(r'\x1b\[\?([0-9]+)u')
-            kitty_match = kitty_pattern.search(response_text)
-
-            if kitty_match:
+            if match.group('kitty'):
                 # Kitty response found - parse and return flags
                 # (doesn't matter if DA1 also responded or not)
-                flags_value = int(kitty_match.group(1))
+                flags_str = match.group('flags')
+                flags_value = int(flags_str) if flags_str else 0
                 return KittyKeyboardProtocol(flags_value)
 
-            # Check for DA1 response
-            da1_pattern = re.compile(r'\x1b\[\?([0-9]+)(?:;[0-9]+)*c')
-            da1_match = da1_pattern.search(response_text)
-
-            if da1_match:
-                # Only DA1 response found, no Kitty support
-                self._kitty_kb_first_query_failed = True
-                return None
-
-            # Neither response found - no support
+            # Only DA1 response found, no Kitty support
             self._kitty_kb_first_query_failed = True
             return None
 
         # Subsequent calls or forced calls use the standard single-query approach
         query = '\x1b[?u'
-        response_pattern = re.compile('\x1b\\[\\?([0-9]+)u')
+        response_pattern = re.compile('\x1b\\[\\?([0-9]*)u')
 
         match = self._query_response(query, response_pattern, timeout)
 
@@ -1904,7 +1897,8 @@ class Terminal():
             return None
 
         # parse and return the response value (no caching)
-        flags_value = int(match.group(1))
+        flags_str = match.group(1)
+        flags_value = int(flags_str) if flags_str else 0
         return KittyKeyboardProtocol(flags_value)
 
     @contextlib.contextmanager

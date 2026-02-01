@@ -3,6 +3,9 @@
 Version History
 ===============
 
+1.29
+  * bugfix: :meth:`Terminal.get_kitty_keyboard_state` failed to match :ghpull:`348`.
+
 1.28
   * improved: upgrade to wcwidth 0.5, improving performance and correctness
     of :meth:`Terminal.wrap`, :meth:`Terminal.ljust`, and related functions, :ghpull:`344`.

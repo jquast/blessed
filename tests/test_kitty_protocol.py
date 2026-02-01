@@ -1511,3 +1511,22 @@ def test_kitty_keyboard_protocol_equality_with_other_types():
     assert protocol is not None
     assert protocol != [15]
     assert protocol != {'value': 15}
+
+
+@pytest.mark.parametrize("response,expected_flags", [
+    ('\x1b[?0u', 0),
+    ('\x1b[?u', 0),
+    ('\x1b[?9u', 9),
+])
+def test_kitty_state_boundary_kitty_only_response(response, expected_flags):
+    """Test boundary approach with kitty-only response (no DA1)."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        term._is_a_tty = True
+        term.ungetch(response)
+        flags = term.get_kitty_keyboard_state(timeout=0.01)
+        assert flags is not None
+        assert flags.value == expected_flags
+        assert term._kitty_kb_first_query_failed is False
+    child()
