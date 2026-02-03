@@ -1409,14 +1409,13 @@ def _read_until(term: 'Terminal',
     must ensure any such keyboard data is well-received by the next call to
     term.inkey() without delay.
     """
+    # Maximum buffer size to prevent runaway condition -- one such example is automatic terminal
+    # responses that get echoed back indefinitely in an accidental LINEMODE telnet server. 64KB is
+    # far more than any legitimate automatic terminal response could be.
+    max_buffer_size = 65536
+
     stime = time.time()
     match, buf = None, ''
-
-    # first, buffer all pending data. pexpect library provides a
-    # 'searchwindowsize' attribute that limits this memory region.  We're not
-    # concerned about OOM conditions: only (human) keyboard input and terminal
-    # response sequences are expected.
-
     while True:  # pragma: no branch
         # block as long as necessary to ensure at least one character is
         # received on input or remaining timeout has elapsed.
@@ -1427,6 +1426,9 @@ def _read_until(term: 'Terminal',
         # for short timeout periods.
         while ucs:
             buf += ucs
+            # Check buffer size limit to catch echo loops early
+            if len(buf) > max_buffer_size:
+                break
             ucs = term.inkey(timeout=0, esc_delay=0)
 
         match = re.search(pattern=pattern, string=buf)
@@ -1436,6 +1438,10 @@ def _read_until(term: 'Terminal',
 
         if timeout is not None and not _time_left(stime, timeout):
             # timeout
+            break
+
+        if len(buf) > max_buffer_size:
+            # buffer overflow - likely an echo loop or misbehaving terminal
             break
 
     return match, buf

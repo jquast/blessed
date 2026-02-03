@@ -890,6 +890,29 @@ def test_read_until_loop_continuation():
     assert output == 'LOOP_CONTINUED'
 
 
+def test_read_until_max_buffer_size():
+    """Test _read_until stops when buffer exceeds max size limit."""
+    from blessed.keyboard import _read_until
+
+    term = TestTerminal(is_a_tty=True)
+    term._line_buffered = False
+    term._keyboard_fd = 0
+
+    chars = iter('x' * 70000)
+
+    def mock_inkey(timeout=None, esc_delay=None):
+        try:
+            return next(chars)
+        except StopIteration:
+            return ''
+
+    with mock.patch.object(term, 'inkey', side_effect=mock_inkey):
+        match, buf = _read_until(term, r'NEVER_MATCH', timeout=1.0)
+
+    assert match is None
+    assert len(buf) == 65537
+
+
 def test_esc_delay_while_loop_with_continued_input():
     """Test ESC key delay while loop when receiving a complete escape sequence incrementally."""
     def child(term):
