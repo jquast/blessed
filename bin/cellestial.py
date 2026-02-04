@@ -9,9 +9,25 @@ import random
 import signal
 import sys
 import time
+import warnings
 
 from blessed import Terminal
 from blessed.colorspace import X11_COLORNAMES_TO_RGB, hex_to_rgb
+
+
+def _make_terminal(**kwargs):
+    # be more forgiving about terminals, this might be something we
+    # want directly in the system .. i'm not sure ..
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        term = Terminal(**kwargs)
+    if any("setupterm" in str(w.message) for w in caught):
+        kind = os.environ.get("TERM", "")
+        kwargs["kind"] = "xterm" if kind.startswith("xterm") else "ansi"
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            term = Terminal(**kwargs)
+    return term
 
 FULL_BLOCK, LEFT_HALF, RIGHT_HALF = '\u2588', '\u258C', '\u2590'
 INTERESTING_RULES = [18, 22, 26, 30, 45, 60, 75, 82, 86, 89, 90, 101, 102, 105, 109, 110,
@@ -525,7 +541,7 @@ def main():
     a = p.parse_args()
     speed_range = tuple(int(x) for x in a.speed_range.split('-'))
     engine = CAEngine(max_rows=a.width)
-    Pager(term=Terminal(), engine=engine,
+    Pager(term=_make_terminal(), engine=engine,
           autoscroll=a.autoscroll,
           rule_change_secs=a.rule_change_seconds,
           rules=a.rules or INTERESTING_RULES,
