@@ -30,8 +30,7 @@ from .keyboard import (DEFAULT_ESCDELAY,
                        get_keyboard_sequences)
 from .dec_modes import DecPrivateMode as _DecPrivateMode
 from .dec_modes import DecModeResponse
-from wcwidth import wrap as wcwidth_wrap
-from .sequences import Termcap, Sequence, SequenceTextWrapper
+from .sequences import Termcap, Sequence
 from .colorspace import RGB_256TABLE, hex_to_rgb, rgb_to_hex, xparse_color
 from .formatters import (COLORS,
                          COMPOUNDABLES,
@@ -46,6 +45,13 @@ from ._capabilities import (CAPABILITY_DATABASE,
                             CAPABILITIES_ADDITIVES,
                             CAPABILITIES_RAW_MIXIN,
                             CAPABILITIES_HORIZONTAL_DISTANCE)
+
+# 3rd party
+from wcwidth import (center as wcwidth_center,
+                     ljust as wcwidth_ljust,
+                     rjust as wcwidth_rjust,
+                     width as wcwidth_width,
+                     wrap as wcwidth_wrap)
 
 # isort: off
 
@@ -2435,7 +2441,7 @@ class Terminal():
         # the vocabulary error of the str method for polymorphism.
         if width is None:
             width = self.width
-        return Sequence(text, self).ljust(width, fillchar)
+        return wcwidth_ljust(text, width.__index__(), fillchar, control_codes='ignore')
 
     def rjust(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
@@ -2450,7 +2456,7 @@ class Terminal():
         """
         if width is None:
             width = self.width
-        return Sequence(text, self).rjust(width, fillchar)
+        return wcwidth_rjust(text, width.__index__(), fillchar, control_codes='ignore')
 
     def center(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
@@ -2465,7 +2471,7 @@ class Terminal():
         """
         if width is None:
             width = self.width
-        return Sequence(text, self).center(width, fillchar)
+        return wcwidth_center(text, width.__index__(), fillchar, control_codes='ignore')
 
     def truncate(self, text: str, width: Optional[SupportsIndex] = None) -> str:
         r"""
@@ -2510,7 +2516,7 @@ class Terminal():
             (y, x)(0, 0), are evaluated as a printable length of
             *0*.
         """
-        return Sequence(text, self).length()
+        return wcwidth_width(text)
 
     def strip(self, text: str, chars: Optional[str] = None) -> str:
         r"""
