@@ -3,15 +3,15 @@ from __future__ import annotations
 
 # std imports
 import re
-from typing import TYPE_CHECKING, List, Tuple, Pattern, Iterator, Optional, SupportsIndex
+from typing import TYPE_CHECKING, Tuple, Pattern, Iterator, Optional, SupportsIndex
 
 # 3rd party
+from wcwidth import SequenceTextWrapper  # noqa: F401  # re-exported for API compatibility
 from wcwidth import clip as wcwidth_clip
 from wcwidth import ljust as wcwidth_ljust
 from wcwidth import rjust as wcwidth_rjust
 from wcwidth import width as wcwidth_width
 from wcwidth import center as wcwidth_center
-from wcwidth import SequenceTextWrapper  # noqa: F401  # re-exported for API compatibility
 
 # local
 from blessed._capabilities import CAPABILITIES_CAUSE_MOVEMENT, CAPABILITIES_HORIZONTAL_DISTANCE

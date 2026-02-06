@@ -15,6 +15,13 @@ import contextlib
 import collections
 from typing import IO, Dict, List, Match, Tuple, Union, Optional, Generator, SupportsIndex
 
+# 3rd party
+from wcwidth import wrap as wcwidth_wrap
+from wcwidth import ljust as wcwidth_ljust
+from wcwidth import rjust as wcwidth_rjust
+from wcwidth import width as wcwidth_width
+from wcwidth import center as wcwidth_center
+
 # local
 from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
 from .keyboard import (DEFAULT_ESCDELAY,
@@ -45,13 +52,6 @@ from ._capabilities import (CAPABILITY_DATABASE,
                             CAPABILITIES_ADDITIVES,
                             CAPABILITIES_RAW_MIXIN,
                             CAPABILITIES_HORIZONTAL_DISTANCE)
-
-# 3rd party
-from wcwidth import (center as wcwidth_center,
-                     ljust as wcwidth_ljust,
-                     rjust as wcwidth_rjust,
-                     width as wcwidth_width,
-                     wrap as wcwidth_wrap)
 
 # isort: off
 
@@ -2610,6 +2610,7 @@ class Terminal():
         :arg \**kwargs: See :py:class:`textwrap.TextWrapper`
         :rtype: list
         :returns: List of wrapped lines
+        :raises ValueError: for non-positive values of ``width``.
 
         See :class:`textwrap.TextWrapper` for keyword arguments that can
         customize wrapping behaviour.
