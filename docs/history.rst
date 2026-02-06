@@ -2,6 +2,8 @@
 
 Version History
 ===============
+1.30
+  * bugfix: Terminal.wrap drops color escape sequences, :ghpull:`352`.
 
 1.29
   * bugfix: :meth:`Terminal.get_kitty_keyboard_state` failed to match :ghpull:`348`.

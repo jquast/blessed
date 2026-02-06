@@ -368,7 +368,7 @@ def measure_length(text: str, term: 'Terminal') -> int:
     :rtype: int
     :returns: Length of the first sequence in the string
 
-    .. deprecated:: 1.12.0
+    .. deprecated:: 1.30.0
     """
     try:
         text, capability = next(iter_parse(term, text))
