@@ -30,6 +30,7 @@ from .keyboard import (DEFAULT_ESCDELAY,
                        get_keyboard_sequences)
 from .dec_modes import DecPrivateMode as _DecPrivateMode
 from .dec_modes import DecModeResponse
+from wcwidth import wrap as wcwidth_wrap
 from .sequences import Termcap, Sequence, SequenceTextWrapper
 from .colorspace import RGB_256TABLE, hex_to_rgb, rgb_to_hex, xparse_color
 from .formatters import (COLORS,
@@ -2608,11 +2609,14 @@ class Terminal():
         customize wrapping behaviour.
         """
         width = self.width if width is None else width
-        wrapper = SequenceTextWrapper(width=width, term=self, **kwargs)
+        if not isinstance(width, int) or width <= 0:
+            raise ValueError(
+                f"invalid width {width!r}({type(width)!r}) (must be integer > 0)"
+            )
         lines: List[str] = []
         for line in text.splitlines():
-            lines.extend(iter(wrapper.wrap(line)) if line.strip() else ('',))
-
+            lines.extend(
+                wcwidth_wrap(line, width=width, **kwargs) if line.strip() else ('',))
         return lines
 
     def getch(self, decode_latin1: bool = False) -> str:

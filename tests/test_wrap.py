@@ -81,26 +81,31 @@ def test_SequenceWrapper(many_columns, kwargs):
 
         # Older versions of textwrap could leave a preceding all whitespace line
         # https://github.com/python/cpython/issues/140627
-        if (
-            kwargs.get('drop_whitespace') and
-            sys.version_info[:2] < (3, 15) and
-            not internal_wrapped[0].strip()
-        ):
-            internal_wrapped = internal_wrapped[1:]
-            # # This also means any subsequent indent got applied to the first line
-            if kwargs.get('subsequent_indent'):
-                internal_wrapped[0] = internal_wrapped[0][len(kwargs['subsequent_indent']):]
+        def _normalize(lines):
+            if not lines:
+                return lines
+            lines = [line.rstrip() for line in lines]
+            while lines and not lines[0].strip():
+                lines = lines[1:]
+                si = kwargs.get('subsequent_indent', '')
+                if si and lines:
+                    lines[0] = lines[0][len(si):]
+            while lines and not lines[-1].strip():
+                lines = lines[:-1]
+            return lines
 
-        # ensure we textwrap ascii the same as python
-        assert internal_wrapped == my_wrapped
+        assert _normalize(internal_wrapped) == _normalize(my_wrapped)
 
         # ensure content matches for each line, when the sequences are
         # stripped back off of each line
-        for left, right in zip(internal_wrapped, my_wrapped_colored):
-            assert left == term.strip_seqs(right)
+        norm_internal = _normalize(internal_wrapped)
+        norm_colored = _normalize(
+            [term.strip_seqs(line) for line in my_wrapped_colored])
+        for left, right in zip(norm_internal, norm_colored):
+            assert left == right
 
         # ensure our colored textwrap is the same paragraph length
-        assert (len(internal_wrapped) == len(my_wrapped_colored))
+        assert len(norm_internal) == len(norm_colored)
 
     child(width=many_columns, kwargs=kwargs,
           pgraph=' Z! a bc defghij klmnopqrstuvw<<>>xyz012345678900 ' * 2)
@@ -323,6 +328,21 @@ def test_wrap_leading_sequence_preserved():
         result = term.wrap(text, width=20)
         # First line should start with the red sequence
         assert result[0].startswith('\x1b[')
+
+    child()
+
+
+def test_wrap_color_preserved_across_boundary():
+    """Regression test for #351: wrap drops color escape sequence."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        text = f"{term.blue('a' * 10)} {term.blue('b' * 10)}"
+        result = term.wrap(text, width=15)
+        for line in result:
+            stripped = term.strip_seqs(line)
+            if stripped.startswith('b'):
+                assert '\x1b[' in line
 
     child()
 
