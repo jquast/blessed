@@ -363,12 +363,12 @@ def iter_parse(term: 'Terminal', text: str) -> Iterator[Tuple[str, Optional[Term
 
 def measure_length(text: str, term: 'Terminal') -> int:
     """
-    .. deprecated:: 1.12.0
+    Kept for API compatibility.
 
     :rtype: int
     :returns: Length of the first sequence in the string
 
-    Kept for API compatibility.
+    .. deprecated:: 1.12.0
     """
     try:
         text, capability = next(iter_parse(term, text))
