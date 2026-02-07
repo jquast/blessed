@@ -3,10 +3,10 @@ from __future__ import annotations
 
 # std imports
 import re
-import textwrap
-from typing import TYPE_CHECKING, List, Tuple, Pattern, Iterator, Optional, SupportsIndex
+from typing import TYPE_CHECKING, Tuple, Pattern, Iterator, Optional, SupportsIndex
 
 # 3rd party
+from wcwidth import SequenceTextWrapper  # noqa: F401  # re-exported for API compatibility
 from wcwidth import clip as wcwidth_clip
 from wcwidth import ljust as wcwidth_ljust
 from wcwidth import rjust as wcwidth_rjust
@@ -145,243 +145,6 @@ class Termcap():
         return cls(name, re.sub(pattern, lambda x: _numeric_regex, _outp), attribute, nparams)
 
 
-class SequenceTextWrapper(textwrap.TextWrapper):
-    """Docstring overridden."""
-
-    def __init__(self, width: int, term: 'Terminal', **kwargs: object) -> None:
-        """
-        Class initializer.
-
-        This class supports the :meth:`~.Terminal.wrap` method.
-        """
-        self.term = term
-        textwrap.TextWrapper.__init__(self, width, **kwargs)
-
-    def _split(self, text: str) -> List[str]:
-        """
-        Sequence-aware variant of :meth:`textwrap.TextWrapper._split`.
-
-        This method ensures that terminal escape sequences don't interfere with the text splitting
-        logic, particularly for hyphen-based word breaking.
-        """
-        # pylint: disable=too-many-locals
-        term = self.term
-
-        # Build a mapping from stripped text positions to original text positions
-        # and extract the stripped (sequence-free) text
-        stripped_to_original: List[int] = []
-        stripped_text = ''
-        original_pos = 0
-
-        for segment, capability in iter_parse(term, text):
-            if capability is None:
-                # This is regular text, not a sequence
-                for char in segment:
-                    stripped_to_original.append(original_pos)
-                    stripped_text += char
-                    original_pos += 1
-            else:
-                # This is an escape sequence, skip it in stripped text
-                original_pos += len(segment)
-
-        # Add sentinel for end position
-        stripped_to_original.append(original_pos)
-
-        # Use parent's _split on the stripped text
-        # pylint:disable=protected-access
-        stripped_chunks = textwrap.TextWrapper._split(self, stripped_text)
-
-        # Map the chunks back to the original text with sequences
-        result: List[str] = []
-        stripped_pos = 0
-
-        for chunk in stripped_chunks:
-            chunk_len = len(chunk)
-
-            # Find the start and end positions in the original text
-            # For first chunk, start from 0 to include any leading sequences
-            start_orig = 0 if stripped_pos == 0 else stripped_to_original[stripped_pos]
-            end_orig = stripped_to_original[stripped_pos + chunk_len]
-
-            # Extract the corresponding portion from the original text
-            result.append(text[start_orig:end_orig])
-            stripped_pos += chunk_len
-
-        return result
-
-    # pylint: disable-next=too-complex,too-many-branches
-    def _wrap_chunks(self, chunks: List[str]) -> List[str]:
-        """
-        Sequence-aware variant of :meth:`textwrap.TextWrapper._wrap_chunks`.
-
-        :raises ValueError: ``self.width`` is not a positive integer
-        :rtype: list
-        :returns: text chunks adjusted for width
-
-        This simply ensures that word boundaries are not broken mid-sequence, as standard python
-        textwrap would incorrectly determine the length of a string containing sequences, and may
-        also break consider sequences part of a "word" that may be broken by hyphen (``-``), where
-        this implementation corrects both.
-        """
-        lines: List[str] = []
-        if self.width <= 0 or not isinstance(self.width, int):
-            raise ValueError(
-                f"invalid width {self.width!r}({type(self.width)!r}) (must be integer > 0)"
-            )
-
-        if self.max_lines is not None:
-            indent = self.subsequent_indent if self.max_lines > 1 else self.initial_indent
-            if len(indent) + len(self.placeholder.lstrip()) > self.width:
-                raise ValueError("placeholder too large for max width")
-
-        term = self.term
-
-        # Arrange in reverse order so items can be efficiently popped from a stack of chucks.
-        chunks.reverse()
-        while chunks:  # pylint: disable=too-many-nested-blocks
-
-            cur_line: List[str] = []  # Current line.
-            cur_len = 0  # Length of all the chunks in cur_line
-
-            # Figure out which static string will prefix this line.
-            indent = self.subsequent_indent if lines else self.initial_indent
-            # Maximum width for this line.
-            width = self.width - len(indent)
-
-            # First chunk on line is whitespace -- drop it, unless this
-            # is the very beginning of the text (ie. no lines started yet).
-            if self.drop_whitespace and lines and not Sequence(chunks[-1], term).strip():
-                del chunks[-1]
-
-            while chunks:
-                chunk_len = Sequence(chunks[-1], term).length()
-
-                # The current line is full, and the next chunk is too big to fit on *any* line
-                if chunk_len > width:
-                    self._handle_long_word(chunks, cur_line, cur_len, width)
-                    cur_len = sum(Sequence(chunk, term).length() for chunk in cur_line)
-                    break
-
-                if cur_len + chunk_len > width:
-                    break
-
-                cur_line.append(chunks.pop())
-                cur_len += chunk_len
-
-            # If the last chunk on this line is all whitespace, drop it.
-            if self.drop_whitespace and cur_line:
-                chunk = Sequence(cur_line[-1], term)
-                if not chunk.strip():
-                    cur_len -= chunk.length()
-                    del cur_line[-1]
-
-            if cur_line:
-                if (  # pylint: disable=too-many-boolean-expressions
-                    self.max_lines is None
-                    or len(lines) + 1 < self.max_lines
-                    or (
-                        not chunks
-                        or self.drop_whitespace
-                        and len(chunks) == 1
-                        and not chunks[0].strip()
-                    )
-                    and cur_len <= width
-                ):
-                    lines.append(indent + ''.join(cur_line))
-
-                else:
-                    while cur_line:
-                        chunk = Sequence(cur_line[-1], term)
-                        if (chunk.strip() and cur_len + len(self.placeholder) <= width):
-                            cur_line.append(self.placeholder)
-                            lines.append(indent + ''.join(cur_line))
-                            break
-                        cur_len -= chunk.length()
-                        del cur_line[-1]
-                    else:
-                        if lines:
-                            prev_line = lines[-1].rstrip()
-                            if len(prev_line) + len(self.placeholder) <= self.width:
-                                lines[-1] = prev_line + self.placeholder
-                                break
-                        lines.append(indent + self.placeholder.lstrip())
-                    break
-
-        return lines
-
-    def _handle_long_word(self, reversed_chunks: List[str], cur_line: List[str],
-                          cur_len: int, width: int) -> None:
-        """
-        Sequence-aware :meth:`textwrap.TextWrapper._handle_long_word`.
-
-        This method ensures that word boundaries are not broken mid-sequence, as
-        standard python textwrap would incorrectly determine the length of a
-        string containing sequences and wide characters it would also break
-        these "words" that would be broken by hyphen (``-``), this
-        implementation corrects both.
-
-        This is done by mutating the passed arguments, removing items from
-        'reversed_chunks' and appending them to 'cur_line'.
-
-        However, some characters (east-asian, emoji, etc.) cannot be split any
-        less than 2 cells, so in the case of a width of 1, we have no choice
-        but to allow those characters to flow outside of the given cell.
-        """
-        # Figure out when indent is larger than the specified width, and make
-        # sure at least one character is stripped off on every pass
-        space_left = 1 if width < 1 else width - cur_len
-        # If we're allowed to break long words, then do so: put as much
-        # of the next chunk onto the current line as will fit.
-
-        if self.break_long_words and space_left > 0:
-            term = self.term
-            chunk = reversed_chunks[-1]
-            idx = nxt = seq_length = 0
-            last_hyphen_idx = 0
-            last_hyphen_had_nonhyphens = False
-            for text, cap in iter_parse(term, chunk):
-                nxt += len(text)
-                seq_length += Sequence(text, term).length()
-                if seq_length > space_left:
-                    if cur_len == 0 and width == 1 and nxt == 1 and seq_length == 2:
-                        # Emoji etc. cannot be split under 2 cells, so in the
-                        # case of a width of 1, we have no choice but to allow
-                        # those characters to flow outside of the given cell.
-                        pass
-                    else:
-                        break
-                idx = nxt
-                # Track hyphen positions for break_on_hyphens
-                if cap is None:
-                    if text == '-':
-                        if last_hyphen_had_nonhyphens:
-                            last_hyphen_idx = nxt
-                    else:
-                        last_hyphen_had_nonhyphens = True
-
-            # If break_on_hyphens is enabled, prefer breaking after last hyphen
-            if self.break_on_hyphens and last_hyphen_idx > 0:
-                idx = last_hyphen_idx
-
-            cur_line.append(chunk[:idx])
-            reversed_chunks[-1] = chunk[idx:]
-
-        # Otherwise, we have to preserve the long word intact.  Only add
-        # it to the current line if there's nothing already there --
-        # that minimizes how much we violate the width constraint.
-        elif not cur_line:
-            cur_line.append(reversed_chunks.pop())
-
-        # If we're not allowed to break long words, and there's already
-        # text on the current line, do nothing.  Next time through the
-        # main loop of _wrap_chunks(), we'll wind up here again, but
-        # cur_len will be zero, so the next line will be entirely
-        # devoted to the long word that we can't handle right now.
-
-
-SequenceTextWrapper.__doc__ = textwrap.TextWrapper.__doc__
-
-
 class Sequence(str):
     """
     A "sequence-aware" version of the base :class:`str` class.
@@ -389,6 +152,9 @@ class Sequence(str):
     This unicode-derived class understands the effect of escape sequences
     of printable length, allowing a properly implemented :meth:`rjust`,
     :meth:`ljust`, :meth:`center`, and :meth:`length`.
+
+    .. note:: that other than :meth:`Sequence.padd`, this is just a thin layer
+        over :mod:`wcwidth`, kept by name for API compatibility.
     """
 
     def __new__(cls, sequence_text: str, term: 'Terminal') -> Sequence:
@@ -581,6 +347,10 @@ def iter_parse(term: 'Terminal', text: str) -> Iterator[Tuple[str, Optional[Term
     value for ``capability`` may be ``None``, where ``text`` is
     :class:`str` of length 1.  Otherwise, ``text`` is a full
     matching sequence of given capability.
+
+    .. note:: Previously used by SequenceTextWrapper, sequence-aware text
+       wrapping now exists in wcwidth as :func:`wcwidth.wrap`. This function
+       is kept for API compatibility and used by :func:`measure_length`.
     """
     for match in term._caps_compiled_any.finditer(text):  # pylint: disable=protected-access
         name = match.lastgroup
@@ -593,10 +363,12 @@ def iter_parse(term: 'Terminal', text: str) -> Iterator[Tuple[str, Optional[Term
 
 def measure_length(text: str, term: 'Terminal') -> int:
     """
-    .. deprecated:: 1.12.0.
+    Kept for API compatibility.
 
     :rtype: int
     :returns: Length of the first sequence in the string
+
+    .. deprecated:: 1.30.0
     """
     try:
         text, capability = next(iter_parse(term, text))

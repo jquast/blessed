@@ -15,6 +15,13 @@ import contextlib
 import collections
 from typing import IO, Dict, List, Match, Tuple, Union, Optional, Generator, SupportsIndex
 
+# 3rd party
+from wcwidth import wrap as wcwidth_wrap
+from wcwidth import ljust as wcwidth_ljust
+from wcwidth import rjust as wcwidth_rjust
+from wcwidth import width as wcwidth_width
+from wcwidth import center as wcwidth_center
+
 # local
 from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
 from .keyboard import (DEFAULT_ESCDELAY,
@@ -30,7 +37,7 @@ from .keyboard import (DEFAULT_ESCDELAY,
                        get_keyboard_sequences)
 from .dec_modes import DecPrivateMode as _DecPrivateMode
 from .dec_modes import DecModeResponse
-from .sequences import Termcap, Sequence, SequenceTextWrapper
+from .sequences import Termcap, Sequence
 from .colorspace import RGB_256TABLE, hex_to_rgb, rgb_to_hex, xparse_color
 from .formatters import (COLORS,
                          COMPOUNDABLES,
@@ -2434,7 +2441,7 @@ class Terminal():
         # the vocabulary error of the str method for polymorphism.
         if width is None:
             width = self.width
-        return Sequence(text, self).ljust(width, fillchar)
+        return wcwidth_ljust(text, width.__index__(), fillchar, control_codes='ignore')
 
     def rjust(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
@@ -2449,7 +2456,7 @@ class Terminal():
         """
         if width is None:
             width = self.width
-        return Sequence(text, self).rjust(width, fillchar)
+        return wcwidth_rjust(text, width.__index__(), fillchar, control_codes='ignore')
 
     def center(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
@@ -2464,7 +2471,7 @@ class Terminal():
         """
         if width is None:
             width = self.width
-        return Sequence(text, self).center(width, fillchar)
+        return wcwidth_center(text, width.__index__(), fillchar, control_codes='ignore')
 
     def truncate(self, text: str, width: Optional[SupportsIndex] = None) -> str:
         r"""
@@ -2509,7 +2516,7 @@ class Terminal():
             (y, x)(0, 0), are evaluated as a printable length of
             *0*.
         """
-        return Sequence(text, self).length()
+        return wcwidth_width(text)
 
     def strip(self, text: str, chars: Optional[str] = None) -> str:
         r"""
@@ -2603,16 +2610,20 @@ class Terminal():
         :arg \**kwargs: See :py:class:`textwrap.TextWrapper`
         :rtype: list
         :returns: List of wrapped lines
+        :raises ValueError: for non-positive values of ``width``.
 
         See :class:`textwrap.TextWrapper` for keyword arguments that can
         customize wrapping behaviour.
         """
         width = self.width if width is None else width
-        wrapper = SequenceTextWrapper(width=width, term=self, **kwargs)
+        if not isinstance(width, int) or width <= 0:
+            raise ValueError(
+                f"invalid width {width!r}({type(width)!r}) (must be integer > 0)"
+            )
         lines: List[str] = []
         for line in text.splitlines():
-            lines.extend(iter(wrapper.wrap(line)) if line.strip() else ('',))
-
+            lines.extend(
+                wcwidth_wrap(line, width=width, **kwargs) if line.strip() else ('',))
         return lines
 
     def getch(self, decode_latin1: bool = False) -> str:
