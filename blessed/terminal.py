@@ -29,6 +29,9 @@ from .keyboard import (DEFAULT_ESCDELAY,
                        DeviceAttribute,
                        SoftwareVersion,
                        KittyKeyboardProtocol,
+                       TermcapResponse,
+                       ITerm2Capabilities,
+                       XTGETTCAP_CAPABILITIES,
                        _time_left,
                        _read_until,
                        resolve_sequence,
@@ -94,6 +97,14 @@ _RE_XTWINOPS_14_RESPONSE = re.compile(r'\x1b\[4;(\d+);(\d+)t')
 _RE_XTWINOPS_16_RESPONSE = re.compile(r'\x1b\[6;(\d+);(\d+)t')
 _RE_GET_DEVICE_ATTR_RESPONSE = re.compile('\x1b\\[\\?([0-9]+)((?:;[0-9]+)*)c')
 _RE_GET_SOFTWARE_VERSION_RESPONSE = re.compile('\x1bP>\\|(.+?)\x1b\\\\')
+_RE_XTGETTCAP_RESPONSE = re.compile(
+    r'\x1bP([01])\+r([0-9a-fA-F]+)(?:=([0-9a-fA-F]*))?\x1b\\')
+_RE_KITTY_GRAPHICS_RESPONSE = re.compile(r'\x1b_Gi=31;(.+?)\x1b\\')
+_RE_ITERM2_CAPABILITIES_RESPONSE = re.compile(
+    r'\x1b\]1337;Capabilities=([^\x07\x1b]+)[\x07\x1b]')
+_RE_ITERM2_CELLSIZE_RESPONSE = re.compile(r'\x1b\]1337;ReportCellSize=')
+_RE_KITTY_NOTIFICATIONS_RESPONSE = re.compile(
+    r'\x1b\]99;([^\x07\x1b]*?)[\x07\x1b]')
 
 
 class Terminal():
@@ -273,6 +284,19 @@ class Terminal():
         # When notify_on_resize() context manager is active, this stores the latest
         # terminal dimensions from resize events
         self._preferred_size_cache: Optional["WINSZ"] = None
+
+        # XTGETTCAP cache and sticky failure tracking
+        self._xtgettcap_cache: Optional[TermcapResponse] = None
+        self._xtgettcap_first_query_failed = False
+
+        # Kitty Graphics protocol detection cache
+        self._kitty_graphics_supported: Optional[bool] = None
+
+        # iTerm2 capabilities cache
+        self._iterm2_capabilities_cache: Optional["ITerm2Capabilities"] = None
+
+        # Kitty notifications (OSC 99) detection cache
+        self._kitty_notifications_supported: Optional[bool] = None
 
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
@@ -1056,6 +1080,8 @@ class Terminal():
         :rtype: bool
         :returns: ``True`` if terminal supports sixel graphics, ``False`` otherwise
         """
+        if not self.does_styling:
+            return False
         da = self.get_device_attributes(timeout=timeout, force=force)
         return da.supports_sixel if da is not None else False
 
@@ -1377,6 +1403,320 @@ class Terminal():
         """
         response = self.get_dec_mode(_DecPrivateMode.IN_BAND_WINDOW_RESIZE, timeout=timeout)
         return response.supported
+
+    def does_bracketed_paste(self, timeout: float = 1.0) -> bool:
+        """
+        Check if the terminal supports bracketed paste mode.
+
+        Bracketed paste mode (DEC mode 2004) wraps pasted text in special
+        sequences so applications can distinguish pasted text from typed input.
+
+        .. seealso:: https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Bracketed-Paste-Mode
+
+        :arg float timeout: Timeout for mode query (default 1.0s).
+        :returns: True if bracketed paste mode is supported.
+        :rtype: bool
+        """
+        response = self.get_dec_mode(_DecPrivateMode.BRACKETED_PASTE, timeout=timeout)
+        return response.supported
+
+    def does_synchronized_output(self, timeout: float = 1.0) -> bool:
+        """
+        Check if the terminal supports synchronized output.
+
+        Synchronized output (DEC mode 2026) allows applications to batch
+        screen updates, preventing tearing during rapid redraws.
+
+        .. seealso:: https://gist.github.com/christianparpart/d8a62cc1ab659194571ec44c8e0a7085
+
+        :arg float timeout: Timeout for mode query (default 1.0s).
+        :returns: True if synchronized output is supported.
+        :rtype: bool
+        """
+        response = self.get_dec_mode(_DecPrivateMode.SYNCHRONIZED_OUTPUT, timeout=timeout)
+        return response.supported
+
+    def does_grapheme_clustering(self, timeout: float = 1.0) -> bool:
+        """
+        Check if the terminal supports grapheme clustering.
+
+        Grapheme clustering (DEC mode 2027) enables Unicode grapheme cluster
+        aware cursor movement and display.
+
+        .. seealso:: https://mitchellh.com/writing/grapheme-clusters-in-terminals
+
+        :arg float timeout: Timeout for mode query (default 1.0s).
+        :returns: True if grapheme clustering is supported.
+        :rtype: bool
+        """
+        response = self.get_dec_mode(_DecPrivateMode.GRAPHEME_CLUSTERING, timeout=timeout)
+        return response.supported
+
+    def does_focus_events(self, timeout: float = 1.0) -> bool:
+        """
+        Check if the terminal supports focus in/out event reporting.
+
+        Focus event reporting (DEC mode 1004) sends escape sequences when
+        the terminal window gains or loses focus.
+
+        .. seealso:: https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-FocusIn_FocusOut
+
+        :arg float timeout: Timeout for mode query (default 1.0s).
+        :returns: True if focus event reporting is supported.
+        :rtype: bool
+        """
+        response = self.get_dec_mode(_DecPrivateMode.FOCUS_IN_OUT_EVENTS, timeout=timeout)
+        return response.supported
+
+    def get_xtgettcap(self, timeout: Optional[float] = 1,
+                      force: bool = False) -> Optional[TermcapResponse]:
+        """
+        Query terminal capabilities via XTGETTCAP (DCS +q).
+
+        Sends XTGETTCAP queries to discover the terminal's built-in
+        terminfo capabilities, bypassing the local terminfo database.
+        Supported by xterm, foot, kitty, WezTerm, ghostty, and others.
+
+        Uses a probe-first strategy: sends a single capability query
+        first, then queries remaining capabilities only if the probe
+        succeeds.  This avoids visible garbage on terminals that do
+        not support XTGETTCAP.
+
+        When :attr:`is_a_tty` is False, returns ``None``.
+
+        Responses are cached unless *force* is True.
+
+        .. seealso:: https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands
+
+        :arg float timeout: Timeout in seconds per query round.
+        :arg bool force: Bypass cache and re-query the terminal.
+        :rtype: TermcapResponse or None
+        """
+        if not self.is_a_tty:
+            return None
+
+        if self._xtgettcap_cache is not None and not force:
+            return self._xtgettcap_cache
+
+        if self._xtgettcap_first_query_failed and not force:
+            return None
+
+        # Phase 1: Probe with single capability via _query_response,
+        # which safely preserves any concurrent keyboard input.
+        probe_cap = XTGETTCAP_CAPABILITIES[0][0]
+        probe_query = f'\x1bP+q{TermcapResponse._hex_encode(probe_cap)}\x1b\\'
+        match = self._query_response(
+            probe_query, _RE_XTGETTCAP_RESPONSE, timeout)
+
+        if match is None:
+            self._xtgettcap_first_query_failed = True
+            # Erase any visible garbage from unsupported terminals
+            self.stream.write(f'\r{self.clear_eol}')
+            self.stream.flush()
+            return None
+
+        capabilities: Dict[str, str] = {}
+        self._parse_single_xtgettcap(match, capabilities)
+
+        # Phase 2: Batch-query remaining capabilities.  We use
+        # flushinp() here because multiple DCS responses arrive, then
+        # re-buffer any non-DCS keyboard data via ungetch().
+        ctx = None
+        try:
+            if self._line_buffered:
+                ctx = self.cbreak()
+                ctx.__enter__()
+
+            for capname, _desc in XTGETTCAP_CAPABILITIES[1:]:
+                self.stream.write(
+                    f'\x1bP+q{TermcapResponse._hex_encode(capname)}\x1b\\')
+            self.stream.flush()
+
+            raw = self.flushinp(timeout=timeout)
+            if raw:
+                self._parse_xtgettcap_responses(raw, capabilities)
+                # Re-buffer any keyboard input that arrived alongside
+                remaining = _RE_XTGETTCAP_RESPONSE.sub('', raw)
+                if remaining:
+                    self.ungetch(remaining)
+
+        finally:
+            if ctx is not None:
+                ctx.__exit__(None, None, None)
+
+        result = TermcapResponse(supported=True, capabilities=capabilities)
+        self._xtgettcap_cache = result
+        return result
+
+    @staticmethod
+    def _parse_single_xtgettcap(match: Match, capabilities: Dict[str, str]) -> None:
+        """Parse a single XTGETTCAP DCS +r regex match into *capabilities*."""
+        success = match.group(1) == '1'
+        if success:
+            cap_name = TermcapResponse._hex_decode(match.group(2))
+            val_hex = match.group(3)
+            capabilities[cap_name] = (
+                TermcapResponse._hex_decode(val_hex) if val_hex is not None else '')
+
+    @staticmethod
+    def _parse_xtgettcap_responses(raw: str, capabilities: Dict[str, str]) -> None:
+        """Parse DCS +r responses from XTGETTCAP into *capabilities* dict."""
+        for match in _RE_XTGETTCAP_RESPONSE.finditer(raw):
+            Terminal._parse_single_xtgettcap(match, capabilities)
+
+    def does_xtgettcap(self, timeout: Optional[float] = 1,
+                       force: bool = False) -> bool:
+        """
+        Check if the terminal supports XTGETTCAP (DCS +q) queries.
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        result = self.get_xtgettcap(timeout=timeout, force=force)
+        return result is not None and result.supported
+
+    def does_kitty_graphics(self, timeout: Optional[float] = 1,
+                            force: bool = False) -> bool:
+        """
+        Check if the terminal supports the Kitty graphics protocol.
+
+        Sends a minimal Kitty graphics query and checks for an ``OK``
+        response.  Supported by kitty and WezTerm.
+
+        .. seealso:: https://sw.kovidgoyal.net/kitty/graphics-protocol/
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        if not self.does_styling:
+            return False
+        if self._kitty_graphics_supported is not None and not force:
+            return self._kitty_graphics_supported
+
+        match = self._query_response(
+            '\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\',
+            _RE_KITTY_GRAPHICS_RESPONSE,
+            timeout)
+        supported = match is not None and 'OK' in match.group(1)
+        self._kitty_graphics_supported = supported
+        return supported
+
+    def get_iterm2_capabilities(self, timeout: Optional[float] = 1,
+                                force: bool = False
+                                ) -> Optional["ITerm2Capabilities"]:
+        """
+        Query iTerm2 capabilities via OSC 1337;Capabilities.
+
+        Falls back to OSC 1337;ReportCellSize as a probe for terminals
+        that support the iTerm2 inline image protocol but do not
+        implement the Capabilities query (e.g. WezTerm).
+
+        When :attr:`is_a_tty` is False, returns ``None``.
+
+        Responses are cached unless *force* is True.  The total time
+        spent on both the primary query and fallback probe is bounded
+        by *timeout*.
+
+        .. seealso:: https://iterm2.com/documentation-escape-codes.html
+
+        :arg float timeout: Timeout in seconds (total budget).
+        :arg bool force: Bypass cached result.
+        :rtype: ITerm2Capabilities or None
+        """
+        if not self.is_a_tty or not self.does_styling:
+            return None
+
+        if self._iterm2_capabilities_cache is not None and not force:
+            return self._iterm2_capabilities_cache
+
+        stime = time.time()
+
+        # Primary: OSC 1337;Capabilities query
+        match = self._query_response(
+            '\x1b]1337;Capabilities\x07',
+            _RE_ITERM2_CAPABILITIES_RESPONSE,
+            timeout)
+        if match:
+            features = ITerm2Capabilities.parse_feature_string(
+                match.group(1))
+            result = ITerm2Capabilities(
+                supported=True, features=features)
+            self._iterm2_capabilities_cache = result
+            return result
+
+        # Fallback: OSC 1337;ReportCellSize probe with remaining budget
+        remaining = _time_left(stime, timeout)
+        if remaining is None or remaining > 0:
+            match = self._query_response(
+                '\x1b]1337;ReportCellSize\x07',
+                _RE_ITERM2_CELLSIZE_RESPONSE,
+                remaining)
+            if match:
+                result = ITerm2Capabilities(
+                    supported=True, detection='ReportCellSize')
+                self._iterm2_capabilities_cache = result
+                return result
+
+        result = ITerm2Capabilities(supported=False)
+        self._iterm2_capabilities_cache = result
+        return result
+
+    def does_iterm2(self, timeout: Optional[float] = 1,
+                    force: bool = False) -> bool:
+        """
+        Check if the terminal supports any iTerm2 protocols.
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        result = self.get_iterm2_capabilities(timeout=timeout, force=force)
+        return result is not None and result.supported
+
+    def does_iterm2_graphics(self, timeout: Optional[float] = 1,
+                             force: bool = False) -> bool:
+        """
+        Check if the terminal supports iTerm2 inline image protocol.
+
+        This is equivalent to :meth:`does_iterm2` and exists to pair
+        with :meth:`does_kitty_graphics` for graphics capability checks.
+
+        .. seealso:: https://iterm2.com/documentation-images.html
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        return self.does_iterm2(timeout=timeout, force=force)
+
+    def does_kitty_notifications(self, timeout: Optional[float] = 1,
+                                 force: bool = False) -> bool:
+        """
+        Check if the terminal supports Kitty desktop notifications (OSC 99).
+
+        Uses boundary detection: sends OSC 99 alongside DA1, and checks
+        whether the terminal responds to the OSC 99 query.  Currently
+        supported only by kitty.
+
+        .. seealso:: https://sw.kovidgoyal.net/kitty/desktop-notifications/
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        if self._kitty_notifications_supported is not None and not force:
+            return self._kitty_notifications_supported
+
+        # Send OSC 99 query + DA1 as boundary marker
+        match = self._query_response(
+            '\x1b]99;i=blessed:p=?\x1b\\\x1b[c',
+            _RE_KITTY_NOTIFICATIONS_RESPONSE,
+            timeout)
+        supported = match is not None
+        self._kitty_notifications_supported = supported
+        return supported
 
     @contextlib.contextmanager
     def mouse_enabled(self, *, clicks: bool = True, report_pixels: bool = False,
@@ -2931,6 +3271,137 @@ class Terminal():
                 ws_ypixel=event_vals.height_pixels)  # type: ignore[union-attr]
 
         return ks
+
+    async def async_inkey(self, timeout: Optional[float] = None,
+                          esc_delay: float = DEFAULT_ESCDELAY) -> Keystroke:
+        r"""
+        Asynchronous version of :meth:`inkey` for use with :mod:`asyncio`.
+
+        Read and return the next keyboard event within given timeout, yielding
+        control to the asyncio event loop while waiting for input rather than
+        blocking the thread.
+
+        Uses :meth:`asyncio.AbstractEventLoop.add_reader` on the keyboard file
+        descriptor, reusing the same :func:`~.resolve_sequence`, keymap, and
+        :class:`~.Keystroke` internals as the synchronous :meth:`inkey`.
+
+        Must be called within a :meth:`cbreak` or :meth:`raw` context, just
+        like :meth:`inkey`.
+
+        :arg float timeout: Number of seconds to wait for a keystroke before
+            returning.  When ``None`` (default), this method may block
+            indefinitely.
+        :arg float esc_delay: Time in seconds to wait after Escape key
+            is received to disambiguate bare Escape from escape sequences.
+        :rtype: :class:`~.Keystroke`
+        :returns: :class:`~.Keystroke`, which may be empty (``''``) if
+            ``timeout`` is specified and keystroke is not received.
+        """
+        import asyncio  # pylint: disable=import-outside-toplevel
+
+        loop = asyncio.get_event_loop()
+
+        # drain keyboard buffer (non-blocking)
+        ucs = self.flushinp()
+
+        # resolve any buffered keystroke
+        ks = resolve_sequence(ucs, self._keymap, self._keycodes,
+                              self._keymap_prefixes, final=False,
+                              dec_mode_cache=self._dec_mode_cache)
+
+        # read bytes until a complete keystroke is resolved
+        while not ks:
+            byte = await self._async_read_byte(loop, timeout)
+            if byte is None:
+                # timeout expired with no input
+                return Keystroke()
+            decode_latin1 = ucs.startswith('\x1b[M')
+            if decode_latin1:
+                ucs += chr(byte[0])
+            else:
+                ucs += self._keyboard_decoder.decode(byte, final=False)
+
+            # drain all immediately available bytes (non-blocking)
+            while self.kbhit(timeout=0):
+                ucs += self.getch(decode_latin1=ucs.startswith('\x1b[M'))
+
+            ks = resolve_sequence(ucs, self._keymap, self._keycodes,
+                                  self._keymap_prefixes, final=False,
+                                  dec_mode_cache=self._dec_mode_cache)
+
+        # escape key disambiguation: wait esc_delay for more bytes
+        if ks.code == self.KEY_ESCAPE and len(ks) == 1:
+            while (ks.code == self.KEY_ESCAPE
+                   and self._is_incomplete_keystroke(ucs)):
+                byte = await self._async_read_byte(loop, esc_delay)
+                if byte is None:
+                    break
+                ucs += self.getch(decode_latin1=ucs.startswith('\x1b[M'))
+                # drain remaining immediately available bytes
+                while self.kbhit(timeout=0):
+                    ucs += self.getch(
+                        decode_latin1=ucs.startswith('\x1b[M'))
+                final = bool(ucs) and not self._is_incomplete_keystroke(ucs)
+                ks = resolve_sequence(
+                    ucs, self._keymap, self._keycodes,
+                    self._keymap_prefixes, final=final,
+                    dec_mode_cache=self._dec_mode_cache)
+
+            if ks.code == self.KEY_ESCAPE and self._is_incomplete_keystroke(ucs):
+                ks = resolve_sequence(
+                    ucs, self._keymap, self._keycodes,
+                    self._keymap_prefixes, final=True,
+                    dec_mode_cache=self._dec_mode_cache)
+
+        # buffer any remaining text
+        self.ungetch(ucs[len(ks):])
+
+        # update preferred size cache if this is a resize event
+        if ks._mode == _DecPrivateMode.IN_BAND_WINDOW_RESIZE:
+            event_vals = ks._mode_values
+            self._preferred_size_cache = WINSZ(
+                ws_row=event_vals.height_chars,
+                ws_col=event_vals.width_chars,
+                ws_xpixel=event_vals.width_pixels,
+                ws_ypixel=event_vals.height_pixels)
+
+        return ks
+
+    async def _async_read_byte(
+        self,
+        loop: "asyncio.AbstractEventLoop",
+        timeout: Optional[float],
+    ) -> Optional[bytes]:
+        """
+        Read one byte from keyboard fd using asyncio, with optional timeout.
+
+        :arg loop: The asyncio event loop.
+        :arg timeout: Seconds to wait, or None for indefinite.
+        :returns: A single byte, or None on timeout.
+        """
+        import asyncio  # pylint: disable=import-outside-toplevel
+
+        assert self._keyboard_fd is not None
+        fut: asyncio.Future[bytes] = loop.create_future()
+
+        def _on_readable() -> None:
+            if not fut.done():
+                try:
+                    data = os.read(self._keyboard_fd, 1)
+                    fut.set_result(data)
+                except OSError as exc:
+                    fut.set_exception(exc)
+
+        loop.add_reader(self._keyboard_fd, _on_readable)
+        try:
+            if timeout is not None:
+                try:
+                    return await asyncio.wait_for(fut, timeout=timeout)
+                except asyncio.TimeoutError:
+                    return None
+            return await fut
+        finally:
+            loop.remove_reader(self._keyboard_fd)
 
 
 class WINSZ(collections.namedtuple('WINSZ', (

@@ -1177,3 +1177,47 @@ def test_does_inband_resize_no_styling():
     result = term.does_inband_resize()
     assert result is False
     assert stream.getvalue() == ""
+
+
+@pytest.mark.parametrize("method_name", [
+    "does_bracketed_paste",
+    "does_synchronized_output",
+    "does_grapheme_clustering",
+    "does_focus_events",
+])
+@pytest.mark.parametrize("response_value,expected", [
+    (DecModeResponse.SET, True),
+    (DecModeResponse.RESET, True),
+    (DecModeResponse.NOT_RECOGNIZED, False),
+    (DecModeResponse.NO_RESPONSE, False),
+])
+def test_does_dec_mode_convenience(method_name, response_value, expected):
+    """Boolean DEC mode convenience methods return correct values."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+
+        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(
+            mode_num, response_value)
+
+        result = getattr(term, method_name)()
+        assert result is expected
+    child()
+
+
+@pytest.mark.parametrize("method_name", [
+    "does_bracketed_paste",
+    "does_synchronized_output",
+    "does_grapheme_clustering",
+    "does_focus_events",
+])
+def test_does_dec_mode_convenience_not_a_tty(method_name):
+    """Boolean DEC mode convenience methods return False when not a TTY."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=io.StringIO(), force_styling=True, is_a_tty=False)
+        result = getattr(term, method_name)(timeout=0.01)
+        assert result is False
+    child()
