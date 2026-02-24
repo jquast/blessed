@@ -1,48 +1,21 @@
-"""
-Headless line editor with history, auto-suggest, and grapheme-aware editing.
+"""Headless line editor with history, auto-suggest, and grapheme-aware editing.
 
 This module provides :class:`LineEditor` for single-line input with readline-style
-editing, :class:`History` for command recall and file persistence, and
-:class:`LiveLineEditor` for rendering the editor at a fixed terminal position using
-an asyncio ``(reader, writer)`` pair or a :class:`~.Terminal` instance.
-
-Grapheme cluster boundaries are used for all cursor movement and display width
-calculations via :func:`wcwidth.iter_graphemes` and :func:`wcwidth.width`.
-
-Example usage with blessed Terminal::
-
-    import asyncio
-    from blessed import Terminal
-    from blessed.line_editor import LineEditor, History
-
-    async def main():
-        term = Terminal()
-        history = History()
-        editor = LineEditor(history=history)
-        with term.cbreak():
-            while True:
-                key = await term.async_inkey()
-                result = editor.feed_key(key)
-                if result.line is not None:
-                    print(f"\\nYou typed: {result.line}")
-                    break
-
-Example usage with asyncio reader/writer::
-
-    editor = LiveLineEditor(reader=stdin_reader, writer=stdout_writer,
-                            row=23, col=0, width=80, history=history)
-    line = await editor.readline()
+editing and :class:`LineHistory` for command recall and file persistence.
 """
 
+# std imports
 import os
+from typing import Dict, List, Tuple, Union, Callable, Optional
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Union
 
+# 3rd party
 from wcwidth import iter_graphemes, width as wcswidth
 
 PASSWORD_CHAR = "\u25cf"
 
 __all__ = (
+    "DisplayState",
     "InputStyle",
     "LineEditResult",
     "LineHistory",
@@ -52,161 +25,69 @@ __all__ = (
 
 @dataclass
 class InputStyle:
-    """SGR styling for the input line, changeable at runtime.
+    """SGR styling for the input line, changeable at runtime."""
 
-    .. py:attribute:: text_sgr
-
-        SGR sequence applied to main input text.
-
-    .. py:attribute:: suggestion_sgr
-
-        SGR sequence applied to auto-suggest suffix.
-
-    .. py:attribute:: bg_sgr
-
-        SGR sequence for the whole input line background.
-
-    .. py:attribute:: ellipsis_sgr
-
-        SGR sequence applied to overflow ellipsis characters.
-
-    .. py:attribute:: cursor_seq
-
-        DECSCUSR sequence for cursor shape (e.g. ``"\\x1b[5 q"``).
-    """
-
+    #: SGR sequence applied to main input text.
     text_sgr: str = ""
+    #: SGR sequence applied to auto-suggest suffix.
     suggestion_sgr: str = ""
+    #: SGR sequence for the whole input line background.
     bg_sgr: str = ""
+    #: SGR sequence applied to overflow ellipsis characters.
     ellipsis_sgr: str = ""
+    #: DECSCUSR sequence for cursor shape (e.g. ``"\\x1b[5 q"``).
     cursor_seq: str = ""
 
 
 @dataclass
 class LineEditResult:
-    """Result of processing a keystroke.
+    """Result of processing a keystroke."""
 
-    .. py:attribute:: line
-
-        The accepted line text when Enter was pressed, otherwise ``None``.
-
-    .. py:attribute:: eof
-
-        ``True`` when Ctrl+D pressed on an empty line.
-
-    .. py:attribute:: interrupt
-
-        ``True`` when Ctrl+C pressed.
-
-    .. py:attribute:: changed
-
-        ``True`` when the display needs redrawing.
-
-    .. py:attribute:: bell
-
-        Bell string to emit (e.g. ``"\\a"``), empty when silent.
-    """
-
+    #: Accepted line text when Enter was pressed, otherwise ``None``.
     line: Optional[str] = None
+    #: ``True`` when Ctrl+D pressed on an empty line.
     eof: bool = False
+    #: ``True`` when Ctrl+C pressed.
     interrupt: bool = False
+    #: ``True`` when the display needs redrawing.
     changed: bool = False
+    #: Bell string to emit (e.g. ``"\\a"``), empty when silent.
     bell: str = ""
 
 
 @dataclass
 class DisplayState:
-    """Current visual state of the editor for rendering.
+    """Current visual state of the editor for rendering."""
 
-    When the :class:`LineEditor` has a ``max_width`` set, text and suggestion
-    are clipped to fit, ``cursor`` is adjusted for the visible window, and
-    ``clipped_left`` / ``clipped_right`` indicate overflow.
-
-    .. py:attribute:: text
-
-        Buffer text (masked with :data:`PASSWORD_CHAR` if password mode).
-        When ``max_width`` is active this is the visible slice only.
-
-    .. py:attribute:: cursor
-
-        0-indexed cursor position in display columns within the visible
-        window (already adjusted for horizontal scroll).
-
-    .. py:attribute:: suggestion
-
-        Auto-suggest suffix (to be rendered dim/grey after text).
-        Clipped to remaining space when ``max_width`` is active.
-
-    .. py:attribute:: clipped_left
-
-        ``True`` when content extends beyond the left edge of the visible
-        window (i.e. text has been scrolled right).
-
-    .. py:attribute:: clipped_right
-
-        ``True`` when content extends beyond the right edge of the visible
-        window.
-
-    .. py:attribute:: text_sgr
-
-        SGR sequence for main input text (copied from :class:`InputStyle`).
-
-    .. py:attribute:: suggestion_sgr
-
-        SGR sequence for auto-suggest suffix.
-
-    .. py:attribute:: bg_sgr
-
-        SGR sequence for the whole input line background.
-
-    .. py:attribute:: ellipsis_sgr
-
-        SGR sequence for overflow ellipsis characters.
-
-    .. py:attribute:: cursor_seq
-
-        DECSCUSR sequence for cursor shape.
-    """
-
+    #: Visible buffer text (masked in password mode, clipped when scrolling).
     text: str = ""
+    #: Cursor column within the visible window.
     cursor: int = 0
+    #: Auto-suggest suffix (rendered dim/grey after text).
     suggestion: str = ""
-    clipped_left: bool = False
-    clipped_right: bool = False
+    #: ``True`` when content extends beyond the left edge.
+    overflow_left: bool = False
+    #: ``True`` when content extends beyond the right edge.
+    overflow_right: bool = False
+    #: SGR sequence for main input text (from :class:`InputStyle`).
     text_sgr: str = ""
+    #: SGR sequence for auto-suggest suffix.
     suggestion_sgr: str = ""
+    #: SGR sequence for the whole input line background.
     bg_sgr: str = ""
+    #: SGR sequence for overflow ellipsis characters.
     ellipsis_sgr: str = ""
+    #: DECSCUSR sequence for cursor shape.
     cursor_seq: str = ""
 
 
-def _graphemes(text: str) -> List[str]:
-    """Split *text* into grapheme clusters."""
-    return list(iter_graphemes(text))
-
-
-def _display_width(text: str) -> int:
-    """Return the display column width of *text*, ignoring control codes."""
-    return wcswidth(text, control_codes="ignore")
-
-
-def _grapheme_width(grapheme: str) -> int:
-    """Return the display column width of a single grapheme cluster."""
-    w = wcswidth(grapheme, control_codes="ignore")
-    return max(0, w)
-
-
-def _is_displayable_grapheme(grapheme: str) -> bool:
-    """Return whether a grapheme cluster is displayable (not a C0/C1 control)."""
-    w = wcswidth(grapheme, control_codes="ignore")
-    if w > 0:
-        return True
-    return all(ch.isprintable() or ch == "\t" for ch in grapheme)
+def _is_control(grapheme: str) -> bool:
+    cp = ord(grapheme[0])
+    return cp < 0x20 or 0x7F <= cp < 0xA0
 
 
 class LineHistory:
-    """
-    In-memory command history with optional file persistence.
+    """In-memory command history with optional file persistence.
 
     :param max_entries: Maximum number of history entries retained.
     """
@@ -223,11 +104,7 @@ class LineHistory:
         return self._entries
 
     def add(self, line: str) -> None:
-        """
-        Append a line to history, skipping consecutive duplicates.
-
-        :param line: Line text to add.
-        """
+        """Append *line* to history, skipping empty and consecutive duplicates."""
         if not line:
             return
         if self._entries and self._entries[-1] == line:
@@ -237,12 +114,7 @@ class LineHistory:
             self._entries = self._entries[-self._max_entries:]
 
     def search_prefix(self, prefix: str) -> Optional[str]:
-        """
-        Find the most recent history entry matching *prefix*.
-
-        :param prefix: Prefix to match.
-        :returns: The matching entry, or ``None``.
-        """
+        """Return the most recent entry starting with *prefix*, or ``None``."""
         if not prefix:
             return None
         for entry in reversed(self._entries):
@@ -251,11 +123,7 @@ class LineHistory:
         return None
 
     def load_file(self, path: str) -> None:
-        """
-        Load history entries from a file (one per line).
-
-        :param path: Path to the history file.
-        """
+        """Load history entries from *path* (one per line)."""
         if not os.path.exists(path):
             return
         with open(path, "r", encoding="utf-8", errors="replace") as fh:
@@ -267,12 +135,7 @@ class LineHistory:
             self._entries = self._entries[-self._max_entries:]
 
     def save_entry(self, line: str, path: str) -> None:
-        """
-        Append a single entry to the history file.
-
-        :param line: Line text to save.
-        :param path: Path to the history file.
-        """
+        """Append *line* to the history file at *path*."""
         if not line:
             return
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -280,31 +143,19 @@ class LineHistory:
             fh.write(line + "\n")
 
     def nav_start(self, current_line: str) -> None:
-        """
-        Begin history navigation, saving the current line.
-
-        :param current_line: The current editor buffer to preserve.
-        """
+        """Begin history navigation, saving *current_line*."""
         self._nav_idx = len(self._entries)
         self._nav_saved = current_line
 
     def nav_up(self) -> Optional[str]:
-        """
-        Navigate to the previous (older) history entry.
-
-        :returns: The history entry text, or ``None`` if at the beginning.
-        """
+        """Navigate to the previous (older) history entry."""
         if self._nav_idx <= 0:
             return None
         self._nav_idx -= 1
         return self._entries[self._nav_idx]
 
     def nav_down(self) -> Optional[str]:
-        """
-        Navigate to the next (newer) history entry.
-
-        :returns: The history entry, the saved current line, or ``None``.
-        """
+        """Navigate to the next (newer) history entry."""
         if self._nav_idx >= len(self._entries):
             return None
         self._nav_idx += 1
@@ -313,56 +164,34 @@ class LineHistory:
         return self._entries[self._nav_idx]
 
 
-#: Alias for backward compatibility.
-History = LineHistory
-
-
 class LineEditor:
-    """
-    Headless single-line editor with grapheme-aware cursor movement.
+    """Headless single-line editor with grapheme-aware cursor movement.
 
     Feed keystrokes via :meth:`feed_key`, read display state via
-    :attr:`display`.  The editor stores its buffer as a list of grapheme
-    clusters, ensuring that cursor movement never splits a grapheme.
-
-    Accepts blessed :class:`~.Keystroke` objects directly (dispatching on
-    ``.name``), or plain strings for testing and non-blessed usage.
-
-    :param history: Optional :class:`History` for up/down and auto-suggest.
-    :param is_password: Optional callable returning ``True`` in password mode.
-    :param max_width: When set, :attr:`display` clips text to this many
-        columns with horizontal scrolling.  ``0`` means unlimited.
-    :param ellipsis: Character shown at clipped edges (default ``\u2026``).
-    :param limit: Maximum grapheme clusters allowed; ``0`` means unlimited.
-    :param limit_bell: String emitted once when the limit is reached
-        (default ``"\\a"``).  Set to ``""`` to silence.
-    :param scroll_trigger_pct: Fraction of *max_width* used as the scroll
-        trigger zone near each edge (default ``0.10``).
-    :param scroll_factor: How many trigger-zone widths to scroll at once
-        (default ``2.0``).
-    :param style: Optional :class:`InputStyle` for runtime-changeable SGR
-        styling.  Fields are copied into :class:`DisplayState` on each
-        :attr:`display` access.
+    :attr:`display`.  Accepts blessed :class:`~.Keystroke` objects
+    directly (dispatching on ``.name``), or plain strings for testing.
     """
 
     def __init__(
         self,
-        history: Optional[History] = None,
+        history: Optional[LineHistory] = None,
         is_password: Optional[Callable[[], bool]] = None,
+        password_char: str = PASSWORD_CHAR,
         max_width: int = 0,
         ellipsis: str = "\u2026",
         limit: int = 65536,
         limit_bell: str = "\a",
-        scroll_trigger_pct: float = 0.10,
-        scroll_factor: float = 2.0,
+        scroll_jump: float = 0.5,
         style: Optional[InputStyle] = None,
+        keymap: Optional[Dict[str, Callable]] = None,
     ) -> None:
-        self._buf: List[str] = []  # list of grapheme clusters
-        self._cursor: int = 0      # index into _buf (grapheme position)
-        self._history: History = history or History()
+        self._buf: List[str] = []
+        self._cursor: int = 0
+        self._history = history or LineHistory()
         self._is_password: Optional[Callable[[], bool]] = is_password
+        self.password_char: str = password_char
         self._kill_ring: List[str] = []
-        self._undo_stack: List[tuple[List[str], int]] = []
+        self._undo_stack: List[Tuple[List[str], int]] = []
         self._in_history: bool = False
         self._password_mode: bool = False
         self.max_width: int = max_width
@@ -370,13 +199,16 @@ class LineEditor:
         self.limit: int = limit
         self.limit_bell: str = limit_bell
         self._limit_bell_fired: bool = False
-        self.scroll_trigger_pct: float = scroll_trigger_pct
-        self.scroll_factor: float = scroll_factor
+        self.scroll_jump: float = scroll_jump
+        self._scroll_offset: int = 0
         self.style: InputStyle = style if style is not None else InputStyle()
+        self._keymap: Dict[str, Callable] = dict(_KEY_DISPATCH)
+        if keymap:
+            self._keymap.update(keymap)
 
     @property
-    def history(self) -> History:
-        """Return the attached :class:`History` instance."""
+    def history(self) -> LineHistory:
+        """Return the attached :class:`LineHistory` instance."""
         return self._history
 
     @property
@@ -391,108 +223,67 @@ class LineEditor:
             return self._is_password()
         return self._password_mode
 
-    def _copy_style(self, ds: DisplayState) -> DisplayState:
-        """Copy :attr:`style` fields into a :class:`DisplayState`."""
-        ds.text_sgr = self.style.text_sgr
-        ds.suggestion_sgr = self.style.suggestion_sgr
-        ds.bg_sgr = self.style.bg_sgr
-        ds.ellipsis_sgr = self.style.ellipsis_sgr
-        ds.cursor_seq = self.style.cursor_seq
-        return ds
-
-    def _needs_hscroll(self) -> bool:
-        """Return whether horizontal scrolling is needed.
-
-        When the limit is set and fits within ``max_width``, the text can
-        never exceed the window — no scrolling needed.
-        """
-        if self.max_width <= 0:
-            return False
-        if self.limit > 0 and self.limit <= self.max_width:
-            return False
-        return True
-
     @property
     def display(self) -> DisplayState:
-        """Return the current :class:`DisplayState` for rendering.
-
-        When :attr:`max_width` is set (> 0), the returned state has text
-        and suggestion clipped to fit, with ``clipped_left`` and
-        ``clipped_right`` indicating overflow.  The ``cursor`` value is
-        relative to the visible window.
-        """
+        """Return the current :class:`DisplayState` for rendering."""
         line = self.line
         cursor_col = self._cursor_display_col()
+        sf = self._style_fields()
         if self.password_mode:
-            pw_text = PASSWORD_CHAR * len(self._buf)
+            pw_text = self.password_char * len(self._buf)
             if self._needs_hscroll():
-                return self._copy_style(_apply_hscroll(
+                cw = wcswidth(pw_text)
+                offset = self._compute_scroll(cursor_col, cw)
+                ds = _apply_hscroll(
                     pw_text, "", cursor_col, self.max_width, self.ellipsis,
-                    self.scroll_trigger_pct, self.scroll_factor,
-                ))
-            return self._copy_style(
-                DisplayState(text=pw_text, cursor=cursor_col)
-            )
+                    scroll_offset=offset)
+                return DisplayState(**{**vars(ds), **sf})
+            return DisplayState(text=pw_text, cursor=cursor_col, **sf)
         suggestion = self._get_suggestion()
         if self._needs_hscroll():
-            return self._copy_style(_apply_hscroll(
+            text_w = wcswidth(line)
+            suggest_w = wcswidth(suggestion)
+            offset = self._compute_scroll(cursor_col, text_w + suggest_w)
+            ds = _apply_hscroll(
                 line, suggestion, cursor_col, self.max_width, self.ellipsis,
-                self.scroll_trigger_pct, self.scroll_factor,
-            ))
-        return self._copy_style(
-            DisplayState(text=line, cursor=cursor_col, suggestion=suggestion)
-        )
+                scroll_offset=offset)
+            return DisplayState(**{**vars(ds), **sf})
+        return DisplayState(
+            text=line, cursor=cursor_col, suggestion=suggestion, **sf)
 
-    def feed_key(self, key: Union["Keystroke", str]) -> LineEditResult:
-        """
-        Process one keystroke event.
-
-        Accepts a blessed :class:`~.Keystroke` (dispatching on its ``.name``
-        attribute) or a plain string for testing.
-
-        :param key: A :class:`~.Keystroke` or a string.
-        :returns: :class:`LineEditResult` describing what happened.
-        """
+    def feed_key(self, key: Union["Keystroke", str]) -> LineEditResult:  # noqa: F821
+        """Process one keystroke and return a :class:`LineEditResult`."""
         name = getattr(key, "name", None)
         if name:
-            handler = _KEY_DISPATCH.get(name)
+            handler = self._keymap.get(name)
             if handler is not None:
                 return handler(self)
-
+            return LineEditResult()
         key_str = str(key)
-        if key_str and _is_displayable_grapheme(key_str):
+        if key_str and key_str.isprintable():
             if self._at_limit():
                 return LineEditResult(
-                    changed=False, bell=self._fire_limit_bell(),
-                )
+                    changed=False, bell=self._fire_limit_bell())
             self._save_undo()
-            for grapheme in _graphemes(key_str):
+            for grapheme in iter_graphemes(key_str):
                 if self._at_limit():
                     break
                 self._buf.insert(self._cursor, grapheme)
                 self._cursor += 1
             self._in_history = False
             return LineEditResult(changed=True)
-
         return LineEditResult()
 
     def insert_text(self, text: str) -> LineEditResult:
-        """
-        Insert text at cursor position (for bracketed paste).
-
-        :param text: Text to insert.
-        :returns: :class:`LineEditResult` with ``changed=True``, or
-            ``changed=False`` with a bell if the limit blocks insertion.
-        """
+        """Insert *text* at cursor position (for bracketed paste)."""
         if self._at_limit():
             return LineEditResult(
-                changed=False, bell=self._fire_limit_bell(),
-            )
+                changed=False, bell=self._fire_limit_bell())
         self._save_undo()
-        for grapheme in _graphemes(text):
+        for grapheme in iter_graphemes(text):
             if self._at_limit():
                 break
-            if _is_displayable_grapheme(grapheme):
+            if not _is_control(grapheme):
                 self._buf.insert(self._cursor, grapheme)
                 self._cursor += 1
         return LineEditResult(changed=True)
@@ -501,35 +292,56 @@ class LineEditor:
         """Clear the buffer and reset cursor to start."""
         self._buf.clear()
         self._cursor = 0
+        self._scroll_offset = 0
         self._in_history = False
 
     def set_password_mode(self, enabled: bool) -> None:
-        """
-        Set password mode directly (used when no ``is_password`` callable).
-
-        :param enabled: Whether to mask input display.
-        """
+        """Set password mode directly (used when no *is_password* callable)."""
         self._password_mode = enabled
 
+    def _style_fields(self) -> dict:
+        s = self.style
+        return dict(text_sgr=s.text_sgr, suggestion_sgr=s.suggestion_sgr,
+                    bg_sgr=s.bg_sgr, ellipsis_sgr=s.ellipsis_sgr,
+                    cursor_seq=s.cursor_seq)
+
+    def _needs_hscroll(self) -> bool:
+        if self.max_width <= 0:
+            return False
+        if self.limit > 0 and self.limit <= self.max_width:
+            return False
+        return True
+
+    def _compute_scroll(self, cursor_col: int, content_width: int) -> int:
+        usable = self.max_width
+        if content_width < usable and cursor_col < usable:
+            self._scroll_offset = 0
+            return 0
+        jump = max(1, int(usable * self.scroll_jump))
+        ecw = wcswidth(self.ellipsis)
+        left_cost = ecw if self._scroll_offset > 0 else 0
+        right_edge = self._scroll_offset + usable - left_cost
+        if cursor_col >= right_edge:
+            self._scroll_offset = cursor_col - usable + jump + 1 + ecw
+        elif cursor_col <= self._scroll_offset and self._scroll_offset > 0:
+            self._scroll_offset = max(0, cursor_col - jump)
+        return self._scroll_offset
+
     def _at_limit(self) -> bool:
-        """Return ``True`` when the buffer is at or above the input limit."""
         return self.limit > 0 and len(self._buf) >= self.limit
 
     def _fire_limit_bell(self) -> str:
-        """Return the bell string if limit just reached, else empty."""
         if not self._limit_bell_fired:
             self._limit_bell_fired = True
             return self.limit_bell
         return ""
 
     def _maybe_reset_limit_bell(self) -> None:
-        """Reset the bell-fired flag if buffer has shrunk below limit."""
         if self._limit_bell_fired and not self._at_limit():
             self._limit_bell_fired = False
 
     def _cursor_display_col(self) -> int:
-        """Return the display column of the cursor (sum of widths before it)."""
-        return sum(_grapheme_width(g) for g in self._buf[:self._cursor])
+        return sum(wcswidth(g) for g in self._buf[:self._cursor])
 
     def _save_undo(self) -> None:
         self._undo_stack.append((list(self._buf), self._cursor))
@@ -586,15 +398,18 @@ class LineEditor:
             return LineEditResult(changed=True)
         return LineEditResult()
 
-    def _move_word_left(self) -> LineEditResult:
-        if self._cursor == 0:
-            return LineEditResult()
+    def _find_word_left(self) -> int:
         pos = self._cursor - 1
         while pos > 0 and not self._buf[pos - 1].isalnum():
             pos -= 1
         while pos > 0 and self._buf[pos - 1].isalnum():
             pos -= 1
-        self._cursor = pos
+        return pos
+
+    def _move_word_left(self) -> LineEditResult:
+        if self._cursor == 0:
+            return LineEditResult()
+        self._cursor = self._find_word_left()
         return LineEditResult(changed=True)
 
     def _move_word_right(self) -> LineEditResult:
@@ -652,11 +467,7 @@ class LineEditor:
             return LineEditResult()
         self._save_undo()
         end = self._cursor
-        pos = self._cursor - 1
-        while pos > 0 and not self._buf[pos - 1].isalnum():
-            pos -= 1
-        while pos > 0 and self._buf[pos - 1].isalnum():
-            pos -= 1
+        pos = self._find_word_left()
         killed = "".join(self._buf[pos:end])
         del self._buf[pos:end]
         self._cursor = pos
@@ -669,7 +480,7 @@ class LineEditor:
             return LineEditResult()
         self._save_undo()
         text = self._kill_ring[-1]
-        for grapheme in _graphemes(text):
+        for grapheme in iter_graphemes(text):
             self._buf.insert(self._cursor, grapheme)
             self._cursor += 1
         return LineEditResult(changed=True)
@@ -694,12 +505,11 @@ class LineEditor:
         return LineEditResult()
 
     def _accept_suggestion(self) -> LineEditResult:
-        """Accept auto-suggest when cursor is at end, otherwise move right."""
         if self._cursor == len(self._buf):
             suggestion = self._get_suggestion()
             if suggestion:
                 self._save_undo()
-                for grapheme in _graphemes(suggestion):
+                for grapheme in iter_graphemes(suggestion):
                     self._buf.append(grapheme)
                 self._cursor = len(self._buf)
                 return LineEditResult(changed=True)
@@ -709,7 +519,7 @@ class LineEditor:
         return LineEditResult()
 
     def _set_text(self, text: str) -> None:
-        self._buf = _graphemes(text)
+        self._buf = list(iter_graphemes(text))
         self._cursor = len(self._buf)
 
     def _get_suggestion(self) -> str:
@@ -730,55 +540,35 @@ def _apply_hscroll(
     cursor_col: int,
     max_width: int,
     ellipsis: str = "\u2026",
-    scroll_trigger_pct: float = 0.10,
-    scroll_factor: float = 2.0,
+    scroll_jump: float = 0.5,
+    scroll_offset: Optional[int] = None,
 ) -> DisplayState:
-    """
-    Clip *text* and *suggestion* to *max_width* with horizontal scrolling.
-
-    The cursor is kept visible within the window.  An ellipsis character is
-    shown at the clipped edge(s).
-
-    :param text: Full buffer text.
-    :param suggestion: Auto-suggest suffix.
-    :param cursor_col: Cursor position in display columns (full text).
-    :param max_width: Available display columns.
-    :param ellipsis: Overflow indicator character.
-    :param scroll_trigger_pct: Fraction of *max_width* for the trigger zone.
-    :param scroll_factor: Multiplier on trigger zone for scroll amount.
-    :returns: A :class:`DisplayState` with clipped text and adjusted cursor.
-    """
-    ellipsis_w = _grapheme_width(ellipsis) if ellipsis else 0
-    text_w = _display_width(text)
-    suggest_w = _display_width(suggestion) if suggestion else 0
+    ellipsis_w = wcswidth(ellipsis)
+    text_w = wcswidth(text)
+    suggest_w = wcswidth(suggestion)
     total_w = text_w + suggest_w
 
-    if total_w <= max_width:
+    if total_w < max_width and cursor_col < max_width:
         return DisplayState(
-            text=text, cursor=cursor_col, suggestion=suggestion,
-        )
+            text=text, cursor=cursor_col, suggestion=suggestion)
 
-    trigger_cols = max(1, int(max_width * scroll_trigger_pct))
-    scroll_amount = max(1, int(trigger_cols * scroll_factor))
     usable = max_width
+    if scroll_offset is None:
+        jump = max(1, int(usable * scroll_jump))
+        scroll_offset = 0
+        if cursor_col >= usable:
+            scroll_offset = cursor_col - usable + jump + 1
 
-    scroll_offset = 0
-    if cursor_col >= usable - trigger_cols:
-        scroll_offset = cursor_col - usable + scroll_amount + 1
-
-    # Adjust for left ellipsis taking up space.
-    clipped_left = scroll_offset > 0
-    if clipped_left:
+    overflow_left = scroll_offset > 0
+    if overflow_left:
         usable -= ellipsis_w
 
-    # Slice graphemes from the combined text+suggestion.
     combined = text + suggestion
     vis_parts: List[str] = []
     vis_width = 0
     col = 0
-
     for grapheme in iter_graphemes(combined):
-        g_w = _grapheme_width(grapheme)
+        g_w = wcswidth(grapheme)
         if col + g_w <= scroll_offset:
             col += g_w
             continue
@@ -788,19 +578,17 @@ def _apply_hscroll(
         vis_width += g_w
         col += g_w
 
-    clipped_right = (scroll_offset + usable) < total_w
-    if clipped_right:
-        # Make room for right ellipsis by removing last grapheme(s).
+    overflow_right = (scroll_offset + usable) < total_w
+    if overflow_right:
         while vis_parts and vis_width + ellipsis_w > usable:
             removed = vis_parts.pop()
-            vis_width -= _grapheme_width(removed)
+            vis_width -= wcswidth(removed)
 
-    # Split visible parts back into text and suggestion portions.
     vis_text_parts: List[str] = []
     vis_suggest_parts: List[str] = []
     pos = 0
     for grapheme in vis_parts:
-        g_w = _grapheme_width(grapheme)
+        g_w = wcswidth(grapheme)
         src_col = scroll_offset + pos
         if src_col < text_w:
             vis_text_parts.append(grapheme)
@@ -809,31 +597,30 @@ def _apply_hscroll(
         pos += g_w
 
     vis_cursor = cursor_col - scroll_offset
-    if clipped_left:
+    if overflow_left:
         vis_cursor += ellipsis_w
 
     return DisplayState(
         text="".join(vis_text_parts),
         cursor=vis_cursor,
         suggestion="".join(vis_suggest_parts),
-        clipped_left=clipped_left,
-        clipped_right=clipped_right,
+        overflow_left=overflow_left,
+        overflow_right=overflow_right,
     )
 
 
-# Dispatch table keyed by blessed Keystroke.name values.
-_KEY_DISPATCH = {
+_KEY_DISPATCH: Dict[str, Callable] = {
     "KEY_ENTER": LineEditor._handle_enter,
     "KEY_CTRL_C": LineEditor._handle_ctrl_c,
     "KEY_CTRL_D": LineEditor._handle_ctrl_d,
     "KEY_LEFT": LineEditor._move_left,
-    "KEY_CTRL_B": LineEditor._move_left,
     "KEY_RIGHT": LineEditor._accept_suggestion,
-    "KEY_CTRL_F": LineEditor._move_right,
     "KEY_HOME": LineEditor._move_home,
-    "KEY_CTRL_A": LineEditor._move_home,
     "KEY_END": LineEditor._move_end,
+    "KEY_CTRL_A": LineEditor._move_home,
+    "KEY_CTRL_B": LineEditor._move_left,
     "KEY_CTRL_E": LineEditor._move_end,
+    "KEY_CTRL_F": LineEditor._move_right,
     "KEY_SLEFT": LineEditor._move_word_left,
     "KEY_SRIGHT": LineEditor._move_word_right,
     "KEY_CTRL_LEFT": LineEditor._move_word_left,
@@ -845,144 +632,8 @@ _KEY_DISPATCH = {
     "KEY_CTRL_W": LineEditor._kill_word_back,
     "KEY_CTRL_Y": LineEditor._yank,
     "KEY_UP": LineEditor._history_prev,
-    "KEY_CTRL_P": LineEditor._history_prev,
     "KEY_DOWN": LineEditor._history_next,
     "KEY_CTRL_N": LineEditor._history_next,
+    "KEY_CTRL_P": LineEditor._history_prev,
     "KEY_CTRL_Z": LineEditor._undo,
 }
-
-
-# incomplete
-#
-#class LiveLineEditor:
-#    """
-#    Line editor with async rendering to a terminal region.
-#
-#    Renders the editor at a fixed ``(row, col)`` position using an asyncio
-#    writer for output and :meth:`~.Terminal.async_inkey` for input.  If *row*
-#    and *col* are not specified, renders at the current cursor position.
-#
-#    :param terminal: A :class:`~.Terminal` instance for keystroke reading.
-#    :param writer: An :class:`asyncio.StreamWriter` for terminal output.
-#        If ``None``, output is written to *terminal*'s stream.
-#    :param row: 0-indexed row for the input line (``None`` = current position).
-#    :param col: 0-indexed column for the input line (default ``0``).
-#    :param width: Maximum display width (default: terminal width minus *col*).
-#    :param history: :class:`History` instance for command recall.
-#    :param is_password: Callable returning ``True`` when in password mode.
-#    :param prompt: Prompt string displayed before the input area.
-#    :param suggestion_style: SGR escape for auto-suggest text (default: dim).
-#    """
-#
-#    def __init__(
-#        self,
-#        terminal: "Any",
-#        writer: "Any" = None,
-#        row: Optional[int] = None,
-#        col: int = 0,
-#        width: Optional[int] = None,
-#        history: Optional[History] = None,
-#        is_password: Optional[Callable[[], bool]] = None,
-#        prompt: str = "",
-#        suggestion_style: str = "\x1b[2m",
-#    ) -> None:
-#        self._term = terminal
-#        self._writer = writer
-#        self._row = row
-#        self._col = col
-#        self._width = width
-#        self._prompt = prompt
-#        self._suggestion_style = suggestion_style
-#        self._editor = LineEditor(history=history, is_password=is_password)
-#
-#    @property
-#    def editor(self) -> LineEditor:
-#        """Return the underlying :class:`LineEditor`."""
-#        return self._editor
-#
-#    def _write(self, data: bytes) -> None:
-#        """Write bytes to the output stream."""
-#        if self._writer is not None:
-#            self._writer.write(data)
-#        else:
-#            self._term.stream.write(data.decode("utf-8", errors="replace"))
-#            self._term.stream.flush()
-#
-#    def render(self) -> None:
-#        """Render the current editor state to the terminal."""
-#        state = self._editor.display
-#        prompt_width = _display_width(self._prompt) if self._prompt else 0
-#        term_width = getattr(self._term, "width", 80)
-#        width = self._width if self._width is not None else (term_width - self._col)
-#
-#        parts: List[bytes] = []
-#
-#        if self._row is not None:
-#            parts.append(f"\x1b[{self._row + 1};{self._col + 1}H".encode())
-#
-#        parts.append(b"\x1b[K")
-#
-#        if self._prompt:
-#            parts.append(self._prompt.encode("utf-8", errors="replace"))
-#
-#        available = width - prompt_width
-#        text = state.text
-#        text_width = _display_width(text)
-#        if text_width <= available:
-#            parts.append(text.encode("utf-8", errors="replace"))
-#            if state.suggestion:
-#                remaining = available - text_width
-#                suggestion = state.suggestion
-#                if _display_width(suggestion) > remaining:
-#                    suggestion = _truncate_to_width(suggestion, remaining)
-#                parts.append(self._suggestion_style.encode())
-#                parts.append(suggestion.encode("utf-8", errors="replace"))
-#                parts.append(b"\x1b[0m")
-#        else:
-#            parts.append(_truncate_to_width(text, available).encode(
-#                "utf-8", errors="replace"))
-#
-#        cursor_col = self._col + prompt_width + state.cursor
-#        if self._row is not None:
-#            parts.append(f"\x1b[{self._row + 1};{cursor_col + 1}H".encode())
-#
-#        self._write(b"".join(parts))
-#
-#    async def readline(self) -> Optional[str]:
-#        """
-#        Read a complete line of input asynchronously.
-#
-#        Reads keystrokes via :meth:`~.Terminal.async_inkey`, feeds them
-#        directly to the underlying :class:`LineEditor`, and renders after
-#        each change.
-#
-#        :returns: The accepted line, or ``None`` on EOF (Ctrl+D).
-#        :raises KeyboardInterrupt: On Ctrl+C.
-#        """
-#        self.render()
-#        while True:
-#            key = await self._term.async_inkey()
-#            result = self._editor.feed_key(key)
-#
-#            if result.eof:
-#                return None
-#            if result.interrupt:
-#                self.render()
-#                raise KeyboardInterrupt
-#            if result.line is not None:
-#                return result.line
-#            if result.changed:
-#                self.render()
-#
-#
-#def _truncate_to_width(text: str, max_width: int) -> str:
-#    """Truncate *text* to fit within *max_width* display columns."""
-#    result: List[str] = []
-#    used = 0
-#    for grapheme in iter_graphemes(text):
-#        w = _grapheme_width(grapheme)
-#        if used + w > max_width:
-#            break
-#        result.append(grapheme)
-#        used += w
-#    return "".join(result)

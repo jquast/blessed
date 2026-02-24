@@ -1,20 +1,17 @@
 """Tests for blessed.line_editor."""
 
+# std imports
+import math
 import os
 import tempfile
 
-import pytest
-
-from blessed.line_editor import (
-    PASSWORD_CHAR,
-    DisplayState,
-    LineEditResult,
-    LineHistory as History,
-    LineEditor,
-    _apply_hscroll,
-    _display_width,
-    _graphemes,
-)
+# local
+from blessed.line_editor import PASSWORD_CHAR, LineEditor
+from blessed.line_editor import LineHistory as History
+from blessed.line_editor import (DisplayState,
+                                 LineEditResult,
+                                 _apply_hscroll)
+from wcwidth import iter_graphemes, width as wcswidth
 
 
 def _key(name: str) -> str:
@@ -53,20 +50,20 @@ _CTRL_Z = _key("KEY_CTRL_Z")
 
 class TestGraphemeHelpers:
     def test_graphemes_ascii(self) -> None:
-        assert _graphemes("hello") == ["h", "e", "l", "l", "o"]
+        assert list(iter_graphemes("hello")) == ["h", "e", "l", "l", "o"]
 
     def test_graphemes_emoji(self) -> None:
-        result = _graphemes("\U0001f468\u200d\U0001f33e")
+        result = list(iter_graphemes("\U0001f468\u200d\U0001f33e"))
         assert len(result) == 1
 
     def test_display_width_ascii(self) -> None:
-        assert _display_width("hello") == 5
+        assert wcswidth("hello") == 5
 
     def test_display_width_cjk(self) -> None:
-        assert _display_width("\u4e16\u754c") == 4
+        assert wcswidth("\u4e16\u754c") == 4
 
     def test_display_width_empty(self) -> None:
-        assert _display_width("") == 0
+        assert wcswidth("") == 0
 
 
 class TestLineEditResult:
@@ -322,7 +319,7 @@ class TestLineEditorCursorMovement:
 
 
 class TestLineEditorCJK:
-    def test_cjk_display_width(self) -> None:
+    def test_cjkwcswidth(self) -> None:
         ed = LineEditor()
         ed.feed_key("\u4e16")
         ed.feed_key("\u754c")
@@ -622,51 +619,51 @@ class TestApplyHscroll:
         assert ds.text == "hello"
         assert ds.cursor == 5
         assert ds.suggestion == ""
-        assert ds.clipped_left is False
-        assert ds.clipped_right is False
+        assert ds.overflow_left is False
+        assert ds.overflow_right is False
 
     def test_text_with_suggestion_fits(self) -> None:
         ds = _apply_hscroll("he", "llo world", 2, 20)
         assert ds.text == "he"
         assert ds.suggestion == "llo world"
-        assert ds.clipped_left is False
-        assert ds.clipped_right is False
+        assert ds.overflow_left is False
+        assert ds.overflow_right is False
 
     def test_text_overflows_right(self) -> None:
         ds = _apply_hscroll("abcdefghij", "", 3, 5)
-        assert ds.clipped_right is True
+        assert ds.overflow_right is True
         assert len(ds.text) <= 5
 
     def test_cursor_at_end_scrolls(self) -> None:
         text = "a" * 30
         ds = _apply_hscroll(text, "", 30, 10)
-        assert ds.clipped_left is True
+        assert ds.overflow_left is True
         assert ds.cursor >= 0
         assert ds.cursor <= 10
 
     def test_cursor_at_start_no_left_clip(self) -> None:
         text = "a" * 30
         ds = _apply_hscroll(text, "", 0, 10)
-        assert ds.clipped_left is False
-        assert ds.clipped_right is True
+        assert ds.overflow_left is False
+        assert ds.overflow_right is True
         assert ds.cursor == 0
 
     def test_suggestion_clipped(self) -> None:
         ds = _apply_hscroll("ab", "cdefghijklmnop", 2, 8)
-        assert ds.clipped_right is True
-        total = _display_width(ds.text) + _display_width(ds.suggestion)
+        assert ds.overflow_right is True
+        total = wcswidth(ds.text) + wcswidth(ds.suggestion)
         assert total <= 8
 
     def test_custom_ellipsis(self) -> None:
         ds = _apply_hscroll("a" * 20, "", 20, 10, ellipsis="...")
-        assert ds.clipped_left is True
+        assert ds.overflow_left is True
 
     def test_empty_text(self) -> None:
         ds = _apply_hscroll("", "", 0, 10)
         assert ds.text == ""
         assert ds.cursor == 0
-        assert ds.clipped_left is False
-        assert ds.clipped_right is False
+        assert ds.overflow_left is False
+        assert ds.overflow_right is False
 
 
 class TestLineEditorMaxWidth:
@@ -675,16 +672,16 @@ class TestLineEditorMaxWidth:
         for ch in "hello world this is a long line":
             ed.feed_key(ch)
         ds = ed.display
-        assert ds.clipped_left is False
-        assert ds.clipped_right is False
+        assert ds.overflow_left is False
+        assert ds.overflow_right is False
 
     def test_max_width_clips(self) -> None:
         ed = LineEditor(max_width=10)
         for ch in "abcdefghijklmnop":
             ed.feed_key(ch)
         ds = ed.display
-        assert ds.clipped_left is True
-        total = _display_width(ds.text) + _display_width(ds.suggestion)
+        assert ds.overflow_left is True
+        total = wcswidth(ds.text) + wcswidth(ds.suggestion)
         assert total <= 10
 
     def test_max_width_short_text_no_clip(self) -> None:
@@ -692,8 +689,8 @@ class TestLineEditorMaxWidth:
         for ch in "hi":
             ed.feed_key(ch)
         ds = ed.display
-        assert ds.clipped_left is False
-        assert ds.clipped_right is False
+        assert ds.overflow_left is False
+        assert ds.overflow_right is False
         assert ds.text == "hi"
 
     def test_max_width_cursor_stays_visible(self) -> None:
@@ -709,17 +706,17 @@ class TestLineEditorMaxWidth:
             ed.feed_key(ch)
         ed.feed_key(_HOME)
         ds = ed.display
-        assert ds.clipped_left is False
+        assert ds.overflow_left is False
         assert ds.cursor == 0
 
     def test_max_width_updated_dynamically(self) -> None:
         ed = LineEditor(max_width=5)
         for ch in "abcdefghij":
             ed.feed_key(ch)
-        assert ed.display.clipped_left is True
+        assert ed.display.overflow_left is True
         ed.max_width = 20
         ds = ed.display
-        assert ds.clipped_left is False
+        assert ds.overflow_left is False
 
     def test_max_width_password_mode(self) -> None:
         ed = LineEditor(max_width=5, is_password=lambda: True)
@@ -727,4 +724,296 @@ class TestLineEditorMaxWidth:
             ed.feed_key(ch)
         ds = ed.display
         assert PASSWORD_CHAR in ds.text
-        assert _display_width(ds.text) <= 5
+        assert wcswidth(ds.text) <= 5
+
+
+class TestLineEditorCoverage:
+    def test_load_file_truncates_to_max_entries(self) -> None:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("one\ntwo\nthree\nfour\nfive\n")
+            f.flush()
+            path = f.name
+        try:
+            h = History(max_entries=3)
+            h.load_file(path)
+            assert h.entries == ["three", "four", "five"]
+        finally:
+            os.unlink(path)
+
+    def test_feed_key_multi_grapheme_hits_limit_mid_insertion(self) -> None:
+        ed = LineEditor(limit=2)
+        ed.feed_key("abc")
+        assert ed.line == "ab"
+
+    def test_insert_text_hits_limit_mid_insertion(self) -> None:
+        ed = LineEditor(limit=2)
+        ed.insert_text("abc")
+        assert ed.line == "ab"
+
+    def test_insert_text_filters_control_chars(self) -> None:
+        ed = LineEditor()
+        ed.insert_text("a\x01b")
+        assert ed.line == "ab"
+
+    def test_limit_bell_fires_once_then_resets(self) -> None:
+        ed = LineEditor(limit=2)
+        ed.feed_key("a")
+        ed.feed_key("b")
+        r = ed.feed_key("c")
+        assert r.bell == "\a"
+        r = ed.feed_key("d")
+        assert r.bell == ""
+        ed.feed_key(_BACKSPACE)
+        r = ed.feed_key("x")
+        r = ed.feed_key("y")
+        assert r.bell == "\a"
+
+    def test_needs_hscroll_false_when_limit_fits(self) -> None:
+        ed = LineEditor(max_width=10, limit=5)
+        assert ed._needs_hscroll() is False
+        ds = ed.display
+        assert ds.overflow_left is False
+        assert ds.overflow_right is False
+
+    def test_kill_line_at_position_zero(self) -> None:
+        ed = LineEditor()
+        ed.feed_key("a")
+        ed.feed_key("b")
+        ed.feed_key(_HOME)
+        ed.feed_key(_CTRL_U)
+        assert ed.line == "ab"
+        assert ed._kill_ring == []
+
+    def test_accept_suggestion_at_end_no_match(self) -> None:
+        ed = LineEditor()
+        for ch in "hello":
+            ed.feed_key(ch)
+        r = ed.feed_key(_RIGHT)
+        assert r.changed is False
+        assert ed.line == "hello"
+
+    def test_accept_suggestion_mid_line(self) -> None:
+        h = History()
+        h.add("hello world")
+        ed = LineEditor(history=h)
+        for ch in "hello":
+            ed.feed_key(ch)
+        ed.feed_key(_LEFT)
+        r = ed.feed_key(_RIGHT)
+        assert r.changed is True
+        assert ed._cursor == 5
+        assert ed.line == "hello"
+
+    def test_custom_keymap_override(self) -> None:
+        called = []
+
+        def custom_handler(editor):
+            called.append(True)
+            return LineEditResult()
+
+        ed = LineEditor(keymap={"KEY_ENTER": custom_handler})
+        ed.feed_key("a")
+        ed.feed_key(_ENTER)
+        assert called == [True]
+        assert ed.line == "a"
+
+    def test_custom_keymap_adds_binding(self) -> None:
+        called = []
+
+        def custom_handler(editor):
+            called.append(True)
+            return LineEditResult()
+
+        _F1 = _key("KEY_F1")
+        ed = LineEditor(keymap={"KEY_F1": custom_handler})
+        ed.feed_key(_F1)
+        assert called == [True]
+
+    def test_custom_keymap_disable_binding(self) -> None:
+        ed = LineEditor(keymap={"KEY_CTRL_C": None})
+        ed.feed_key("a")
+        r = ed.feed_key(_CTRL_C)
+        assert r.interrupt is False
+        assert r.changed is False
+        assert ed.line == "a"
+
+    def test_load_file_skips_blank_lines(self) -> None:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("alpha\n\nbravo\n")
+            f.flush()
+            path = f.name
+        try:
+            h = History()
+            h.load_file(path)
+            assert h.entries == ["alpha", "bravo"]
+        finally:
+            os.unlink(path)
+
+    def test_clear_resets_scroll_offset(self) -> None:
+        ed = LineEditor(max_width=10)
+        for ch in "a" * 30:
+            ed.feed_key(ch)
+        _ = ed.display
+        assert ed._scroll_offset > 0
+        ed.clear()
+        assert ed._scroll_offset == 0
+
+    def test_move_right_at_end(self) -> None:
+        ed = LineEditor()
+        ed.feed_key("a")
+        ed.feed_key(_key("KEY_CTRL_F"))
+        r = ed.feed_key(_key("KEY_CTRL_F"))
+        assert r.changed is False
+
+    def test_home_already_at_start(self) -> None:
+        ed = LineEditor()
+        r = ed.feed_key(_HOME)
+        assert r.changed is False
+
+    def test_end_already_at_end(self) -> None:
+        ed = LineEditor()
+        ed.feed_key("a")
+        r = ed.feed_key(_END)
+        assert r.changed is False
+
+    def test_kill_line_empty_buffer(self) -> None:
+        ed = LineEditor()
+        r = ed.feed_key(_CTRL_U)
+        assert r.changed is False
+
+    def test_kill_word_back_at_start(self) -> None:
+        ed = LineEditor()
+        ed.feed_key("a")
+        ed.feed_key(_HOME)
+        r = ed.feed_key(_CTRL_W)
+        assert r.changed is False
+
+
+class TestStatefulHScroll:
+    def test_no_scroll_while_inside_window(self) -> None:
+        ed = LineEditor(max_width=20)
+        for ch in "abcdef":
+            ed.feed_key(ch)
+        ds = ed.display
+        assert ed._scroll_offset == 0
+        assert ds.cursor == 6
+        assert ds.overflow_left is False
+
+    def test_first_scroll_at_field_boundary(self) -> None:
+        ed = LineEditor(max_width=20)
+        for ch in "a" * 19:
+            ed.feed_key(ch)
+        ds = ed.display
+        assert ed._scroll_offset == 0
+        assert ds.cursor == 19
+        ed.feed_key("b")
+        ds = ed.display
+        assert ed._scroll_offset > 0
+        assert ds.cursor < 15
+
+    def test_typing_across_full_width_then_jump(self) -> None:
+        ed = LineEditor(max_width=40)
+        for i in range(50):
+            ed.feed_key(chr(ord("a") + (i % 26)))
+            ds = ed.display
+        assert ed._scroll_offset > 0
+        assert 0 <= ds.cursor <= 40
+
+    def test_scroll_left_on_home(self) -> None:
+        ed = LineEditor(max_width=20)
+        for ch in "a" * 40:
+            ed.feed_key(ch)
+        _ = ed.display
+        assert ed._scroll_offset > 0
+        ed.feed_key(_HOME)
+        ds = ed.display
+        assert ed._scroll_offset == 0
+        assert ds.cursor == 0
+        assert ds.overflow_left is False
+
+    def test_large_jump_fewer_scrolls(self) -> None:
+        ed = LineEditor(max_width=40, scroll_jump=0.75)
+        scrolls = 0
+        for ch in "a" * 80:
+            old = ed._scroll_offset
+            ed.feed_key(ch)
+            _ = ed.display
+            if ed._scroll_offset != old:
+                scrolls += 1
+        assert scrolls < 5
+
+    def test_small_jump_more_scrolls(self) -> None:
+        ed = LineEditor(max_width=40, scroll_jump=0.1)
+        scrolls = 0
+        for ch in "a" * 80:
+            old = ed._scroll_offset
+            ed.feed_key(ch)
+            _ = ed.display
+            if ed._scroll_offset != old:
+                scrolls += 1
+        assert scrolls > 5
+
+    def test_default_jump_makes_room(self) -> None:
+        ed = LineEditor(max_width=40)
+        for ch in "a" * 40:
+            ed.feed_key(ch)
+        ds = ed.display
+        assert ed._scroll_offset > 0
+        assert ds.cursor < 25
+
+    def test_scroll_left_near_left_edge(self) -> None:
+        ed = LineEditor(max_width=20)
+        for ch in "a" * 30:
+            ed.feed_key(ch)
+        _ = ed.display
+        right_offset = ed._scroll_offset
+        for _ in range(25):
+            ed.feed_key(_LEFT)
+        ds = ed.display
+        assert ed._scroll_offset < right_offset
+
+    def test_apply_hscroll_with_explicit_scroll_offset(self) -> None:
+        ds = _apply_hscroll("a" * 30, "", 25, 10, scroll_offset=20)
+        assert ds.overflow_left is True
+        assert ds.cursor == 25 - 20 + wcswidth("\u2026")
+
+    def test_apply_hscroll_scroll_offset_zero(self) -> None:
+        ds = _apply_hscroll("a" * 30, "", 3, 10, scroll_offset=0)
+        assert ds.overflow_left is False
+        assert ds.overflow_right is True
+        assert ds.cursor == 3
+
+    def test_enter_resets_scroll_offset(self) -> None:
+        ed = LineEditor(max_width=10)
+        for ch in "a" * 20:
+            ed.feed_key(ch)
+        _ = ed.display
+        assert ed._scroll_offset > 0
+        ed.feed_key(_ENTER)
+        assert ed._scroll_offset == 0
+
+    def test_ctrl_c_resets_scroll_offset(self) -> None:
+        ed = LineEditor(max_width=10)
+        for ch in "a" * 20:
+            ed.feed_key(ch)
+        _ = ed.display
+        assert ed._scroll_offset > 0
+        ed.feed_key(_CTRL_C)
+        assert ed._scroll_offset == 0
+
+    def test_small_field_width_10(self) -> None:
+        ed = LineEditor(max_width=10)
+        for ch in "a" * 15:
+            ed.feed_key(ch)
+        ds = ed.display
+        assert 0 <= ds.cursor <= 10
+        assert ed._scroll_offset > 0
+
+    def test_password_mode_stateful_scroll(self) -> None:
+        ed = LineEditor(max_width=10, is_password=lambda: True)
+        for ch in "a" * 20:
+            ed.feed_key(ch)
+        ds = ed.display
+        assert ed._scroll_offset > 0
+        assert 0 <= ds.cursor <= 10
+
