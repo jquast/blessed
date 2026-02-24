@@ -1,10 +1,5 @@
 """Tests for blessed.line_editor."""
 
-# std imports
-import math
-import os
-import tempfile
-
 # local
 from blessed.line_editor import PASSWORD_CHAR, LineEditor
 from blessed.line_editor import LineHistory as History
@@ -12,6 +7,16 @@ from blessed.line_editor import (DisplayState,
                                  LineEditResult,
                                  _apply_hscroll)
 from wcwidth import iter_graphemes, width as wcswidth
+
+
+class MockTerminal:
+    """Minimal terminal stub for render method tests."""
+
+    normal = "<NORMAL>"
+
+    @staticmethod
+    def move_yx(row: int, col: int) -> str:
+        return f"<MV:{row},{col}>"
 
 
 def _key(name: str) -> str:
@@ -79,9 +84,7 @@ class TestLineEditResult:
         assert r.line == "hello"
         assert r.changed is True
 
-
-class TestDisplayState:
-    def test_defaults(self) -> None:
+    def test_display_state_defaults(self) -> None:
         d = DisplayState()
         assert d.text == ""
         assert d.cursor == 0
@@ -145,39 +148,6 @@ class TestHistory:
         h = History()
         h.nav_start("")
         assert h.nav_up() is None
-
-    def test_load_file(self) -> None:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-            f.write("alpha\nbravo\ncharlie\n")
-            f.flush()
-            path = f.name
-        try:
-            h = History()
-            h.load_file(path)
-            assert h.entries == ["alpha", "bravo", "charlie"]
-        finally:
-            os.unlink(path)
-
-    def test_load_file_missing(self) -> None:
-        h = History()
-        h.load_file("/nonexistent/path")
-        assert h.entries == []
-
-    def test_save_entry(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = os.path.join(tmpdir, "sub", "history.txt")
-            h = History()
-            h.save_entry("hello", path)
-            h.save_entry("world", path)
-            with open(path, "r") as f:
-                assert f.read() == "hello\nworld\n"
-
-    def test_save_entry_empty(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = os.path.join(tmpdir, "history.txt")
-            h = History()
-            h.save_entry("", path)
-            assert not os.path.exists(path)
 
 
 class TestLineEditorBasicEditing:
@@ -252,6 +222,53 @@ class TestLineEditorBasicEditing:
         assert r.changed is False
         assert r.line is None
 
+    def test_ctrl_c_clears_and_interrupts(self) -> None:
+        ed = LineEditor()
+        ed.feed_key("a")
+        ed.feed_key("b")
+        r = ed.feed_key(_CTRL_C)
+        assert r.interrupt is True
+        assert r.changed is True
+        assert ed.line == ""
+
+    def test_ctrl_d_eof_on_empty(self) -> None:
+        ed = LineEditor()
+        r = ed.feed_key(_CTRL_D)
+        assert r.eof is True
+
+    def test_ctrl_d_deletes_on_nonempty(self) -> None:
+        ed = LineEditor()
+        ed.feed_key("a")
+        ed.feed_key("b")
+        ed.feed_key(_HOME)
+        r = ed.feed_key(_CTRL_D)
+        assert r.eof is False
+        assert r.changed is True
+        assert ed.line == "b"
+
+    def test_feed_key_multi_grapheme_hits_limit_mid_insertion(self) -> None:
+        ed = LineEditor(limit=2)
+        ed.feed_key("abc")
+        assert ed.line == "ab"
+
+    def test_insert_text_hits_limit_mid_insertion(self) -> None:
+        ed = LineEditor(limit=2)
+        ed.insert_text("abc")
+        assert ed.line == "ab"
+
+    def test_insert_text_already_at_limit(self) -> None:
+        ed = LineEditor(limit=2)
+        ed.feed_key("a")
+        ed.feed_key("b")
+        r = ed.insert_text("x")
+        assert r.changed is False
+        assert ed.line == "ab"
+
+    def test_insert_text_filters_control_chars(self) -> None:
+        ed = LineEditor()
+        ed.insert_text("a\x01b")
+        assert ed.line == "ab"
+
 
 class TestLineEditorCursorMovement:
     def test_left_right(self) -> None:
@@ -317,29 +334,38 @@ class TestLineEditorCursorMovement:
         assert ed.line == "abc"
         assert ed.display.cursor == 2
 
-
-class TestLineEditorCJK:
-    def test_cjkwcswidth(self) -> None:
+    def test_ctrl_a_moves_home(self) -> None:
         ed = LineEditor()
-        ed.feed_key("\u4e16")
-        ed.feed_key("\u754c")
-        assert ed.display.cursor == 4
-        assert ed.display.text == "\u4e16\u754c"
+        ed.feed_key("a")
+        ed.feed_key("b")
+        ed.feed_key(_CTRL_A)
+        assert ed.display.cursor == 0
 
-    def test_cjk_cursor_after_left(self) -> None:
+    def test_ctrl_e_moves_end(self) -> None:
         ed = LineEditor()
-        ed.feed_key("\u4e16")
-        ed.feed_key("\u754c")
-        ed.feed_key(_LEFT)
+        ed.feed_key("a")
+        ed.feed_key("b")
+        ed.feed_key(_HOME)
+        ed.feed_key(_CTRL_E)
         assert ed.display.cursor == 2
 
-    def test_backspace_cjk(self) -> None:
+    def test_move_right_at_end(self) -> None:
         ed = LineEditor()
-        ed.feed_key("\u4e16")
-        ed.feed_key("\u754c")
-        ed.feed_key(_BACKSPACE)
-        assert ed.line == "\u4e16"
-        assert ed.display.cursor == 2
+        ed.feed_key("a")
+        ed.feed_key(_key("KEY_CTRL_F"))
+        r = ed.feed_key(_key("KEY_CTRL_F"))
+        assert r.changed is False
+
+    def test_home_already_at_start(self) -> None:
+        ed = LineEditor()
+        r = ed.feed_key(_HOME)
+        assert r.changed is False
+
+    def test_end_already_at_end(self) -> None:
+        ed = LineEditor()
+        ed.feed_key("a")
+        r = ed.feed_key(_END)
+        assert r.changed is False
 
 
 class TestLineEditorGraphemeEditing:
@@ -374,6 +400,28 @@ class TestLineEditorGraphemeEditing:
         assert ed._cursor == 1
         ed.feed_key(_RIGHT)
         assert ed._cursor == 2
+
+    def test_cjk_display_width(self) -> None:
+        ed = LineEditor()
+        ed.feed_key("\u4e16")
+        ed.feed_key("\u754c")
+        assert ed.display.cursor == 4
+        assert ed.display.text == "\u4e16\u754c"
+
+    def test_cjk_cursor_after_left(self) -> None:
+        ed = LineEditor()
+        ed.feed_key("\u4e16")
+        ed.feed_key("\u754c")
+        ed.feed_key(_LEFT)
+        assert ed.display.cursor == 2
+
+    def test_backspace_cjk(self) -> None:
+        ed = LineEditor()
+        ed.feed_key("\u4e16")
+        ed.feed_key("\u754c")
+        ed.feed_key(_BACKSPACE)
+        assert ed.line == "\u4e16"
+        assert ed.display.cursor == 2
 
 
 class TestLineEditorKillRing:
@@ -424,6 +472,27 @@ class TestLineEditorKillRing:
         ed = LineEditor()
         ed.feed_key("a")
         r = ed.feed_key(_CTRL_K)
+        assert r.changed is False
+
+    def test_kill_line_at_position_zero(self) -> None:
+        ed = LineEditor()
+        ed.feed_key("a")
+        ed.feed_key("b")
+        ed.feed_key(_HOME)
+        ed.feed_key(_CTRL_U)
+        assert ed.line == "ab"
+        assert ed._kill_ring == []
+
+    def test_kill_line_empty_buffer(self) -> None:
+        ed = LineEditor()
+        r = ed.feed_key(_CTRL_U)
+        assert r.changed is False
+
+    def test_kill_word_back_at_start(self) -> None:
+        ed = LineEditor()
+        ed.feed_key("a")
+        ed.feed_key(_HOME)
+        r = ed.feed_key(_CTRL_W)
         assert r.changed is False
 
 
@@ -543,6 +612,26 @@ class TestLineEditorAutoSuggest:
         ed.feed_key(_RIGHT)
         assert ed.line == "hello world"
 
+    def test_accept_suggestion_at_end_no_match(self) -> None:
+        ed = LineEditor()
+        for ch in "hello":
+            ed.feed_key(ch)
+        r = ed.feed_key(_RIGHT)
+        assert r.changed is False
+        assert ed.line == "hello"
+
+    def test_accept_suggestion_mid_line(self) -> None:
+        h = History()
+        h.add("hello world")
+        ed = LineEditor(history=h)
+        for ch in "hello":
+            ed.feed_key(ch)
+        ed.feed_key(_LEFT)
+        r = ed.feed_key(_RIGHT)
+        assert r.changed is True
+        assert ed._cursor == 5
+        assert ed.line == "hello"
+
 
 class TestLineEditorPasswordMode:
     def test_masked_display(self) -> None:
@@ -570,47 +659,39 @@ class TestLineEditorPasswordMode:
         assert h.entries == []
 
 
-class TestLineEditorCtrlCD:
-    def test_ctrl_c_clears_and_interrupts(self) -> None:
-        ed = LineEditor()
+class TestLineEditorKeymap:
+    def test_custom_keymap_override(self) -> None:
+        called = []
+
+        def custom_handler(editor):
+            called.append(True)
+            return LineEditResult()
+
+        ed = LineEditor(keymap={"KEY_ENTER": custom_handler})
         ed.feed_key("a")
-        ed.feed_key("b")
+        ed.feed_key(_ENTER)
+        assert called == [True]
+        assert ed.line == "a"
+
+    def test_custom_keymap_adds_binding(self) -> None:
+        called = []
+
+        def custom_handler(editor):
+            called.append(True)
+            return LineEditResult()
+
+        _F1 = _key("KEY_F1")
+        ed = LineEditor(keymap={"KEY_F1": custom_handler})
+        ed.feed_key(_F1)
+        assert called == [True]
+
+    def test_custom_keymap_disable_binding(self) -> None:
+        ed = LineEditor(keymap={"KEY_CTRL_C": None})
+        ed.feed_key("a")
         r = ed.feed_key(_CTRL_C)
-        assert r.interrupt is True
-        assert r.changed is True
-        assert ed.line == ""
-
-    def test_ctrl_d_eof_on_empty(self) -> None:
-        ed = LineEditor()
-        r = ed.feed_key(_CTRL_D)
-        assert r.eof is True
-
-    def test_ctrl_d_deletes_on_nonempty(self) -> None:
-        ed = LineEditor()
-        ed.feed_key("a")
-        ed.feed_key("b")
-        ed.feed_key(_HOME)
-        r = ed.feed_key(_CTRL_D)
-        assert r.eof is False
-        assert r.changed is True
-        assert ed.line == "b"
-
-
-class TestLineEditorCtrlAE:
-    def test_ctrl_a_moves_home(self) -> None:
-        ed = LineEditor()
-        ed.feed_key("a")
-        ed.feed_key("b")
-        ed.feed_key(_CTRL_A)
-        assert ed.display.cursor == 0
-
-    def test_ctrl_e_moves_end(self) -> None:
-        ed = LineEditor()
-        ed.feed_key("a")
-        ed.feed_key("b")
-        ed.feed_key(_HOME)
-        ed.feed_key(_CTRL_E)
-        assert ed.display.cursor == 2
+        assert r.interrupt is False
+        assert r.changed is False
+        assert ed.line == "a"
 
 
 class TestApplyHscroll:
@@ -726,35 +807,6 @@ class TestLineEditorMaxWidth:
         assert PASSWORD_CHAR in ds.text
         assert wcswidth(ds.text) <= 5
 
-
-class TestLineEditorCoverage:
-    def test_load_file_truncates_to_max_entries(self) -> None:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-            f.write("one\ntwo\nthree\nfour\nfive\n")
-            f.flush()
-            path = f.name
-        try:
-            h = History(max_entries=3)
-            h.load_file(path)
-            assert h.entries == ["three", "four", "five"]
-        finally:
-            os.unlink(path)
-
-    def test_feed_key_multi_grapheme_hits_limit_mid_insertion(self) -> None:
-        ed = LineEditor(limit=2)
-        ed.feed_key("abc")
-        assert ed.line == "ab"
-
-    def test_insert_text_hits_limit_mid_insertion(self) -> None:
-        ed = LineEditor(limit=2)
-        ed.insert_text("abc")
-        assert ed.line == "ab"
-
-    def test_insert_text_filters_control_chars(self) -> None:
-        ed = LineEditor()
-        ed.insert_text("a\x01b")
-        assert ed.line == "ab"
-
     def test_limit_bell_fires_once_then_resets(self) -> None:
         ed = LineEditor(limit=2)
         ed.feed_key("a")
@@ -774,119 +826,6 @@ class TestLineEditorCoverage:
         ds = ed.display
         assert ds.overflow_left is False
         assert ds.overflow_right is False
-
-    def test_kill_line_at_position_zero(self) -> None:
-        ed = LineEditor()
-        ed.feed_key("a")
-        ed.feed_key("b")
-        ed.feed_key(_HOME)
-        ed.feed_key(_CTRL_U)
-        assert ed.line == "ab"
-        assert ed._kill_ring == []
-
-    def test_accept_suggestion_at_end_no_match(self) -> None:
-        ed = LineEditor()
-        for ch in "hello":
-            ed.feed_key(ch)
-        r = ed.feed_key(_RIGHT)
-        assert r.changed is False
-        assert ed.line == "hello"
-
-    def test_accept_suggestion_mid_line(self) -> None:
-        h = History()
-        h.add("hello world")
-        ed = LineEditor(history=h)
-        for ch in "hello":
-            ed.feed_key(ch)
-        ed.feed_key(_LEFT)
-        r = ed.feed_key(_RIGHT)
-        assert r.changed is True
-        assert ed._cursor == 5
-        assert ed.line == "hello"
-
-    def test_custom_keymap_override(self) -> None:
-        called = []
-
-        def custom_handler(editor):
-            called.append(True)
-            return LineEditResult()
-
-        ed = LineEditor(keymap={"KEY_ENTER": custom_handler})
-        ed.feed_key("a")
-        ed.feed_key(_ENTER)
-        assert called == [True]
-        assert ed.line == "a"
-
-    def test_custom_keymap_adds_binding(self) -> None:
-        called = []
-
-        def custom_handler(editor):
-            called.append(True)
-            return LineEditResult()
-
-        _F1 = _key("KEY_F1")
-        ed = LineEditor(keymap={"KEY_F1": custom_handler})
-        ed.feed_key(_F1)
-        assert called == [True]
-
-    def test_custom_keymap_disable_binding(self) -> None:
-        ed = LineEditor(keymap={"KEY_CTRL_C": None})
-        ed.feed_key("a")
-        r = ed.feed_key(_CTRL_C)
-        assert r.interrupt is False
-        assert r.changed is False
-        assert ed.line == "a"
-
-    def test_load_file_skips_blank_lines(self) -> None:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-            f.write("alpha\n\nbravo\n")
-            f.flush()
-            path = f.name
-        try:
-            h = History()
-            h.load_file(path)
-            assert h.entries == ["alpha", "bravo"]
-        finally:
-            os.unlink(path)
-
-    def test_clear_resets_scroll_offset(self) -> None:
-        ed = LineEditor(max_width=10)
-        for ch in "a" * 30:
-            ed.feed_key(ch)
-        _ = ed.display
-        assert ed._scroll_offset > 0
-        ed.clear()
-        assert ed._scroll_offset == 0
-
-    def test_move_right_at_end(self) -> None:
-        ed = LineEditor()
-        ed.feed_key("a")
-        ed.feed_key(_key("KEY_CTRL_F"))
-        r = ed.feed_key(_key("KEY_CTRL_F"))
-        assert r.changed is False
-
-    def test_home_already_at_start(self) -> None:
-        ed = LineEditor()
-        r = ed.feed_key(_HOME)
-        assert r.changed is False
-
-    def test_end_already_at_end(self) -> None:
-        ed = LineEditor()
-        ed.feed_key("a")
-        r = ed.feed_key(_END)
-        assert r.changed is False
-
-    def test_kill_line_empty_buffer(self) -> None:
-        ed = LineEditor()
-        r = ed.feed_key(_CTRL_U)
-        assert r.changed is False
-
-    def test_kill_word_back_at_start(self) -> None:
-        ed = LineEditor()
-        ed.feed_key("a")
-        ed.feed_key(_HOME)
-        r = ed.feed_key(_CTRL_W)
-        assert r.changed is False
 
 
 class TestStatefulHScroll:
@@ -1017,3 +956,205 @@ class TestStatefulHScroll:
         assert ed._scroll_offset > 0
         assert 0 <= ds.cursor <= 10
 
+    def test_clear_resets_scroll_offset(self) -> None:
+        ed = LineEditor(max_width=10)
+        for ch in "a" * 30:
+            ed.feed_key(ch)
+        _ = ed.display
+        assert ed._scroll_offset > 0
+        ed.clear()
+        assert ed._scroll_offset == 0
+
+
+class TestRender:
+    def test_render_basic(self) -> None:
+        mt = MockTerminal()
+        ed = LineEditor()
+        for ch in "hello":
+            ed.feed_key(ch)
+        out = ed.render(mt, 3, 40)
+        assert "<MV:3,0>" in out
+        assert "hello" in out
+        assert "<MV:3,5>" in out
+        assert "<NORMAL>" in out
+
+    def test_render_with_suggestion(self) -> None:
+        mt = MockTerminal()
+        h = History()
+        h.add("hello world")
+        ed = LineEditor(history=h)
+        for ch in "he":
+            ed.feed_key(ch)
+        out = ed.render(mt, 0, 40)
+        assert "he" in out
+        assert "llo world" in out
+        assert ed.suggestion_sgr in out
+
+    def test_render_overflow_left_right(self) -> None:
+        mt = MockTerminal()
+        ed = LineEditor(max_width=10)
+        for ch in "abcdefghijklmnop":
+            ed.feed_key(ch)
+        ed.feed_key(_HOME)
+        ed.feed_key(_RIGHT)
+        for ch in "xyz":
+            ed.feed_key(ch)
+        out = ed.render(mt, 0, 10)
+        ds = ed.display
+        if ds.overflow_left:
+            assert ed.ellipsis in out
+        if ds.overflow_right:
+            assert ed.ellipsis in out
+
+    def test_render_updates_prev_state(self) -> None:
+        mt = MockTerminal()
+        ed = LineEditor()
+        for ch in "abc":
+            ed.feed_key(ch)
+        ed.render(mt, 0, 40)
+        assert ed._prev_cursor == 3
+        assert ed._prev_content_w == 3
+        assert ed._prev_overflow == (False, False)
+
+    def test_render_padding(self) -> None:
+        mt = MockTerminal()
+        ed = LineEditor()
+        ed.feed_key("a")
+        out = ed.render(mt, 0, 10)
+        assert " " * 9 in out
+
+    def test_render_empty_text(self) -> None:
+        mt = MockTerminal()
+        ed = LineEditor()
+        out = ed.render(mt, 0, 10)
+        assert "<MV:0,0>" in out
+        assert " " * 10 in out
+
+
+class TestRenderInsert:
+    def test_render_insert_at_end(self) -> None:
+        mt = MockTerminal()
+        ed = LineEditor()
+        for ch in "hel":
+            ed.feed_key(ch)
+        ed.render(mt, 0, 40)
+        ed.feed_key("l")
+        result = ed.render_insert(mt, 0, "l")
+        assert result is not None
+        assert "l" in result
+
+    def test_render_insert_mid_buffer_returns_none(self) -> None:
+        mt = MockTerminal()
+        ed = LineEditor()
+        for ch in "abc":
+            ed.feed_key(ch)
+        ed.render(mt, 0, 40)
+        ed.feed_key(_LEFT)
+        ed.feed_key("x")
+        result = ed.render_insert(mt, 0, "x")
+        assert result is None
+
+    def test_render_insert_overflow_change_returns_none(self) -> None:
+        mt = MockTerminal()
+        ed = LineEditor(max_width=5)
+        for ch in "abcd":
+            ed.feed_key(ch)
+        ed.render(mt, 0, 5)
+        ed.feed_key("e")
+        ed.feed_key("f")
+        result = ed.render_insert(mt, 0, "f")
+        assert result is None
+
+    def test_render_insert_clears_stale_suggestion(self) -> None:
+        mt = MockTerminal()
+        h = History()
+        h.add("hello world")
+        ed = LineEditor(history=h)
+        for ch in "he":
+            ed.feed_key(ch)
+        ed.render(mt, 0, 40)
+        ed.feed_key("l")
+        result = ed.render_insert(mt, 0, "l")
+        assert result is not None
+
+    def test_render_insert_updates_prev_state(self) -> None:
+        mt = MockTerminal()
+        ed = LineEditor()
+        for ch in "ab":
+            ed.feed_key(ch)
+        ed.render(mt, 0, 40)
+        ed.feed_key("c")
+        ed.render_insert(mt, 0, "c")
+        assert ed._prev_cursor == 3
+        assert ed._prev_content_w == 3
+        assert ed._prev_overflow == (False, False)
+
+
+class TestRenderBackspace:
+    def test_render_backspace_at_end(self) -> None:
+        mt = MockTerminal()
+        ed = LineEditor()
+        for ch in "abc":
+            ed.feed_key(ch)
+        ed.render(mt, 0, 40)
+        ed.feed_key(_BACKSPACE)
+        result = ed.render_backspace(mt, 0)
+        assert result is not None
+
+    def test_render_backspace_mid_buffer_returns_none(self) -> None:
+        mt = MockTerminal()
+        ed = LineEditor()
+        for ch in "abc":
+            ed.feed_key(ch)
+        ed.render(mt, 0, 40)
+        ed.feed_key(_LEFT)
+        ed.feed_key(_BACKSPACE)
+        result = ed.render_backspace(mt, 0)
+        assert result is None
+
+    def test_render_backspace_overflow_change_returns_none(self) -> None:
+        mt = MockTerminal()
+        ed = LineEditor(max_width=5)
+        for ch in "abcdef":
+            ed.feed_key(ch)
+        ed.render(mt, 0, 5)
+        for _ in range(4):
+            ed.feed_key(_BACKSPACE)
+        result = ed.render_backspace(mt, 0)
+        assert result is None
+
+    def test_render_backspace_erases_trailing(self) -> None:
+        mt = MockTerminal()
+        ed = LineEditor()
+        for ch in "abc":
+            ed.feed_key(ch)
+        ed.render(mt, 0, 40)
+        ed.feed_key(_BACKSPACE)
+        result = ed.render_backspace(mt, 0)
+        assert result is not None
+        assert " " in result
+
+    def test_render_backspace_updates_prev_state(self) -> None:
+        mt = MockTerminal()
+        ed = LineEditor()
+        for ch in "abc":
+            ed.feed_key(ch)
+        ed.render(mt, 0, 40)
+        ed.feed_key(_BACKSPACE)
+        ed.render_backspace(mt, 0)
+        assert ed._prev_cursor == 2
+        assert ed._prev_content_w == 2
+        assert ed._prev_overflow == (False, False)
+
+    def test_render_backspace_with_suggestion(self) -> None:
+        mt = MockTerminal()
+        h = History()
+        h.add("hello world")
+        ed = LineEditor(history=h)
+        for ch in "hel":
+            ed.feed_key(ch)
+        ed.render(mt, 0, 40)
+        ed.feed_key(_BACKSPACE)
+        result = ed.render_backspace(mt, 0)
+        assert result is not None
+        assert ed.suggestion_sgr in result

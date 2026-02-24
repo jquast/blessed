@@ -3,40 +3,27 @@
 This module provides :class:`LineEditor` for single-line input with readline-style
 editing and :class:`LineHistory` for command recall and file persistence.
 """
+from __future__ import annotations
 
 # std imports
-import os
-from typing import Dict, List, Tuple, Union, Callable, Optional
+from typing import TYPE_CHECKING, Dict, List, Tuple, Union, Callable, Optional
 from dataclasses import dataclass
+
+if TYPE_CHECKING:
+    from .terminal import Terminal
 
 # 3rd party
 from wcwidth import iter_graphemes, width as wcswidth
 
-PASSWORD_CHAR = "\u25cf"
+PASSWORD_CHAR = "\u273b"
 
 __all__ = (
+    "DEFAULT_KEYMAP",
     "DisplayState",
-    "InputStyle",
     "LineEditResult",
     "LineHistory",
     "LineEditor",
 )
-
-
-@dataclass
-class InputStyle:
-    """SGR styling for the input line, changeable at runtime."""
-
-    #: SGR sequence applied to main input text.
-    text_sgr: str = ""
-    #: SGR sequence applied to auto-suggest suffix.
-    suggestion_sgr: str = ""
-    #: SGR sequence for the whole input line background.
-    bg_sgr: str = ""
-    #: SGR sequence applied to overflow ellipsis characters.
-    ellipsis_sgr: str = ""
-    #: DECSCUSR sequence for cursor shape (e.g. ``"\\x1b[5 q"``).
-    cursor_seq: str = ""
 
 
 @dataclass
@@ -69,16 +56,14 @@ class DisplayState:
     overflow_left: bool = False
     #: ``True`` when content extends beyond the right edge.
     overflow_right: bool = False
-    #: SGR sequence for main input text (from :class:`InputStyle`).
+    #: SGR sequence applied to buffer text.
     text_sgr: str = ""
-    #: SGR sequence for auto-suggest suffix.
+    #: SGR sequence applied to suggestion text.
     suggestion_sgr: str = ""
-    #: SGR sequence for the whole input line background.
+    #: SGR sequence applied to fill the background.
     bg_sgr: str = ""
-    #: SGR sequence for overflow ellipsis characters.
+    #: SGR sequence applied to the ellipsis indicator.
     ellipsis_sgr: str = ""
-    #: DECSCUSR sequence for cursor shape.
-    cursor_seq: str = ""
 
 
 def _is_control(grapheme: str) -> bool:
@@ -93,58 +78,34 @@ class LineHistory:
     """
 
     def __init__(self, max_entries: int = 5000) -> None:
-        self._entries: List[str] = []
+        #: History entries list (most recent last).
+        self.entries: List[str] = []
         self._max_entries = max_entries
         self._nav_idx: int = -1
         self._nav_saved: str = ""
-
-    @property
-    def entries(self) -> List[str]:
-        """Return the history entries list (most recent last)."""
-        return self._entries
 
     def add(self, line: str) -> None:
         """Append *line* to history, skipping empty and consecutive duplicates."""
         if not line:
             return
-        if self._entries and self._entries[-1] == line:
+        if self.entries and self.entries[-1] == line:
             return
-        self._entries.append(line)
-        if len(self._entries) > self._max_entries:
-            self._entries = self._entries[-self._max_entries:]
+        self.entries.append(line)
+        if len(self.entries) > self._max_entries:
+            self.entries = self.entries[-self._max_entries:]
 
     def search_prefix(self, prefix: str) -> Optional[str]:
         """Return the most recent entry starting with *prefix*, or ``None``."""
         if not prefix:
             return None
-        for entry in reversed(self._entries):
+        for entry in reversed(self.entries):
             if entry.startswith(prefix) and entry != prefix:
                 return entry
         return None
 
-    def load_file(self, path: str) -> None:
-        """Load history entries from *path* (one per line)."""
-        if not os.path.exists(path):
-            return
-        with open(path, "r", encoding="utf-8", errors="replace") as fh:
-            for raw_line in fh:
-                line = raw_line.rstrip("\n")
-                if line:
-                    self._entries.append(line)
-        if len(self._entries) > self._max_entries:
-            self._entries = self._entries[-self._max_entries:]
-
-    def save_entry(self, line: str, path: str) -> None:
-        """Append *line* to the history file at *path*."""
-        if not line:
-            return
-        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-        with open(path, "a", encoding="utf-8") as fh:
-            fh.write(line + "\n")
-
     def nav_start(self, current_line: str) -> None:
         """Begin history navigation, saving *current_line*."""
-        self._nav_idx = len(self._entries)
+        self._nav_idx = len(self.entries)
         self._nav_saved = current_line
 
     def nav_up(self) -> Optional[str]:
@@ -152,16 +113,16 @@ class LineHistory:
         if self._nav_idx <= 0:
             return None
         self._nav_idx -= 1
-        return self._entries[self._nav_idx]
+        return self.entries[self._nav_idx]
 
     def nav_down(self) -> Optional[str]:
         """Navigate to the next (newer) history entry."""
-        if self._nav_idx >= len(self._entries):
+        if self._nav_idx >= len(self.entries):
             return None
         self._nav_idx += 1
-        if self._nav_idx >= len(self._entries):
+        if self._nav_idx >= len(self.entries):
             return self._nav_saved
-        return self._entries[self._nav_idx]
+        return self.entries[self._nav_idx]
 
 
 class LineEditor:
@@ -182,7 +143,11 @@ class LineEditor:
         limit: int = 65536,
         limit_bell: str = "\a",
         scroll_jump: float = 0.5,
-        style: Optional[InputStyle] = None,
+        text_sgr: str = "\x1b[38;2;230;225;220m",
+        suggestion_sgr: str = "\x1b[30m",
+        bg_sgr: str = "",
+        ellipsis_sgr: str = "",
+        cursor_seq: str = "",
         keymap: Optional[Dict[str, Callable]] = None,
     ) -> None:
         self._buf: List[str] = []
@@ -201,10 +166,17 @@ class LineEditor:
         self._limit_bell_fired: bool = False
         self.scroll_jump: float = scroll_jump
         self._scroll_offset: int = 0
-        self.style: InputStyle = style if style is not None else InputStyle()
-        self._keymap: Dict[str, Callable] = dict(_KEY_DISPATCH)
+        self.text_sgr: str = text_sgr
+        self.suggestion_sgr: str = suggestion_sgr
+        self.bg_sgr: str = bg_sgr
+        self.ellipsis_sgr: str = ellipsis_sgr
+        self.cursor_seq: str = cursor_seq
+        self.keymap: Dict[str, Callable] = dict(DEFAULT_KEYMAP)
         if keymap:
-            self._keymap.update(keymap)
+            self.keymap.update(keymap)
+        self._prev_cursor: int = 0
+        self._prev_content_w: int = 0
+        self._prev_overflow: Tuple[bool, bool] = (False, False)
 
     @property
     def history(self) -> LineHistory:
@@ -223,39 +195,139 @@ class LineEditor:
             return self._is_password()
         return self._password_mode
 
+    def _apply_sgr(self, state: DisplayState) -> DisplayState:
+        """Populate SGR fields on a :class:`DisplayState` from editor style."""
+        state.text_sgr = self.text_sgr
+        state.suggestion_sgr = self.suggestion_sgr
+        state.bg_sgr = self.bg_sgr
+        state.ellipsis_sgr = self.ellipsis_sgr
+        return state
+
     @property
     def display(self) -> DisplayState:
         """Return the current :class:`DisplayState` for rendering."""
         line = self.line
         cursor_col = self._cursor_display_col()
-        sf = self._style_fields()
         if self.password_mode:
             pw_text = self.password_char * len(self._buf)
             if self._needs_hscroll():
                 cw = wcswidth(pw_text)
                 offset = self._compute_scroll(cursor_col, cw)
-                ds = _apply_hscroll(
+                return self._apply_sgr(_apply_hscroll(
                     pw_text, "", cursor_col, self.max_width, self.ellipsis,
-                    scroll_offset=offset)
-                return DisplayState(**{**vars(ds), **sf})
-            return DisplayState(text=pw_text, cursor=cursor_col, **sf)
+                    scroll_offset=offset))
+            return self._apply_sgr(
+                DisplayState(text=pw_text, cursor=cursor_col))
         suggestion = self._get_suggestion()
         if self._needs_hscroll():
             text_w = wcswidth(line)
             suggest_w = wcswidth(suggestion)
             offset = self._compute_scroll(cursor_col, text_w + suggest_w)
-            ds = _apply_hscroll(
+            return self._apply_sgr(_apply_hscroll(
                 line, suggestion, cursor_col, self.max_width, self.ellipsis,
-                scroll_offset=offset)
-            return DisplayState(**{**vars(ds), **sf})
-        return DisplayState(
-            text=line, cursor=cursor_col, suggestion=suggestion, **sf)
+                scroll_offset=offset))
+        return self._apply_sgr(DisplayState(
+            text=line, cursor=cursor_col, suggestion=suggestion))
+
+    def render(self, term: Terminal, row: int, width: int) -> str:
+        """Build escape sequences to render the current display state.
+
+        :param term: Blessed :class:`~.Terminal` instance for cursor/SGR.
+        :param row: Terminal row for the input line.
+        :param width: Available columns.
+        :returns: Escape-sequence string; caller writes/encodes it.
+        """
+        cur = self.display
+        ellipsis_w = wcswidth(self.ellipsis)
+        parts: List[str] = [term.move_yx(row, 0), cur.bg_sgr]
+        rendered = 0
+
+        if cur.overflow_left:
+            parts.extend((cur.ellipsis_sgr, self.ellipsis, cur.bg_sgr))
+            rendered += ellipsis_w
+
+        if cur.text:
+            parts.extend((cur.text_sgr, cur.text))
+            rendered += wcswidth(cur.text)
+
+        if cur.suggestion:
+            parts.extend((cur.suggestion_sgr, cur.suggestion))
+            rendered += wcswidth(cur.suggestion)
+
+        if cur.overflow_right:
+            parts.extend((cur.ellipsis_sgr, self.ellipsis))
+            rendered += ellipsis_w
+
+        pad = width - rendered
+        if pad > 0:
+            parts.extend((cur.bg_sgr, " " * pad))
+
+        parts.extend((term.normal, term.move_yx(row, cur.cursor)))
+        self._prev_cursor = cur.cursor
+        self._prev_content_w = rendered
+        self._prev_overflow = (cur.overflow_left, cur.overflow_right)
+        return "".join(parts)
+
+    def render_insert(
+        self, term: Terminal, row: int, grapheme: str
+    ) -> Optional[str]:
+        """Fast-path render for a single grapheme inserted at end of buffer.
+
+        :param term: Blessed :class:`~.Terminal` instance.
+        :param row: Terminal row for the input line.
+        :param grapheme: The grapheme cluster just inserted.
+        :returns: Escape-sequence string, or ``None`` if a full redraw is needed.
+        """
+        if self._cursor != len(self._buf):
+            return None
+        cur = self.display
+        if (cur.overflow_left, cur.overflow_right) != self._prev_overflow:
+            return None
+        col = self._prev_cursor
+        parts: List[str] = [term.move_yx(row, col), cur.text_sgr, grapheme]
+        new_content_w = wcswidth(cur.text) + wcswidth(cur.suggestion)
+        if cur.suggestion:
+            parts.extend((cur.suggestion_sgr, cur.suggestion))
+        trail = self._prev_content_w - new_content_w
+        if trail > 0:
+            parts.extend((cur.bg_sgr, " " * trail))
+        parts.extend((term.normal, term.move_yx(row, cur.cursor)))
+        self._prev_cursor = cur.cursor
+        self._prev_content_w = new_content_w
+        self._prev_overflow = (cur.overflow_left, cur.overflow_right)
+        return "".join(parts)
+
+    def render_backspace(self, term: Terminal, row: int) -> Optional[str]:
+        """Fast-path render after a backspace at end of buffer.
+
+        :param term: Blessed :class:`~.Terminal` instance.
+        :param row: Terminal row for the input line.
+        :returns: Escape-sequence string, or ``None`` if a full redraw is needed.
+        """
+        if self._cursor != len(self._buf):
+            return None
+        cur = self.display
+        if (cur.overflow_left, cur.overflow_right) != self._prev_overflow:
+            return None
+        col = cur.cursor
+        new_content_w = wcswidth(cur.text) + wcswidth(cur.suggestion)
+        erase = self._prev_content_w - new_content_w
+        parts: List[str] = [term.move_yx(row, col)]
+        if cur.suggestion:
+            parts.extend((cur.suggestion_sgr, cur.suggestion))
+        if erase > 0:
+            parts.extend((cur.bg_sgr, " " * erase))
+        parts.extend((term.normal, term.move_yx(row, cur.cursor)))
+        self._prev_cursor = cur.cursor
+        self._prev_content_w = new_content_w
+        self._prev_overflow = (cur.overflow_left, cur.overflow_right)
+        return "".join(parts)
 
     def feed_key(self, key: Union["Keystroke", str]) -> LineEditResult:  # noqa: F821
         """Process one keystroke and return a :class:`LineEditResult`."""
         name = getattr(key, "name", None)
         if name:
-            handler = self._keymap.get(name)
+            handler = self.keymap.get(name)
             if handler is not None:
                 return handler(self)
             return LineEditResult()
@@ -298,12 +370,6 @@ class LineEditor:
     def set_password_mode(self, enabled: bool) -> None:
         """Set password mode directly (used when no *is_password* callable)."""
         self._password_mode = enabled
-
-    def _style_fields(self) -> dict:
-        s = self.style
-        return dict(text_sgr=s.text_sgr, suggestion_sgr=s.suggestion_sgr,
-                    bg_sgr=s.bg_sgr, ellipsis_sgr=s.ellipsis_sgr,
-                    cursor_seq=s.cursor_seq)
 
     def _needs_hscroll(self) -> bool:
         if self.max_width <= 0:
@@ -609,7 +675,7 @@ def _apply_hscroll(
     )
 
 
-_KEY_DISPATCH: Dict[str, Callable] = {
+DEFAULT_KEYMAP: Dict[str, Callable] = {
     "KEY_ENTER": LineEditor._handle_enter,
     "KEY_CTRL_C": LineEditor._handle_ctrl_c,
     "KEY_CTRL_D": LineEditor._handle_ctrl_d,
