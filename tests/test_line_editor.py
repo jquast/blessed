@@ -8,9 +8,10 @@ import pytest
 from blessed.line_editor import (
     PASSWORD_CHAR,
     DisplayState,
-    EditResult,
-    History,
+    LineEditResult,
+    LineHistory as History,
     LineEditor,
+    _apply_hscroll,
     _display_width,
     _graphemes,
 )
@@ -68,16 +69,16 @@ class TestGraphemeHelpers:
         assert _display_width("") == 0
 
 
-class TestEditResult:
+class TestLineEditResult:
     def test_defaults(self) -> None:
-        r = EditResult()
+        r = LineEditResult()
         assert r.line is None
         assert r.eof is False
         assert r.interrupt is False
         assert r.changed is False
 
     def test_accept(self) -> None:
-        r = EditResult(line="hello", changed=True)
+        r = LineEditResult(line="hello", changed=True)
         assert r.line == "hello"
         assert r.changed is True
 
@@ -613,3 +614,117 @@ class TestLineEditorCtrlAE:
         ed.feed_key(_HOME)
         ed.feed_key(_CTRL_E)
         assert ed.display.cursor == 2
+
+
+class TestApplyHscroll:
+    def test_no_scroll_needed(self) -> None:
+        ds = _apply_hscroll("hello", "", 5, 20)
+        assert ds.text == "hello"
+        assert ds.cursor == 5
+        assert ds.suggestion == ""
+        assert ds.clipped_left is False
+        assert ds.clipped_right is False
+
+    def test_text_with_suggestion_fits(self) -> None:
+        ds = _apply_hscroll("he", "llo world", 2, 20)
+        assert ds.text == "he"
+        assert ds.suggestion == "llo world"
+        assert ds.clipped_left is False
+        assert ds.clipped_right is False
+
+    def test_text_overflows_right(self) -> None:
+        ds = _apply_hscroll("abcdefghij", "", 3, 5)
+        assert ds.clipped_right is True
+        assert len(ds.text) <= 5
+
+    def test_cursor_at_end_scrolls(self) -> None:
+        text = "a" * 30
+        ds = _apply_hscroll(text, "", 30, 10)
+        assert ds.clipped_left is True
+        assert ds.cursor >= 0
+        assert ds.cursor <= 10
+
+    def test_cursor_at_start_no_left_clip(self) -> None:
+        text = "a" * 30
+        ds = _apply_hscroll(text, "", 0, 10)
+        assert ds.clipped_left is False
+        assert ds.clipped_right is True
+        assert ds.cursor == 0
+
+    def test_suggestion_clipped(self) -> None:
+        ds = _apply_hscroll("ab", "cdefghijklmnop", 2, 8)
+        assert ds.clipped_right is True
+        total = _display_width(ds.text) + _display_width(ds.suggestion)
+        assert total <= 8
+
+    def test_custom_ellipsis(self) -> None:
+        ds = _apply_hscroll("a" * 20, "", 20, 10, ellipsis="...")
+        assert ds.clipped_left is True
+
+    def test_empty_text(self) -> None:
+        ds = _apply_hscroll("", "", 0, 10)
+        assert ds.text == ""
+        assert ds.cursor == 0
+        assert ds.clipped_left is False
+        assert ds.clipped_right is False
+
+
+class TestLineEditorMaxWidth:
+    def test_no_max_width_no_clipping(self) -> None:
+        ed = LineEditor()
+        for ch in "hello world this is a long line":
+            ed.feed_key(ch)
+        ds = ed.display
+        assert ds.clipped_left is False
+        assert ds.clipped_right is False
+
+    def test_max_width_clips(self) -> None:
+        ed = LineEditor(max_width=10)
+        for ch in "abcdefghijklmnop":
+            ed.feed_key(ch)
+        ds = ed.display
+        assert ds.clipped_left is True
+        total = _display_width(ds.text) + _display_width(ds.suggestion)
+        assert total <= 10
+
+    def test_max_width_short_text_no_clip(self) -> None:
+        ed = LineEditor(max_width=20)
+        for ch in "hi":
+            ed.feed_key(ch)
+        ds = ed.display
+        assert ds.clipped_left is False
+        assert ds.clipped_right is False
+        assert ds.text == "hi"
+
+    def test_max_width_cursor_stays_visible(self) -> None:
+        ed = LineEditor(max_width=10)
+        for ch in "a" * 50:
+            ed.feed_key(ch)
+        ds = ed.display
+        assert 0 <= ds.cursor <= 10
+
+    def test_max_width_home_shows_start(self) -> None:
+        ed = LineEditor(max_width=10)
+        for ch in "abcdefghijklmnop":
+            ed.feed_key(ch)
+        ed.feed_key(_HOME)
+        ds = ed.display
+        assert ds.clipped_left is False
+        assert ds.cursor == 0
+
+    def test_max_width_updated_dynamically(self) -> None:
+        ed = LineEditor(max_width=5)
+        for ch in "abcdefghij":
+            ed.feed_key(ch)
+        assert ed.display.clipped_left is True
+        ed.max_width = 20
+        ds = ed.display
+        assert ds.clipped_left is False
+
+    def test_max_width_password_mode(self) -> None:
+        ed = LineEditor(max_width=5, is_password=lambda: True)
+        for ch in "abcdefghij":
+            ed.feed_key(ch)
+        ds = ed.display
+        assert PASSWORD_CHAR in ds.text
+        assert _display_width(ds.text) <= 5
