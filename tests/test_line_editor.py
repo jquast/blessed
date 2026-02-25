@@ -1,4 +1,5 @@
 """Tests for blessed.line_editor."""
+# pylint: disable=too-many-positional-arguments
 
 # 3rd party
 import pytest
