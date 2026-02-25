@@ -1,4 +1,5 @@
-"""Headless line editor with history, auto-suggest, and grapheme-aware editing.
+"""
+Headless line editor with history, auto-suggest, and grapheme-aware editing.
 
 This module provides :class:`LineEditor` for single-line input with readline-style
 editing and :class:`LineHistory` for command recall.
@@ -6,15 +7,16 @@ editing and :class:`LineHistory` for command recall.
 from __future__ import annotations
 
 # std imports
+from typing import TYPE_CHECKING, Dict, List, Deque, Tuple, Union, Callable, Optional
 from collections import deque
-from typing import TYPE_CHECKING, Deque, Dict, List, Tuple, Union, Callable, Optional
 from dataclasses import dataclass
 
 if TYPE_CHECKING:
     from .terminal import Terminal
 
 # 3rd party
-from wcwidth import iter_graphemes, width as wcswidth
+from wcwidth import width as wcswidth
+from wcwidth import iter_graphemes
 
 PASSWORD_CHAR = "\u273b"
 
@@ -44,7 +46,7 @@ class LineEditResult:
 
 
 @dataclass
-class DisplayState:
+class DisplayState:  # pylint: disable=too-many-instance-attributes
     """Current visual state of the editor for rendering."""
 
     #: Visible buffer text (masked in password mode, clipped when scrolling).
@@ -74,12 +76,14 @@ def _is_control(grapheme: str) -> bool:
 
 
 class LineHistory:
-    """In-memory command history with navigation and prefix search.
+    """
+    In-memory command history with navigation and prefix search.
 
     :param max_entries: Maximum number of history entries retained.
     """
 
     def __init__(self, max_entries: int = 5000) -> None:
+        """Initialize history with given maximum capacity."""
         #: History entries list (most recent last).
         self.entries: List[str] = []
         self._max_entries = max_entries
@@ -127,8 +131,9 @@ class LineHistory:
         return self.entries[self._nav_idx]
 
 
-class LineEditor:
-    """Headless single-line editor with grapheme-aware cursor movement.
+class LineEditor:  # pylint: disable=too-many-instance-attributes
+    """
+    Headless single-line editor with grapheme-aware cursor movement.
 
     Feed keystrokes via :meth:`feed_key`, read display state via
     :attr:`display`.  Accepts blessed :class:`~.Keystroke` objects
@@ -141,7 +146,7 @@ class LineEditor:
             ...
     """
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         history: Optional[LineHistory] = None,
         password: bool = False,
@@ -155,8 +160,9 @@ class LineEditor:
         suggestion_sgr: str = "\x1b[30m",
         bg_sgr: str = "",
         ellipsis_sgr: str = "",
-        keymap: Optional[Dict[str, Optional[Callable]]] = None,
+        keymap: Optional[Dict[str, Optional[Callable[..., LineEditResult]]]] = None,
     ) -> None:
+        """Initialize editor with optional history, display, and keymap settings."""
         self._buf: List[str] = []
         self._cursor: int = 0
         self._history = history or LineHistory()
@@ -176,7 +182,7 @@ class LineEditor:
         self.suggestion_sgr: str = suggestion_sgr
         self.bg_sgr: str = bg_sgr
         self.ellipsis_sgr: str = ellipsis_sgr
-        self.keymap: Dict[str, Optional[Callable]] = dict(DEFAULT_KEYMAP)
+        self.keymap: Dict[str, Optional[Callable[..., LineEditResult]]] = dict(DEFAULT_KEYMAP)
         if keymap:
             self.keymap.update(keymap)
         self._prev_cursor: int = 0
@@ -235,7 +241,8 @@ class LineEditor:
         self._prev_scroll_offset = self._scroll_offset
 
     def render(self, term: Terminal, row: int, width: int) -> str:
-        """Build escape sequences to render the current display state.
+        """
+        Build escape sequences to render the current display state.
 
         :param term: Blessed :class:`~.Terminal` instance for cursor/SGR.
         :param row: Terminal row for the input line.
@@ -274,7 +281,8 @@ class LineEditor:
     def render_insert(
         self, term: Terminal, row: int, grapheme: str
     ) -> Optional[str]:
-        """Fast-path render for a single grapheme inserted at end of buffer.
+        """
+        Fast-path render for a single grapheme inserted at end of buffer.
 
         :param term: Blessed :class:`~.Terminal` instance.
         :param row: Terminal row for the input line.
@@ -301,7 +309,8 @@ class LineEditor:
         return "".join(parts)
 
     def render_backspace(self, term: Terminal, row: int) -> Optional[str]:
-        """Fast-path render after a backspace at end of buffer.
+        """
+        Fast-path render after a backspace at end of buffer.
 
         :param term: Blessed :class:`~.Terminal` instance.
         :param row: Terminal row for the input line.
@@ -369,7 +378,7 @@ class LineEditor:
         self._password_mode = enabled
 
     def _needs_hscroll(self) -> bool:
-        return self.max_width > 0 and not (0 < self.limit <= self.max_width)
+        return self.max_width > 0 and not 0 < self.limit <= self.max_width
 
     def _compute_scroll(self, cursor_col: int, content_width: int) -> int:
         usable = self.max_width
@@ -597,7 +606,7 @@ class LineEditor:
         return ""
 
 
-def _apply_hscroll(
+def _apply_hscroll(  # pylint: disable=too-many-locals,too-many-branches,too-many-positional-arguments,too-complex
     text: str,
     suggestion: str,
     cursor_col: int,
@@ -671,7 +680,8 @@ def _apply_hscroll(
     )
 
 
-DEFAULT_KEYMAP: Dict[str, Callable] = {
+# pylint: disable=protected-access
+DEFAULT_KEYMAP: Dict[str, Callable[..., LineEditResult]] = {
     "KEY_ENTER": LineEditor._handle_enter,
     "KEY_CTRL_C": LineEditor._handle_ctrl_c,
     "KEY_CTRL_D": LineEditor._handle_ctrl_d,
@@ -699,3 +709,4 @@ DEFAULT_KEYMAP: Dict[str, Callable] = {
     "KEY_CTRL_P": LineEditor._history_prev,
     "KEY_CTRL_Z": LineEditor._undo,
 }
+# pylint: enable=protected-access

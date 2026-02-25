@@ -26,6 +26,7 @@ from wcwidth import center as wcwidth_center
 from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
 from .keyboard import (DEFAULT_ESCDELAY,
                        Keystroke,
+                       ResizeEvent,
                        DeviceAttribute,
                        SoftwareVersion,
                        KittyKeyboardProtocol,
@@ -2727,9 +2728,11 @@ class Terminal():
                 self._line_buffered = False
                 yield
             finally:
-                # Restore prior mode:
+                # Restore prior mode.  TCSADRAIN (not TCSAFLUSH) so that
+                # keystrokes buffered during the mode switch are preserved;
+                # TCSAFLUSH discards unread input, dropping user keystrokes.
                 termios.tcsetattr(self._keyboard_fd,
-                                  termios.TCSAFLUSH,
+                                  termios.TCSADRAIN,
                                   save_mode)
                 self._line_buffered = save_line_buffered
         else:
@@ -2764,9 +2767,11 @@ class Terminal():
                 self._line_buffered = False
                 yield
             finally:
-                # Restore prior mode:
+                # Restore prior mode.  TCSADRAIN (not TCSAFLUSH) so that
+                # keystrokes buffered during the mode switch are preserved;
+                # TCSAFLUSH discards unread input, dropping user keystrokes.
                 termios.tcsetattr(self._keyboard_fd,
-                                  termios.TCSAFLUSH,
+                                  termios.TCSADRAIN,
                                   save_mode)
                 self._line_buffered = save_line_buffered
         else:
@@ -2924,11 +2929,12 @@ class Terminal():
         # Update preferred size cache if this is a resize event
         if ks._mode == _DecPrivateMode.IN_BAND_WINDOW_RESIZE:  # pylint: disable=protected-access
             event_vals = ks._mode_values  # pylint: disable=protected-access
+            assert isinstance(event_vals, ResizeEvent)
             self._preferred_size_cache = WINSZ(
-                ws_row=event_vals.height_chars,  # type: ignore[union-attr]
-                ws_col=event_vals.width_chars,  # type: ignore[union-attr]
-                ws_xpixel=event_vals.width_pixels,  # type: ignore[union-attr]
-                ws_ypixel=event_vals.height_pixels)  # type: ignore[union-attr]
+                ws_row=event_vals.height_chars,
+                ws_col=event_vals.width_chars,
+                ws_xpixel=event_vals.width_pixels,
+                ws_ypixel=event_vals.height_pixels)
 
         return ks
 
@@ -3017,8 +3023,9 @@ class Terminal():
         self.ungetch(ucs[len(ks):])
 
         # update preferred size cache if this is a resize event
-        if ks._mode == _DecPrivateMode.IN_BAND_WINDOW_RESIZE:
-            event_vals = ks._mode_values
+        if ks._mode == _DecPrivateMode.IN_BAND_WINDOW_RESIZE:  # pylint: disable=protected-access
+            event_vals = ks._mode_values  # pylint: disable=protected-access
+            assert isinstance(event_vals, ResizeEvent)
             self._preferred_size_cache = WINSZ(
                 ws_row=event_vals.height_chars,
                 ws_col=event_vals.width_chars,
