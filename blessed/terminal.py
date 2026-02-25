@@ -8,7 +8,6 @@ import time
 import codecs
 import locale
 import asyncio
-import logging
 import select
 import struct
 import platform
@@ -2967,7 +2966,6 @@ class Terminal():
         :returns: :class:`~.Keystroke`, which may be empty (``''``) if
             ``timeout`` is specified and keystroke is not received.
         """
-        # pylint: disable=too-many-locals,too-many-branches,too-complex
         loop = asyncio.get_running_loop()
 
         # drain keyboard buffer (non-blocking)
