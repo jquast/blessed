@@ -2,8 +2,8 @@
 
 
 # std imports
-import contextlib
 import msvcrt  # pylint: disable=import-error
+import contextlib
 from typing import Optional, Generator
 
 # 3rd party
