@@ -3029,7 +3029,7 @@ class Terminal():
 
     async def _async_read_byte(
         self,
-        loop: "asyncio.AbstractEventLoop",
+        loop: "asyncio.AbstractEventLoop",  # noqa: F821
         timeout: Optional[float],
     ) -> Optional[bytes]:
         """
@@ -3041,7 +3041,9 @@ class Terminal():
         """
         import asyncio  # pylint: disable=import-outside-toplevel
 
-        assert self._keyboard_fd is not None
+        if self._keyboard_fd is None:
+            raise RuntimeError(
+                "async_inkey requires a keyboard file descriptor")
         fut: asyncio.Future[bytes] = loop.create_future()
 
         def _on_readable() -> None:

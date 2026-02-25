@@ -479,7 +479,8 @@ class TestLineEditorKillRing:
         ed.feed_key("a")
         ed.feed_key("b")
         ed.feed_key(_HOME)
-        ed.feed_key(_CTRL_U)
+        r = ed.feed_key(_CTRL_U)
+        assert r.changed is False
         assert ed.line == "ab"
         assert ed._kill_ring == []
 
@@ -523,6 +524,16 @@ class TestLineEditorUndo:
         assert ed.line == ""
         ed.feed_key(_CTRL_Z)
         assert ed.line == "hello"
+
+    def test_undo_delete(self) -> None:
+        ed = LineEditor()
+        ed.feed_key("a")
+        ed.feed_key("b")
+        ed.feed_key(_HOME)
+        ed.feed_key(_DELETE)
+        assert ed.line == "b"
+        ed.feed_key(_CTRL_Z)
+        assert ed.line == "ab"
 
     def test_undo_empty_stack(self) -> None:
         ed = LineEditor()

@@ -67,6 +67,7 @@ class DisplayState:
 
 
 def _is_control(grapheme: str) -> bool:
+    """Return ``True`` if *grapheme* is a C0 or C1 control character."""
     cp = ord(grapheme[0])
     return cp < 0x20 or 0x7F <= cp < 0xA0
 
@@ -131,6 +132,12 @@ class LineEditor:
     Feed keystrokes via :meth:`feed_key`, read display state via
     :attr:`display`.  Accepts blessed :class:`~.Keystroke` objects
     directly (dispatching on ``.name``), or plain strings for testing.
+
+    Custom keymap handlers must be callables accepting a single
+    :class:`LineEditor` argument and returning a :class:`LineEditResult`::
+
+        def my_handler(editor: LineEditor) -> LineEditResult:
+            ...
     """
 
     def __init__(
@@ -147,7 +154,6 @@ class LineEditor:
         suggestion_sgr: str = "\x1b[30m",
         bg_sgr: str = "",
         ellipsis_sgr: str = "",
-        cursor_seq: str = "",
         keymap: Optional[Dict[str, Callable]] = None,
     ) -> None:
         self._buf: List[str] = []
@@ -170,7 +176,6 @@ class LineEditor:
         self.suggestion_sgr: str = suggestion_sgr
         self.bg_sgr: str = bg_sgr
         self.ellipsis_sgr: str = ellipsis_sgr
-        self.cursor_seq: str = cursor_seq
         self.keymap: Dict[str, Callable] = dict(DEFAULT_KEYMAP)
         if keymap:
             self.keymap.update(keymap)
@@ -501,6 +506,7 @@ class LineEditor:
 
     def _delete_at_cursor(self) -> LineEditResult:
         if self._cursor < len(self._buf):
+            self._save_undo()
             del self._buf[self._cursor]
             self._maybe_reset_limit_bell()
             return LineEditResult(changed=True)
@@ -517,13 +523,12 @@ class LineEditor:
         return LineEditResult()
 
     def _kill_line(self) -> LineEditResult:
-        if self._buf:
+        if self._buf and self._cursor > 0:
             self._save_undo()
             killed = "".join(self._buf[:self._cursor])
             del self._buf[:self._cursor]
             self._cursor = 0
-            if killed:
-                self._kill_ring.append(killed)
+            self._kill_ring.append(killed)
             self._maybe_reset_limit_bell()
             return LineEditResult(changed=True)
         return LineEditResult()
@@ -606,7 +611,6 @@ def _apply_hscroll(
     cursor_col: int,
     max_width: int,
     ellipsis: str = "\u2026",
-    scroll_jump: float = 0.5,
     scroll_offset: Optional[int] = None,
 ) -> DisplayState:
     ellipsis_w = wcswidth(ellipsis)
@@ -620,9 +624,9 @@ def _apply_hscroll(
 
     usable = max_width
     if scroll_offset is None:
-        jump = max(1, int(usable * scroll_jump))
         scroll_offset = 0
         if cursor_col >= usable:
+            jump = max(1, usable // 2)
             scroll_offset = cursor_col - usable + jump + 1
 
     overflow_left = scroll_offset > 0
