@@ -3,9 +3,7 @@
 Version History
 ===============
 1.31
-  * introduced: :mod:`blessed.line_editor` — headless single-line editor with readline-style
-    keybindings, grapheme-aware cursor, kill ring, undo, auto-suggest, password mode,
-    horizontal scrolling, and custom keymap support.
+  * introduced: :mod:`blessed.line_editor` - "headless" single-line editor
   * introduced: :meth:`~.Terminal.async_inkey` — asyncio-compatible version of
     :meth:`~.Terminal.inkey` using event loop readers.
 

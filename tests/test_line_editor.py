@@ -246,6 +246,15 @@ class TestLineEditorBasicEditing:
         assert r.changed is True
         assert ed.line == "b"
 
+    def test_ctrl_d_single_undo(self) -> None:
+        ed = LineEditor()
+        ed.feed_key("a")
+        ed.feed_key("b")
+        ed.feed_key(_HOME)
+        before = len(ed._undo_stack)
+        ed.feed_key(_CTRL_D)
+        assert len(ed._undo_stack) - before == 1
+
     def test_feed_key_multi_grapheme_hits_limit_mid_insertion(self) -> None:
         ed = LineEditor(limit=2)
         ed.feed_key("abc")
@@ -268,6 +277,20 @@ class TestLineEditorBasicEditing:
         ed = LineEditor()
         ed.insert_text("a\x01b")
         assert ed.line == "ab"
+
+    def test_insert_text_empty_string(self) -> None:
+        ed = LineEditor()
+        ed.feed_key("a")
+        r = ed.insert_text("")
+        assert r.changed is False
+        assert ed.line == "a"
+
+    def test_insert_text_only_control_chars(self) -> None:
+        ed = LineEditor()
+        ed.feed_key("a")
+        r = ed.insert_text("\x01\x02")
+        assert r.changed is False
+        assert ed.line == "a"
 
 
 class TestLineEditorCursorMovement:
@@ -659,6 +682,23 @@ class TestLineEditorPasswordMode:
         ed.feed_key("x")
         assert ed.display.text == PASSWORD_CHAR
 
+    def test_password_cursor_with_wide_char(self) -> None:
+        ed = LineEditor(is_password=lambda: True, password_char="\u4e16")
+        ed.feed_key("a")
+        ed.feed_key("b")
+        ds = ed.display
+        assert ds.cursor == 4
+        assert wcswidth(ds.text) == 4
+
+    def test_password_cursor_after_left(self) -> None:
+        ed = LineEditor(is_password=lambda: True, password_char="\u4e16")
+        ed.feed_key("a")
+        ed.feed_key("b")
+        ed.feed_key("c")
+        ed.feed_key(_LEFT)
+        ds = ed.display
+        assert ds.cursor == 4
+
     def test_password_enter_not_saved(self) -> None:
         h = History()
         ed = LineEditor(history=h)
@@ -919,7 +959,7 @@ class TestStatefulHScroll:
         right_offset = ed._scroll_offset
         for _ in range(25):
             ed.feed_key(_LEFT)
-        ds = ed.display
+        _ = ed.display
         assert ed._scroll_offset < right_offset
 
     def test_apply_hscroll_with_explicit_scroll_offset(self) -> None:

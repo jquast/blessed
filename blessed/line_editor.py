@@ -215,14 +215,15 @@ class LineEditor:
         cursor_col = self._cursor_display_col()
         if self.password_mode:
             pw_text = self.password_char * len(self._buf)
+            pw_cursor = self._cursor * wcswidth(self.password_char)
             if self._needs_hscroll():
                 cw = wcswidth(pw_text)
-                offset = self._compute_scroll(cursor_col, cw)
+                offset = self._compute_scroll(pw_cursor, cw)
                 return self._apply_sgr(_apply_hscroll(
-                    pw_text, "", cursor_col, self.max_width, self.ellipsis,
+                    pw_text, "", pw_cursor, self.max_width, self.ellipsis,
                     scroll_offset=offset))
             return self._apply_sgr(
-                DisplayState(text=pw_text, cursor=cursor_col))
+                DisplayState(text=pw_text, cursor=pw_cursor))
         suggestion = self._get_suggestion()
         if self._needs_hscroll():
             text_w = wcswidth(line)
@@ -356,6 +357,7 @@ class LineEditor:
         if self._at_limit():
             return LineEditResult(
                 changed=False, bell=self._fire_limit_bell())
+        old_len = len(self._buf)
         self._save_undo()
         for grapheme in iter_graphemes(text):
             if self._at_limit():
@@ -363,6 +365,9 @@ class LineEditor:
             if not _is_control(grapheme):
                 self._buf.insert(self._cursor, grapheme)
                 self._cursor += 1
+        if len(self._buf) == old_len:
+            self._undo_stack.pop()
+            return LineEditResult(changed=False)
         return LineEditResult(changed=True)
 
     def clear(self) -> None:
@@ -441,9 +446,7 @@ class LineEditor:
     def _handle_ctrl_d(self) -> LineEditResult:
         if not self._buf:
             return LineEditResult(eof=True)
-        self._save_undo()
-        self._delete_at_cursor()
-        return LineEditResult(changed=True)
+        return self._delete_at_cursor()
 
     def _move_left(self) -> LineEditResult:
         if self._cursor > 0:
