@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Dict, List, Deque, Tuple, Union, Callable, Opt
 from collections import deque
 from dataclasses import dataclass
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from .terminal import Terminal
 
 # 3rd party
@@ -606,35 +606,17 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
         return ""
 
 
-def _apply_hscroll(  # pylint: disable=too-many-locals,too-many-branches,too-many-positional-arguments,too-complex
-    text: str,
-    suggestion: str,
-    cursor_col: int,
-    max_width: int,
-    ellipsis: str = "\u2026",
-    scroll_offset: Optional[int] = None,
-) -> DisplayState:
-    ellipsis_w = wcswidth(ellipsis)
-    text_w = wcswidth(text)
-    suggest_w = wcswidth(suggestion)
-    total_w = text_w + suggest_w
+def _clip_graphemes(
+    combined: str, scroll_offset: int, usable: int
+) -> Tuple[List[str], int]:
+    """
+    Collect visible graphemes from *combined* within a scroll window.
 
-    if total_w < max_width and cursor_col < max_width:
-        return DisplayState(
-            text=text, cursor=cursor_col, suggestion=suggestion)
-
-    usable = max_width
-    if scroll_offset is None:
-        scroll_offset = 0
-        if cursor_col >= usable:
-            jump = max(1, usable // 2)
-            scroll_offset = cursor_col - usable + jump + 1
-
-    overflow_left = scroll_offset > 0
-    if overflow_left:
-        usable -= ellipsis_w
-
-    combined = text + suggestion
+    :param combined: Full text (buffer + suggestion).
+    :param scroll_offset: Column offset of the left edge.
+    :param usable: Available display columns.
+    :returns: ``(visible_parts, visible_width)`` tuple.
+    """
     vis_parts: List[str] = []
     vis_width = 0
     col = 0
@@ -648,33 +630,100 @@ def _apply_hscroll(  # pylint: disable=too-many-locals,too-many-branches,too-man
         vis_parts.append(grapheme)
         vis_width += g_w
         col += g_w
+    return vis_parts, vis_width
 
-    overflow_right = (scroll_offset + usable) < total_w
-    if overflow_right:
-        while vis_parts and vis_width + ellipsis_w > usable:
-            removed = vis_parts.pop()
-            vis_width -= wcswidth(removed)
 
+def _split_text_suggestion(
+    vis_parts: List[str], scroll_offset: int, text_w: int
+) -> Tuple[str, str]:
+    """
+    Split visible graphemes into text and suggestion portions.
+
+    :param vis_parts: Graphemes within the visible window.
+    :param scroll_offset: Column offset of the left edge.
+    :param text_w: Display width of the buffer text (before suggestion).
+    :returns: ``(visible_text, visible_suggestion)`` tuple.
+    """
     vis_text_parts: List[str] = []
     vis_suggest_parts: List[str] = []
     pos = 0
     for grapheme in vis_parts:
         g_w = wcswidth(grapheme)
-        src_col = scroll_offset + pos
-        if src_col < text_w:
+        if scroll_offset + pos < text_w:
             vis_text_parts.append(grapheme)
         else:
             vis_suggest_parts.append(grapheme)
         pos += g_w
+    return "".join(vis_text_parts), "".join(vis_suggest_parts)
 
-    vis_cursor = cursor_col - scroll_offset
-    if overflow_left:
-        vis_cursor += ellipsis_w
+
+def _default_scroll_offset(cursor_col: int, max_width: int) -> int:
+    """
+    Compute an initial scroll offset when none is provided.
+
+    :param cursor_col: Cursor display column.
+    :param max_width: Available display columns.
+    :returns: Scroll offset in columns.
+    """
+    if cursor_col >= max_width:
+        jump = max(1, max_width // 2)
+        return cursor_col - max_width + jump + 1
+    return 0
+
+
+def _trim_right_overflow(
+    vis_parts: List[str], vis_width: int, ellipsis_w: int, usable: int
+) -> int:
+    """
+    Remove trailing graphemes to make room for a right-side ellipsis.
+
+    :param vis_parts: Visible grapheme list (mutated in place).
+    :param vis_width: Current total display width of *vis_parts*.
+    :param ellipsis_w: Display width of the ellipsis character.
+    :param usable: Available display columns.
+    :returns: Updated visible width after trimming.
+    """
+    while vis_parts and vis_width + ellipsis_w > usable:
+        vis_width -= wcswidth(vis_parts.pop())
+    return vis_width
+
+
+def _apply_hscroll(  # pylint: disable=too-many-positional-arguments
+    text: str,
+    suggestion: str,
+    cursor_col: int,
+    max_width: int,
+    ellipsis: str = "\u2026",
+    scroll_offset: Optional[int] = None,
+) -> DisplayState:
+    """Build a :class:`DisplayState` with horizontal scrolling applied."""
+    text_w = wcswidth(text)
+
+    if text_w + wcswidth(suggestion) < max_width and cursor_col < max_width:
+        return DisplayState(
+            text=text, cursor=cursor_col, suggestion=suggestion)
+
+    if scroll_offset is None:
+        scroll_offset = _default_scroll_offset(cursor_col, max_width)
+
+    overflow_left = scroll_offset > 0
+    ellipsis_w = wcswidth(ellipsis)
+    usable = max_width - (ellipsis_w if overflow_left else 0)
+
+    vis_parts, vis_width = _clip_graphemes(
+        text + suggestion, scroll_offset, usable)
+
+    overflow_right = (scroll_offset + usable) < text_w + wcswidth(suggestion)
+    if overflow_right:
+        _trim_right_overflow(vis_parts, vis_width, ellipsis_w, usable)
+
+    vis_text, vis_suggestion = _split_text_suggestion(
+        vis_parts, scroll_offset, text_w)
 
     return DisplayState(
-        text="".join(vis_text_parts),
-        cursor=vis_cursor,
-        suggestion="".join(vis_suggest_parts),
+        text=vis_text,
+        cursor=cursor_col - scroll_offset + (ellipsis_w if overflow_left else 0),
+        suggestion=vis_suggestion,
         overflow_left=overflow_left,
         overflow_right=overflow_right,
     )

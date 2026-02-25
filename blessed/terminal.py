@@ -7,9 +7,9 @@ import sys
 import time
 import codecs
 import locale
-import asyncio
 import select
 import struct
+import asyncio
 import platform
 import warnings
 import contextlib
@@ -2966,6 +2966,7 @@ class Terminal():
         :returns: :class:`~.Keystroke`, which may be empty (``''``) if
             ``timeout`` is specified and keystroke is not received.
         """
+        # pylint: disable=too-complex,too-many-branches
         loop = asyncio.get_running_loop()
 
         # drain keyboard buffer (non-blocking)
@@ -3003,7 +3004,11 @@ class Terminal():
                 byte = await self._async_read_byte(loop, esc_delay)
                 if byte is None:
                     break
-                ucs += self.getch(decode_latin1=ucs.startswith('\x1b[M'))
+                decode_latin1 = ucs.startswith('\x1b[M')
+                if decode_latin1:
+                    ucs += chr(byte[0])
+                else:
+                    ucs += self._keyboard_decoder.decode(byte, final=False)
                 # drain remaining immediately available bytes
                 while self.kbhit(timeout=0):
                     ucs += self.getch(

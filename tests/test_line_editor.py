@@ -1237,6 +1237,22 @@ class TestRenderInsert:
         assert ed._prev_content_w == 3
         assert ed._prev_overflow == (False, False)
 
+    def test_render_insert_trailing_space_cleanup(self) -> None:
+        """render_insert pads with spaces when new content is narrower."""
+        mt = MockTerminal()
+        h = History()
+        h.add("hello")
+        ed = LineEditor(history=h)
+        for ch in "hel":
+            ed.feed_key(ch)
+        ed.render(mt, 0, 40)
+        prev_w = ed._prev_content_w
+        assert prev_w == 5
+        ed.feed_key("x")
+        result = ed.render_insert(mt, 0, "x")
+        assert result is not None
+        assert "x " in result
+
 
 class TestRenderBackspace:
     """Test render_backspace incremental rendering optimization."""

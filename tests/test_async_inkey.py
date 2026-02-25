@@ -293,3 +293,45 @@ def test_async_inkey_incomplete_csi_timeout():
 
     output = pty_test(child, parent, 'test_async_inkey_incomplete_csi_timeout')
     assert output == 'OK'
+
+
+def test_async_inkey_escape_then_arrow():
+    """async_inkey resolves escape + CSI sequence arriving byte-by-byte."""
+    def child(term):
+        os.write(sys.__stdout__.fileno(), SEMAPHORE)
+        with term.cbreak():
+            loop = asyncio.new_event_loop()
+            try:
+                ks = loop.run_until_complete(
+                    term.async_inkey(timeout=2.0, esc_delay=0.5))
+            finally:
+                loop.close()
+            assert ks.name == 'KEY_UP'
+            assert ks.is_sequence
+            return b'OK'
+
+    def parent(master_fd):
+        read_until_semaphore(master_fd)
+        os.write(master_fd, b'\x1b')
+        time.sleep(0.05)
+        os.write(master_fd, b'[A')
+
+    output = pty_test(child, parent, 'test_async_inkey_escape_then_arrow')
+    assert output == 'OK'
+
+
+def test_async_inkey_no_keyboard_fd():
+    """_async_read_byte raises RuntimeError without keyboard fd."""
+    @as_subprocess
+    def child():
+        term = TestTerminal()
+        term._keyboard_fd = None
+        loop = asyncio.new_event_loop()
+        try:
+            with pytest.raises(RuntimeError, match="keyboard file descriptor"):
+                loop.run_until_complete(
+                    term._async_read_byte(loop, timeout=1.0))
+        finally:
+            loop.close()
+
+    child()
