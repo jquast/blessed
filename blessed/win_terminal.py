@@ -3,24 +3,11 @@
 
 # std imports
 import contextlib
-import ctypes
-from ctypes import wintypes
 import msvcrt  # pylint: disable=import-error
-import time
 from typing import Optional, Generator
 
 # 3rd party
 from jinxed import win32  # pylint: disable=import-error
-
-# Windows API for efficient waiting (like select() on Unix)
-_kernel32 = ctypes.windll.kernel32
-_WaitForSingleObject = _kernel32.WaitForSingleObject
-_WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
-_WaitForSingleObject.restype = wintypes.DWORD
-_WAIT_OBJECT_0 = 0x00000000
-_WAIT_TIMEOUT = 0x00000102
-_WAIT_FAILED = 0xFFFFFFFF
-_INFINITE = 0xFFFFFFFF
 
 # local
 from .terminal import WINSZ
@@ -61,8 +48,9 @@ class Terminal(_Terminal):
         Return whether a keypress has been detected on the keyboard.
 
         This method is used by :meth:`inkey` to determine if a byte may
-        be read using :meth:`getch` without blocking.  This is implemented
-        using WaitForSingleObject for efficient waiting (like select() on Unix).
+        be read using :meth:`getch` without blocking.  The actual waiting
+        is delegated to :func:`jinxed.win32.kbhit`, which uses
+        ``WaitForSingleObject`` for efficient waiting.
 
         :arg float timeout: When ``timeout`` is 0, this call is
             non-blocking, otherwise blocking indefinitely until keypress
@@ -73,44 +61,13 @@ class Terminal(_Terminal):
         :returns: True if a keypress is awaiting to be read on the keyboard
             attached to this terminal.
         """
-        # Quick check first - if data is already available, return immediately
+        # Quick check -- if data is already available, return immediately
         if msvcrt.kbhit():
             return True
 
-        # Get the console input handle for WaitForSingleObject
         if self._keyboard_fd is not None:
-            handle = wintypes.HANDLE(msvcrt.get_osfhandle(self._keyboard_fd))
-            # Convert timeout to milliseconds for Windows API
-            if timeout is None:
-                wait_ms = _INFINITE
-            elif timeout <= 0:
-                return False  # Non-blocking, already checked above
-            else:
-                wait_ms = int(timeout * 1000)
+            return win32.kbhit(self._keyboard_fd, timeout)
 
-            # Efficient wait using Windows API (like select() on Unix)
-            result = _WaitForSingleObject(handle, wait_ms)
-            if result == _WAIT_FAILED:
-                # Fallback to polling on error
-                return self._kbhit_poll(timeout)
-            if result == _WAIT_OBJECT_0:
-                return msvcrt.kbhit()  # Double-check after wait
-            if result == _WAIT_TIMEOUT:
-                return False
-            return False  # Unexpected return value
-        else:
-            # Fallback to polling if no keyboard fd
-            return self._kbhit_poll(timeout)
-
-    def _kbhit_poll(self, timeout: Optional[float]) -> bool:
-        """Fallback polling implementation for kbhit."""
-        end = time.time() + (timeout or 0)
-        while True:
-            if msvcrt.kbhit():
-                return True
-            if timeout is not None and end < time.time():
-                break
-            time.sleep(0.01)
         return False
 
     @staticmethod
