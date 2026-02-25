@@ -3,6 +3,9 @@
 Version History
 ===============
 1.31
+  * bugfix: :meth:`~.cbreak` and :meth:`~.raw` should use ``TCSADRAIN`` to preserve keystrokes
+    buffered during mode switches, previously ``TCSAFLUSH`` was used which discarded unread input,
+    dropping keystrokes.
   * introduced: :mod:`blessed.line_editor` - "headless" single-line editor
   * introduced: :meth:`~.Terminal.async_inkey` — asyncio-compatible version of
     :meth:`~.Terminal.inkey` using event loop readers.
