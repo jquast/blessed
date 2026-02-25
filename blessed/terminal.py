@@ -7,6 +7,8 @@ import sys
 import time
 import codecs
 import locale
+import asyncio
+import logging
 import select
 import struct
 import platform
@@ -2938,8 +2940,10 @@ class Terminal():
 
         return ks
 
-    async def async_inkey(self, timeout: Optional[float] = None,
-                          esc_delay: float = DEFAULT_ESCDELAY) -> Keystroke:
+    async def async_inkey(
+        self, timeout: Optional[float] = None,
+        esc_delay: float = DEFAULT_ESCDELAY,
+    ) -> Keystroke:
         r"""
         Asynchronous version of :meth:`inkey` for use with :mod:`asyncio`.
 
@@ -2963,8 +2967,7 @@ class Terminal():
         :returns: :class:`~.Keystroke`, which may be empty (``''``) if
             ``timeout`` is specified and keystroke is not received.
         """
-        import asyncio  # pylint: disable=import-outside-toplevel
-
+        # pylint: disable=too-many-locals,too-many-branches,too-complex
         loop = asyncio.get_running_loop()
 
         # drain keyboard buffer (non-blocking)
@@ -3046,8 +3049,6 @@ class Terminal():
         :arg timeout: Seconds to wait, or None for indefinite.
         :returns: A single byte, or None on timeout.
         """
-        import asyncio  # pylint: disable=import-outside-toplevel
-
         if self._keyboard_fd is None:
             raise RuntimeError(
                 "async_inkey requires a keyboard file descriptor")
