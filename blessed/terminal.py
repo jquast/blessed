@@ -2959,7 +2959,7 @@ class Terminal():
         """
         import asyncio  # pylint: disable=import-outside-toplevel
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         # drain keyboard buffer (non-blocking)
         ucs = self.flushinp()

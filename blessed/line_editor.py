@@ -1,12 +1,13 @@
 """Headless line editor with history, auto-suggest, and grapheme-aware editing.
 
 This module provides :class:`LineEditor` for single-line input with readline-style
-editing and :class:`LineHistory` for command recall and file persistence.
+editing and :class:`LineHistory` for command recall.
 """
 from __future__ import annotations
 
 # std imports
-from typing import TYPE_CHECKING, Dict, List, Tuple, Union, Callable, Optional
+from collections import deque
+from typing import TYPE_CHECKING, Deque, Dict, List, Tuple, Union, Callable, Optional
 from dataclasses import dataclass
 
 if TYPE_CHECKING:
@@ -73,7 +74,7 @@ def _is_control(grapheme: str) -> bool:
 
 
 class LineHistory:
-    """In-memory command history with optional file persistence.
+    """In-memory command history with navigation and prefix search.
 
     :param max_entries: Maximum number of history entries retained.
     """
@@ -93,7 +94,7 @@ class LineHistory:
             return
         self.entries.append(line)
         if len(self.entries) > self._max_entries:
-            self.entries = self.entries[-self._max_entries:]
+            del self.entries[:-self._max_entries]
 
     def search_prefix(self, prefix: str) -> Optional[str]:
         """Return the most recent entry starting with *prefix*, or ``None``."""
@@ -143,7 +144,7 @@ class LineEditor:
     def __init__(
         self,
         history: Optional[LineHistory] = None,
-        is_password: Optional[Callable[[], bool]] = None,
+        password: bool = False,
         password_char: str = PASSWORD_CHAR,
         max_width: int = 0,
         ellipsis: str = "\u2026",
@@ -154,17 +155,16 @@ class LineEditor:
         suggestion_sgr: str = "\x1b[30m",
         bg_sgr: str = "",
         ellipsis_sgr: str = "",
-        keymap: Optional[Dict[str, Callable]] = None,
+        keymap: Optional[Dict[str, Optional[Callable]]] = None,
     ) -> None:
         self._buf: List[str] = []
         self._cursor: int = 0
         self._history = history or LineHistory()
-        self._is_password: Optional[Callable[[], bool]] = is_password
+        self._password_mode: bool = password
         self.password_char: str = password_char
-        self._kill_ring: List[str] = []
+        self._kill_ring: Deque[str] = deque(maxlen=64)
         self._undo_stack: List[Tuple[List[str], int]] = []
-        self._in_history: bool = False
-        self._password_mode: bool = False
+        self._navigating_history: bool = False
         self.max_width: int = max_width
         self.ellipsis: str = ellipsis
         self.limit: int = limit
@@ -176,12 +176,13 @@ class LineEditor:
         self.suggestion_sgr: str = suggestion_sgr
         self.bg_sgr: str = bg_sgr
         self.ellipsis_sgr: str = ellipsis_sgr
-        self.keymap: Dict[str, Callable] = dict(DEFAULT_KEYMAP)
+        self.keymap: Dict[str, Optional[Callable]] = dict(DEFAULT_KEYMAP)
         if keymap:
             self.keymap.update(keymap)
         self._prev_cursor: int = 0
         self._prev_content_w: int = 0
         self._prev_overflow: Tuple[bool, bool] = (False, False)
+        self._prev_scroll_offset: int = 0
 
     @property
     def history(self) -> LineHistory:
@@ -196,8 +197,6 @@ class LineEditor:
     @property
     def password_mode(self) -> bool:
         """Return whether password mode is currently active."""
-        if self._is_password is not None:
-            return self._is_password()
         return self._password_mode
 
     def _apply_sgr(self, state: DisplayState) -> DisplayState:
@@ -211,29 +210,29 @@ class LineEditor:
     @property
     def display(self) -> DisplayState:
         """Return the current :class:`DisplayState` for rendering."""
-        line = self.line
-        cursor_col = self._cursor_display_col()
         if self.password_mode:
-            pw_text = self.password_char * len(self._buf)
-            pw_cursor = self._cursor * wcswidth(self.password_char)
-            if self._needs_hscroll():
-                cw = wcswidth(pw_text)
-                offset = self._compute_scroll(pw_cursor, cw)
-                return self._apply_sgr(_apply_hscroll(
-                    pw_text, "", pw_cursor, self.max_width, self.ellipsis,
-                    scroll_offset=offset))
-            return self._apply_sgr(
-                DisplayState(text=pw_text, cursor=pw_cursor))
-        suggestion = self._get_suggestion()
+            text = self.password_char * len(self._buf)
+            cursor_col = self._cursor * wcswidth(self.password_char)
+            suggestion = ""
+        else:
+            text = self.line
+            cursor_col = self._cursor_display_col()
+            suggestion = self._get_suggestion()
         if self._needs_hscroll():
-            text_w = wcswidth(line)
-            suggest_w = wcswidth(suggestion)
-            offset = self._compute_scroll(cursor_col, text_w + suggest_w)
+            content_w = wcswidth(text) + wcswidth(suggestion)
+            offset = self._compute_scroll(cursor_col, content_w)
             return self._apply_sgr(_apply_hscroll(
-                line, suggestion, cursor_col, self.max_width, self.ellipsis,
-                scroll_offset=offset))
-        return self._apply_sgr(DisplayState(
-            text=line, cursor=cursor_col, suggestion=suggestion))
+                text, suggestion, cursor_col, self.max_width,
+                self.ellipsis, scroll_offset=offset))
+        return self._apply_sgr(
+            DisplayState(text=text, cursor=cursor_col, suggestion=suggestion))
+
+    def _update_render_state(self, cur: DisplayState, content_w: int) -> None:
+        """Update previous-frame tracking state after rendering."""
+        self._prev_cursor = cur.cursor
+        self._prev_content_w = content_w
+        self._prev_overflow = (cur.overflow_left, cur.overflow_right)
+        self._prev_scroll_offset = self._scroll_offset
 
     def render(self, term: Terminal, row: int, width: int) -> str:
         """Build escape sequences to render the current display state.
@@ -269,9 +268,7 @@ class LineEditor:
             parts.extend((cur.bg_sgr, " " * pad))
 
         parts.extend((term.normal, term.move_yx(row, cur.cursor)))
-        self._prev_cursor = cur.cursor
-        self._prev_content_w = rendered
-        self._prev_overflow = (cur.overflow_left, cur.overflow_right)
+        self._update_render_state(cur, rendered)
         return "".join(parts)
 
     def render_insert(
@@ -289,6 +286,8 @@ class LineEditor:
         cur = self.display
         if (cur.overflow_left, cur.overflow_right) != self._prev_overflow:
             return None
+        if self._scroll_offset != self._prev_scroll_offset:
+            return None
         col = self._prev_cursor
         parts: List[str] = [term.move_yx(row, col), cur.text_sgr, grapheme]
         new_content_w = wcswidth(cur.text) + wcswidth(cur.suggestion)
@@ -298,9 +297,7 @@ class LineEditor:
         if trail > 0:
             parts.extend((cur.bg_sgr, " " * trail))
         parts.extend((term.normal, term.move_yx(row, cur.cursor)))
-        self._prev_cursor = cur.cursor
-        self._prev_content_w = new_content_w
-        self._prev_overflow = (cur.overflow_left, cur.overflow_right)
+        self._update_render_state(cur, new_content_w)
         return "".join(parts)
 
     def render_backspace(self, term: Terminal, row: int) -> Optional[str]:
@@ -315,6 +312,8 @@ class LineEditor:
         cur = self.display
         if (cur.overflow_left, cur.overflow_right) != self._prev_overflow:
             return None
+        if self._scroll_offset != self._prev_scroll_offset:
+            return None
         col = cur.cursor
         new_content_w = wcswidth(cur.text) + wcswidth(cur.suggestion)
         erase = self._prev_content_w - new_content_w
@@ -324,9 +323,7 @@ class LineEditor:
         if erase > 0:
             parts.extend((cur.bg_sgr, " " * erase))
         parts.extend((term.normal, term.move_yx(row, cur.cursor)))
-        self._prev_cursor = cur.cursor
-        self._prev_content_w = new_content_w
-        self._prev_overflow = (cur.overflow_left, cur.overflow_right)
+        self._update_render_state(cur, new_content_w)
         return "".join(parts)
 
     def feed_key(self, key: Union["Keystroke", str]) -> LineEditResult:  # noqa: F821
@@ -343,12 +340,8 @@ class LineEditor:
                 return LineEditResult(
                     changed=False, bell=self._fire_limit_bell())
             self._save_undo()
-            for grapheme in iter_graphemes(key_str):
-                if self._at_limit():
-                    break
-                self._buf.insert(self._cursor, grapheme)
-                self._cursor += 1
-            self._in_history = False
+            self._insert_at_cursor(key_str)
+            self._navigating_history = False
             return LineEditResult(changed=True)
         return LineEditResult()
 
@@ -357,15 +350,9 @@ class LineEditor:
         if self._at_limit():
             return LineEditResult(
                 changed=False, bell=self._fire_limit_bell())
-        old_len = len(self._buf)
         self._save_undo()
-        for grapheme in iter_graphemes(text):
-            if self._at_limit():
-                break
-            if not _is_control(grapheme):
-                self._buf.insert(self._cursor, grapheme)
-                self._cursor += 1
-        if len(self._buf) == old_len:
+        count = self._insert_at_cursor(text, filter_control=True)
+        if count == 0:
             self._undo_stack.pop()
             return LineEditResult(changed=False)
         return LineEditResult(changed=True)
@@ -375,18 +362,14 @@ class LineEditor:
         self._buf.clear()
         self._cursor = 0
         self._scroll_offset = 0
-        self._in_history = False
+        self._navigating_history = False
 
     def set_password_mode(self, enabled: bool) -> None:
-        """Set password mode directly (used when no *is_password* callable)."""
+        """Toggle password masking on or off."""
         self._password_mode = enabled
 
     def _needs_hscroll(self) -> bool:
-        if self.max_width <= 0:
-            return False
-        if self.limit > 0 and self.limit <= self.max_width:
-            return False
-        return True
+        return self.max_width > 0 and not (0 < self.limit <= self.max_width)
 
     def _compute_scroll(self, cursor_col: int, content_width: int) -> int:
         usable = self.max_width
@@ -394,11 +377,11 @@ class LineEditor:
             self._scroll_offset = 0
             return 0
         jump = max(1, int(usable * self.scroll_jump))
-        ecw = wcswidth(self.ellipsis)
-        left_cost = ecw if self._scroll_offset > 0 else 0
-        right_edge = self._scroll_offset + usable - left_cost
+        ellipsis_w = wcswidth(self.ellipsis)
+        left_margin = ellipsis_w if self._scroll_offset > 0 else 0
+        right_edge = self._scroll_offset + usable - left_margin
         if cursor_col >= right_edge:
-            self._scroll_offset = cursor_col - usable + jump + 1 + ecw
+            self._scroll_offset = cursor_col - usable + jump + 1 + ellipsis_w
         elif cursor_col <= self._scroll_offset and self._scroll_offset > 0:
             self._scroll_offset = max(0, cursor_col - jump)
         return self._scroll_offset
@@ -422,7 +405,25 @@ class LineEditor:
     def _save_undo(self) -> None:
         self._undo_stack.append((list(self._buf), self._cursor))
         if len(self._undo_stack) > 100:
-            self._undo_stack = self._undo_stack[-100:]
+            del self._undo_stack[:-100]
+
+    def _insert_at_cursor(self, text: str, check_limit: bool = True,
+                          filter_control: bool = False) -> int:
+        """Insert *text* graphemes at cursor, returning count inserted."""
+        count = 0
+        for grapheme in iter_graphemes(text):
+            if check_limit and self._at_limit():
+                break
+            if filter_control and _is_control(grapheme):
+                continue
+            self._buf.insert(self._cursor, grapheme)
+            self._cursor += 1
+            count += 1
+        return count
+
+    def _set_text(self, text: str) -> None:
+        self._buf = list(iter_graphemes(text))
+        self._cursor = len(self._buf)
 
     def _undo(self) -> LineEditResult:
         if not self._undo_stack:
@@ -553,16 +554,13 @@ class LineEditor:
         if not self._kill_ring:
             return LineEditResult()
         self._save_undo()
-        text = self._kill_ring[-1]
-        for grapheme in iter_graphemes(text):
-            self._buf.insert(self._cursor, grapheme)
-            self._cursor += 1
+        self._insert_at_cursor(self._kill_ring[-1], check_limit=False)
         return LineEditResult(changed=True)
 
     def _history_prev(self) -> LineEditResult:
-        if not self._in_history:
+        if not self._navigating_history:
             self._history.nav_start(self.line)
-            self._in_history = True
+            self._navigating_history = True
         entry = self._history.nav_up()
         if entry is not None:
             self._set_text(entry)
@@ -570,7 +568,7 @@ class LineEditor:
         return LineEditResult()
 
     def _history_next(self) -> LineEditResult:
-        if not self._in_history:
+        if not self._navigating_history:
             return LineEditResult()
         entry = self._history.nav_down()
         if entry is not None:
@@ -583,18 +581,9 @@ class LineEditor:
             suggestion = self._get_suggestion()
             if suggestion:
                 self._save_undo()
-                for grapheme in iter_graphemes(suggestion):
-                    self._buf.append(grapheme)
-                self._cursor = len(self._buf)
+                self._insert_at_cursor(suggestion, check_limit=False)
                 return LineEditResult(changed=True)
-        if self._cursor < len(self._buf):
-            self._cursor += 1
-            return LineEditResult(changed=True)
-        return LineEditResult()
-
-    def _set_text(self, text: str) -> None:
-        self._buf = list(iter_graphemes(text))
-        self._cursor = len(self._buf)
+        return self._move_right()
 
     def _get_suggestion(self) -> str:
         if self.password_mode:

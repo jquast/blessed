@@ -505,12 +505,20 @@ class TestLineEditorKillRing:
         r = ed.feed_key(_CTRL_U)
         assert r.changed is False
         assert ed.line == "ab"
-        assert ed._kill_ring == []
+        assert len(ed._kill_ring) == 0
 
     def test_kill_line_empty_buffer(self) -> None:
         ed = LineEditor()
         r = ed.feed_key(_CTRL_U)
         assert r.changed is False
+
+    def test_kill_ring_capped_at_64(self) -> None:
+        ed = LineEditor()
+        for i in range(70):
+            ed.feed_key(str(i % 10))
+            ed.feed_key(_CTRL_K)
+            ed.feed_key(_HOME)
+        assert len(ed._kill_ring) == 64
 
     def test_kill_word_back_at_start(self) -> None:
         ed = LineEditor()
@@ -603,7 +611,7 @@ class TestLineEditorHistory:
 
     def test_enter_password_mode_skips_history(self) -> None:
         h = History()
-        ed = LineEditor(history=h, is_password=lambda: True)
+        ed = LineEditor(history=h, password=True)
         ed.feed_key("s")
         ed.feed_key("e")
         ed.feed_key("c")
@@ -633,7 +641,7 @@ class TestLineEditorAutoSuggest:
     def test_no_suggestion_password_mode(self) -> None:
         h = History()
         h.add("secret123")
-        ed = LineEditor(history=h, is_password=lambda: True)
+        ed = LineEditor(history=h, password=True)
         ed.feed_key("s")
         assert ed.display.suggestion == ""
 
@@ -669,7 +677,7 @@ class TestLineEditorAutoSuggest:
 
 class TestLineEditorPasswordMode:
     def test_masked_display(self) -> None:
-        ed = LineEditor(is_password=lambda: True)
+        ed = LineEditor(password=True)
         ed.feed_key("a")
         ed.feed_key("b")
         ed.feed_key("c")
@@ -683,7 +691,7 @@ class TestLineEditorPasswordMode:
         assert ed.display.text == PASSWORD_CHAR
 
     def test_password_cursor_with_wide_char(self) -> None:
-        ed = LineEditor(is_password=lambda: True, password_char="\u4e16")
+        ed = LineEditor(password=True, password_char="\u4e16")
         ed.feed_key("a")
         ed.feed_key("b")
         ds = ed.display
@@ -691,7 +699,7 @@ class TestLineEditorPasswordMode:
         assert wcswidth(ds.text) == 4
 
     def test_password_cursor_after_left(self) -> None:
-        ed = LineEditor(is_password=lambda: True, password_char="\u4e16")
+        ed = LineEditor(password=True, password_char="\u4e16")
         ed.feed_key("a")
         ed.feed_key("b")
         ed.feed_key("c")
@@ -851,7 +859,7 @@ class TestLineEditorMaxWidth:
         assert ds.overflow_left is False
 
     def test_max_width_password_mode(self) -> None:
-        ed = LineEditor(max_width=5, is_password=lambda: True)
+        ed = LineEditor(max_width=5, password=True)
         for ch in "abcdefghij":
             ed.feed_key(ch)
         ds = ed.display
@@ -1000,7 +1008,7 @@ class TestStatefulHScroll:
         assert ed._scroll_offset > 0
 
     def test_password_mode_stateful_scroll(self) -> None:
-        ed = LineEditor(max_width=10, is_password=lambda: True)
+        ed = LineEditor(max_width=10, password=True)
         for ch in "a" * 20:
             ed.feed_key(ch)
         ds = ed.display
@@ -1116,6 +1124,20 @@ class TestRenderInsert:
         result = ed.render_insert(mt, 0, "f")
         assert result is None
 
+    def test_render_insert_returns_none_when_scroll_changes(self) -> None:
+        mt = MockTerminal()
+        ed = LineEditor(max_width=10)
+        for ch in "a" * 9:
+            ed.feed_key(ch)
+        ed.render(mt, 0, 10)
+        old_offset = ed._scroll_offset
+        for ch in "bbb":
+            ed.feed_key(ch)
+        _ = ed.display
+        assert ed._scroll_offset != old_offset
+        result = ed.render_insert(mt, 0, "b")
+        assert result is None
+
     def test_render_insert_clears_stale_suggestion(self) -> None:
         mt = MockTerminal()
         h = History()
@@ -1171,6 +1193,20 @@ class TestRenderBackspace:
         ed.render(mt, 0, 5)
         for _ in range(4):
             ed.feed_key(_BACKSPACE)
+        result = ed.render_backspace(mt, 0)
+        assert result is None
+
+    def test_render_backspace_returns_none_when_scroll_changes(self) -> None:
+        mt = MockTerminal()
+        ed = LineEditor(max_width=10)
+        for ch in "a" * 20:
+            ed.feed_key(ch)
+        ed.render(mt, 0, 10)
+        old_offset = ed._scroll_offset
+        for _ in range(15):
+            ed.feed_key(_BACKSPACE)
+        _ = ed.display
+        assert ed._scroll_offset != old_offset
         result = ed.render_backspace(mt, 0)
         assert result is None
 

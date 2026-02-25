@@ -9,19 +9,25 @@ movement, auto-suggest from history, password masking, and horizontal scrolling.
 
 .. note::
 
-   The editor is entirely headless — it does not write to the terminal.
+   The editor never writes to the terminal directly — your application
+   controls when and where output appears.
 
-   Your application must read :attr:`~blessed.line_editor.LineEditor.display`
-   and render the text, cursor, and suggestion itself, as shown in the
-   example below.
+   Use the built-in :ref:`render methods <line_editor_render>` to produce
+   ready-to-print escape sequences, or read
+   :attr:`~blessed.line_editor.LineEditor.display` for raw display state
+   if you need fully custom rendering.
 
 Overview
 --------
 
 Feed keystrokes (from :meth:`~.Terminal.inkey` or :meth:`~.Terminal.async_inkey`) into
 :meth:`~blessed.line_editor.LineEditor.feed_key`.  It returns a
-:class:`~blessed.line_editor.LineEditResult` telling you whether the line was accepted,
-an interrupt or EOF occurred, or the display changed.
+:class:`~blessed.line_editor.LineEditResult` with these fields:
+
+- ``line`` — the accepted string when Enter is pressed, otherwise ``None``
+- ``interrupt`` / ``eof`` — ``True`` on Ctrl+C / Ctrl+D respectively
+- ``changed`` — ``True`` when the display needs redrawing
+- ``bell`` — a bell string to emit (empty when silent)
 
 For bracketed paste, feed the pasted text through
 :meth:`~blessed.line_editor.LineEditor.insert_text` instead of
@@ -48,7 +54,8 @@ History
 History navigation (Up/Down) and auto-suggest (type a prefix, press Right to accept)
 are enabled automatically when a history instance is attached to the editor.
 
-For on-disk persistence, read/write the ``entries`` list directly.
+For on-disk persistence, read/write the ``entries`` list directly (most recent
+entry last).
 
 .. _line_editor_display:
 
@@ -59,8 +66,8 @@ Each call to :attr:`~blessed.line_editor.LineEditor.display` returns a
 :class:`~blessed.line_editor.DisplayState` with the visible text, cursor position,
 suggestion suffix, and clipping indicators.
 
-Override the default SGR styling with ``text_sgr``, ``suggestion_sgr``, ``bg_sgr``, or
-``ellipsis_sgr``::
+The editor ships with default SGR styling (light cream text, dark suggestion).
+Override with ``text_sgr``, ``suggestion_sgr``, ``bg_sgr``, or ``ellipsis_sgr``::
 
     editor = LineEditor(bg_sgr=term.on_brown, max_width=term.width)
 
@@ -90,6 +97,41 @@ build complete escape-sequence strings from the current display state:
 Try the fast-path first and fall back to ``render()`` when it returns
 ``None``.  See the :ref:`example above <line_editor>` for the complete
 pattern.
+
+.. _line_editor_other:
+
+Other Methods
+-------------
+
+:meth:`~blessed.line_editor.LineEditor.clear`
+   Reset the buffer, cursor, and undo history.
+
+:meth:`~blessed.line_editor.LineEditor.set_password_mode`
+   Toggle password masking on or off mid-session.
+
+.. _line_editor_constructor:
+
+Constructor Options
+-------------------
+
+Beyond the styling and keybinding options shown above, :class:`~blessed.line_editor.LineEditor`
+accepts:
+
+``password``
+   If ``True``, start in password mode (characters are masked).  Toggle at
+   runtime with :meth:`~blessed.line_editor.LineEditor.set_password_mode`.
+
+``password_char``
+   Replacement character shown in password mode (default ``"⚻"``).
+
+``limit``
+   Maximum buffer length in characters (default 65536).
+
+``limit_bell``
+   Bell string emitted when the limit is reached (default ``"\\a"``).
+
+``scroll_jump``
+   Fraction of ``max_width`` to scroll when the cursor overflows (default 0.5).
 
 .. _line_editor_keybindings:
 
