@@ -1,13 +1,14 @@
 """Module containing Windows version of :class:`Terminal`."""
-
+# pylint: disable=import-error
 
 # std imports
-import msvcrt  # pylint: disable=import-error
+import time
+import msvcrt
 import contextlib
 from typing import Optional, Generator
 
 # 3rd party
-from jinxed import win32  # pylint: disable=import-error
+from jinxed import win32
 
 # local
 from .terminal import WINSZ
@@ -48,9 +49,12 @@ class Terminal(_Terminal):
         Return whether a keypress has been detected on the keyboard.
 
         This method is used by :meth:`inkey` to determine if a byte may
-        be read using :meth:`getch` without blocking.  The actual waiting
-        is delegated to :func:`jinxed.win32.kbhit`, which uses
-        ``WaitForSingleObject`` for efficient waiting.
+        be read using :meth:`getch` without blocking.
+
+        Uses :func:`jinxed.win32.select` for efficient, non-polling
+        input detection.  Non-key-down events (key-up releases, resize,
+        mouse, focus, menu) are consumed so they do not cause spurious
+        returns.
 
         :arg float timeout: When ``timeout`` is 0, this call is
             non-blocking, otherwise blocking indefinitely until keypress
@@ -61,14 +65,32 @@ class Terminal(_Terminal):
         :returns: True if a keypress is awaiting to be read on the keyboard
             attached to this terminal.
         """
-        # Quick check -- if data is already available, return immediately
-        if msvcrt.kbhit():
-            return True
+        if self._keyboard_fd is None:
+            return False
 
-        if self._keyboard_fd is not None:
-            return win32.kbhit(self._keyboard_fd, timeout)
+        deadline = None if timeout is None else time.monotonic() + timeout
 
-        return False
+        while True:
+            event = win32.peek_input(self._keyboard_fd)
+
+            if event is not None:
+                if (event.EventType == win32.KEY_EVENT
+                        and event.Event.KeyEvent.bKeyDown):
+                    return True
+                # Consume non-key-down events.
+                win32.read_input(self._keyboard_fd)
+                continue
+
+            # Buffer empty -- wait for something to arrive.
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+            else:
+                remaining = None
+
+            if not win32.select(self._keyboard_fd, remaining):
+                return False
 
     @staticmethod
     def _winsize(fd: int) -> WINSZ:
