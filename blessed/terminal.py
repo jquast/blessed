@@ -9,6 +9,7 @@ import codecs
 import locale
 import select
 import struct
+import asyncio
 import platform
 import warnings
 import contextlib
@@ -26,6 +27,7 @@ from wcwidth import center as wcwidth_center
 from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
 from .keyboard import (DEFAULT_ESCDELAY,
                        Keystroke,
+                       ResizeEvent,
                        DeviceAttribute,
                        SoftwareVersion,
                        KittyKeyboardProtocol,
@@ -3067,9 +3069,11 @@ class Terminal():
                 self._line_buffered = False
                 yield
             finally:
-                # Restore prior mode:
+                # Restore prior mode.  TCSADRAIN (not TCSAFLUSH) so that
+                # keystrokes buffered during the mode switch are preserved;
+                # TCSAFLUSH discards unread input, dropping user keystrokes.
                 termios.tcsetattr(self._keyboard_fd,
-                                  termios.TCSAFLUSH,
+                                  termios.TCSADRAIN,
                                   save_mode)
                 self._line_buffered = save_line_buffered
         else:
@@ -3104,9 +3108,11 @@ class Terminal():
                 self._line_buffered = False
                 yield
             finally:
-                # Restore prior mode:
+                # Restore prior mode.  TCSADRAIN (not TCSAFLUSH) so that
+                # keystrokes buffered during the mode switch are preserved;
+                # TCSAFLUSH discards unread input, dropping user keystrokes.
                 termios.tcsetattr(self._keyboard_fd,
-                                  termios.TCSAFLUSH,
+                                  termios.TCSADRAIN,
                                   save_mode)
                 self._line_buffered = save_line_buffered
         else:
@@ -3264,13 +3270,151 @@ class Terminal():
         # Update preferred size cache if this is a resize event
         if ks._mode == _DecPrivateMode.IN_BAND_WINDOW_RESIZE:  # pylint: disable=protected-access
             event_vals = ks._mode_values  # pylint: disable=protected-access
+            assert isinstance(event_vals, ResizeEvent)
             self._preferred_size_cache = WINSZ(
-                ws_row=event_vals.height_chars,  # type: ignore[union-attr]
-                ws_col=event_vals.width_chars,  # type: ignore[union-attr]
-                ws_xpixel=event_vals.width_pixels,  # type: ignore[union-attr]
-                ws_ypixel=event_vals.height_pixels)  # type: ignore[union-attr]
+                ws_row=event_vals.height_chars,
+                ws_col=event_vals.width_chars,
+                ws_xpixel=event_vals.width_pixels,
+                ws_ypixel=event_vals.height_pixels)
 
         return ks
+
+    async def async_inkey(
+        self, timeout: Optional[float] = None,
+        esc_delay: float = DEFAULT_ESCDELAY,
+    ) -> Keystroke:
+        r"""
+        Asynchronous version of :meth:`inkey` for use with :mod:`asyncio`.
+
+        Read and return the next keyboard event within given timeout, yielding
+        control to the asyncio event loop while waiting for input rather than
+        blocking the thread.
+
+        Uses :meth:`asyncio.AbstractEventLoop.add_reader` on the keyboard file
+        descriptor, reusing the same :func:`~.resolve_sequence`, keymap, and
+        :class:`~.Keystroke` internals as the synchronous :meth:`inkey`.
+
+        Must be called within a :meth:`cbreak` or :meth:`raw` context, just
+        like :meth:`inkey`.
+
+        :arg float timeout: Number of seconds to wait for a keystroke before
+            returning.  When ``None`` (default), this method may block
+            indefinitely.
+        :arg float esc_delay: Time in seconds to wait after Escape key
+            is received to disambiguate bare Escape from escape sequences.
+        :rtype: :class:`~.Keystroke`
+        :returns: :class:`~.Keystroke`, which may be empty (``''``) if
+            ``timeout`` is specified and keystroke is not received.
+        """
+        # pylint: disable=too-complex,too-many-branches
+        loop = asyncio.get_running_loop()
+
+        # drain keyboard buffer (non-blocking)
+        ucs = self.flushinp()
+
+        # resolve any buffered keystroke
+        ks = resolve_sequence(ucs, self._keymap, self._keycodes,
+                              self._keymap_prefixes, final=False,
+                              dec_mode_cache=self._dec_mode_cache)
+
+        # read bytes until a complete keystroke is resolved
+        while not ks:
+            byte = await self._async_read_byte(loop, timeout)
+            if byte is None:
+                # timeout expired with no input
+                return Keystroke()
+            decode_latin1 = ucs.startswith('\x1b[M')
+            if decode_latin1:
+                ucs += chr(byte[0])
+            else:
+                ucs += self._keyboard_decoder.decode(byte, final=False)
+
+            # drain all immediately available bytes (non-blocking)
+            while self.kbhit(timeout=0):
+                ucs += self.getch(decode_latin1=ucs.startswith('\x1b[M'))
+
+            ks = resolve_sequence(ucs, self._keymap, self._keycodes,
+                                  self._keymap_prefixes, final=False,
+                                  dec_mode_cache=self._dec_mode_cache)
+
+        # escape key disambiguation: wait esc_delay for more bytes
+        if ks.code == self.KEY_ESCAPE and len(ks) == 1:
+            while (ks.code == self.KEY_ESCAPE
+                   and self._is_incomplete_keystroke(ucs)):
+                byte = await self._async_read_byte(loop, esc_delay)
+                if byte is None:
+                    break
+                decode_latin1 = ucs.startswith('\x1b[M')
+                if decode_latin1:
+                    ucs += chr(byte[0])
+                else:
+                    ucs += self._keyboard_decoder.decode(byte, final=False)
+                # drain remaining immediately available bytes
+                while self.kbhit(timeout=0):
+                    ucs += self.getch(
+                        decode_latin1=ucs.startswith('\x1b[M'))
+                final = bool(ucs) and not self._is_incomplete_keystroke(ucs)
+                ks = resolve_sequence(
+                    ucs, self._keymap, self._keycodes,
+                    self._keymap_prefixes, final=final,
+                    dec_mode_cache=self._dec_mode_cache)
+
+            if ks.code == self.KEY_ESCAPE and self._is_incomplete_keystroke(ucs):
+                ks = resolve_sequence(
+                    ucs, self._keymap, self._keycodes,
+                    self._keymap_prefixes, final=True,
+                    dec_mode_cache=self._dec_mode_cache)
+
+        # buffer any remaining text
+        self.ungetch(ucs[len(ks):])
+
+        # update preferred size cache if this is a resize event
+        if ks._mode == _DecPrivateMode.IN_BAND_WINDOW_RESIZE:  # pylint: disable=protected-access
+            event_vals = ks._mode_values  # pylint: disable=protected-access
+            assert isinstance(event_vals, ResizeEvent)
+            self._preferred_size_cache = WINSZ(
+                ws_row=event_vals.height_chars,
+                ws_col=event_vals.width_chars,
+                ws_xpixel=event_vals.width_pixels,
+                ws_ypixel=event_vals.height_pixels)
+
+        return ks
+
+    async def _async_read_byte(
+        self,
+        loop: "asyncio.AbstractEventLoop",  # noqa: F821
+        timeout: Optional[float],
+    ) -> Optional[bytes]:
+        """
+        Read one byte from keyboard fd using asyncio, with optional timeout.
+
+        :arg loop: The asyncio event loop.
+        :arg timeout: Seconds to wait, or None for indefinite.
+        :returns: A single byte, or None on timeout.
+        """
+        if self._keyboard_fd is None:
+            raise RuntimeError(
+                "async_inkey requires a keyboard file descriptor")
+        fut: asyncio.Future[bytes] = loop.create_future()
+
+        def _on_readable() -> None:
+            if not fut.done():
+                try:
+                    data = os.read(self._keyboard_fd, 1)
+                    fut.set_result(data)
+                except OSError as exc:
+                    fut.set_exception(exc)
+
+        loop.add_reader(self._keyboard_fd, _on_readable)
+        try:
+            if timeout is not None:
+                try:
+                    return await asyncio.wait_for(fut, timeout=timeout)
+                except asyncio.TimeoutError:
+                    return None
+            return await fut
+        finally:
+            loop.remove_reader(self._keyboard_fd)
 
 
 class WINSZ(collections.namedtuple('WINSZ', (

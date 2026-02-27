@@ -208,3 +208,35 @@ those found in :linuxman:`curses(3)`, or those `constants
 <https://docs.python.org/3/library/curses.html#constants>`_ in :mod:`curses`
 beginning with phrase *KEY_*. These have numeric values that can be used for
 all basic application keys.
+
+.. _async_input:
+
+Async Input
+-----------
+
+The :meth:`~.Terminal.async_inkey` method is an asyncio-compatible version of
+:meth:`~.Terminal.inkey`.  It yields control to the event loop while waiting for
+input, making it suitable for use with ``async``/``await``.
+
+.. code-block:: python
+
+    import asyncio
+    from blessed import Terminal
+
+    async def main():
+        term = Terminal()
+        with term.cbreak():
+            key = await term.async_inkey(timeout=5.0)
+            if key:
+                print(f"You pressed: {key!r}")
+            else:
+                print("Timed out")
+
+    asyncio.run(main())
+
+The method accepts the same ``timeout`` and ``esc_delay`` parameters as
+:meth:`~.Terminal.inkey`.  It must be called within a :meth:`~.Terminal.cbreak`
+or :meth:`~.Terminal.raw` context.
+
+For a complete example using ``async_inkey`` with the :doc:`line_editor`, see
+:ref:`line_editor`.
