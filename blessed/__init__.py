@@ -12,5 +12,7 @@ if _platform.system() == 'Windows':
 else:
     from blessed.terminal import Terminal  # type: ignore[assignment]
 
-__all__ = ('Terminal',)
-__version__ = "1.30.0"
+from blessed.line_editor import LineEditor, LineHistory
+
+__all__ = ('Terminal', 'LineEditor', 'LineHistory')
+__version__ = "1.31.0"
