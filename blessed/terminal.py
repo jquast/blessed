@@ -26,14 +26,14 @@ from wcwidth import center as wcwidth_center
 # local
 from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
 from .keyboard import (DEFAULT_ESCDELAY,
+                       XTGETTCAP_CAPABILITIES,
                        Keystroke,
                        ResizeEvent,
                        DeviceAttribute,
                        SoftwareVersion,
-                       KittyKeyboardProtocol,
                        TermcapResponse,
                        ITerm2Capabilities,
-                       XTGETTCAP_CAPABILITIES,
+                       KittyKeyboardProtocol,
                        _time_left,
                        _read_until,
                        resolve_sequence,
@@ -1487,8 +1487,6 @@ class Terminal():
         When :attr:`is_a_tty` is False, returns ``None``.
 
         Responses are cached unless *force* is True.
-
-        .. seealso:: https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands
 
         :arg float timeout: Timeout in seconds per query round.
         :arg bool force: Bypass cache and re-query the terminal.

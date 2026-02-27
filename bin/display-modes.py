@@ -103,7 +103,7 @@ def display_sugar_methods(term):
     print(term.bold("Advanced Protocol Detection:"))
     print("-" * 40)
 
-    print(f'  Testing XTGETTCAP...' + term.clear_eol, end='\r', flush=True)
+    print('  Testing XTGETTCAP...' + term.clear_eol, end='\r', flush=True)
     xtgettcap = term.get_xtgettcap()
     print(f"  {_yn(term, xtgettcap is not None)}  XTGETTCAP (DCS +q)" + term.clear_eol)
     if xtgettcap and xtgettcap.supported:
@@ -116,11 +116,11 @@ def display_sugar_methods(term):
         caps = ', '.join(sorted(xtgettcap.capabilities.keys()))
         print(f"       Capabilities ({len(xtgettcap)}): {caps}")
 
-    print(f'  Testing Kitty graphics...' + term.clear_eol, end='\r', flush=True)
+    print('  Testing Kitty graphics...' + term.clear_eol, end='\r', flush=True)
     print(f"  {_yn(term, term.does_kitty_graphics())}  "
           f"Kitty graphics protocol (APC)" + term.clear_eol)
 
-    print(f'  Testing iTerm2...' + term.clear_eol, end='\r', flush=True)
+    print('  Testing iTerm2...' + term.clear_eol, end='\r', flush=True)
     iterm2 = term.get_iterm2_capabilities()
     has_iterm2 = iterm2 is not None and iterm2.supported
     print(f"  {_yn(term, has_iterm2)}  iTerm2 capabilities (OSC 1337)" + term.clear_eol)
@@ -130,7 +130,7 @@ def display_sugar_methods(term):
             feats = ', '.join(f'{k}={v}' for k, v in sorted(iterm2.features.items()))
             print(f"       Features: {feats}")
 
-    print(f'  Testing Kitty notifications...' + term.clear_eol, end='\r', flush=True)
+    print('  Testing Kitty notifications...' + term.clear_eol, end='\r', flush=True)
     print(f"  {_yn(term, term.does_kitty_notifications())}  "
           f"Kitty desktop notifications (OSC 99)" + term.clear_eol)
 
@@ -198,30 +198,18 @@ def main():
     print()
 
     # Display Device Attributes
-    try:
-        display_device_attributes(term)
-        print()
-    except Exception as e:
-        print(f"Error querying device attributes: {e}")
-        print()
+    display_device_attributes(term)
+    print()
 
     # Display sugar methods and advanced protocols
-    try:
-        display_sugar_methods(term)
-        print()
-    except Exception as e:
-        print(f"Error querying capabilities: {e}")
-        print()
+    display_sugar_methods(term)
+    print()
 
     # Display all DEC Private Modes (only with --all)
     if show_all:
-        try:
-            display_all_dec_modes(term)
-        except Exception as e:
-            print(f"Error querying DEC modes: {e}")
+        display_all_dec_modes(term)
     else:
-        print(term.dim + f"Use --all to query all DEC Private Modes" + term.normal)
-        print()
+        print(term.bold_black("Use --all to query all DEC Private Modes"))
 
 
 if __name__ == '__main__':

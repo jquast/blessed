@@ -2437,7 +2437,7 @@ class TermcapResponse:
 
 class ITerm2Capabilities:
     """
-    iTerm2 capability features from OSC 1337;Capabilities response.
+    ITerm2 capability features from OSC 1337;Capabilities response.
 
     Features are accessible as a dict via :attr:`features`.  The
     :attr:`detection` attribute indicates how support was detected
