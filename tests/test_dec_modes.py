@@ -305,7 +305,7 @@ def test_get_dec_mode_successful_query():
                 mock.patch.object(
                     term, '_query_with_boundary',
                     return_value=mock_match
-                ) as mock_query:
+        ) as mock_query:
             response = term.get_dec_mode(
                 DecPrivateMode.DECTCEM, timeout=0.5
             )
@@ -330,7 +330,7 @@ def test_get_dec_mode_timeout():
                 mock.patch.object(
                     term, '_query_with_boundary',
                     return_value=None
-                ):
+        ):
             response = term.get_dec_mode(
                 DecPrivateMode.DECTCEM, timeout=0.1
             )
@@ -354,7 +354,7 @@ def test_get_dec_mode_cached_response():
         with mock.patch.object(term, '_is_a_tty', True), \
                 mock.patch.object(
                     term, '_query_with_boundary'
-                ) as mock_query:
+        ) as mock_query:
             response = term.get_dec_mode(DecPrivateMode.DECTCEM)
 
             mock_query.assert_not_called()
@@ -379,7 +379,7 @@ def test_get_dec_mode_force_bypass_cache():
                 mock.patch.object(
                     term, '_query_with_boundary',
                     return_value=mock_match
-                ) as mock_query:
+        ) as mock_query:
             response = term.get_dec_mode(
                 DecPrivateMode.DECTCEM, force=True
             )
@@ -401,7 +401,7 @@ def test_get_dec_mode_sticky_failure():
                 mock.patch.object(
                     term, '_query_with_boundary',
                     return_value=None
-                ):
+        ):
 
             first_response = term.get_dec_mode(
                 DecPrivateMode.DECTCEM, timeout=0.1

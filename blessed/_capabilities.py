@@ -361,7 +361,7 @@ class TermcapResponse:
         """Decode a hex-encoded string from an XTGETTCAP response."""
         try:
             return bytes.fromhex(hex_str).decode('ascii', errors='strict')
-        except (ValueError, UnicodeDecodeError):
+        except ValueError:
             return ''
 
 

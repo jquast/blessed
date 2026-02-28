@@ -37,9 +37,6 @@ from .keyboard import (DEFAULT_ESCDELAY,
                        get_keyboard_codes,
                        get_leading_prefixes,
                        get_keyboard_sequences)
-from ._capabilities import (XTGETTCAP_CAPABILITIES,
-                             TermcapResponse,
-                             ITerm2Capabilities)
 from .dec_modes import DecPrivateMode as _DecPrivateMode
 from .dec_modes import DecModeResponse
 from .sequences import Termcap, Sequence
@@ -56,7 +53,10 @@ from .formatters import (COLORS,
 from ._capabilities import (CAPABILITY_DATABASE,
                             CAPABILITIES_ADDITIVES,
                             CAPABILITIES_RAW_MIXIN,
-                            CAPABILITIES_HORIZONTAL_DISTANCE)
+                            XTGETTCAP_CAPABILITIES,
+                            CAPABILITIES_HORIZONTAL_DISTANCE,
+                            TermcapResponse,
+                            ITerm2Capabilities)
 
 # isort: off
 

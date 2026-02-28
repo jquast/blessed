@@ -53,7 +53,7 @@ def test_does_sixel_returns_false_on_timeout():
         return b'SIXEL_TIMEOUT'
 
     output = pty_test(child, parent_func=None, test_name='test_does_sixel_returns_false_on_timeout')
-    assert output == '\x1b[cSIXEL_TIMEOUT'
+    assert output == '\x1b[c\x1b[6nSIXEL_TIMEOUT'
 
 
 def test_does_sixel_uses_cache():
@@ -71,7 +71,7 @@ def test_does_sixel_uses_cache():
         return b'SIXEL_CACHE'
 
     output = pty_test(child, parent_func=None, test_name='test_does_sixel_uses_cache')
-    assert output == '\x1b[cSIXEL_CACHE'
+    assert output == '\x1b[c\x1b[6nSIXEL_CACHE'
 
 
 def test_does_sixel_not_a_tty():
