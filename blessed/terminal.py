@@ -107,6 +107,8 @@ _RE_ITERM2_CAPABILITIES_RESPONSE = re.compile(
 _RE_KITTY_NOTIFICATIONS_RESPONSE = re.compile(
     r'\x1b\]99;([^\x07\x1b]*?)[\x07\x1b]')
 _RE_CPR_BOUNDARY = re.compile(r'\x1b\[[0-9]+;[0-9]+R')
+_RE_KITTY_CLIPBOARD = re.compile(r'\x1b\[\?5522;(\d+)\$y')
+_RE_KITTY_POINTER = re.compile(r'\x1b\]22;([^\x07\x1b]+)[\x07\x1b]')
 
 
 class Terminal():
@@ -298,6 +300,12 @@ class Terminal():
 
         # Kitty notifications (OSC 99) detection cache
         self._kitty_notifications_supported: Optional[bool] = None
+
+        # Kitty clipboard protocol (DECRQM 5522) detection cache
+        self._kitty_clipboard_supported: Optional[bool] = None
+
+        # Kitty pointer shapes (OSC 22) detection cache
+        self._kitty_pointer_shapes_result: Optional[Tuple[bool, str]] = None
 
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
@@ -1751,6 +1759,97 @@ class Terminal():
         supported = match is not None
         self._kitty_notifications_supported = supported
         return supported
+
+    def does_kitty_clipboard(self, timeout: Optional[float] = 1,
+                             force: bool = False) -> bool:
+        """
+        Check if the terminal supports the Kitty clipboard protocol (mode 5522).
+
+        Sends a DECRQM query for DEC private mode 5522 (Bracketed Paste MIME)
+        with a CPR boundary guard for fast negative detection on terminals that
+        do not recognize the mode.
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        if self._kitty_clipboard_supported is not None and not force:
+            return self._kitty_clipboard_supported
+
+        match = self._query_with_boundary(
+            '\x1b[?5522$p', _RE_KITTY_CLIPBOARD, timeout)
+        supported = False
+        if match:
+            ps = int(match.group(1))
+            if ps not in (0, 4):
+                supported = True
+        self._kitty_clipboard_supported = supported
+        return supported
+
+    def does_kitty_pointer_shapes(self, timeout: Optional[float] = 1,
+                                  force: bool = False
+                                  ) -> Optional[str]:
+        """
+        Query Kitty mouse pointer shape support (OSC 22).
+
+        Returns the current pointer shape name if supported, or ``None``
+        if the terminal does not respond.  Uses a CPR boundary guard for
+        fast negative detection.
+
+        .. seealso:: https://sw.kovidgoyal.net/kitty/pointer-shapes/
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cached result.
+        :rtype: str or None
+        """
+        if self._kitty_pointer_shapes_result is not None and not force:
+            supported, shape = self._kitty_pointer_shapes_result
+            return shape if supported else None
+
+        match = self._query_with_boundary(
+            '\x1b]22;?__current__\x1b\\', _RE_KITTY_POINTER, timeout)
+        if match:
+            shape = match.group(1)
+            self._kitty_pointer_shapes_result = (True, shape)
+            return shape
+        self._kitty_pointer_shapes_result = (False, '')
+        return None
+
+    def does_text_sizing(self, timeout: float = 1) -> Tuple[bool, bool]:
+        """
+        Detect Kitty text sizing protocol support (OSC 66).
+
+        Tests width and scale text sizing by sending OSC 66 probes and
+        measuring cursor position delta.  Supported terminals may write
+        up to 2 destructive spaces at the current cursor position, while
+        unsupported terminals typically produce no output.
+
+        :arg float timeout: Timeout in seconds for each CPR query.
+        :rtype: tuple
+        :returns: ``(width, scale)`` where each is ``True`` if supported.
+        """
+        if not self.is_a_tty:
+            return (False, False)
+
+        _, col0 = self.get_location(timeout)
+        if col0 == -1:
+            return (False, False)
+
+        self.stream.write('\x1b]66;w=2; \x07')
+        self.stream.flush()
+        _, col1 = self.get_location(timeout)
+        if col1 == -1:
+            return (False, False)
+
+        self.stream.write('\x1b]66;s=2; \x07')
+        self.stream.flush()
+        _, col2 = self.get_location(timeout)
+        if col2 == -1:
+            return (False, False)
+
+        width = col1 - col0 == 2
+        scale = col2 - col1 == 2
+        return (width, scale)
 
     @contextlib.contextmanager
     def mouse_enabled(self, *, clicks: bool = True, report_pixels: bool = False,

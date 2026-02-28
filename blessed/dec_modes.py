@@ -133,6 +133,25 @@ class DecModeResponse:
         """
         return self.value < 0
 
+    def to_dict(self) -> dict:
+        """
+        Return response as a dictionary.
+
+        :rtype: dict
+        :returns: Dictionary with keys ``value``, ``value_description``,
+            ``mode_description``, ``mode_name``, ``supported``, ``enabled``,
+            and ``changeable``.
+        """
+        return {
+            'value': self.value,
+            'value_description': str(self),
+            'mode_description': self.description,
+            'mode_name': self.mode.name,
+            'supported': self.supported,
+            'enabled': self.enabled,
+            'changeable': self.changeable,
+        }
+
     def __str__(self) -> str:
         """
         Return the constant name for the response value.
@@ -340,6 +359,7 @@ class DecPrivateMode:
     REPORT_GRID_CELL_SELECTION = 2030
     COLOR_PALETTE_UPDATES = 2031
     IN_BAND_WINDOW_RESIZE = 2048
+    BRACKETED_PASTE_MIME = 5522
 
     # VTE bidirectional text extensions
     MIRROR_BOX_DRAWING = 2500
@@ -540,6 +560,7 @@ class DecPrivateMode:
         REPORT_GRID_CELL_SELECTION: "Report grid cell selection",
         COLOR_PALETTE_UPDATES: "Color palette updates",
         IN_BAND_WINDOW_RESIZE: "In-Band Window Resize Notifications",
+        BRACKETED_PASTE_MIME: "Bracketed Paste MIME",
 
         # VTE bidirectional text extensions
         MIRROR_BOX_DRAWING: "Mirror box drawing characters",
