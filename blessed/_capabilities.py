@@ -389,3 +389,27 @@ class ITerm2Capabilities:
         """Return string representation."""
         return (f'ITerm2Capabilities(supported={self.supported}, '
                 f'features={self.features})')
+
+
+class TextSizingResult:
+    """
+    Result of Kitty text sizing protocol detection (OSC 66).
+
+    :param bool width: True if width sizing is supported.
+    :param bool scale: True if scale sizing is supported.
+    """
+
+    def __init__(self, width: bool = False, scale: bool = False) -> None:
+        self.width = width
+        self.scale = scale
+
+    def __bool__(self) -> bool:
+        return self.width or self.scale
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, TextSizingResult):
+            return self.width == other.width and self.scale == other.scale
+        return NotImplemented
+
+    def __repr__(self) -> str:
+        return f"TextSizingResult(width={self.width}, scale={self.scale})"

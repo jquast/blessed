@@ -6,7 +6,7 @@ import io
 import pytest
 
 # local
-from blessed._capabilities import ITerm2Capabilities
+from blessed._capabilities import ITerm2Capabilities, TextSizingResult
 from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, as_subprocess, pty_test
 
@@ -22,7 +22,7 @@ pytestmark = pytest.mark.skipif(
     ('does_kitty_clipboard', False),
     ('does_kitty_pointer_shapes', None),
     ('get_iterm2_capabilities', None),
-    ('does_text_sizing', (False, False)),
+    ('does_text_sizing', TextSizingResult()),
 ])
 def test_detection_not_a_tty(method_name, expected):
     """Detection methods return falsy default when not a TTY."""
@@ -41,7 +41,7 @@ def test_detection_not_a_tty(method_name, expected):
     ('does_kitty_clipboard', False),
     ('does_kitty_pointer_shapes', None),
     ('get_iterm2_capabilities', None),
-    ('does_text_sizing', (False, False)),
+    ('does_text_sizing', TextSizingResult()),
 ])
 def test_detection_no_styling(method_name, expected):
     """Detection methods return falsy default when does_styling is False."""
@@ -348,4 +348,102 @@ def test_query_with_boundary_timeout():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_query_with_boundary_timeout')
+    assert 'OK' in output
+
+
+def test_query_with_boundary_requires_styling():
+    """_query_with_boundary returns None when requires_styling and not styling."""
+    import re
+
+    def child(term):
+        feature_re = re.compile(r'\x1b_Gi=31;(.+?)\x1b\\')
+        term._does_styling = False
+        match = term._query_with_boundary(
+            '\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\',
+            feature_re, timeout=0.5, requires_styling=True)
+        assert match is None
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_query_with_boundary_requires_styling')
+    assert 'OK' in output
+
+
+def test_does_text_sizing_both_supported():
+    """does_text_sizing returns (True, True) when both width and scale detected."""
+    def child(term):
+        term.ungetch('\x1b[1;11R\x1b[1;13R\x1b[1;15R')
+        result = term.does_text_sizing(timeout=0.1)
+        assert result == TextSizingResult(width=True, scale=True)
+        assert result
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_text_sizing_both_supported')
+    assert 'OK' in output
+
+
+def test_does_text_sizing_width_only():
+    """does_text_sizing returns (True, False) when only width detected."""
+    def child(term):
+        term.ungetch('\x1b[1;11R\x1b[1;13R\x1b[1;14R')
+        result = term.does_text_sizing(timeout=0.1)
+        assert result == TextSizingResult(width=True, scale=False)
+        assert result
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_text_sizing_width_only')
+    assert 'OK' in output
+
+
+def test_does_text_sizing_neither_supported():
+    """does_text_sizing returns falsy result when no sizing detected."""
+    def child(term):
+        term.ungetch('\x1b[1;11R\x1b[1;11R\x1b[1;11R')
+        result = term.does_text_sizing(timeout=0.1)
+        assert result == TextSizingResult()
+        assert not result
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_text_sizing_neither_supported')
+    assert 'OK' in output
+
+
+def test_does_text_sizing_initial_location_timeout():
+    """does_text_sizing returns falsy result when first get_location times out."""
+    def child(term):
+        result = term.does_text_sizing(timeout=0.01)
+        assert result == TextSizingResult()
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_text_sizing_initial_location_timeout')
+    assert 'OK' in output
+
+
+def test_does_text_sizing_width_location_timeout():
+    """does_text_sizing returns falsy result when second get_location times out."""
+    def child(term):
+        term.ungetch('\x1b[1;11R')
+        result = term.does_text_sizing(timeout=0.01)
+        assert result == TextSizingResult()
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_text_sizing_width_location_timeout')
+    assert 'OK' in output
+
+
+def test_does_text_sizing_scale_location_timeout():
+    """does_text_sizing returns falsy result when third get_location times out."""
+    def child(term):
+        term.ungetch('\x1b[1;11R\x1b[1;13R')
+        result = term.does_text_sizing(timeout=0.01)
+        assert result == TextSizingResult()
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_text_sizing_scale_location_timeout')
     assert 'OK' in output

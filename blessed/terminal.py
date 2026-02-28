@@ -56,7 +56,8 @@ from ._capabilities import (CAPABILITY_DATABASE,
                             XTGETTCAP_CAPABILITIES,
                             CAPABILITIES_HORIZONTAL_DISTANCE,
                             TermcapResponse,
-                            ITerm2Capabilities)
+                            ITerm2Capabilities,
+                            TextSizingResult)
 
 # isort: off
 
@@ -1819,7 +1820,7 @@ class Terminal():
         self._kitty_pointer_shapes_result = (False, '')
         return None
 
-    def does_text_sizing(self, timeout: float = 1) -> Tuple[bool, bool]:
+    def does_text_sizing(self, timeout: float = 1) -> TextSizingResult:
         """
         Detect Kitty text sizing protocol support (OSC 66).
 
@@ -1829,31 +1830,33 @@ class Terminal():
         unsupported terminals typically produce no output.
 
         :arg float timeout: Timeout in seconds for each CPR query.
-        :rtype: tuple
-        :returns: ``(width, scale)`` where each is ``True`` if supported.
+        :rtype: TextSizingResult
+        :returns: Result with ``.width`` and ``.scale`` boolean attributes.
         """
         if not self.is_a_tty or not self._does_styling:
-            return (False, False)
+            return TextSizingResult()
 
         _, col0 = self.get_location(timeout)
         if col0 == -1:
-            return (False, False)
+            return TextSizingResult()
 
+        # width test
         self.stream.write('\x1b]66;w=2; \x07')
         self.stream.flush()
         _, col1 = self.get_location(timeout)
         if col1 == -1:
-            return (False, False)
+            return TextSizingResult()
 
+        # scale test
         self.stream.write('\x1b]66;s=2; \x07')
         self.stream.flush()
         _, col2 = self.get_location(timeout)
         if col2 == -1:
-            return (False, False)
+            return TextSizingResult()
 
         width = col1 - col0 == 2
         scale = col2 - col1 == 2
-        return (width, scale)
+        return TextSizingResult(width=width, scale=scale)
 
     @contextlib.contextmanager
     def mouse_enabled(self, *, clicks: bool = True, report_pixels: bool = False,
