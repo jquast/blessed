@@ -397,6 +397,19 @@ def test_query_with_boundary_requires_styling():
     assert 'OK' in output
 
 
+def test_text_sizing_result_eq_non_text_sizing():
+    """TextSizingResult.__eq__ returns NotImplemented for other types."""
+    result = TextSizingResult(width=True, scale=False)
+    assert result != (True, False)
+    assert result != "TextSizingResult(width=True, scale=False)"
+
+
+def test_text_sizing_result_repr():
+    """TextSizingResult.__repr__ includes width and scale."""
+    assert repr(TextSizingResult()) == "TextSizingResult(width=False, scale=False)"
+    assert repr(TextSizingResult(width=True, scale=True)) == "TextSizingResult(width=True, scale=True)"
+
+
 def test_does_text_sizing_both_supported():
     """does_text_sizing returns (True, True) when both width and scale detected."""
     def child(term):
