@@ -297,6 +297,7 @@ def test_get_dec_mode_successful_query():
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
+        term._boundary_guard_available = False
 
         mock_match = mock.Mock()
         mock_match.group.return_value = '1'
@@ -320,6 +321,7 @@ def test_get_dec_mode_timeout():
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
+        term._boundary_guard_available = False
 
         with mock.patch.object(term, '_is_a_tty', True), \
                 mock.patch.object(term, '_query_response', return_value=None):
@@ -357,6 +359,7 @@ def test_get_dec_mode_force_bypass_cache():
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
+        term._boundary_guard_available = False
 
         term._dec_mode_cache[_DPM.DECTCEM] = DecModeResponse.SET
 
@@ -379,6 +382,7 @@ def test_get_dec_mode_sticky_failure():
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
+        term._boundary_guard_available = False
 
         with mock.patch.object(term, '_is_a_tty', True), \
                 mock.patch.object(term, '_query_response', return_value=None):
@@ -401,6 +405,7 @@ def test_get_dec_mode_no_response_after_success():
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
+        term._boundary_guard_available = False
 
         mock_match_success = mock.Mock()
         mock_match_success.group.return_value = '1'

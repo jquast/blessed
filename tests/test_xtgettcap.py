@@ -6,7 +6,7 @@ import io
 import pytest
 
 # local
-from blessed.keyboard import TermcapResponse, XTGETTCAP_CAPABILITIES
+from blessed.keyboard import TermcapResponse, ITerm2Capabilities, XTGETTCAP_CAPABILITIES
 from .accessories import TestTerminal, as_subprocess
 
 
@@ -14,17 +14,25 @@ class TestTermcapResponseParsing:
     """TermcapResponse hex encoding/decoding and construction."""
 
     def test_hex_encode(self):
-        assert TermcapResponse._hex_encode('TN') == '544e'
-        assert TermcapResponse._hex_encode('colors') == '636f6c6f7273'
+        """Hex-encode ASCII strings."""
+        assert TermcapResponse.hex_encode('TN') == '544e'
+        assert TermcapResponse.hex_encode('colors') == '636f6c6f7273'
 
     def test_hex_decode(self):
-        assert TermcapResponse._hex_decode('544e') == 'TN'
-        assert TermcapResponse._hex_decode('636f6c6f7273') == 'colors'
+        """Hex-decode valid hex strings."""
+        assert TermcapResponse.hex_decode('544e') == 'TN'
+        assert TermcapResponse.hex_decode('636f6c6f7273') == 'colors'
 
     def test_hex_decode_invalid(self):
-        assert TermcapResponse._hex_decode('zzzz') == 'zzzz'
+        """Hex-decode returns empty string on invalid hex."""
+        assert TermcapResponse.hex_decode('zzzz') == ''
+
+    def test_hex_decode_non_ascii(self):
+        """Hex-decode returns empty string on non-ASCII bytes."""
+        assert TermcapResponse.hex_decode('c0c1') == ''
 
     def test_supported_with_capabilities(self):
+        """Supported response exposes capabilities via dict-like API."""
         caps = {'TN': 'xterm-256color', 'colors': '256'}
         resp = TermcapResponse(supported=True, capabilities=caps)
         assert resp.supported is True
@@ -37,6 +45,7 @@ class TestTermcapResponseParsing:
         assert resp.get('missing', 'default') == 'default'
 
     def test_unsupported(self):
+        """Unsupported response returns None for all properties."""
         resp = TermcapResponse(supported=False)
         assert resp.supported is False
         assert resp.terminal_name is None
@@ -45,24 +54,29 @@ class TestTermcapResponseParsing:
         assert len(resp) == 0
 
     def test_num_colors_non_integer(self):
+        """Non-integer colors value returns None."""
         resp = TermcapResponse(supported=True, capabilities={'colors': 'abc'})
         assert resp.num_colors is None
 
     def test_rgb_bits(self):
+        """RGB capability value is accessible."""
         resp = TermcapResponse(supported=True, capabilities={'RGB': '8'})
         assert resp.rgb_bits == '8'
 
     def test_repr(self):
+        """String representation includes key attributes."""
         resp = TermcapResponse(supported=True, capabilities={'TN': 'xterm'})
         assert 'supported=True' in repr(resp)
         assert 'TN' in repr(resp)
 
     def test_getitem_keyerror(self):
+        """Missing key raises KeyError."""
         resp = TermcapResponse(supported=True, capabilities={})
         with pytest.raises(KeyError):
-            resp['nonexistent']
+            _ = resp['nonexistent']
 
     def test_defaults_empty_capabilities(self):
+        """Default capabilities is empty dict."""
         resp = TermcapResponse(supported=True)
         assert resp.capabilities == {}
         assert len(resp) == 0
@@ -72,6 +86,7 @@ class TestXtgettcapCapabilitiesList:
     """XTGETTCAP_CAPABILITIES constant."""
 
     def test_is_tuple_of_pairs(self):
+        """Each entry is a (name, description) pair."""
         assert isinstance(XTGETTCAP_CAPABILITIES, tuple)
         for entry in XTGETTCAP_CAPABILITIES:
             assert len(entry) == 2
@@ -79,16 +94,90 @@ class TestXtgettcapCapabilitiesList:
             assert isinstance(entry[1], str)
 
     def test_first_is_tn(self):
+        """First capability is TN (terminal name)."""
         assert XTGETTCAP_CAPABILITIES[0][0] == 'TN'
 
     def test_has_expected_count(self):
+        """Expected number of capabilities."""
         assert len(XTGETTCAP_CAPABILITIES) == 23
+
+
+class TestITerm2Capabilities:
+    """ITerm2Capabilities parsing and construction."""
+
+    @pytest.mark.parametrize('feature_str,expected', [
+        ('T2CwBF', {
+            'truecolor': 2,
+            'clipboard_writable': True,
+            'bracketed_paste': True,
+            'focus_reporting': True,
+        }),
+        ('', {}),
+        ('ZZZ', {}),
+        ('Sc', {'decscusr': 0}),
+        ('Sc3', {'decscusr': 3}),
+        ('MSxNo', {
+            'mouse': True,
+            'sixel': True,
+            'notifications': True,
+        }),
+        ('UAwUw6', {
+            'unicode_basic': True,
+            'ambiguous_wide': True,
+            'unicode_widths': 6,
+        }),
+        ('LrGsGoSyH', {
+            'decslrm': True,
+            'strikethrough': True,
+            'overline': True,
+            'sync': True,
+            'hyperlinks': True,
+        }),
+        ('Ts2', {'titles': 2}),
+    ])
+    def test_parse_feature_string(self, feature_str, expected):
+        """Parse iTerm2 feature string into dict."""
+        result = ITerm2Capabilities.parse_feature_string(feature_str)
+        assert result == expected
+
+    def test_supported_capabilities_response(self):
+        """Supported response with features and default detection."""
+        features = {'truecolor': 2, 'sixel': True}
+        caps = ITerm2Capabilities(supported=True, features=features)
+        assert caps.supported is True
+        assert caps.features == features
+        assert caps.detection == 'Capabilities'
+
+    def test_unsupported(self):
+        """Unsupported response has empty features."""
+        caps = ITerm2Capabilities(supported=False)
+        assert caps.supported is False
+        assert caps.features == {}
+        assert caps.detection == 'Capabilities'
+
+    def test_report_cell_size_detection(self):
+        """ReportCellSize detection method."""
+        caps = ITerm2Capabilities(supported=True, detection='ReportCellSize')
+        assert caps.supported is True
+        assert caps.detection == 'ReportCellSize'
+        assert caps.features == {}
+
+    def test_repr(self):
+        """String representation includes key attributes."""
+        caps = ITerm2Capabilities(
+            supported=True, features={'truecolor': 2},
+            detection='Capabilities')
+        r = repr(caps)
+        assert 'supported=True' in r
+        assert 'Capabilities' in r
+        assert 'truecolor' in r
 
 
 class TestGetXtgettcap:
     """Terminal.get_xtgettcap() method."""
 
     def test_not_a_tty_returns_none(self):
+        """Returns None when not a TTY."""
         @as_subprocess
         def child():
             term = TestTerminal(stream=io.StringIO(), force_styling=True,
@@ -97,6 +186,7 @@ class TestGetXtgettcap:
         child()
 
     def test_does_xtgettcap_not_a_tty(self):
+        """does_xtgettcap returns False when not a TTY."""
         @as_subprocess
         def child():
             term = TestTerminal(stream=io.StringIO(), force_styling=True,
@@ -105,6 +195,7 @@ class TestGetXtgettcap:
         child()
 
     def test_cached_result(self):
+        """Returns cached result without re-querying."""
         @as_subprocess
         def child():
             stream = io.StringIO()
@@ -120,6 +211,7 @@ class TestGetXtgettcap:
         child()
 
     def test_sticky_failure(self):
+        """Returns None after first query failure."""
         @as_subprocess
         def child():
             stream = io.StringIO()
@@ -132,6 +224,7 @@ class TestGetXtgettcap:
         child()
 
     def test_force_bypasses_cache(self):
+        """force=True bypasses both cache and sticky failure."""
         @as_subprocess
         def child():
             stream = io.StringIO()
@@ -143,13 +236,12 @@ class TestGetXtgettcap:
             term._xtgettcap_cache = cached
             term._xtgettcap_first_query_failed = True
 
-            # With force, it should attempt query (and timeout)
             result = term.get_xtgettcap(timeout=0.01, force=True)
-            # Timeout means no response, so returns None
             assert result is None
         child()
 
     def test_parse_xtgettcap_responses(self):
+        """Parse multiple DCS +r responses."""
         from blessed.terminal import Terminal
         raw = (
             '\x1bP1+r544e=787465726d\x1b\\'
@@ -163,6 +255,7 @@ class TestGetXtgettcap:
         assert 'bce' not in capabilities
 
     def test_parse_xtgettcap_boolean_capability(self):
+        """Parse DCS +r boolean capability (no value)."""
         from blessed.terminal import Terminal
         raw = '\x1bP1+r626365\x1b\\'
         capabilities: dict = {}
@@ -170,6 +263,7 @@ class TestGetXtgettcap:
         assert capabilities['bce'] == ''
 
     def test_does_xtgettcap_with_cached(self):
+        """does_xtgettcap returns True with cached supported result."""
         @as_subprocess
         def child():
             stream = io.StringIO()
@@ -182,6 +276,7 @@ class TestGetXtgettcap:
         child()
 
     def test_does_xtgettcap_unsupported(self):
+        """does_xtgettcap returns False after probe failure."""
         @as_subprocess
         def child():
             stream = io.StringIO()

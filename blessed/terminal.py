@@ -107,6 +107,7 @@ _RE_ITERM2_CAPABILITIES_RESPONSE = re.compile(
 _RE_ITERM2_CELLSIZE_RESPONSE = re.compile(r'\x1b\]1337;ReportCellSize=')
 _RE_KITTY_NOTIFICATIONS_RESPONSE = re.compile(
     r'\x1b\]99;([^\x07\x1b]*?)[\x07\x1b]')
+_RE_CPR_BOUNDARY = re.compile(r'\x1b\[[0-9]+;[0-9]+R')
 
 
 class Terminal():
@@ -262,7 +263,6 @@ class Terminal():
 
         # Initialize Kitty keyboard protocol tracking
         self._kitty_kb_first_query_failed = False
-        self._kitty_kb_first_query_attempted = False
 
         # Device Attributes (DA1) cache and sticky failure tracking
         self._device_attributes_cache: Optional[DeviceAttribute] = None
@@ -299,6 +299,11 @@ class Terminal():
 
         # Kitty notifications (OSC 99) detection cache
         self._kitty_notifications_supported: Optional[bool] = None
+
+        # Boundary guard: whether CPR (cursor position report) can be used
+        # as a boundary marker for fast negative detection of unsupported
+        # features. None = not yet detected, True = works, False = does not
+        self._boundary_guard_available: Optional[bool] = None
 
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
@@ -703,6 +708,57 @@ class Terminal():
                 ctx.__exit__(None, None, None)
 
         return match
+
+    def _detect_boundary_guard(self, timeout: Optional[float]) -> bool:
+        """
+        Detect whether CPR can be used as a boundary guard.
+
+        Sends a CPR request and checks for a valid response. The result
+        is cached in :attr:`_boundary_guard_available`.
+
+        :arg float timeout: Timeout in seconds for the CPR probe.
+        :rtype: bool
+        """
+        if self._boundary_guard_available is None:
+            row, col = self.get_location(timeout=timeout)
+            self._boundary_guard_available = (row >= 0 and col >= 0)
+        return self._boundary_guard_available
+
+    def _query_with_boundary(self, query_str: str,
+                             feature_re: "re.Pattern[str]",
+                             timeout: Optional[float]
+                             ) -> Optional[Match[str]]:
+        """
+        Query the terminal with a CPR boundary guard for fast negatives.
+
+        Sends the feature query alongside a CPR request. If CPR responds
+        without the feature response, we know immediately the feature is
+        unsupported, avoiding a full timeout wait.
+
+        Falls back to :meth:`_query_response` when CPR is unavailable.
+
+        :arg str query_str: Query string written to output.
+        :arg re.Pattern feature_re: Compiled regex for the feature response.
+        :arg float timeout: Timeout in seconds for each sub-query.
+        :rtype: re.Match or None
+        """
+        if not self._detect_boundary_guard(timeout):
+            return self._query_response(query_str, feature_re, timeout)
+
+        combined_pattern = (feature_re.pattern + '|'
+                            + _RE_CPR_BOUNDARY.pattern)
+
+        match = self._query_response(
+            query_str + '\x1b[6n', combined_pattern, timeout)
+        if match is None:
+            return None
+
+        # Check if the feature pattern specifically matched
+        feature_match = feature_re.search(match.group(0))
+        if feature_match:
+            return feature_match
+        # Only CPR matched -- fast negative
+        return None
 
     @contextlib.contextmanager
     def location(self, x: Optional[int] = None, y: Optional[int]
@@ -1217,7 +1273,7 @@ class Terminal():
         query = f'\x1b[?{int(mode):d}$p'
         response_pattern = re.compile(f'\x1b\\[\\?{int(mode):d};([0-4])\\$y')
 
-        match = self._query_response(query, response_pattern, timeout)
+        match = self._query_with_boundary(query, response_pattern, timeout)
 
         # invalid or no response (timeout or not a TTY)
         if match is None:
@@ -1501,11 +1557,12 @@ class Terminal():
         if self._xtgettcap_first_query_failed and not force:
             return None
 
-        # Phase 1: Probe with single capability via _query_response,
-        # which safely preserves any concurrent keyboard input.
+        # Phase 1: Probe with single capability via _query_with_boundary,
+        # which safely preserves any concurrent keyboard input and uses
+        # CPR boundary guard for fast negative detection.
         probe_cap = XTGETTCAP_CAPABILITIES[0][0]
-        probe_query = f'\x1bP+q{TermcapResponse._hex_encode(probe_cap)}\x1b\\'
-        match = self._query_response(
+        probe_query = f'\x1bP+q{TermcapResponse.hex_encode(probe_cap)}\x1b\\'
+        match = self._query_with_boundary(
             probe_query, _RE_XTGETTCAP_RESPONSE, timeout)
 
         if match is None:
@@ -1529,7 +1586,7 @@ class Terminal():
 
             for capname, _desc in XTGETTCAP_CAPABILITIES[1:]:
                 self.stream.write(
-                    f'\x1bP+q{TermcapResponse._hex_encode(capname)}\x1b\\')
+                    f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\')
             self.stream.flush()
 
             raw = self.flushinp(timeout=timeout)
@@ -1549,14 +1606,14 @@ class Terminal():
         return result
 
     @staticmethod
-    def _parse_single_xtgettcap(match: Match, capabilities: Dict[str, str]) -> None:
+    def _parse_single_xtgettcap(match: Match[str], capabilities: Dict[str, str]) -> None:
         """Parse a single XTGETTCAP DCS +r regex match into *capabilities*."""
         success = match.group(1) == '1'
         if success:
-            cap_name = TermcapResponse._hex_decode(match.group(2))
+            cap_name = TermcapResponse.hex_decode(match.group(2))
             val_hex = match.group(3)
             capabilities[cap_name] = (
-                TermcapResponse._hex_decode(val_hex) if val_hex is not None else '')
+                TermcapResponse.hex_decode(val_hex) if val_hex is not None else '')
 
     @staticmethod
     def _parse_xtgettcap_responses(raw: str, capabilities: Dict[str, str]) -> None:
@@ -1595,7 +1652,7 @@ class Terminal():
         if self._kitty_graphics_supported is not None and not force:
             return self._kitty_graphics_supported
 
-        match = self._query_response(
+        match = self._query_with_boundary(
             '\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\',
             _RE_KITTY_GRAPHICS_RESPONSE,
             timeout)
@@ -1615,13 +1672,14 @@ class Terminal():
 
         When :attr:`is_a_tty` is False, returns ``None``.
 
-        Responses are cached unless *force* is True.  The total time
-        spent on both the primary query and fallback probe is bounded
-        by *timeout*.
+        Responses are cached unless *force* is True.
 
         .. seealso:: https://iterm2.com/documentation-escape-codes.html
 
-        :arg float timeout: Timeout in seconds (total budget).
+        :arg float timeout: Timeout in seconds for each sub-query.  On the
+            first call, an additional CPR probe may be performed to enable
+            fast negative detection, so total elapsed time may exceed
+            *timeout* for terminals that do not respond.
         :arg bool force: Bypass cached result.
         :rtype: ITerm2Capabilities or None
         """
@@ -1631,10 +1689,8 @@ class Terminal():
         if self._iterm2_capabilities_cache is not None and not force:
             return self._iterm2_capabilities_cache
 
-        stime = time.time()
-
         # Primary: OSC 1337;Capabilities query
-        match = self._query_response(
+        match = self._query_with_boundary(
             '\x1b]1337;Capabilities\x07',
             _RE_ITERM2_CAPABILITIES_RESPONSE,
             timeout)
@@ -1646,18 +1702,16 @@ class Terminal():
             self._iterm2_capabilities_cache = result
             return result
 
-        # Fallback: OSC 1337;ReportCellSize probe with remaining budget
-        remaining = _time_left(stime, timeout)
-        if remaining is None or remaining > 0:
-            match = self._query_response(
-                '\x1b]1337;ReportCellSize\x07',
-                _RE_ITERM2_CELLSIZE_RESPONSE,
-                remaining)
-            if match:
-                result = ITerm2Capabilities(
-                    supported=True, detection='ReportCellSize')
-                self._iterm2_capabilities_cache = result
-                return result
+        # Fallback: OSC 1337;ReportCellSize probe
+        match = self._query_with_boundary(
+            '\x1b]1337;ReportCellSize\x07',
+            _RE_ITERM2_CELLSIZE_RESPONSE,
+            timeout)
+        if match:
+            result = ITerm2Capabilities(
+                supported=True, detection='ReportCellSize')
+            self._iterm2_capabilities_cache = result
+            return result
 
         result = ITerm2Capabilities(supported=False)
         self._iterm2_capabilities_cache = result
@@ -1696,22 +1750,23 @@ class Terminal():
         """
         Check if the terminal supports Kitty desktop notifications (OSC 99).
 
-        Uses boundary detection: sends OSC 99 alongside DA1, and checks
-        whether the terminal responds to the OSC 99 query.  Currently
-        supported only by kitty.
+        Sends an OSC 99 query with a CPR boundary guard for fast negative
+        detection.  Currently supported only by kitty.
 
         .. seealso:: https://sw.kovidgoyal.net/kitty/desktop-notifications/
 
-        :arg float timeout: Timeout in seconds.
+        :arg float timeout: Timeout in seconds for each sub-query.  On the
+            first call, an additional CPR probe may be performed to enable
+            fast negative detection, so total elapsed time may exceed
+            *timeout* for terminals that do not respond.
         :arg bool force: Bypass cached result.
         :rtype: bool
         """
         if self._kitty_notifications_supported is not None and not force:
             return self._kitty_notifications_supported
 
-        # Send OSC 99 query + DA1 as boundary marker
-        match = self._query_response(
-            '\x1b]99;i=blessed:p=?\x1b\\\x1b[c',
+        match = self._query_with_boundary(
+            '\x1b]99;i=blessed:p=?\x1b\\',
             _RE_KITTY_NOTIFICATIONS_RESPONSE,
             timeout)
         supported = match is not None
@@ -2165,85 +2220,18 @@ class Terminal():
         :rtype: KittyKeyboardProtocol or None
         :returns: KittyKeyboardProtocol instance with current flags, or None if unsupported/timeout
         """
-        # This method uses a boundary detection approach on the first query to quickly
-        # determine terminal capabilities by sending both Kitty keyboard and Device
-        # Attributes (DA1) queries simultaneously, as suggested by Kitty,
-        # https://sw.kovidgoyal.net/kitty/keyboard-protocol/#detection-of-support-for-this-protocol
-        # By sending both queries together and checking which responses are
-        # received, we can quickly infer support without multiple round trips.
-        #
-        # > An application can query the terminal for support of this protocol by
-        # > sending the escape code querying for the current progressive
-        # > enhancement status followed by request for the primary device
-        # > attributes. If an answer for the device attributes is received without
-        # > getting back an answer for the progressive enhancement the terminal
-        # > does not support this protocol.
-        #
-        # Note that Kitty **does not answer** to DA1 despite making this very
-        # recommendation! So we must handle all possible 2x2 match combinations:
-        # DA1 + Kitty, !DA1 + Kitty, DA1 + !Kitty, and !DA1 and !Kitty (timeout)
         if self._kitty_kb_first_query_failed and not force:
-            # When the first query is not responded, we can safely assume all
-            # subsequent inquiries will be ignored
             return None
 
-        # Use boundary approach on first query attempt (when not previously
-        # attempted and not forced)
-        if not self._kitty_kb_first_query_attempted and not force:
-            # Mark that we've attempted the first query
-            self._kitty_kb_first_query_attempted = True
+        response_pattern = re.compile(r'\x1b\[\?([0-9]*)u')
+        match = self._query_with_boundary(
+            '\x1b[?u', response_pattern, timeout)
 
-            # Send both Kitty and DA queries together for boundary detection
-            # This allows us to quickly determine which protocols are supported:
-            # - Kitty terminal: responds to Kitty query but not DA1
-            # - xterm-like: responds to both Kitty and DA1
-            # - Konsole-like: responds to DA1 but not Kitty
-            # - Dumb terminals: respond to neither
-            boundary_query = '\x1b[?u\x1b[c'
-
-            # Use a specific pattern matching the expected kitty or DA1 response.
-            # A catch-all like (.+) would match prematurely because _read_until
-            # uses inkey() internally, and resolve_sequence() treats unrecognized
-            # CSI sequences (like \x1b[?0u) as a bare KEY_ESCAPE — causing (.+)
-            # to match on that single character before the full response arrives.
-            boundary_pattern = re.compile(
-                r'(?P<kitty>\x1b\[\?(?P<flags>[0-9]*)u)'
-                r'|(?P<da1>\x1b\[\?[0-9]+(?:;[0-9]+)*c)'
-            )
-
-            match = self._query_response(boundary_query, boundary_pattern, timeout)
-
-            # invalid or no response (timeout or not a TTY)
-            if match is None:
-                # Set sticky failure flag only if we have a TTY but query failed
-                # If not a TTY, _query_response() returned None immediately
-                if self.is_a_tty:
-                    self._kitty_kb_first_query_failed = True
-                return None
-
-            if match.group('kitty'):
-                # Kitty response found - parse and return flags
-                # (doesn't matter if DA1 also responded or not)
-                flags_str = match.group('flags')
-                flags_value = int(flags_str) if flags_str else 0
-                return KittyKeyboardProtocol(flags_value)
-
-            # Only DA1 response found, no Kitty support
-            self._kitty_kb_first_query_failed = True
-            return None
-
-        # Subsequent calls or forced calls use the standard single-query approach
-        query = '\x1b[?u'
-        response_pattern = re.compile('\x1b\\[\\?([0-9]*)u')
-
-        match = self._query_response(query, response_pattern, timeout)
-
-        # invalid or no response (timeout or not a TTY)
         if match is None:
-            self._kitty_kb_first_query_failed = True
+            if self.is_a_tty:
+                self._kitty_kb_first_query_failed = True
             return None
 
-        # parse and return the response value (no caching)
         flags_str = match.group(1)
         flags_value = int(flags_str) if flags_str else 0
         return KittyKeyboardProtocol(flags_value)

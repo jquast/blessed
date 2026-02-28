@@ -9,6 +9,18 @@ Version History
   * introduced: :mod:`blessed.line_editor` - "headless" single-line editor
   * introduced: :meth:`~.Terminal.async_inkey` — asyncio-compatible version of
     :meth:`~.Terminal.inkey` using event loop readers.
+  * introduced: :meth:`~.Terminal.get_xtgettcap` -- query terminal capabilities via
+    XTGETTCAP (DCS +q), bypassing the local terminfo database.
+  * introduced: :meth:`~.Terminal.does_xtgettcap`, :meth:`~.Terminal.does_kitty_graphics`,
+    :meth:`~.Terminal.does_kitty_notifications`, :meth:`~.Terminal.does_iterm2`,
+    :meth:`~.Terminal.does_iterm2_graphics` -- boolean detection for terminal features.
+  * introduced: :meth:`~.Terminal.get_iterm2_capabilities` -- query iTerm2 protocol
+    features with fallback to ReportCellSize probe.
+  * introduced: :class:`~blessed.keyboard.TermcapResponse` and
+    :class:`~blessed.keyboard.ITerm2Capabilities` response classes.
+  * improved: detection methods use CPR boundary guard for fast negative
+    detection of unsupported features, reducing latency on terminals that
+    do not respond to feature queries.
 
 1.30
   * bugfix: Terminal.wrap drops color escape sequences, :ghpull:`352`.

@@ -253,18 +253,17 @@ def test_device_attribute_raw_stored():
     assert da.raw == raw
 
 
-def test_get_kitty_keyboard_state_boundary_neither_response():
-    """Test boundary detection when neither Kitty nor DA1 response matches."""
+def test_get_kitty_keyboard_state_boundary_no_response():
+    """Kitty keyboard query sets sticky failure when no response."""
     @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
+        term._boundary_guard_available = False
 
-        term.ungetch('garbage_response')
         flags = term.get_kitty_keyboard_state(timeout=0.01)
         assert flags is None
-        assert term._kitty_kb_first_query_attempted is True
         assert term._kitty_kb_first_query_failed is True
 
         flags2 = term.get_kitty_keyboard_state(timeout=1.0)
@@ -272,23 +271,19 @@ def test_get_kitty_keyboard_state_boundary_neither_response():
     child()
 
 
-def test_get_kitty_keyboard_state_boundary_da1_only():
-    """Test boundary detection when only DA1 responds."""
+def test_get_kitty_keyboard_state_cpr_fast_negative():
+    """Kitty keyboard query returns None quickly via CPR boundary."""
     @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
+        term._boundary_guard_available = True
 
-        # DA1 response: VT420 (64) with 132-col (1), Printer (2) - no Kitty protocol
-        term.ungetch('\x1b[?64;1;2c')
-        flags = term.get_kitty_keyboard_state(timeout=0.01)
+        term.ungetch('\x1b[10;20R')
+        flags = term.get_kitty_keyboard_state(timeout=0.5)
         assert flags is None
-        assert term._kitty_kb_first_query_attempted is True
         assert term._kitty_kb_first_query_failed is True
-
-        flags2 = term.get_kitty_keyboard_state(timeout=1.0)
-        assert flags2 is None
     child()
 
 

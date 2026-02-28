@@ -2376,6 +2376,7 @@ class TermcapResponse:
 
     def __init__(self, supported: bool,
                  capabilities: Optional[Dict[str, str]] = None) -> None:
+        """Initialize TermcapResponse with support status and capabilities."""
         self.supported = supported
         self.capabilities: Dict[str, str] = capabilities or {}
 
@@ -2422,17 +2423,17 @@ class TermcapResponse:
                 f'capabilities={self.capabilities})')
 
     @staticmethod
-    def _hex_encode(name: str) -> str:
+    def hex_encode(name: str) -> str:
         """Hex-encode a capability name for an XTGETTCAP query."""
         return name.encode('ascii').hex()
 
     @staticmethod
-    def _hex_decode(hex_str: str) -> str:
+    def hex_decode(hex_str: str) -> str:
         """Decode a hex-encoded string from an XTGETTCAP response."""
         try:
-            return bytes.fromhex(hex_str).decode('ascii', errors='replace')
+            return bytes.fromhex(hex_str).decode('ascii', errors='strict')
         except (ValueError, UnicodeDecodeError):
-            return hex_str
+            return ''
 
 
 class ITerm2Capabilities:
@@ -2473,6 +2474,7 @@ class ITerm2Capabilities:
     def __init__(self, supported: bool,
                  features: Optional[Dict[str, typing.Any]] = None,
                  detection: str = 'Capabilities') -> None:
+        """Initialize ITerm2Capabilities with support status and features."""
         self.supported = supported
         self.features: Dict[str, typing.Any] = features or {}
         self.detection = detection
