@@ -6,7 +6,7 @@ import io
 import pytest
 
 # local
-from blessed.keyboard import TermcapResponse, ITerm2Capabilities, XTGETTCAP_CAPABILITIES
+from blessed._capabilities import TermcapResponse, ITerm2Capabilities, XTGETTCAP_CAPABILITIES
 from .accessories import TestTerminal, as_subprocess
 
 
@@ -99,7 +99,7 @@ class TestXtgettcapCapabilitiesList:
 
     def test_has_expected_count(self):
         """Expected number of capabilities."""
-        assert len(XTGETTCAP_CAPABILITIES) == 23
+        assert len(XTGETTCAP_CAPABILITIES) == 97
 
 
 class TestITerm2Capabilities:

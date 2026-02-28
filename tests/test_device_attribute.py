@@ -260,7 +260,6 @@ def test_get_kitty_keyboard_state_boundary_no_response():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
-        term._boundary_guard_available = False
 
         flags = term.get_kitty_keyboard_state(timeout=0.01)
         assert flags is None
@@ -278,7 +277,6 @@ def test_get_kitty_keyboard_state_cpr_fast_negative():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
-        term._boundary_guard_available = True
 
         term.ungetch('\x1b[10;20R')
         flags = term.get_kitty_keyboard_state(timeout=0.5)

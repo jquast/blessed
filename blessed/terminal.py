@@ -26,13 +26,10 @@ from wcwidth import center as wcwidth_center
 # local
 from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
 from .keyboard import (DEFAULT_ESCDELAY,
-                       XTGETTCAP_CAPABILITIES,
                        Keystroke,
                        ResizeEvent,
                        DeviceAttribute,
                        SoftwareVersion,
-                       TermcapResponse,
-                       ITerm2Capabilities,
                        KittyKeyboardProtocol,
                        _time_left,
                        _read_until,
@@ -40,6 +37,9 @@ from .keyboard import (DEFAULT_ESCDELAY,
                        get_keyboard_codes,
                        get_leading_prefixes,
                        get_keyboard_sequences)
+from ._capabilities import (XTGETTCAP_CAPABILITIES,
+                             TermcapResponse,
+                             ITerm2Capabilities)
 from .dec_modes import DecPrivateMode as _DecPrivateMode
 from .dec_modes import DecModeResponse
 from .sequences import Termcap, Sequence
@@ -298,11 +298,6 @@ class Terminal():
 
         # Kitty notifications (OSC 99) detection cache
         self._kitty_notifications_supported: Optional[bool] = None
-
-        # Boundary guard: whether CPR (cursor position report) can be used
-        # as a boundary marker for fast negative detection of unsupported
-        # features. None = not yet detected, True = works, False = does not
-        self._boundary_guard_available: Optional[bool] = None
 
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
@@ -708,21 +703,6 @@ class Terminal():
 
         return match
 
-    def _detect_boundary_guard(self, timeout: Optional[float]) -> bool:
-        """
-        Detect whether CPR can be used as a boundary guard.
-
-        Sends a CPR request and checks for a valid response. The result
-        is cached in :attr:`_boundary_guard_available`.
-
-        :arg float timeout: Timeout in seconds for the CPR probe.
-        :rtype: bool
-        """
-        if self._boundary_guard_available is None:
-            row, col = self.get_location(timeout=timeout)
-            self._boundary_guard_available = (row >= 0 and col >= 0)
-        return self._boundary_guard_available
-
     def _query_with_boundary(self, query_str: str,
                              feature_re: "re.Pattern[str]",
                              timeout: Optional[float]
@@ -730,34 +710,50 @@ class Terminal():
         """
         Query the terminal with a CPR boundary guard for fast negatives.
 
-        Sends the feature query alongside a CPR request. If CPR responds
-        without the feature response, we know immediately the feature is
-        unsupported, avoiding a full timeout wait.
-
-        Falls back to :meth:`_query_response` when CPR is unavailable.
+        Sends the feature query alongside a CPR request. The CPR is always the last response -- if
+        it arrives without the feature response, the feature is unsupported (fast negative). If CPR
+        itself times out, the timeout is the natural fallback.
 
         :arg str query_str: Query string written to output.
         :arg re.Pattern feature_re: Compiled regex for the feature response.
         :arg float timeout: Timeout in seconds for each sub-query.
         :rtype: re.Match or None
         """
-        if not self._detect_boundary_guard(timeout):
-            return self._query_response(query_str, feature_re, timeout)
-
-        combined_pattern = (feature_re.pattern + '|'
-                            + _RE_CPR_BOUNDARY.pattern)
-
-        match = self._query_response(
-            query_str + '\x1b[6n', combined_pattern, timeout)
-        if match is None:
+        if not self.is_a_tty:
             return None
 
-        # Check if the feature pattern specifically matched
-        feature_match = feature_re.search(match.group(0))
-        if feature_match:
-            return feature_match
-        # Only CPR matched -- fast negative
-        return None
+        # Send feature query + CPR request. We always wait for the CPR
+        # as the boundary marker, then check if the feature also responded.
+        # This ensures the CPR is always consumed before returning.
+        ctx = None
+        try:
+            if self._line_buffered:
+                ctx = self.cbreak()
+                ctx.__enter__()
+
+            self.stream.write(query_str + '\x1b[6n')
+            self.stream.flush()
+
+            # Wait for CPR boundary -- this is always the last response
+            match, data = _read_until(self, _RE_CPR_BOUNDARY.pattern, timeout)
+
+            # Strip the CPR from the buffer
+            if match:
+                data = data[:match.start()] + data[match.end():]
+
+            # Check if the feature response arrived before the CPR
+            feature_match = feature_re.search(data)
+            if feature_match:
+                data = data[:feature_match.start()] + data[feature_match.end():]
+
+            # Re-buffer any remaining keyboard input
+            self.ungetch(data)
+
+        finally:
+            if ctx is not None:
+                ctx.__exit__(None, None, None)
+
+        return feature_match
 
     @contextlib.contextmanager
     def location(self, x: Optional[int] = None, y: Optional[int]
@@ -810,7 +806,7 @@ class Terminal():
             self.stream.write(self.restore)
             self.stream.flush()
 
-    def get_location(self, timeout: float = 1, force: bool = False) -> Tuple[int, int]:
+    def get_location(self, timeout: float = 1) -> Tuple[int, int]:
         r"""
         Return tuple (row, column) of cursor position.
 
@@ -819,7 +815,6 @@ class Terminal():
 
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1)`` indicating
             that the remote end did not respond.
-        :arg bool force: Force active terminal inquiry even if a previous call failed.
         :rtype: tuple
         :returns: cursor position as tuple in form of ``(y, x)``.  When a timeout is specified,
             always ensure the return value is checked for ``(-1, -1)``.
@@ -863,10 +858,6 @@ class Terminal():
         # >  u7   cursor position request (equiv. to VT100/ANSI/ECMA-48 DSR 6)
         # >  u6   cursor position report (equiv. to ANSI/ECMA-48 CPR)
 
-        # Sticky failure: if CPR already failed, skip the query unless forced.
-        if self._boundary_guard_available is False and not force:
-            return -1, -1
-
         response_str = getattr(self, self.caps['cursor_report'].attribute) or '\x1b[%i%d;%dR'
         match = self._query_response(
             self.u7 or '\x1b[6n', self.caps['cursor_report'].re_compiled, timeout)
@@ -885,13 +876,11 @@ class Terminal():
             if '%i' in response_str:
                 row -= 1
                 col -= 1
-            self._boundary_guard_available = True
             return row, col
 
         # We chose to return an illegal value rather than an exception,
         # favoring that users author function filters, such as max(0, y),
         # rather than crowbarring such logic into an exception handler.
-        self._boundary_guard_available = False
         return -1, -1
 
     def get_fgcolor(self, timeout: float = 1, bits: int = 16) -> Tuple[int, int, int]:

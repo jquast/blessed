@@ -2,6 +2,7 @@
 # std imports
 import re
 import typing
+from typing import Dict, Optional
 from collections import OrderedDict
 
 __all__ = (
@@ -10,6 +11,9 @@ __all__ = (
     'CAPABILITIES_ADDITIVES',
     'CAPABILITIES_HORIZONTAL_DISTANCE',
     'CAPABILITIES_CAUSE_MOVEMENT',
+    'XTGETTCAP_CAPABILITIES',
+    'TermcapResponse',
+    'ITerm2Capabilities',
 )
 
 CAPABILITY_DATABASE: \
@@ -169,3 +173,263 @@ CAPABILITIES_CAUSE_MOVEMENT: typing.Tuple[str, ...] = tuple(CAPABILITIES_HORIZON
     'row_address',
     'scroll_forward',
 )
+
+XTGETTCAP_CAPABILITIES = (
+    # xterm extensions
+    ("TN", "Terminal name"),
+    ("Co", "Number of colors"),
+    ("RGB", "Bits per color channel"),
+    # Boolean capabilities
+    ("bce", "Background color erase"),
+    ("ccc", "Can redefine colors"),
+    ("npc", "No pad character"),
+    ("xenl", "Newline glitch"),
+    # Numeric capabilities
+    ("colors", "Max colors"),
+    ("pairs", "Max color-pairs"),
+    # String capabilities -- attributes
+    ("bold", "Enter bold mode"),
+    ("dim", "Enter dim mode"),
+    ("blink", "Enter blink mode"),
+    ("rev", "Enter reverse mode"),
+    ("smso", "Enter standout mode"),
+    ("rmso", "Exit standout mode"),
+    ("smul", "Enter underline mode"),
+    ("rmul", "Exit underline mode"),
+    ("sitm", "Enter italics mode"),
+    ("ritm", "Exit italics mode"),
+    ("sshm", "Enter shadow mode"),
+    ("rshm", "Exit shadow mode"),
+    ("ssubm", "Enter subscript mode"),
+    ("rsubm", "Exit subscript mode"),
+    ("ssupm", "Enter superscript mode"),
+    ("rsupm", "Exit superscript mode"),
+    ("sgr", "Define video attributes"),
+    ("sgr0", "Reset attributes"),
+    # String capabilities -- colors
+    ("setaf", "Set foreground color"),
+    ("setab", "Set background color"),
+    ("op", "Original pair"),
+    # String capabilities -- cursor
+    ("sc", "Save cursor"),
+    ("rc", "Restore cursor"),
+    ("civis", "Hide cursor"),
+    ("cnorm", "Normal cursor"),
+    ("cvvis", "Very visible cursor"),
+    ("cup", "Cursor address"),
+    ("home", "Cursor home"),
+    ("hpa", "Horizontal position"),
+    ("vpa", "Vertical position"),
+    ("cub1", "Cursor left"),
+    ("cuf1", "Cursor right"),
+    ("cuu1", "Cursor up"),
+    ("cud1", "Cursor down"),
+    ("cub", "Cursor left n"),
+    ("cuf", "Cursor right n"),
+    ("cuu", "Cursor up n"),
+    ("cud", "Cursor down n"),
+    # String capabilities -- editing
+    ("el", "Clear to end of line"),
+    ("el1", "Clear to start of line"),
+    ("ed", "Clear to end of screen"),
+    ("clear", "Clear screen"),
+    ("ech", "Erase characters"),
+    ("dch1", "Delete character"),
+    ("dl1", "Delete line"),
+    ("il1", "Insert line"),
+    ("dch", "Delete n characters"),
+    ("dl", "Delete n lines"),
+    ("ich", "Insert n characters"),
+    ("il", "Insert n lines"),
+    ("indn", "Scroll forward n"),
+    ("ind", "Scroll forward"),
+    ("rin", "Scroll reverse n"),
+    # String capabilities -- screen
+    ("smcup", "Enter alt screen"),
+    ("rmcup", "Exit alt screen"),
+    ("csr", "Change scroll region"),
+    ("smam", "Enable line wrap"),
+    ("rmam", "Disable line wrap"),
+    ("flash", "Flash screen"),
+    ("bel", "Bell"),
+    ("cr", "Carriage return"),
+    # String capabilities -- keypad and modes
+    ("smkx", "Keypad transmit mode"),
+    ("rmkx", "Keypad local mode"),
+    ("smm", "Meta on"),
+    ("rmm", "Meta off"),
+    ("rmir", "Exit insert mode"),
+    ("rmacs", "Exit alt charset"),
+    ("acsc", "Graphic charset pairs"),
+    ("kmous", "Mouse event prefix"),
+    # String capabilities -- character sets
+    ("s0ds", "Designate G0 charset"),
+    ("s1ds", "Designate G1 charset"),
+    ("s2ds", "Designate G2 charset"),
+    ("s3ds", "Designate G3 charset"),
+    # String capabilities -- tabs
+    ("ht", "Tab"),
+    ("hts", "Set tab stop"),
+    ("tbc", "Clear all tabs"),
+    # String capabilities -- init/reset
+    ("is2", "Init string"),
+    ("rs1", "Reset string"),
+    ("r1", "Reset 1"),
+    ("r2", "Reset 2"),
+    ("r3", "Reset 3"),
+    # String capabilities -- printing
+    ("mc0", "Print screen"),
+    ("mc4", "Printer off"),
+    ("mc5", "Printer on"),
+    # String capabilities -- user-defined (xterm convention)
+    ("u6", "CPR response format"),
+    ("u7", "CPR request"),
+    ("u8", "DA request"),
+    ("u9", "DA response"),
+)
+
+
+class TermcapResponse:
+    """
+    Terminal capabilities queried via XTGETTCAP (DCS +q).
+
+    XTGETTCAP queries the terminal emulator's built-in terminfo
+    capabilities, bypassing the local terminfo database.  Capabilities
+    are accessible by name via dict-like interface.
+
+    .. seealso::
+
+        `XTGETTCAP specification
+        <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html>`_
+    """
+
+    def __init__(self, supported: bool,
+                 capabilities: Optional[Dict[str, str]] = None) -> None:
+        """Initialize TermcapResponse with support status and capabilities."""
+        self.supported = supported
+        self.capabilities: Dict[str, str] = capabilities or {}
+
+    def get(self, name: str, default: Optional[str] = None) -> Optional[str]:
+        """Return capability value by name, or *default*."""
+        return self.capabilities.get(name, default)
+
+    def __contains__(self, name: object) -> bool:
+        """Return True if capability *name* was reported."""
+        return name in self.capabilities
+
+    def __getitem__(self, name: str) -> str:
+        """Return capability value, raising :exc:`KeyError` if absent."""
+        return self.capabilities[name]
+
+    def __len__(self) -> int:
+        """Return number of capabilities."""
+        return len(self.capabilities)
+
+    @property
+    def terminal_name(self) -> Optional[str]:
+        """Terminal name from ``TN`` capability, or ``None``."""
+        return self.capabilities.get('TN')
+
+    @property
+    def num_colors(self) -> Optional[int]:
+        """Number of colors from ``colors`` capability, or ``None``."""
+        val = self.capabilities.get('colors')
+        if val is not None:
+            try:
+                return int(val)
+            except ValueError:
+                pass
+        return None
+
+    @property
+    def rgb_bits(self) -> Optional[str]:
+        """RGB bits per channel from ``RGB`` capability, or ``None``."""
+        return self.capabilities.get('RGB')
+
+    def __repr__(self) -> str:
+        """Return string representation."""
+        return (f'TermcapResponse(supported={self.supported}, '
+                f'capabilities={self.capabilities})')
+
+    @staticmethod
+    def hex_encode(name: str) -> str:
+        """Hex-encode a capability name for an XTGETTCAP query."""
+        return name.encode('ascii').hex()
+
+    @staticmethod
+    def hex_decode(hex_str: str) -> str:
+        """Decode a hex-encoded string from an XTGETTCAP response."""
+        try:
+            return bytes.fromhex(hex_str).decode('ascii', errors='strict')
+        except (ValueError, UnicodeDecodeError):
+            return ''
+
+
+class ITerm2Capabilities:
+    """
+    ITerm2 capability features from OSC 1337;Capabilities response.
+
+    Features are accessible as a dict via :attr:`features`.
+
+    .. seealso::
+
+        `iTerm2 escape codes
+        <https://iterm2.com/documentation-escape-codes.html>`_
+    """
+
+    FEATURE_MAP = {
+        'T': ('truecolor', 'int', 2),
+        'Cw': ('clipboard_writable', 'bool', 0),
+        'Lr': ('decslrm', 'bool', 0),
+        'M': ('mouse', 'bool', 0),
+        'Sc': ('decscusr', 'int', 3),
+        'U': ('unicode_basic', 'bool', 0),
+        'Aw': ('ambiguous_wide', 'bool', 0),
+        'Uw': ('unicode_widths', 'int', 6),
+        'Ts': ('titles', 'int', 2),
+        'B': ('bracketed_paste', 'bool', 0),
+        'F': ('focus_reporting', 'bool', 0),
+        'Gs': ('strikethrough', 'bool', 0),
+        'Go': ('overline', 'bool', 0),
+        'Sy': ('sync', 'bool', 0),
+        'H': ('hyperlinks', 'bool', 0),
+        'No': ('notifications', 'bool', 0),
+        'Sx': ('sixel', 'bool', 0),
+    }
+
+    def __init__(self, supported: bool,
+                 features: Optional[Dict[str, typing.Any]] = None) -> None:
+        """Initialize ITerm2Capabilities with support status and features."""
+        self.supported = supported
+        self.features: Dict[str, typing.Any] = features or {}
+
+    @staticmethod
+    def parse_feature_string(feature_str: str) -> Dict[str, typing.Any]:
+        """Parse an iTerm2 Capabilities feature string into a dict."""
+        features: Dict[str, typing.Any] = {}
+        pos = 0
+        while pos < len(feature_str):
+            matched = False
+            for code_len in (2, 1):
+                code = feature_str[pos:pos + code_len]
+                if code in ITerm2Capabilities.FEATURE_MAP:
+                    name, ftype, bits = ITerm2Capabilities.FEATURE_MAP[code]
+                    pos += code_len
+                    if ftype == 'int' and bits > 0:
+                        digits = ''
+                        while pos < len(feature_str) and feature_str[pos].isdigit():
+                            digits += feature_str[pos]
+                            pos += 1
+                        features[name] = int(digits) if digits else 0
+                    else:
+                        features[name] = True
+                    matched = True
+                    break
+            if not matched:
+                pos += 1
+        return features
+
+    def __repr__(self) -> str:
+        """Return string representation."""
+        return (f'ITerm2Capabilities(supported={self.supported}, '
+                f'features={self.features})')

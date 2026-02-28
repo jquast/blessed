@@ -297,14 +297,18 @@ def test_get_dec_mode_successful_query():
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
-        term._boundary_guard_available = False
 
         mock_match = mock.Mock()
         mock_match.group.return_value = '1'
 
         with mock.patch.object(term, '_is_a_tty', True), \
-                mock.patch.object(term, '_query_response', return_value=mock_match) as mock_query:
-            response = term.get_dec_mode(DecPrivateMode.DECTCEM, timeout=0.5)
+                mock.patch.object(
+                    term, '_query_with_boundary',
+                    return_value=mock_match
+                ) as mock_query:
+            response = term.get_dec_mode(
+                DecPrivateMode.DECTCEM, timeout=0.5
+            )
 
             mock_query.assert_called_once()
             assert response.value == DecModeResponse.SET
@@ -321,11 +325,15 @@ def test_get_dec_mode_timeout():
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
-        term._boundary_guard_available = False
 
         with mock.patch.object(term, '_is_a_tty', True), \
-                mock.patch.object(term, '_query_response', return_value=None):
-            response = term.get_dec_mode(DecPrivateMode.DECTCEM, timeout=0.1)
+                mock.patch.object(
+                    term, '_query_with_boundary',
+                    return_value=None
+                ):
+            response = term.get_dec_mode(
+                DecPrivateMode.DECTCEM, timeout=0.1
+            )
 
             assert response.value == DecModeResponse.NO_RESPONSE
             assert response.failed is True
@@ -344,7 +352,9 @@ def test_get_dec_mode_cached_response():
         term._dec_mode_cache[_DPM.DECTCEM] = DecModeResponse.SET
 
         with mock.patch.object(term, '_is_a_tty', True), \
-                mock.patch.object(term, '_query_response') as mock_query:
+                mock.patch.object(
+                    term, '_query_with_boundary'
+                ) as mock_query:
             response = term.get_dec_mode(DecPrivateMode.DECTCEM)
 
             mock_query.assert_not_called()
@@ -359,7 +369,6 @@ def test_get_dec_mode_force_bypass_cache():
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
-        term._boundary_guard_available = False
 
         term._dec_mode_cache[_DPM.DECTCEM] = DecModeResponse.SET
 
@@ -367,8 +376,13 @@ def test_get_dec_mode_force_bypass_cache():
         mock_match.group.return_value = '2'
 
         with mock.patch.object(term, '_is_a_tty', True), \
-                mock.patch.object(term, '_query_response', return_value=mock_match) as mock_query:
-            response = term.get_dec_mode(DecPrivateMode.DECTCEM, force=True)
+                mock.patch.object(
+                    term, '_query_with_boundary',
+                    return_value=mock_match
+                ) as mock_query:
+            response = term.get_dec_mode(
+                DecPrivateMode.DECTCEM, force=True
+            )
 
             mock_query.assert_called_once()
             assert response.value == DecModeResponse.RESET
@@ -382,16 +396,22 @@ def test_get_dec_mode_sticky_failure():
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
-        term._boundary_guard_available = False
 
         with mock.patch.object(term, '_is_a_tty', True), \
-                mock.patch.object(term, '_query_response', return_value=None):
+                mock.patch.object(
+                    term, '_query_with_boundary',
+                    return_value=None
+                ):
 
-            first_response = term.get_dec_mode(DecPrivateMode.DECTCEM, timeout=0.1)
+            first_response = term.get_dec_mode(
+                DecPrivateMode.DECTCEM, timeout=0.1
+            )
             assert first_response.value == DecModeResponse.NO_RESPONSE
             assert term._dec_first_query_failed is True
 
-            second_response = term.get_dec_mode(DecPrivateMode.BRACKETED_PASTE)
+            second_response = term.get_dec_mode(
+                DecPrivateMode.BRACKETED_PASTE
+            )
             assert second_response.value == DecModeResponse.NOT_QUERIED
             assert second_response.failed is True
 
@@ -405,19 +425,29 @@ def test_get_dec_mode_no_response_after_success():
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
-        term._boundary_guard_available = False
 
         mock_match_success = mock.Mock()
         mock_match_success.group.return_value = '1'
 
         with mock.patch.object(term, '_is_a_tty', True):
-            with mock.patch.object(term, '_query_response', return_value=mock_match_success):
-                first_response = term.get_dec_mode(DecPrivateMode.DECTCEM, timeout=0.1)
+            with mock.patch.object(
+                term, '_query_with_boundary',
+                return_value=mock_match_success
+            ):
+                first_response = term.get_dec_mode(
+                    DecPrivateMode.DECTCEM, timeout=0.1
+                )
                 assert first_response.value == DecModeResponse.SET
                 assert term._dec_any_query_succeeded is True
 
-            with mock.patch.object(term, '_query_response', return_value=None):
-                second_response = term.get_dec_mode(DecPrivateMode.BRACKETED_PASTE, timeout=0.1)
+            with mock.patch.object(
+                term, '_query_with_boundary',
+                return_value=None
+            ):
+                second_response = term.get_dec_mode(
+                    DecPrivateMode.BRACKETED_PASTE,
+                    timeout=0.1
+                )
                 assert second_response.value == DecModeResponse.NO_RESPONSE
                 assert second_response.failed is True
                 assert term._dec_any_query_succeeded is True

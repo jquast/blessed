@@ -562,7 +562,6 @@ def test_get_kitty_state_boundary_no_response():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
-        term._boundary_guard_available = True
         expected_kitty_query = '\x1b[?u'
         expected_cpr_query = '\x1b[6n'
         flags = term.get_kitty_keyboard_state(timeout=0.01)
@@ -580,11 +579,10 @@ def test_get_kitty_keyboard_state_boundary_approach():
     def child():
         stream = io.StringIO()
 
-        # Test 1: Kitty response found (boundary guard disabled)
+        # Test 1: Kitty response found via CPR boundary
         term = Terminal(stream=stream, force_styling=True)
         term._is_a_tty = True
-        term._boundary_guard_available = False
-        term.ungetch('\x1b[?9u')
+        term.ungetch('\x1b[?9u\x1b[10;20R')
         flags = term.get_kitty_keyboard_state(timeout=0.01)
         assert flags is not None
         assert flags.value == 9
@@ -593,7 +591,6 @@ def test_get_kitty_keyboard_state_boundary_approach():
         # Test 2: Timeout with no response sets sticky failure
         term = Terminal(stream=stream, force_styling=True)
         term._is_a_tty = True
-        term._boundary_guard_available = False
         flags = term.get_kitty_keyboard_state(timeout=0.001)
         assert flags is None
         assert term._kitty_kb_first_query_failed is True
@@ -603,7 +600,6 @@ def test_get_kitty_keyboard_state_boundary_approach():
         # Test 3: CPR boundary fast negative (only CPR responds)
         term = Terminal(stream=stream, force_styling=True)
         term._is_a_tty = True
-        term._boundary_guard_available = True
         term.ungetch('\x1b[10;20R')
         flags = term.get_kitty_keyboard_state(timeout=0.5)
         assert flags is None
@@ -612,12 +608,11 @@ def test_get_kitty_keyboard_state_boundary_approach():
         # Test 4: Subsequent call after success
         term = Terminal(stream=stream, force_styling=True)
         term._is_a_tty = True
-        term._boundary_guard_available = False
-        term.ungetch('\x1b[?15u')
+        term.ungetch('\x1b[?15u\x1b[10;20R')
         flags1 = term.get_kitty_keyboard_state(timeout=0.01)
         assert flags1 is not None
         assert flags1.value == 15
-        term.ungetch('\x1b[?7u')
+        term.ungetch('\x1b[?7u\x1b[10;20R')
         flags2 = term.get_kitty_keyboard_state(timeout=0.01)
         assert flags2 is not None
         assert flags2.value == 7
@@ -625,8 +620,7 @@ def test_get_kitty_keyboard_state_boundary_approach():
         # Test 5: force=True bypasses sticky failure
         term = Terminal(stream=stream, force_styling=True)
         term._is_a_tty = True
-        term._boundary_guard_available = False
-        term.ungetch('\x1b[?13u')
+        term.ungetch('\x1b[?13u\x1b[10;20R')
         flags = term.get_kitty_keyboard_state(timeout=0.01, force=True)
         assert flags is not None
         assert flags.value == 13

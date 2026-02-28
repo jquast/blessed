@@ -113,8 +113,7 @@ def display_sugar_methods(term):
             print(f"       Colors: {xtgettcap.num_colors}")
         if xtgettcap.rgb_bits:
             print(f"       RGB bits: {xtgettcap.rgb_bits}")
-        caps = ', '.join(sorted(xtgettcap.capabilities.keys()))
-        print(f"       Capabilities ({len(xtgettcap)}): {caps}")
+        print(f"       Capabilities: {len(xtgettcap)}")
 
     print('  Testing Kitty graphics...' + term.clear_eol, end='\r', flush=True)
     print(f"  {_yn(term, term.does_kitty_graphics())}  "
