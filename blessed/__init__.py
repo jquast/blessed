@@ -15,4 +15,4 @@ else:
 from blessed.line_editor import LineEditor, LineHistory
 
 __all__ = ('Terminal', 'LineEditor', 'LineHistory')
-__version__ = "1.31.0"
+__version__ = "1.32.0"

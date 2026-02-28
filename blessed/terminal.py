@@ -56,6 +56,7 @@ from ._capabilities import (CAPABILITY_DATABASE,
                             XTGETTCAP_CAPABILITIES,
                             CAPABILITIES_HORIZONTAL_DISTANCE,
                             TermcapResponse,
+                            TextSizingResult,
                             ITerm2Capabilities)
 
 # isort: off
@@ -107,6 +108,8 @@ _RE_ITERM2_CAPABILITIES_RESPONSE = re.compile(
 _RE_KITTY_NOTIFICATIONS_RESPONSE = re.compile(
     r'\x1b\]99;([^\x07\x1b]*?)[\x07\x1b]')
 _RE_CPR_BOUNDARY = re.compile(r'\x1b\[[0-9]+;[0-9]+R')
+_RE_KITTY_CLIPBOARD = re.compile(r'\x1b\[\?5522;(\d+)\$y')
+_RE_KITTY_POINTER = re.compile(r'\x1b\]22;([^\x07\x1b]+)[\x07\x1b]')
 
 
 class Terminal():
@@ -298,6 +301,15 @@ class Terminal():
 
         # Kitty notifications (OSC 99) detection cache
         self._kitty_notifications_supported: Optional[bool] = None
+
+        # Kitty clipboard protocol (DECRQM 5522) detection cache
+        self._kitty_clipboard_supported: Optional[bool] = None
+
+        # Kitty pointer shapes (OSC 22) detection cache
+        self._kitty_pointer_shapes_result: Optional[Tuple[bool, str]] = None
+
+        # Text sizing (OSC 66) detection cache
+        self._text_sizing_cache: Optional[TextSizingResult] = None
 
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
@@ -667,7 +679,6 @@ class Terminal():
         :return: re.match object for response_re or None if not found
         :rtype: re.Match
         """
-        # No query is ever done for terminals where is_a_tty is False
         if not self.is_a_tty:
             return None
 
@@ -705,7 +716,8 @@ class Terminal():
 
     def _query_with_boundary(self, query_str: str,
                              feature_re: "re.Pattern[str]",
-                             timeout: Optional[float]
+                             timeout: Optional[float],
+                             requires_styling: bool = True
                              ) -> Optional[Match[str]]:
         """
         Query the terminal with a CPR boundary guard for fast negatives.
@@ -717,9 +729,14 @@ class Terminal():
         :arg str query_str: Query string written to output.
         :arg re.Pattern feature_re: Compiled regex for the feature response.
         :arg float timeout: Timeout in seconds for each sub-query.
+        :arg bool requires_styling: When True (default), return None if
+            :attr:`does_styling` is False.  Set to False for queries
+            unrelated to visual styling, such as keyboard protocol state.
         :rtype: re.Match or None
         """
         if not self.is_a_tty:
+            return None
+        if requires_styling and not self._does_styling:
             return None
 
         # Send feature query + CPR request. We always wait for the CPR
@@ -1752,6 +1769,106 @@ class Terminal():
         self._kitty_notifications_supported = supported
         return supported
 
+    def does_kitty_clipboard(self, timeout: Optional[float] = 1,
+                             force: bool = False) -> bool:
+        """
+        Check if the terminal supports the Kitty clipboard protocol (mode 5522).
+
+        Sends a DECRQM query for DEC private mode 5522 (Bracketed Paste MIME) with a CPR boundary
+        guard for fast negative detection on terminals that do not recognize the mode.
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        if self._kitty_clipboard_supported is not None and not force:
+            return self._kitty_clipboard_supported
+
+        match = self._query_with_boundary(
+            '\x1b[?5522$p', _RE_KITTY_CLIPBOARD, timeout)
+        supported = False
+        if match:
+            ps = int(match.group(1))
+            if ps not in (0, 4):
+                supported = True
+        self._kitty_clipboard_supported = supported
+        return supported
+
+    def does_kitty_pointer_shapes(self, timeout: Optional[float] = 1,
+                                  force: bool = False
+                                  ) -> Optional[str]:
+        """
+        Query Kitty mouse pointer shape support (OSC 22).
+
+        Returns the current pointer shape name if supported, or ``None``
+        if the terminal does not respond.  Uses a CPR boundary guard for
+        fast negative detection.
+
+        .. seealso:: https://sw.kovidgoyal.net/kitty/pointer-shapes/
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cached result.
+        :rtype: str or None
+        """
+        if self._kitty_pointer_shapes_result is not None and not force:
+            supported, shape = self._kitty_pointer_shapes_result
+            return shape if supported else None
+
+        match = self._query_with_boundary(
+            '\x1b]22;?__current__\x1b\\', _RE_KITTY_POINTER, timeout)
+        if match:
+            shape = match.group(1)
+            self._kitty_pointer_shapes_result = (True, shape)
+            return shape
+        self._kitty_pointer_shapes_result = (False, '')
+        return None
+
+    def does_text_sizing(self, timeout: float = 1,
+                         force: bool = False) -> TextSizingResult:
+        """
+        Detect Kitty text sizing protocol support (OSC 66).
+
+        Tests width and scale text sizing by sending OSC 66 probes and
+        measuring cursor position delta.  Supported terminals may write
+        up to 2 destructive spaces at the current cursor position, while
+        unsupported terminals typically produce no output.
+
+        Responses are cached unless *force* is True.
+
+        :arg float timeout: Timeout in seconds for each CPR query.
+        :arg bool force: Bypass cached result.
+        :rtype: TextSizingResult
+        :returns: Result with ``.width`` and ``.scale`` boolean attributes.
+        """
+        if not self.is_a_tty or not self._does_styling:
+            return TextSizingResult()
+        if self._text_sizing_cache is not None and not force:
+            return self._text_sizing_cache
+
+        _, col0 = self.get_location(timeout)
+        if col0 == -1:
+            return TextSizingResult()
+
+        # width test
+        self.stream.write('\x1b]66;w=2; \x07')
+        self.stream.flush()
+        _, col1 = self.get_location(timeout)
+        if col1 == -1:
+            return TextSizingResult()
+
+        # scale test
+        self.stream.write('\x1b]66;s=2; \x07')
+        self.stream.flush()
+        _, col2 = self.get_location(timeout)
+        if col2 == -1:
+            return TextSizingResult()
+
+        width = col1 - col0 == 2
+        scale = col2 - col1 == 2
+        result = TextSizingResult(width=width, scale=scale)
+        self._text_sizing_cache = result
+        return result
+
     @contextlib.contextmanager
     def mouse_enabled(self, *, clicks: bool = True, report_pixels: bool = False,
                       report_drag: bool = False, report_motion: bool = False,
@@ -2204,7 +2321,8 @@ class Terminal():
 
         response_pattern = re.compile(r'\x1b\[\?([0-9]*)u')
         match = self._query_with_boundary(
-            '\x1b[?u', response_pattern, timeout)
+            '\x1b[?u', response_pattern, timeout,
+            requires_styling=False)
 
         if match is None:
             if self.is_a_tty:

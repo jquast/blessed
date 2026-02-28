@@ -643,8 +643,8 @@ def test_get_fgcolor_0s_reply_via_ungetch():
     child()
 
 
-def test_get_fgcolor_styling_indifferent():
-    """Ensure get_fgcolor() behavior is the same regardless of styling"""
+def test_get_fgcolor_requires_styling():
+    """get_fgcolor returns (-1, -1, -1) when does_styling is False."""
     @as_subprocess
     def child():
         term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
@@ -653,9 +653,8 @@ def test_get_fgcolor_styling_indifferent():
         assert rgb == (210, 180, 140)
 
         term = TestTerminal(stream=StringIO(), force_styling=False, is_a_tty=True)
-        term.ungetch('\x1b]10;rgb:40/e0/d0\x07')  # turquoise
         rgb = term.get_fgcolor(timeout=0.01, bits=8)
-        assert rgb == (64, 224, 208)
+        assert rgb == (-1, -1, -1)
     child()
 
 
@@ -696,8 +695,8 @@ def test_get_bgcolor_0s_reply_via_ungetch():
     child()
 
 
-def test_get_bgcolor_styling_indifferent():
-    """Ensure get_bgcolor() behavior is the same regardless of styling"""
+def test_get_bgcolor_requires_styling():
+    """get_bgcolor returns (-1, -1, -1) when does_styling is False."""
     @as_subprocess
     def child():
         term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
@@ -706,9 +705,8 @@ def test_get_bgcolor_styling_indifferent():
         assert rgb == (255, 228, 196)
 
         term = TestTerminal(stream=StringIO(), force_styling=False, is_a_tty=True)
-        term.ungetch('\x1b]11;rgb:de/b8/87\x07')  # burlywood
         rgb = term.get_bgcolor(timeout=0.01, bits=8)
-        assert rgb == (222, 184, 135)
+        assert rgb == (-1, -1, -1)
     child()
 
 

@@ -251,6 +251,41 @@ def test_dec_mode_response_repr():
     assert repr(response_unknown) == expected_unknown
 
 
+def test_dec_mode_response_to_dict():
+    """DecModeResponse.to_dict returns expected keys and values."""
+    response = DecModeResponse(_DPM.DECTCEM, DecModeResponse.SET)
+    result = response.to_dict()
+    assert result == {
+        'value': 1,
+        'value_description': 'SET',
+        'mode_description': response.description,
+        'mode_name': 'DECTCEM',
+        'supported': True,
+        'enabled': True,
+        'changeable': True,
+    }
+
+
+@pytest.mark.parametrize('value,expected_supported,expected_enabled,expected_changeable', [
+    (DecModeResponse.NOT_RECOGNIZED, False, False, False),
+    (DecModeResponse.RESET, True, False, True),
+    (DecModeResponse.PERMANENTLY_SET, True, True, False),
+    (DecModeResponse.PERMANENTLY_RESET, True, False, False),
+    (DecModeResponse.NO_RESPONSE, False, False, False),
+])
+def test_dec_mode_response_to_dict_values(
+    value, expected_supported, expected_enabled, expected_changeable
+):
+    """DecModeResponse.to_dict reflects computed properties for each value."""
+    response = DecModeResponse(_DPM.DECTCEM, value)
+    result = response.to_dict()
+    assert result['supported'] == expected_supported
+    assert result['enabled'] == expected_enabled
+    assert result['changeable'] == expected_changeable
+    assert result['value'] == value
+    assert result['mode_name'] == 'DECTCEM'
+
+
 def test_dec_mode_response_description_fallback():
     """Test DecModeResponse.description returns fallback for edge cases."""
     response = DecModeResponse(_DPM.DECTCEM, DecModeResponse.SET)
