@@ -2,6 +2,7 @@
 import os
 import sys
 import runpy
+import datetime
 import functools
 
 # 3rd party
@@ -91,7 +92,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Blessed'
-copyright = '2011 Erik Rose, Jeff Quast, Avram Lubkin'
+
+copyright = '2011-{datetime.datetime.now().year} Erik Rose, Jeff Quast, Avram Lubkin'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
