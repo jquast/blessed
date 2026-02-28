@@ -811,7 +811,7 @@ class Terminal():
             self.stream.write(self.restore)
             self.stream.flush()
 
-    def get_location(self, timeout: float = 1) -> Tuple[int, int]:
+    def get_location(self, timeout: float = 1, force: bool = False) -> Tuple[int, int]:
         r"""
         Return tuple (row, column) of cursor position.
 
@@ -820,6 +820,7 @@ class Terminal():
 
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1)`` indicating
             that the remote end did not respond.
+        :arg bool force: Force active terminal inquiry even if a previous call failed.
         :rtype: tuple
         :returns: cursor position as tuple in form of ``(y, x)``.  When a timeout is specified,
             always ensure the return value is checked for ``(-1, -1)``.
@@ -863,6 +864,10 @@ class Terminal():
         # >  u7   cursor position request (equiv. to VT100/ANSI/ECMA-48 DSR 6)
         # >  u6   cursor position report (equiv. to ANSI/ECMA-48 CPR)
 
+        # Sticky failure: if CPR already failed, skip the query unless forced.
+        if self._boundary_guard_available is False and not force:
+            return -1, -1
+
         response_str = getattr(self, self.caps['cursor_report'].attribute) or '\x1b[%i%d;%dR'
         match = self._query_response(
             self.u7 or '\x1b[6n', self.caps['cursor_report'].re_compiled, timeout)
@@ -881,11 +886,13 @@ class Terminal():
             if '%i' in response_str:
                 row -= 1
                 col -= 1
+            self._boundary_guard_available = True
             return row, col
 
         # We chose to return an illegal value rather than an exception,
         # favoring that users author function filters, such as max(0, y),
         # rather than crowbarring such logic into an exception handler.
+        self._boundary_guard_available = False
         return -1, -1
 
     def get_fgcolor(self, timeout: float = 1, bits: int = 16) -> Tuple[int, int, int]:
@@ -922,7 +929,7 @@ class Terminal():
         """
         if bits not in (8, 16):
             raise ValueError(f"bits must be 8 or 16, got {bits}")
-        match = self._query_response('\x1b]10;?\x07', RE_GET_FGCOLOR_RESPONSE, timeout)
+        match = self._query_with_boundary('\x1b]10;?\x07', RE_GET_FGCOLOR_RESPONSE, timeout)
         if not match:
             return (-1, -1, -1)
         return tuple(xparse_color(val, bits=bits) for val in match.groups())
@@ -961,7 +968,7 @@ class Terminal():
         """
         if bits not in (8, 16):
             raise ValueError(f"bits must be 8 or 16, got {bits}")
-        match = self._query_response('\x1b]11;?\x07', RE_GET_BGCOLOR_RESPONSE, timeout)
+        match = self._query_with_boundary('\x1b]11;?\x07', RE_GET_BGCOLOR_RESPONSE, timeout)
         if not match:
             return (-1, -1, -1)
         return tuple(xparse_color(val, bits=bits) for val in match.groups())
@@ -1049,7 +1056,7 @@ class Terminal():
             return self._device_attributes_cache
 
         query = '\x1b[c'
-        match = self._query_response(query, DeviceAttribute.RE_RESPONSE, timeout)
+        match = self._query_with_boundary(query, DeviceAttribute.RE_RESPONSE, timeout)
 
         # invalid or no response (timeout)
         if match is None:
@@ -1108,7 +1115,7 @@ class Terminal():
         # Build and send query sequence and expected response pattern
         query = '\x1b[>q'
 
-        match = self._query_response(query, _RE_GET_SOFTWARE_VERSION_RESPONSE, timeout)
+        match = self._query_with_boundary(query, _RE_GET_SOFTWARE_VERSION_RESPONSE, timeout)
 
         # invalid or no response (timeout)
         if match is None:
@@ -2137,7 +2144,7 @@ class Terminal():
         # Query XTWINOPS 14t for window size: ESC[14t
         # Response: ESC[4;<height>;<width>t - return (height, width)
         query = '\x1b[14t'
-        match = self._query_response(query, _RE_XTWINOPS_14_RESPONSE, timeout)
+        match = self._query_with_boundary(query, _RE_XTWINOPS_14_RESPONSE, timeout)
 
         if match is None:
             return -1, -1
@@ -2149,7 +2156,7 @@ class Terminal():
         # Query XTWINOPS 16t for cell size: ESC[16t
         # Response: ESC[6;<height>;<width>t - return (height, width)
         query = '\x1b[16t'
-        match = self._query_response(query, _RE_XTWINOPS_16_RESPONSE, timeout)
+        match = self._query_with_boundary(query, _RE_XTWINOPS_16_RESPONSE, timeout)
 
         if match is None:
             return -1, -1
@@ -2161,7 +2168,7 @@ class Terminal():
         # Query XTSMGRAPHICS for sixel geometry: ESC[?2;1;0S
         # Response: ESC[?2;0;<width>;<height>S - return (height, width)
         query = '\x1b[?2;1;0S'
-        match = self._query_response(query, _RE_XTSMGRAPHICS_RESPONSE, timeout)
+        match = self._query_with_boundary(query, _RE_XTSMGRAPHICS_RESPONSE, timeout)
 
         if match is None:
             return -1, -1
@@ -2180,7 +2187,7 @@ class Terminal():
         # Query XTSMGRAPHICS for color registers: ESC[?1;1;0S
         # Response: ESC[?1;0;<colors>S
         query = '\x1b[?1;1;0S'
-        match = self._query_response(query, _RE_XTSMGRAPHICS_COLORS_RESPONSE, timeout)
+        match = self._query_with_boundary(query, _RE_XTSMGRAPHICS_COLORS_RESPONSE, timeout)
 
         if match is None:
             return -1
