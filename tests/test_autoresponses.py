@@ -144,6 +144,34 @@ def test_get_iterm2_capabilities_force_bypass():
     assert 'OK' in output
 
 
+def test_does_text_sizing_cached():
+    """does_text_sizing returns cached result."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        cached = TextSizingResult(width=True, scale=True)
+        term._text_sizing_cache = cached
+        assert term.does_text_sizing() is cached
+    child()
+
+
+def test_does_text_sizing_force_bypass():
+    """force=True bypasses text sizing cache."""
+    def child(term):
+        cached = TextSizingResult(width=True, scale=True)
+        term._text_sizing_cache = cached
+        result = term.does_text_sizing(timeout=0.01, force=True)
+        assert result is not cached
+        assert not result
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_text_sizing_force_bypass')
+    assert 'OK' in output
+
+
 def test_does_kitty_pointer_shapes_force_bypass():
     """force=True bypasses kitty pointer shapes cache."""
     def child(term):

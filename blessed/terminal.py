@@ -308,6 +308,9 @@ class Terminal():
         # Kitty pointer shapes (OSC 22) detection cache
         self._kitty_pointer_shapes_result: Optional[Tuple[bool, str]] = None
 
+        # Text sizing (OSC 66) detection cache
+        self._text_sizing_cache: Optional[TextSizingResult] = None
+
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
         if os.getenv('NO_COLOR'):
@@ -1820,7 +1823,8 @@ class Terminal():
         self._kitty_pointer_shapes_result = (False, '')
         return None
 
-    def does_text_sizing(self, timeout: float = 1) -> TextSizingResult:
+    def does_text_sizing(self, timeout: float = 1,
+                         force: bool = False) -> TextSizingResult:
         """
         Detect Kitty text sizing protocol support (OSC 66).
 
@@ -1829,12 +1833,17 @@ class Terminal():
         up to 2 destructive spaces at the current cursor position, while
         unsupported terminals typically produce no output.
 
+        Responses are cached unless *force* is True.
+
         :arg float timeout: Timeout in seconds for each CPR query.
+        :arg bool force: Bypass cached result.
         :rtype: TextSizingResult
         :returns: Result with ``.width`` and ``.scale`` boolean attributes.
         """
         if not self.is_a_tty or not self._does_styling:
             return TextSizingResult()
+        if self._text_sizing_cache is not None and not force:
+            return self._text_sizing_cache
 
         _, col0 = self.get_location(timeout)
         if col0 == -1:
@@ -1856,7 +1865,9 @@ class Terminal():
 
         width = col1 - col0 == 2
         scale = col2 - col1 == 2
-        return TextSizingResult(width=width, scale=scale)
+        result = TextSizingResult(width=width, scale=scale)
+        self._text_sizing_cache = result
+        return result
 
     @contextlib.contextmanager
     def mouse_enabled(self, *, clicks: bool = True, report_pixels: bool = False,
