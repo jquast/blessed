@@ -98,7 +98,7 @@ def test_get_device_attributes_via_ungetch():
         return b'OK'
 
     output = pty_test(child, parent_func=None, test_name='test_get_device_attributes_via_ungetch')
-    assert output == '\x1b[cOK'
+    assert output == '\x1b[c\x1b[6nOK'
 
 
 def test_get_device_attributes_timeout():
@@ -112,7 +112,7 @@ def test_get_device_attributes_timeout():
         return b'TIMEOUT'
 
     output = pty_test(child, parent_func=None, test_name='test_get_device_attributes_timeout')
-    assert output == '\x1b[cTIMEOUT'
+    assert output == '\x1b[c\x1b[6nTIMEOUT'
 
 
 def test_get_device_attributes_force_bypass_cache():
@@ -136,7 +136,7 @@ def test_get_device_attributes_force_bypass_cache():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_get_device_attributes_force_bypass_cache')
-    assert output == '\x1b[c\x1b[cFORCED'
+    assert output == '\x1b[c\x1b[6n\x1b[c\x1b[6nFORCED'
 
 
 def test_get_device_attributes_no_force_uses_cache():
@@ -161,7 +161,7 @@ def test_get_device_attributes_no_force_uses_cache():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_get_device_attributes_no_force_uses_cache')
-    assert output == '\x1b[cNO_FORCE'
+    assert output == '\x1b[c\x1b[6nNO_FORCE'
 
 
 def test_get_device_attributes_retry_after_failure():
@@ -183,7 +183,7 @@ def test_get_device_attributes_retry_after_failure():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_get_device_attributes_retry_after_failure')
-    assert output == '\x1b[c\x1b[cRETRY'
+    assert output == '\x1b[c\x1b[6n\x1b[c\x1b[6nRETRY'
 
 
 def test_get_device_attributes_sticky_failure():
@@ -203,7 +203,7 @@ def test_get_device_attributes_sticky_failure():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_get_device_attributes_sticky_failure')
-    assert output == '\x1b[cSTICKY'
+    assert output == '\x1b[c\x1b[6nSTICKY'
 
 
 def test_get_device_attributes_multiple_extensions():
@@ -223,7 +223,7 @@ def test_get_device_attributes_multiple_extensions():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_get_device_attributes_multiple_extensions')
-    assert output == '\x1b[cMULTI'
+    assert output == '\x1b[c\x1b[6nMULTI'
 
 
 def test_device_attribute_init_with_none_extensions():
