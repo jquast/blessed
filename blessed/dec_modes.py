@@ -1,7 +1,7 @@
 """Class definitions for DEC Private Modes and their Response values."""
 
 # std imports
-from typing import Any, Union
+from typing import Any, Dict, Union
 
 
 class DecModeResponse:
@@ -133,7 +133,7 @@ class DecModeResponse:
         """
         return self.value < 0
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         """
         Return response as a dictionary.
 

@@ -675,7 +675,6 @@ class Terminal():
         :return: re.match object for response_re or None if not found
         :rtype: re.Match
         """
-        # No query is ever done for terminals where is_a_tty is False
         if not self.is_a_tty:
             return None
 
@@ -713,7 +712,8 @@ class Terminal():
 
     def _query_with_boundary(self, query_str: str,
                              feature_re: "re.Pattern[str]",
-                             timeout: Optional[float]
+                             timeout: Optional[float],
+                             requires_styling: bool = True
                              ) -> Optional[Match[str]]:
         """
         Query the terminal with a CPR boundary guard for fast negatives.
@@ -725,9 +725,14 @@ class Terminal():
         :arg str query_str: Query string written to output.
         :arg re.Pattern feature_re: Compiled regex for the feature response.
         :arg float timeout: Timeout in seconds for each sub-query.
+        :arg bool requires_styling: When True (default), return None if
+            :attr:`does_styling` is False.  Set to False for queries
+            unrelated to visual styling, such as keyboard protocol state.
         :rtype: re.Match or None
         """
         if not self.is_a_tty:
+            return None
+        if requires_styling and not self._does_styling:
             return None
 
         # Send feature query + CPR request. We always wait for the CPR
@@ -1765,9 +1770,8 @@ class Terminal():
         """
         Check if the terminal supports the Kitty clipboard protocol (mode 5522).
 
-        Sends a DECRQM query for DEC private mode 5522 (Bracketed Paste MIME)
-        with a CPR boundary guard for fast negative detection on terminals that
-        do not recognize the mode.
+        Sends a DECRQM query for DEC private mode 5522 (Bracketed Paste MIME) with a CPR boundary
+        guard for fast negative detection on terminals that do not recognize the mode.
 
         :arg float timeout: Timeout in seconds.
         :arg bool force: Bypass cached result.
@@ -1828,7 +1832,7 @@ class Terminal():
         :rtype: tuple
         :returns: ``(width, scale)`` where each is ``True`` if supported.
         """
-        if not self.is_a_tty:
+        if not self.is_a_tty or not self._does_styling:
             return (False, False)
 
         _, col0 = self.get_location(timeout)
@@ -2303,7 +2307,8 @@ class Terminal():
 
         response_pattern = re.compile(r'\x1b\[\?([0-9]*)u')
         match = self._query_with_boundary(
-            '\x1b[?u', response_pattern, timeout)
+            '\x1b[?u', response_pattern, timeout,
+            requires_styling=False)
 
         if match is None:
             if self.is_a_tty:

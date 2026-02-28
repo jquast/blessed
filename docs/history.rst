@@ -3,6 +3,14 @@
 Version History
 ===============
 
+1.32
+  * bugfix: :meth:`~.Terminal.get_kitty_keyboard_state` should not check for
+    :attr:`~.Terminal.does_styling` as a requirement.
+  * introduced: :meth:`~.Terminal.does_kitty_clipboard`,
+    :meth:`~.Terminal.does_kitty_pointer_shapes`, and :meth:`~.Terminal.does_text_sizing`
+  * introduced: :meth:`~.DecModeResponse.to_dict` and ``DecPrivateMode.BRACKETED_PASTE_MIME``
+    constant (mode 5522).
+
 1.31
   * bugfix: :meth:`~.cbreak` and :meth:`~.raw` should use ``TCSADRAIN`` to preserve keystrokes
     buffered during mode switches, previously ``TCSAFLUSH`` was used which discarded unread input,
