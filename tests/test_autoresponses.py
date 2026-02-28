@@ -407,7 +407,8 @@ def test_text_sizing_result_eq_non_text_sizing():
 def test_text_sizing_result_repr():
     """TextSizingResult.__repr__ includes width and scale."""
     assert repr(TextSizingResult()) == "TextSizingResult(width=False, scale=False)"
-    assert repr(TextSizingResult(width=True, scale=True)) == "TextSizingResult(width=True, scale=True)"
+    assert repr(TextSizingResult(width=True, scale=True)
+                ) == "TextSizingResult(width=True, scale=True)"
 
 
 def test_does_text_sizing_both_supported():
