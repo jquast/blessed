@@ -255,14 +255,13 @@ def test_get_kitty_keyboard_state_pty_success():
     def parent(master_fd):
         # Wait for child readiness
         read_until_semaphore(master_fd)
-        # Send both Kitty protocol flags response and DA1 response for boundary detection
-        # flags=27: all basic flags set, and a DA1 response indicating VT terminal
-        os.write(master_fd, b'\x1b[?27u\x1b[?64c')
+        # Send Kitty protocol flags response and CPR response for boundary detection
+        # flags=27: all basic flags set, CPR response as boundary marker
+        os.write(master_fd, b'\x1b[?27u\x1b[1;1R')
 
     output = pty_test(child, parent, 'test_get_kitty_keyboard_state_pty_success')
-    # first call to get_kitty_keyboard_state causes both kitty and dec
-    # parameters query to output, we faked a "response" by writing to our master pty side
-    assert output == '\x1b[?u\x1b[c' + '27'  # Should have parsed flags value 27
+    # _query_with_boundary writes query + CPR request, parent fakes both responses
+    assert output == '\x1b[?u\x1b[6n' + '27'
 
 
 @pytest.mark.skipif(not TEST_KEYBOARD, reason="TEST_KEYBOARD not specified")
@@ -556,81 +555,74 @@ def test_kitty_keyboard_protocol_setters(flags, expected_value):
 
 
 def test_get_kitty_state_boundary_no_response():
-    """Test boundary approach when neither Kitty nor DA1 response found."""
+    """Test CPR boundary approach when no response found."""
     @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
-        term.ungetch('garbage response')
-        expected_kitty_query = '\x1b[?u'  # query current flags
-        expected_da1_query = '\x1b[c'  # device attributes query
+        expected_kitty_query = '\x1b[?u'
+        expected_cpr_query = '\x1b[6n'
         flags = term.get_kitty_keyboard_state(timeout=0.01)
         assert flags is None
         assert term._kitty_kb_first_query_failed is True
         output = stream.getvalue()
         assert expected_kitty_query in output
-        assert expected_da1_query in output
+        assert expected_cpr_query in output
     child()
 
 
 def test_get_kitty_keyboard_state_boundary_approach():
-    """Test boundary approach for detecting Kitty keyboard support."""
+    """Test CPR boundary approach for detecting Kitty keyboard support."""
     @as_subprocess
     def child():
         stream = io.StringIO()
 
-        # Test 1: Successful first call with Kitty and DA responses
+        # Test 1: Kitty response found via CPR boundary
         term = Terminal(stream=stream, force_styling=True)
         term._is_a_tty = True
-        term.ungetch('\x1b[?9u\x1b[?64;1;2;4c')
+        term.ungetch('\x1b[?9u\x1b[10;20R')
         flags = term.get_kitty_keyboard_state(timeout=0.01)
         assert flags is not None
         assert flags.value == 9
-        assert term._kitty_kb_first_query_attempted is True
         assert term._kitty_kb_first_query_failed is False
 
-        # Test 2: First call with only DA response (no Kitty support)
-        term = Terminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        term.ungetch('\x1b[?64;1;2c')
-        flags = term.get_kitty_keyboard_state(timeout=0.01)
-        assert flags is None
-        assert term._kitty_kb_first_query_attempted is True
-        assert term._kitty_kb_first_query_failed is True
-        flags2 = term.get_kitty_keyboard_state(timeout=1.0)
-        assert flags2 is None
-
-        # Test 3: First call timeout (no response)
+        # Test 2: Timeout with no response sets sticky failure
         term = Terminal(stream=stream, force_styling=True)
         term._is_a_tty = True
         flags = term.get_kitty_keyboard_state(timeout=0.001)
         assert flags is None
-        assert term._kitty_kb_first_query_attempted is True
         assert term._kitty_kb_first_query_failed is True
         flags2 = term.get_kitty_keyboard_state(timeout=1.0)
         assert flags2 is None
 
-        # Test 4: Subsequent call uses normal query
+        # Test 3: CPR boundary fast negative (only CPR responds)
         term = Terminal(stream=stream, force_styling=True)
         term._is_a_tty = True
-        term.ungetch('\x1b[?15u\x1b[?64c')
+        term.ungetch('\x1b[10;20R')
+        flags = term.get_kitty_keyboard_state(timeout=0.5)
+        assert flags is None
+        assert term._kitty_kb_first_query_failed is True
+
+        # Test 4: Subsequent call after success
+        term = Terminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term.ungetch('\x1b[?15u\x1b[10;20R')
         flags1 = term.get_kitty_keyboard_state(timeout=0.01)
         assert flags1 is not None
         assert flags1.value == 15
-        term.ungetch('\x1b[?7u')
+        term.ungetch('\x1b[?7u\x1b[10;20R')
         flags2 = term.get_kitty_keyboard_state(timeout=0.01)
         assert flags2 is not None
         assert flags2.value == 7
 
-        # Test 5: force=True bypasses boundary approach
+        # Test 5: force=True bypasses sticky failure
         term = Terminal(stream=stream, force_styling=True)
         term._is_a_tty = True
-        term.ungetch('\x1b[?13u')
+        term.ungetch('\x1b[?13u\x1b[10;20R')
         flags = term.get_kitty_keyboard_state(timeout=0.01, force=True)
         assert flags is not None
         assert flags.value == 13
-        assert term._kitty_kb_first_query_attempted is False
         assert term._kitty_kb_first_query_failed is False
     child()
 

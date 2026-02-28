@@ -116,6 +116,14 @@ def main():
     ambig_txt = 'wide (2)' if term.detect_ambiguous_width() == 2 else 'narrow (1)'
     print(f'- Ambiguous width is {ambig_txt}')
 
+    _yn = {True: term.bold_green('YES'), False: term.bold_red('NO')}
+    print(f'- Grapheme clustering (mode 2027): {_yn[term.does_grapheme_clustering()]}')
+
+    xtcap = term.get_xtgettcap()
+    if xtcap and xtcap.supported:
+        tn = xtcap.terminal_name or 'unknown'
+        print(f'- XTGETTCAP terminal name: {term.bold_cyan(tn)}')
+
 
 if __name__ == '__main__':
     main()

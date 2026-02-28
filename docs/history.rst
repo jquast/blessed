@@ -2,13 +2,29 @@
 
 Version History
 ===============
+
 1.31
   * bugfix: :meth:`~.cbreak` and :meth:`~.raw` should use ``TCSADRAIN`` to preserve keystrokes
     buffered during mode switches, previously ``TCSAFLUSH`` was used which discarded unread input,
     dropping keystrokes.
-  * introduced: :mod:`blessed.line_editor` - "headless" single-line editor
-  * introduced: :meth:`~.Terminal.async_inkey` — asyncio-compatible version of
-    :meth:`~.Terminal.inkey` using event loop readers.
+  * improved: :meth:`~.Terminal.get_location` now caches failure and returns ``(-1, -1)``
+    immediately on subsequent calls when the terminal does not support cursor position reports. Pass
+    ``force=True`` to retry.
+  * improved: all terminal query methods now use a CPR boundary guard for fast negative detection of
+    unsupported features: :meth:`~.Terminal.get_fgcolor`, :meth:`~.Terminal.get_bgcolor`,
+    :meth:`~.Terminal.get_device_attributes`, and :meth:`~.Terminal.get_software_version`.
+  * introduced: :mod:`blessed.line_editor`, a "headless" single-line editor.
+  * introduced: :meth:`~.Terminal.async_inkey` -- asyncio-compatible version of
+    :meth:`~.Terminal.inkey`.
+  * introduced: :meth:`~.Terminal.get_xtgettcap` -- query terminal capabilities via XTGETTCAP and
+    :meth:`~.Terminal.get_iterm2_capabilities` for iTerm2 protocol features.
+  * introduced: terminal feature detection methods :meth:`~.Terminal.does_bracketed_paste`,
+    :meth:`~.Terminal.does_focus_events`, :meth:`~.Terminal.does_grapheme_clustering`
+    :meth:`~.Terminal.does_iterm2`, :meth:`~.Terminal.does_iterm2_graphics`,
+    :meth:`~.Terminal.does_kitty_graphics`, :meth:`~.Terminal.does_kitty_notifications`,
+    :meth:`~.Terminal.does_synchronized_output`, and :meth:`~.Terminal.does_xtgettcap`.
+  * introduced: :class:`~blessed.keyboard.TermcapResponse` and
+    :class:`~blessed.keyboard.ITerm2Capabilities` response classes.
 
 1.30
   * bugfix: Terminal.wrap drops color escape sequences, :ghpull:`352`.

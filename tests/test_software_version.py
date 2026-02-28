@@ -102,7 +102,7 @@ def test_get_software_version_via_ungetch(response, expected_name, expected_vers
 
     output = pty_test(child, parent_func=None,
                       test_name=f'test_get_software_version_{test_suffix.lower()}')
-    assert output == f'\x1b[>q{test_suffix}'
+    assert output == f'\x1b[>q\x1b[6n{test_suffix}'
 
 
 def test_get_software_version_timeout():
@@ -116,7 +116,7 @@ def test_get_software_version_timeout():
         return b'TIMEOUT'
 
     output = pty_test(child, parent_func=None, test_name='test_get_software_version_timeout')
-    assert output == '\x1b[>qTIMEOUT'
+    assert output == '\x1b[>q\x1b[6nTIMEOUT'
 
 
 def test_get_software_version_force_bypass_cache():
@@ -140,7 +140,7 @@ def test_get_software_version_force_bypass_cache():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_get_software_version_force_bypass_cache')
-    assert output == '\x1b[>q\x1b[>qFORCED'
+    assert output == '\x1b[>q\x1b[6n\x1b[>q\x1b[6nFORCED'
 
 
 def test_get_software_version_no_force_uses_cache():
@@ -165,7 +165,7 @@ def test_get_software_version_no_force_uses_cache():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_get_software_version_no_force_uses_cache')
-    assert output == '\x1b[>qNO_FORCE'
+    assert output == '\x1b[>q\x1b[6nNO_FORCE'
 
 
 def test_get_software_version_retry_after_timeout():
@@ -187,7 +187,7 @@ def test_get_software_version_retry_after_timeout():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_get_software_version_retry_after_timeout')
-    assert output == '\x1b[>q\x1b[>qRETRY'
+    assert output == '\x1b[>q\x1b[6n\x1b[>q\x1b[6nRETRY'
 
 
 def test_get_software_version_raw_stored():

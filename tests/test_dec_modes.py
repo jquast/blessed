@@ -302,8 +302,13 @@ def test_get_dec_mode_successful_query():
         mock_match.group.return_value = '1'
 
         with mock.patch.object(term, '_is_a_tty', True), \
-                mock.patch.object(term, '_query_response', return_value=mock_match) as mock_query:
-            response = term.get_dec_mode(DecPrivateMode.DECTCEM, timeout=0.5)
+                mock.patch.object(
+                    term, '_query_with_boundary',
+                    return_value=mock_match
+        ) as mock_query:
+            response = term.get_dec_mode(
+                DecPrivateMode.DECTCEM, timeout=0.5
+            )
 
             mock_query.assert_called_once()
             assert response.value == DecModeResponse.SET
@@ -322,8 +327,13 @@ def test_get_dec_mode_timeout():
         term = TestTerminal(stream=stream, force_styling=True)
 
         with mock.patch.object(term, '_is_a_tty', True), \
-                mock.patch.object(term, '_query_response', return_value=None):
-            response = term.get_dec_mode(DecPrivateMode.DECTCEM, timeout=0.1)
+                mock.patch.object(
+                    term, '_query_with_boundary',
+                    return_value=None
+        ):
+            response = term.get_dec_mode(
+                DecPrivateMode.DECTCEM, timeout=0.1
+            )
 
             assert response.value == DecModeResponse.NO_RESPONSE
             assert response.failed is True
@@ -342,7 +352,9 @@ def test_get_dec_mode_cached_response():
         term._dec_mode_cache[_DPM.DECTCEM] = DecModeResponse.SET
 
         with mock.patch.object(term, '_is_a_tty', True), \
-                mock.patch.object(term, '_query_response') as mock_query:
+                mock.patch.object(
+                    term, '_query_with_boundary'
+        ) as mock_query:
             response = term.get_dec_mode(DecPrivateMode.DECTCEM)
 
             mock_query.assert_not_called()
@@ -364,8 +376,13 @@ def test_get_dec_mode_force_bypass_cache():
         mock_match.group.return_value = '2'
 
         with mock.patch.object(term, '_is_a_tty', True), \
-                mock.patch.object(term, '_query_response', return_value=mock_match) as mock_query:
-            response = term.get_dec_mode(DecPrivateMode.DECTCEM, force=True)
+                mock.patch.object(
+                    term, '_query_with_boundary',
+                    return_value=mock_match
+        ) as mock_query:
+            response = term.get_dec_mode(
+                DecPrivateMode.DECTCEM, force=True
+            )
 
             mock_query.assert_called_once()
             assert response.value == DecModeResponse.RESET
@@ -381,13 +398,20 @@ def test_get_dec_mode_sticky_failure():
         term = TestTerminal(stream=stream, force_styling=True)
 
         with mock.patch.object(term, '_is_a_tty', True), \
-                mock.patch.object(term, '_query_response', return_value=None):
+                mock.patch.object(
+                    term, '_query_with_boundary',
+                    return_value=None
+        ):
 
-            first_response = term.get_dec_mode(DecPrivateMode.DECTCEM, timeout=0.1)
+            first_response = term.get_dec_mode(
+                DecPrivateMode.DECTCEM, timeout=0.1
+            )
             assert first_response.value == DecModeResponse.NO_RESPONSE
             assert term._dec_first_query_failed is True
 
-            second_response = term.get_dec_mode(DecPrivateMode.BRACKETED_PASTE)
+            second_response = term.get_dec_mode(
+                DecPrivateMode.BRACKETED_PASTE
+            )
             assert second_response.value == DecModeResponse.NOT_QUERIED
             assert second_response.failed is True
 
@@ -406,13 +430,24 @@ def test_get_dec_mode_no_response_after_success():
         mock_match_success.group.return_value = '1'
 
         with mock.patch.object(term, '_is_a_tty', True):
-            with mock.patch.object(term, '_query_response', return_value=mock_match_success):
-                first_response = term.get_dec_mode(DecPrivateMode.DECTCEM, timeout=0.1)
+            with mock.patch.object(
+                term, '_query_with_boundary',
+                return_value=mock_match_success
+            ):
+                first_response = term.get_dec_mode(
+                    DecPrivateMode.DECTCEM, timeout=0.1
+                )
                 assert first_response.value == DecModeResponse.SET
                 assert term._dec_any_query_succeeded is True
 
-            with mock.patch.object(term, '_query_response', return_value=None):
-                second_response = term.get_dec_mode(DecPrivateMode.BRACKETED_PASTE, timeout=0.1)
+            with mock.patch.object(
+                term, '_query_with_boundary',
+                return_value=None
+            ):
+                second_response = term.get_dec_mode(
+                    DecPrivateMode.BRACKETED_PASTE,
+                    timeout=0.1
+                )
                 assert second_response.value == DecModeResponse.NO_RESPONSE
                 assert second_response.failed is True
                 assert term._dec_any_query_succeeded is True
@@ -1177,3 +1212,47 @@ def test_does_inband_resize_no_styling():
     result = term.does_inband_resize()
     assert result is False
     assert stream.getvalue() == ""
+
+
+@pytest.mark.parametrize("method_name", [
+    "does_bracketed_paste",
+    "does_synchronized_output",
+    "does_grapheme_clustering",
+    "does_focus_events",
+])
+@pytest.mark.parametrize("response_value,expected", [
+    (DecModeResponse.SET, True),
+    (DecModeResponse.RESET, True),
+    (DecModeResponse.NOT_RECOGNIZED, False),
+    (DecModeResponse.NO_RESPONSE, False),
+])
+def test_does_dec_mode_convenience(method_name, response_value, expected):
+    """Boolean DEC mode convenience methods return correct values."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+
+        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(
+            mode_num, response_value)
+
+        result = getattr(term, method_name)()
+        assert result is expected
+    child()
+
+
+@pytest.mark.parametrize("method_name", [
+    "does_bracketed_paste",
+    "does_synchronized_output",
+    "does_grapheme_clustering",
+    "does_focus_events",
+])
+def test_does_dec_mode_convenience_not_a_tty(method_name):
+    """Boolean DEC mode convenience methods return False when not a TTY."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=io.StringIO(), force_styling=True, is_a_tty=False)
+        result = getattr(term, method_name)(timeout=0.01)
+        assert result is False
+    child()
