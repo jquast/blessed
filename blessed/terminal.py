@@ -56,8 +56,8 @@ from ._capabilities import (CAPABILITY_DATABASE,
                             XTGETTCAP_CAPABILITIES,
                             CAPABILITIES_HORIZONTAL_DISTANCE,
                             TermcapResponse,
-                            ITerm2Capabilities,
-                            TextSizingResult)
+                            TextSizingResult,
+                            ITerm2Capabilities)
 
 # isort: off
 
