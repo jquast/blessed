@@ -6,7 +6,7 @@ import io
 import pytest
 
 # local
-from blessed._capabilities import TermcapResponse, ITerm2Capabilities, XTGETTCAP_CAPABILITIES
+from blessed._capabilities import TermcapResponse, ITerm2Capabilities
 from .accessories import TestTerminal, as_subprocess
 
 
@@ -50,7 +50,6 @@ class TestTermcapResponseParsing:
         assert resp.supported is False
         assert resp.terminal_name is None
         assert resp.num_colors is None
-        assert resp.rgb_bits is None
         assert len(resp) == 0
 
     def test_num_colors_non_integer(self):

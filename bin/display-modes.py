@@ -111,8 +111,6 @@ def display_sugar_methods(term):
             print(f"       Terminal name: {term.bright_cyan(xtgettcap.terminal_name)}")
         if xtgettcap.num_colors is not None:
             print(f"       Colors: {xtgettcap.num_colors}")
-        if xtgettcap.rgb_bits:
-            print(f"       RGB bits: {xtgettcap.rgb_bits}")
         print(f"       Capabilities: {len(xtgettcap)}")
 
     print('  Testing Kitty graphics...' + term.clear_eol, end='\r', flush=True)
