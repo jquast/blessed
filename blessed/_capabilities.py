@@ -178,15 +178,8 @@ XTGETTCAP_CAPABILITIES = (
     # xterm extensions
     ("TN", "Terminal name"),
     ("Co", "Number of colors"),
-    ("RGB", "Bits per color channel"),
-    # Boolean capabilities
-    ("bce", "Background color erase"),
-    ("ccc", "Can redefine colors"),
-    ("npc", "No pad character"),
-    ("xenl", "Newline glitch"),
     # Numeric capabilities
     ("colors", "Max colors"),
-    ("pairs", "Max color-pairs"),
     # String capabilities -- attributes
     ("bold", "Enter bold mode"),
     ("dim", "Enter dim mode"),
@@ -198,13 +191,6 @@ XTGETTCAP_CAPABILITIES = (
     ("rmul", "Exit underline mode"),
     ("sitm", "Enter italics mode"),
     ("ritm", "Exit italics mode"),
-    ("sshm", "Enter shadow mode"),
-    ("rshm", "Exit shadow mode"),
-    ("ssubm", "Enter subscript mode"),
-    ("rsubm", "Exit subscript mode"),
-    ("ssupm", "Enter superscript mode"),
-    ("rsupm", "Exit superscript mode"),
-    ("sgr", "Define video attributes"),
     ("sgr0", "Reset attributes"),
     # String capabilities -- colors
     ("setaf", "Set foreground color"),
@@ -253,39 +239,14 @@ XTGETTCAP_CAPABILITIES = (
     ("flash", "Flash screen"),
     ("bel", "Bell"),
     ("cr", "Carriage return"),
-    # String capabilities -- keypad and modes
+    # String capabilities -- keypad
     ("smkx", "Keypad transmit mode"),
     ("rmkx", "Keypad local mode"),
-    ("smm", "Meta on"),
-    ("rmm", "Meta off"),
-    ("rmir", "Exit insert mode"),
-    ("rmacs", "Exit alt charset"),
-    ("acsc", "Graphic charset pairs"),
-    ("kmous", "Mouse event prefix"),
-    # String capabilities -- character sets
-    ("s0ds", "Designate G0 charset"),
-    ("s1ds", "Designate G1 charset"),
-    ("s2ds", "Designate G2 charset"),
-    ("s3ds", "Designate G3 charset"),
-    # String capabilities -- tabs
-    ("ht", "Tab"),
-    ("hts", "Set tab stop"),
-    ("tbc", "Clear all tabs"),
-    # String capabilities -- init/reset
-    ("is2", "Init string"),
-    ("rs1", "Reset string"),
-    ("r1", "Reset 1"),
-    ("r2", "Reset 2"),
-    ("r3", "Reset 3"),
-    # String capabilities -- printing
-    ("mc0", "Print screen"),
-    ("mc4", "Printer off"),
-    ("mc5", "Printer on"),
     # String capabilities -- user-defined (xterm convention)
     ("u6", "CPR response format"),
     ("u7", "CPR request"),
-    ("u8", "DA request"),
-    ("u9", "DA response"),
+    ("u8", "DA response format"),
+    ("u9", "DA request"),
 )
 
 
@@ -340,11 +301,6 @@ class TermcapResponse:
             except ValueError:
                 pass
         return None
-
-    @property
-    def rgb_bits(self) -> Optional[str]:
-        """RGB bits per channel from ``RGB`` capability, or ``None``."""
-        return self.capabilities.get('RGB')
 
     def __repr__(self) -> str:
         """Return string representation."""

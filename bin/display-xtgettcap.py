@@ -29,7 +29,6 @@ def main():
     print()
     print(f'   Terminal: {result.terminal_name}')
     print(f'   Colors: {result.num_colors}')
-    print(f'   RGB: {result.rgb_bits}')
     print()
 
     # column widths

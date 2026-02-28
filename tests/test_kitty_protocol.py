@@ -255,14 +255,13 @@ def test_get_kitty_keyboard_state_pty_success():
     def parent(master_fd):
         # Wait for child readiness
         read_until_semaphore(master_fd)
-        # Send both Kitty protocol flags response and DA1 response for boundary detection
-        # flags=27: all basic flags set, and a DA1 response indicating VT terminal
-        os.write(master_fd, b'\x1b[?27u\x1b[?64c')
+        # Send Kitty protocol flags response and CPR response for boundary detection
+        # flags=27: all basic flags set, CPR response as boundary marker
+        os.write(master_fd, b'\x1b[?27u\x1b[1;1R')
 
     output = pty_test(child, parent, 'test_get_kitty_keyboard_state_pty_success')
-    # first call to get_kitty_keyboard_state causes both kitty and dec
-    # parameters query to output, we faked a "response" by writing to our master pty side
-    assert output == '\x1b[?u\x1b[c' + '27'  # Should have parsed flags value 27
+    # _query_with_boundary writes query + CPR request, parent fakes both responses
+    assert output == '\x1b[?u\x1b[6n' + '27'
 
 
 @pytest.mark.skipif(not TEST_KEYBOARD, reason="TEST_KEYBOARD not specified")

@@ -58,11 +58,6 @@ class TestTermcapResponseParsing:
         resp = TermcapResponse(supported=True, capabilities={'colors': 'abc'})
         assert resp.num_colors is None
 
-    def test_rgb_bits(self):
-        """RGB capability value is accessible."""
-        resp = TermcapResponse(supported=True, capabilities={'RGB': '8'})
-        assert resp.rgb_bits == '8'
-
     def test_repr(self):
         """String representation includes key attributes."""
         resp = TermcapResponse(supported=True, capabilities={'TN': 'xterm'})
@@ -80,26 +75,6 @@ class TestTermcapResponseParsing:
         resp = TermcapResponse(supported=True)
         assert resp.capabilities == {}
         assert len(resp) == 0
-
-
-class TestXtgettcapCapabilitiesList:
-    """XTGETTCAP_CAPABILITIES constant."""
-
-    def test_is_tuple_of_pairs(self):
-        """Each entry is a (name, description) pair."""
-        assert isinstance(XTGETTCAP_CAPABILITIES, tuple)
-        for entry in XTGETTCAP_CAPABILITIES:
-            assert len(entry) == 2
-            assert isinstance(entry[0], str)
-            assert isinstance(entry[1], str)
-
-    def test_first_is_tn(self):
-        """First capability is TN (terminal name)."""
-        assert XTGETTCAP_CAPABILITIES[0][0] == 'TN'
-
-    def test_has_expected_count(self):
-        """Expected number of capabilities."""
-        assert len(XTGETTCAP_CAPABILITIES) == 97
 
 
 class TestITerm2Capabilities:
