@@ -2440,10 +2440,7 @@ class ITerm2Capabilities:
     """
     ITerm2 capability features from OSC 1337;Capabilities response.
 
-    Features are accessible as a dict via :attr:`features`.  The
-    :attr:`detection` attribute indicates how support was detected
-    (``'Capabilities'`` for the full query, ``'ReportCellSize'`` for
-    the fallback probe).
+    Features are accessible as a dict via :attr:`features`.
 
     .. seealso::
 
@@ -2472,12 +2469,10 @@ class ITerm2Capabilities:
     }
 
     def __init__(self, supported: bool,
-                 features: Optional[Dict[str, typing.Any]] = None,
-                 detection: str = 'Capabilities') -> None:
+                 features: Optional[Dict[str, typing.Any]] = None) -> None:
         """Initialize ITerm2Capabilities with support status and features."""
         self.supported = supported
         self.features: Dict[str, typing.Any] = features or {}
-        self.detection = detection
 
     @staticmethod
     def parse_feature_string(feature_str: str) -> Dict[str, typing.Any]:
@@ -2508,7 +2503,7 @@ class ITerm2Capabilities:
     def __repr__(self) -> str:
         """Return string representation."""
         return (f'ITerm2Capabilities(supported={self.supported}, '
-                f'detection={self.detection!r}, features={self.features})')
+                f'features={self.features})')
 
 
 __all__ = ('Keystroke', 'get_keyboard_codes', 'get_keyboard_sequences',

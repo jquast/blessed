@@ -104,7 +104,6 @@ _RE_XTGETTCAP_RESPONSE = re.compile(
 _RE_KITTY_GRAPHICS_RESPONSE = re.compile(r'\x1b_Gi=31;(.+?)\x1b\\')
 _RE_ITERM2_CAPABILITIES_RESPONSE = re.compile(
     r'\x1b\]1337;Capabilities=([^\x07\x1b]+)[\x07\x1b]')
-_RE_ITERM2_CELLSIZE_RESPONSE = re.compile(r'\x1b\]1337;ReportCellSize=')
 _RE_KITTY_NOTIFICATIONS_RESPONSE = re.compile(
     r'\x1b\]99;([^\x07\x1b]*?)[\x07\x1b]')
 _RE_CPR_BOUNDARY = re.compile(r'\x1b\[[0-9]+;[0-9]+R')
@@ -1673,10 +1672,6 @@ class Terminal():
         """
         Query iTerm2 capabilities via OSC 1337;Capabilities.
 
-        Falls back to OSC 1337;ReportCellSize as a probe for terminals
-        that support the iTerm2 inline image protocol but do not
-        implement the Capabilities query (e.g. WezTerm).
-
         When :attr:`is_a_tty` is False, returns ``None``.
 
         Responses are cached unless *force* is True.
@@ -1696,7 +1691,6 @@ class Terminal():
         if self._iterm2_capabilities_cache is not None and not force:
             return self._iterm2_capabilities_cache
 
-        # Primary: OSC 1337;Capabilities query
         match = self._query_with_boundary(
             '\x1b]1337;Capabilities\x07',
             _RE_ITERM2_CAPABILITIES_RESPONSE,
@@ -1706,17 +1700,6 @@ class Terminal():
                 match.group(1))
             result = ITerm2Capabilities(
                 supported=True, features=features)
-            self._iterm2_capabilities_cache = result
-            return result
-
-        # Fallback: OSC 1337;ReportCellSize probe
-        match = self._query_with_boundary(
-            '\x1b]1337;ReportCellSize\x07',
-            _RE_ITERM2_CELLSIZE_RESPONSE,
-            timeout)
-        if match:
-            result = ITerm2Capabilities(
-                supported=True, detection='ReportCellSize')
             self._iterm2_capabilities_cache = result
             return result
 

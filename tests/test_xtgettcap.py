@@ -141,35 +141,24 @@ class TestITerm2Capabilities:
         assert result == expected
 
     def test_supported_capabilities_response(self):
-        """Supported response with features and default detection."""
+        """Supported response with features."""
         features = {'truecolor': 2, 'sixel': True}
         caps = ITerm2Capabilities(supported=True, features=features)
         assert caps.supported is True
         assert caps.features == features
-        assert caps.detection == 'Capabilities'
 
     def test_unsupported(self):
         """Unsupported response has empty features."""
         caps = ITerm2Capabilities(supported=False)
         assert caps.supported is False
         assert caps.features == {}
-        assert caps.detection == 'Capabilities'
-
-    def test_report_cell_size_detection(self):
-        """ReportCellSize detection method."""
-        caps = ITerm2Capabilities(supported=True, detection='ReportCellSize')
-        assert caps.supported is True
-        assert caps.detection == 'ReportCellSize'
-        assert caps.features == {}
 
     def test_repr(self):
         """String representation includes key attributes."""
         caps = ITerm2Capabilities(
-            supported=True, features={'truecolor': 2},
-            detection='Capabilities')
+            supported=True, features={'truecolor': 2})
         r = repr(caps)
         assert 'supported=True' in r
-        assert 'Capabilities' in r
         assert 'truecolor' in r
 
 
