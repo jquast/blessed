@@ -93,7 +93,7 @@ master_doc = 'index'
 # General information about the project.
 project = 'Blessed'
 
-copyright = '2011-{datetime.datetime.now().year} Erik Rose, Jeff Quast, Avram Lubkin'
+copyright = f'2011-{datetime.datetime.now().year} Erik Rose, Jeff Quast, Avram Lubkin'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

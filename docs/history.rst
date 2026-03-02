@@ -2,6 +2,8 @@
 
 Version History
 ===============
+1.33 (not yet released)
+  * bugfix: * :class:`blessed.line_editor.LineEditor` exceed limit when using Yank (Ctrl+Y).
 
 1.32
   * bugfix: :meth:`~.Terminal.get_kitty_keyboard_state` should not check for
