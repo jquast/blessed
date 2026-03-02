@@ -462,6 +462,7 @@ class TestLineEditorKillRing:
         assert ed.line == "hello world"
 
     def test_yank_respects_limit(self) -> None:
+        """Ensure Ctrl-Y respects maximum limit"""
         ed = _editor("hello", _HOME, _CTRL_K, limit=8)
         ed.feed_key(_CTRL_Y)
         assert ed.line == "hello"
