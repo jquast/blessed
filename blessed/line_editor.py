@@ -563,7 +563,10 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
         if not self._kill_ring:
             return LineEditResult()
         self._save_undo()
-        self._insert_at_cursor(self._kill_ring[-1], check_limit=False)
+        n = self._insert_at_cursor(self._kill_ring[-1])
+        if n == 0:
+            self._undo_stack.pop()
+            return LineEditResult()
         return LineEditResult(changed=True)
 
     def _history_prev(self) -> LineEditResult:

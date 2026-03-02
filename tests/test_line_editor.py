@@ -461,6 +461,16 @@ class TestLineEditorKillRing:
         ed.feed_key(_CTRL_Y)
         assert ed.line == "hello world"
 
+    def test_yank_respects_limit(self) -> None:
+        ed = _editor("hello", _HOME, _CTRL_K, limit=8)
+        ed.feed_key(_CTRL_Y)
+        assert ed.line == "hello"
+        r = ed.feed_key(_CTRL_Y)
+        assert len(ed.line) == 8
+        r = ed.feed_key(_CTRL_Y)
+        assert r.changed is False
+        assert len(ed.line) == 8
+
     def test_kill_line_at_position_zero(self) -> None:
         """Test Ctrl-U at position zero reports no change."""
         ed = _editor("ab", _HOME)
