@@ -326,10 +326,8 @@ class Pager:
             int((self._auto_angle % (2 * math.pi) + math.pi / 8) / (math.pi / 4)) % 8]
         auto = f' [{arrow}AUTO]' if self._autoscroll else ''
         rand = ' [RAND]' if self._random_mode else ''
-        left = f' Rule {
-            self.rule} row:{
-            self.viewport_y}-{end_y} col:{
-            self.viewport_x}-{end_x}{auto}{rand} '
+        left = (f' Rule {self.rule} row:{self.viewport_y}-{end_y} '
+                f'col:{self.viewport_x}-{end_x}{auto}{rand} ')
         right = ' ^C quit ^S auto ^F full '
         fill = t.width - len(left) - len(right)
         print(t.move_yx(y, 0) + left + '─' * max(0, fill) + right, end='', flush=True)

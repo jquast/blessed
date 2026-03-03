@@ -47,7 +47,7 @@ classifiers = [
 ]
 dependencies = [
     'wcwidth>=0.6',
-    'jinxed>=1.1.0; platform_system == "Windows"',
+    'jinxed>=1.4.0; platform_system == "Windows"',
 ]
 dynamic = ['version']
 license = 'MIT'
