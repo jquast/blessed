@@ -10,6 +10,7 @@ Welcome to Blessed documentation!
    colors
    keyboard
    keyboard_kitty
+   line_editor
    mouse
    dec_modes
    location

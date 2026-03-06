@@ -99,6 +99,30 @@ Query results are automatically cached. Use ``force=True`` to bypass the cache:
 Try the :ref:`display-modes.py` example program to detect and report all supported
 sequences for a given terminal.
 
+Quick Boolean Detection
+-----------------------
+
+For the most commonly used modes, convenience methods return a simple boolean
+without needing to inspect the full :class:`~blessed.dec_modes.DecModeResponse`:
+
+* :meth:`~blessed.Terminal.does_bracketed_paste` -- Bracketed Paste (mode 2004)
+* :meth:`~blessed.Terminal.does_synchronized_output` -- Synchronized Output (mode 2026)
+* :meth:`~blessed.Terminal.does_grapheme_clustering` -- Grapheme Clustering (mode 2027)
+* :meth:`~blessed.Terminal.does_focus_events` -- Focus In/Out Events (mode 1004)
+
+.. code-block:: python
+
+    term = Terminal()
+
+    if term.does_synchronized_output():
+        print("Synchronized output supported")
+
+    if term.does_bracketed_paste():
+        print("Bracketed paste supported")
+
+These methods accept the same ``timeout`` parameter as
+:meth:`~blessed.Terminal.get_dec_mode` and benefit from the same caching.
+
 Context Managers
 ----------------
 

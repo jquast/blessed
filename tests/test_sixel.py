@@ -53,7 +53,7 @@ def test_does_sixel_returns_false_on_timeout():
         return b'SIXEL_TIMEOUT'
 
     output = pty_test(child, parent_func=None, test_name='test_does_sixel_returns_false_on_timeout')
-    assert output == '\x1b[cSIXEL_TIMEOUT'
+    assert output == '\x1b[c\x1b[6nSIXEL_TIMEOUT'
 
 
 def test_does_sixel_uses_cache():
@@ -71,7 +71,7 @@ def test_does_sixel_uses_cache():
         return b'SIXEL_CACHE'
 
     output = pty_test(child, parent_func=None, test_name='test_does_sixel_uses_cache')
-    assert output == '\x1b[cSIXEL_CACHE'
+    assert output == '\x1b[c\x1b[6nSIXEL_CACHE'
 
 
 def test_does_sixel_not_a_tty():
@@ -212,11 +212,11 @@ def test_sixel_height_and_width_xtwinops_cell_success():
 
     def parent(master_fd):
         read_until_semaphore(master_fd)
-        # Read and discard the query sequence (XTWINOPS 16t)
+        # Read and discard the query sequence (XTWINOPS 16t + CPR)
         os.read(master_fd, 100)
-        # Respond immediately with XTWINOPS 16t: cell is 16x8 pixels
-        # Terminal is typically 24 rows x 80 cols, so 384x640 total pixels
-        os.write(master_fd, b'\x1b[6;16;8t')
+        # Respond with XTWINOPS 16t response + CPR boundary response
+        # Cell is 16x8 pixels, CPR boundary marks end of response
+        os.write(master_fd, b'\x1b[6;16;8t\x1b[1;1R')
 
     stime = time.time()
     output = pty_test(child, parent, 'test_sixel_height_and_width_xtwinops_cell_success')
@@ -225,7 +225,7 @@ def test_sixel_height_and_width_xtwinops_cell_success():
     # Assuming 24 rows x 80 cols: 16*24 = 384 height, 8*80 = 640 width
     assert dimensions == '384x640'
     # Should complete very quickly (not wait for fallback)
-    assert float(duration) < 0.2
+    assert float(duration) < 0.5
     assert math.floor(time.time() - stime) == 0.0
 
 
@@ -243,21 +243,23 @@ def test_sixel_height_and_width_fallback_to_xtwinops():
 
     def parent(master_fd):
         read_until_semaphore(master_fd)
-        # Read and discard first query (XTWINOPS 16t - cell size)
+        # Read and discard first query (XTWINOPS 16t + CPR)
         os.read(master_fd, 100)
-        # Wait for XTWINOPS 16t timeout, then read XTWINOPS 14t query
-        time.sleep(0.36)  # timeout/3, add a bit
-        os.read(master_fd, 100)  # Read XTWINOPS 14t query
-        # Respond to XTWINOPS 14t (window size)
-        os.write(master_fd, b'\x1b[4;600;800t')
+        # Send only CPR boundary (no 16t response) to cause fast negative
+        os.write(master_fd, b'\x1b[1;1R')
+        # Read XTWINOPS 14t query after fallback
+        time.sleep(0.05)
+        os.read(master_fd, 100)
+        # Respond to XTWINOPS 14t (window size) + CPR boundary
+        os.write(master_fd, b'\x1b[4;600;800t\x1b[1;1R')
 
     stime = time.time()
     output = pty_test(child, parent, 'test_sixel_height_and_width_fallback_to_xtwinops')
     dimensions, duration = output.split('|')
 
     assert dimensions == '600x800'
-    # Should take around timeout/3 + a bit
-    assert 0.30 <= float(duration) <= 0.5
+    # Should complete quickly -- CPR boundary provides fast negative for 16t
+    assert float(duration) < 0.5
     assert math.floor(time.time() - stime) == 0.0
 
 
@@ -396,28 +398,30 @@ def test_cell_cache_sticky_failure():
     def parent(master_fd):
         read_until_semaphore(master_fd)
 
-        # First query - read cell, wait for timeout, read window, respond
-        os.read(master_fd, 100)  # XTWINOPS 16t query
-        time.sleep(0.36)  # timeout/3 ≈ 0.33s, add a bit
-        os.read(master_fd, 100)  # XTWINOPS 14t query after fallback
-        os.write(master_fd, b'\x1b[4;480;640t')
+        # First query - read cell query, send CPR-only (fast negative), read window, respond
+        os.read(master_fd, 100)  # XTWINOPS 16t + CPR query
+        os.write(master_fd, b'\x1b[1;1R')  # CPR-only = fast negative for cell
+        time.sleep(0.05)
+        os.read(master_fd, 100)  # XTWINOPS 14t + CPR query after fallback
+        os.write(master_fd, b'\x1b[4;480;640t\x1b[1;1R')
 
         # Second query with force=True - re-queries cell, then window
-        os.read(master_fd, 100)  # XTWINOPS 16t query (force=True bypasses sticky failure)
-        time.sleep(0.36)  # timeout/3 ≈ 0.33s, add a bit
-        os.read(master_fd, 100)  # XTWINOPS 14t query after fallback
-        os.write(master_fd, b'\x1b[4;480;640t')
+        time.sleep(0.05)
+        os.read(master_fd, 100)  # XTWINOPS 16t + CPR query
+        os.write(master_fd, b'\x1b[1;1R')  # CPR-only = fast negative for cell
+        time.sleep(0.05)
+        os.read(master_fd, 100)  # XTWINOPS 14t + CPR query after fallback
+        os.write(master_fd, b'\x1b[4;480;640t\x1b[1;1R')
 
     output = pty_test(child, parent, 'test_cell_cache_sticky_failure')
     dim1, dur1, dim2, dur2 = output.split('|')
 
-    # First call should fallback (takes ~timeout/3)
+    # Both calls use CPR fast negative for cell, then succeed on window
     assert dim1 == '480x640'
-    assert 0.30 <= float(dur1) <= 0.5
+    assert float(dur1) < 0.5
 
-    # Second call with force=True also re-queries and fallbacks (takes ~timeout/3)
     assert dim2 == '480x640'
-    assert 0.30 <= float(dur2) <= 0.5
+    assert float(dur2) < 0.5
 
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")

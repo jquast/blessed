@@ -23,6 +23,7 @@ import collections
 
 # local
 from blessed import Terminal
+from blessed.line_editor import LineEditor
 
 
 def echo(text):
@@ -55,27 +56,20 @@ Cursor = collections.namedtuple('Cursor', ('y', 'x', 'term'))
 
 
 def readline(term, width=20):
-    """A rudimentary readline implementation."""
-    text = ''
+    """Read a line of input using :class:`~blessed.line_editor.LineEditor`."""
+    col = term.get_location()[1]
+    editor = LineEditor(limit=width, max_width=width)
     while True:
         inp = term.inkey()
-        if inp.code == term.KEY_ENTER:
-            break
-        elif inp.code == term.KEY_ESCAPE or inp == chr(3):
-            text = None
-            break
-        elif not inp.is_sequence and len(text) < width:
-            text += inp
-            echo(inp)
-        elif inp.code in (term.KEY_BACKSPACE, term.KEY_DELETE):
-            text = text[:-1]
-            # https://utcc.utoronto.ca/~cks/space/blog/unix/HowUnixBackspaces
-            #
-            # "When you hit backspace, the kernel tty line discipline rubs out
-            # your previous character by printing (in the simple case)
-            # Ctrl-H, a space, and then another Ctrl-H."
-            echo('\b \b')
-    return text
+        result = editor.feed_key(inp)
+        if result.line is not None:
+            return result.line
+        if result.eof or result.interrupt:
+            return None
+        if result.changed:
+            ds = editor.display
+            echo(term.move_x(col) + term.clear_eol + ds.text
+                 + term.move_x(col + ds.cursor))
 
 
 def save(screen, fname):
@@ -209,7 +203,7 @@ def main():
     csr = Cursor(0, 0, term)
     screen = {}
     with term.hidden_cursor(), \
-            term.raw(), \
+            term.cbreak(), \
             term.location(), \
             term.fullscreen(), \
             term.keypad(), \

@@ -2,6 +2,38 @@
 
 Version History
 ===============
+1.33 (not yet released)
+  * bugfix: :class:`blessed.line_editor.LineEditor` exceed limit when using Yank (Ctrl+Y).
+  * bugfix: :meth:`~.Terminal.async_inkey` no longer raises NotImplementedError on Windows.
+
+1.32
+  * bugfix: :meth:`~.Terminal.get_kitty_keyboard_state` should not check for
+    :attr:`~.Terminal.does_styling` as a requirement.
+  * bugfix: :meth:`~.Terminal.get_fgcolor` and :meth:`~.Terminal.get_bgcolor` now
+    return "no support" value, ``(-1, -1, -1)`` when :attr:`~.Terminal.does_styling` is False.
+  * introduced: :meth:`~.Terminal.does_kitty_clipboard`,
+    :meth:`~.Terminal.does_kitty_pointer_shapes`, and :meth:`~.Terminal.does_text_sizing`
+  * introduced: :meth:`~.DecModeResponse.to_dict` and ``DecPrivateMode.BRACKETED_PASTE_MIME``
+    constant (mode 5522).
+
+1.31
+  * bugfix: :meth:`~.cbreak` and :meth:`~.raw` should use ``TCSADRAIN`` to preserve keystrokes
+    buffered during mode switches, previously ``TCSAFLUSH`` was used which discarded unread input,
+    dropping keystrokes.
+  * improved: all terminal query methods now use a CPR boundary guard for fast negative detection of
+    unsupported features: :meth:`~.Terminal.get_fgcolor`, :meth:`~.Terminal.get_bgcolor`,
+    :meth:`~.Terminal.get_device_attributes`, and :meth:`~.Terminal.get_software_version`.
+  * introduced: :meth:`~.Terminal.async_inkey` -- asyncio-compatible version of
+    :meth:`~.Terminal.inkey`.
+  * introduced: :class:`blessed.line_editor.LineEditor`, a "headless" single-line editor.
+  * introduced: :meth:`~.Terminal.get_xtgettcap` -- query terminal capabilities via XTGETTCAP and
+    :meth:`~.Terminal.get_iterm2_capabilities` for iTerm2 protocol features.
+  * introduced: terminal feature detection methods :meth:`~.Terminal.does_bracketed_paste`,
+    :meth:`~.Terminal.does_focus_events`, :meth:`~.Terminal.does_grapheme_clustering`
+    :meth:`~.Terminal.does_iterm2`, :meth:`~.Terminal.does_iterm2_graphics`,
+    :meth:`~.Terminal.does_kitty_graphics`, :meth:`~.Terminal.does_kitty_notifications`,
+    :meth:`~.Terminal.does_synchronized_output`, and :meth:`~.Terminal.does_xtgettcap`.
+
 1.30
   * bugfix: Terminal.wrap drops color escape sequences, :ghpull:`352`.
   * bugfix: Prevent rare feedback loops in automatic responses, :ghpull:`350`.

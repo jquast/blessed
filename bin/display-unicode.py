@@ -60,6 +60,8 @@ VS16_TEST = '\u231A\uFE0F'  # watch + VS16
 
 def detect_wide_version(term, timeout=0.5):
     """Detect highest supported Unicode version for wide characters."""
+    if not term.does_styling:
+        return False
     best_version = None
     for version, char in WIDE_VERSION_TESTS:
         width = measure_width(term, char, timeout)
@@ -70,6 +72,8 @@ def detect_wide_version(term, timeout=0.5):
 
 def detect_zwj_version(term, timeout=0.5):
     """Detect highest supported Emoji ZWJ version."""
+    if not term.does_styling:
+        return False
     best_version = None
     for version, seq in EMOJI_ZWJ_TESTS:
         width = measure_width(term, seq, timeout)
@@ -80,6 +84,8 @@ def detect_zwj_version(term, timeout=0.5):
 
 
 def detect_vs16_support(term, timeout=1):
+    if not term.does_styling:
+        return False
     return measure_width(term, VS16_TEST, timeout) == 2
 
 
@@ -115,6 +121,14 @@ def main():
 
     ambig_txt = 'wide (2)' if term.detect_ambiguous_width() == 2 else 'narrow (1)'
     print(f'- Ambiguous width is {ambig_txt}')
+
+    _yn = {True: term.bold_green('YES'), False: term.bold_red('NO')}
+    print(f'- Grapheme clustering (mode 2027): {_yn[term.does_grapheme_clustering()]}')
+
+    xtcap = term.get_xtgettcap()
+    if xtcap and xtcap.supported:
+        tn = xtcap.terminal_name or 'unknown'
+        print(f'- XTGETTCAP terminal name: {term.bold_cyan(tn)}')
 
 
 if __name__ == '__main__':

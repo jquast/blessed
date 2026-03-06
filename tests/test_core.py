@@ -21,10 +21,10 @@ from .accessories import TestTerminal, unicode_cap, as_subprocess, pty_test
 
 
 def test_export_only_Terminal():
-    "Ensure only Terminal instance is exported for import * statements."
+    "Ensure only expected names are exported for import * statements."
     # local
     import blessed
-    assert blessed.__all__ == ('Terminal',)
+    assert blessed.__all__ == ('Terminal', 'LineEditor', 'LineHistory')
 
 
 def test_null_location(all_terms):
