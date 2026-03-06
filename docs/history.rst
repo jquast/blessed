@@ -3,7 +3,8 @@
 Version History
 ===============
 1.33 (not yet released)
-  * bugfix: * :class:`blessed.line_editor.LineEditor` exceed limit when using Yank (Ctrl+Y).
+  * bugfix: :class:`blessed.line_editor.LineEditor` exceed limit when using Yank (Ctrl+Y).
+  * bugfix: :meth:`~.Terminal.async_inkey` no longer raises NotImplementedError on Windows.
 
 1.32
   * bugfix: :meth:`~.Terminal.get_kitty_keyboard_state` should not check for
