@@ -4,10 +4,14 @@
 # std imports
 import os
 import time
+import logging
 import msvcrt  # pylint: disable=import-error
 import asyncio
 import contextlib
 from typing import Optional, Generator
+
+log = logging.getLogger(__name__)
+TRACE = 5
 
 # 3rd party
 from jinxed import win32  # pylint: disable=import-error
@@ -93,11 +97,18 @@ class Terminal(_Terminal):
         :returns: A single byte, or ``None`` on timeout.
         """
         deadline = loop.time() + timeout if timeout is not None else None
+        log.debug('win32 _async_read_byte enter: timeout=%r keyboard_fd=%r', timeout, self._keyboard_fd)
+        iterations = 0
         while True:
             if msvcrt.kbhit():
-                return os.read(self._keyboard_fd, 1)
+                data = os.read(self._keyboard_fd, 1)
+                log.debug('win32 _async_read_byte got byte: %r after %d iterations', data, iterations)
+                return data
             if deadline is not None and loop.time() >= deadline:
+                log.debug('win32 _async_read_byte timeout after %d iterations', iterations)
                 return None
+            iterations += 1
+            log.log(TRACE, 'win32 _async_read_byte poll %d', iterations)
             await asyncio.sleep(0.005)
 
     @staticmethod
