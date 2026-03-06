@@ -81,11 +81,12 @@ class Terminal(_Terminal):
         timeout: Optional[float],
     ) -> Optional[bytes]:
         """
-        Read one byte from the keyboard using :meth:`kbhit` polling.
+        Read one byte from the keyboard using non-blocking msvcrt polling.
 
         ``ProactorEventLoop`` (the Windows default) does not support
-        ``add_reader``, so this override polls :meth:`kbhit` every 5 ms
-        and yields to the event loop between checks.
+        ``add_reader``.  ``msvcrt.kbhit()`` is called directly (not via
+        :meth:`kbhit`) to avoid the blocking ``time.sleep`` in the
+        inherited implementation, which would stall the event loop.
 
         :arg loop: The running asyncio event loop.
         :arg timeout: Seconds to wait, or ``None`` to wait indefinitely.
@@ -93,7 +94,7 @@ class Terminal(_Terminal):
         """
         deadline = loop.time() + timeout if timeout is not None else None
         while True:
-            if self.kbhit(timeout=0):
+            if msvcrt.kbhit():
                 return os.read(self._keyboard_fd, 1)
             if deadline is not None and loop.time() >= deadline:
                 return None
