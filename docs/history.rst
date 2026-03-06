@@ -2,7 +2,7 @@
 
 Version History
 ===============
-1.33 (not yet released)
+1.33
   * bugfix: :class:`blessed.line_editor.LineEditor` exceed limit when using Yank (Ctrl+Y).
   * bugfix: :meth:`~.Terminal.async_inkey` no longer raises NotImplementedError on Windows.
 
