@@ -2,8 +2,10 @@
 
 
 # std imports
+import os
 import time
 import msvcrt  # pylint: disable=import-error
+import asyncio
 import contextlib
 from typing import Optional, Generator
 
@@ -72,6 +74,30 @@ class Terminal(_Terminal):
 
             time.sleep(0.01)  # Sleep to reduce CPU load
         return False
+
+    async def _async_read_byte(
+        self,
+        loop: "asyncio.AbstractEventLoop",
+        timeout: Optional[float],
+    ) -> Optional[bytes]:
+        """
+        Read one byte from the keyboard using :meth:`kbhit` polling.
+
+        ``ProactorEventLoop`` (the Windows default) does not support
+        ``add_reader``, so this override polls :meth:`kbhit` every 5 ms
+        and yields to the event loop between checks.
+
+        :arg loop: The running asyncio event loop.
+        :arg timeout: Seconds to wait, or ``None`` to wait indefinitely.
+        :returns: A single byte, or ``None`` on timeout.
+        """
+        deadline = loop.time() + timeout if timeout is not None else None
+        while True:
+            if self.kbhit(timeout=0):
+                return os.read(self._keyboard_fd, 1)
+            if deadline is not None and loop.time() >= deadline:
+                return None
+            await asyncio.sleep(0.005)
 
     @staticmethod
     def _winsize(fd: int) -> WINSZ:

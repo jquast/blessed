@@ -3478,10 +3478,6 @@ class Terminal():
         if self._keyboard_fd is None:
             raise RuntimeError(
                 "async_inkey requires a keyboard file descriptor")
-
-        if sys.platform == 'win32':
-            return await self._async_read_byte_windows(timeout)
-
         fut: asyncio.Future[bytes] = loop.create_future()
 
         def _on_readable() -> None:
@@ -3502,30 +3498,6 @@ class Terminal():
             return await fut
         finally:
             loop.remove_reader(self._keyboard_fd)
-
-    async def _async_read_byte_windows(
-        self,
-        timeout: Optional[float],
-    ) -> Optional[bytes]:
-        """
-        Windows fallback for :meth:`_async_read_byte`.
-
-        ``ProactorEventLoop`` (the Windows default) does not support
-        ``add_reader``.  Poll with ``msvcrt.kbhit`` at a short interval so the
-        event loop stays responsive without blocking a thread indefinitely.
-
-        :arg timeout: Seconds to wait, or None for indefinite.
-        :returns: A single byte, or None on timeout.
-        """
-        import msvcrt  # noqa: PLC0415 -- Windows-only, imported lazily
-        deadline = asyncio.get_running_loop().time() + timeout if timeout is not None else None
-        poll_interval = 0.005
-        while True:
-            if msvcrt.kbhit():
-                return os.read(self._keyboard_fd, 1)
-            if deadline is not None and asyncio.get_running_loop().time() >= deadline:
-                return None
-            await asyncio.sleep(poll_interval)
 
 
 class WINSZ(collections.namedtuple('WINSZ', (
