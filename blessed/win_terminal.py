@@ -53,10 +53,9 @@ class Terminal(_Terminal):
         This method is used by :meth:`inkey` to determine if a byte may
         be read using :meth:`getch` without blocking.
 
-        Uses :func:`jinxed.win32.select` for efficient, non-polling
+        Uses :class:`jinxed.win32.ConsoleInput` for efficient, non-polling
         input detection.  Non-key-down events (key-up releases, resize,
-        mouse, focus, menu) are consumed so they do not cause spurious
-        returns.
+        mouse) are consumed so they do not cause spurious returns.
 
         :arg float timeout: When ``timeout`` is 0, this call is
             non-blocking, otherwise blocking indefinitely until keypress
@@ -70,17 +69,18 @@ class Terminal(_Terminal):
         if self._keyboard_fd is None:
             return False
 
+        console = win32.ConsoleInput(self._keyboard_fd)
         deadline = None if timeout is None else time.monotonic() + timeout
 
         while True:
-            event = win32.peek_input(self._keyboard_fd)
+            event = console.peek()
 
             if event is not None:
                 if (event.EventType == win32.KEY_EVENT
                         and event.Event.KeyEvent.bKeyDown):
                     return True
                 # Consume non-key-down events.
-                win32.read_input(self._keyboard_fd)
+                console.read()
                 continue
 
             # Buffer empty -- wait for something to arrive.
@@ -91,7 +91,7 @@ class Terminal(_Terminal):
             else:
                 remaining = None
 
-            if not win32.select(self._keyboard_fd, remaining):
+            if not console.wait(remaining):
                 return False
 
     async def _async_read_byte(
