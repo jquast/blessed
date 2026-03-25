@@ -60,7 +60,6 @@ jobs:
             test_quick: 0
 
     env:
-      TOXENV: ${{ matrix.toxenv || format('py{0}', matrix.python-version) }}
       TEST_QUICK: ${{ matrix.test_quick || 0 }}
       TEST_KEYBOARD: ${{ matrix.test_keyboard || 0 }}
       TEST_RAW: ${{ matrix.test_raw || 0 }}
@@ -68,11 +67,20 @@ jobs:
 
     steps:
 
+      - name: Set TOXENV
+        shell: bash
+        run: |
+          if [ -n "${{ matrix.toxenv }}" ]; then
+            echo "TOXENV=${{ matrix.toxenv }}" >> "$GITHUB_ENV"
+          else
+            echo "TOXENV=py$(echo '${{ matrix.python-version }}' | tr -d '.')" >> "$GITHUB_ENV"
+          fi
+
       - name: Install OS Dependencies
         run: apt update && apt -y install ${{ join(matrix.os-deps, ' ') }}
         if: ${{ matrix.os-deps }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install tox
         run: pip install tox

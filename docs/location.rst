@@ -32,12 +32,12 @@ And four relative capabilities:
   Position cursor 1 or **y** row cells below the current position.
 
   .. note:: ``move_down()`` (no arguments) is often valued as ``\\n``, which additionally returns
-  the carriage to column 0 in the default terminal mode, (when not in :class:`Terminal.raw` or
-  :class:`Terminal.cbreak`), and, depending on your terminal emulator, may also destroy remaining
-  characters at current location to the end of the line.
+     the carriage to column 0 in the default terminal mode, (when not in :class:`Terminal.raw` or
+     :class:`Terminal.cbreak`), and, depending on your terminal emulator, may also destroy
+     remaining characters at current location to the end of the line.
 
-  ``move_down(1)`` is *always* a safe, non-destructive, one-notch movement in the downward direction
-  and should be preferred.
+     ``move_down(1)`` is *always* a safe, non-destructive, one-notch movement in the downward
+     direction and should be preferred.
 
 ``move_left`` or ``move_left(x)``
   Position cursor 1 or **x** column cells left of the current position.
