@@ -33,8 +33,8 @@ def _win32_mouse_to_sgr(mouse_event: "win32.INPUT_RECORD",
     Convert a native Windows MOUSE_EVENT to SGR escape sequences.
 
     :param mouse_event: The INPUT_RECORD with EventType == MOUSE_EVENT.
-    :param prev_button_state: Button state from the previous mouse event,
-        used to detect press/release transitions.
+    :param prev_button_state: Button state from the previous mouse event, used to detect
+        press/release transitions.
     :returns: List of SGR escape sequence strings, possibly empty.
     """
     mouse = mouse_event.Event.MouseEvent
