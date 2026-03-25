@@ -97,10 +97,12 @@ on_resize.py
 ------------
 https://github.com/jquast/blessed/blob/master/bin/on_resize.py
 
-This program installs a SIGWINCH signal handler, which detects
-screen resizes while also polling for input, displaying keypresses.
+This program uses in-band resize notifications when available, with a SIGWINCH
+signal handler as a fallback on Unix. On Windows, native console resize events
+are used automatically.
 
-This demonstrates how a program can react to screen resize events.
+This demonstrates how a program can react to screen resize events
+cross-platform.
 
 .. _plasma.py:
 

@@ -58,7 +58,8 @@ Detecting Resize
 
 The terminal can notify your application when the window size changes. Blessed provides a modern
 cross-platform method using in-band resize notifications, with SIGWINCH_ as a fallback for older
-terminals.
+terminals. On Windows, native console ``WINDOW_BUFFER_SIZE_EVENT`` records are automatically
+converted to in-band resize sequences.
 
 Using SIGWINCH
 --------------
@@ -120,8 +121,12 @@ notifications (DEC mode 2048):
 .. note::
 
     In-band resize notification support (DEC mode 2048) is currently **very limited** among
-    terminal emulators. Most terminals do not support this feature yet. Always check with
+    terminal emulators on Unix. Most terminals do not support this feature yet. Always check with
     :meth:`~.Terminal.does_inband_resize` and provide a fallback using SIGWINCH on Unix systems.
+
+    On Windows, :meth:`~.Terminal.does_inband_resize` always returns ``True`` because the
+    native console API provides ``WINDOW_BUFFER_SIZE_EVENT`` on all versions -- no DEC mode
+    support is required.
 
 The :meth:`~.Terminal.notify_on_resize` context manager enables automatic resize event reporting.
 When the window is resized, :meth:`~.Terminal.inkey` will return a keystroke with

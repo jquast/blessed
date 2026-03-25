@@ -4,10 +4,11 @@
 # std imports
 import os
 import time
-import msvcrt  # pylint: disable=import-error
+import msvcrt
 import asyncio
 import contextlib
-from typing import Optional, Generator
+import collections
+from typing import List, Optional, Generator
 
 # 3rd party
 from jinxed import win32
@@ -15,10 +16,98 @@ from jinxed import win32
 # local
 from .terminal import WINSZ
 from .terminal import Terminal as _Terminal
+from .dec_modes import DecPrivateMode as _DecPrivateMode
+from .dec_modes import DecModeResponse
+
+# Windows button state bits -> SGR button numbers.
+_WIN32_BUTTON_MAP = (
+    (0x0001, 0),  # FROM_LEFT_1ST_BUTTON_PRESSED -> left
+    (0x0004, 1),  # FROM_LEFT_2ND_BUTTON_PRESSED -> middle
+    (0x0002, 2),  # RIGHTMOST_BUTTON_PRESSED -> right
+)
+
+
+def _win32_mouse_to_sgr(mouse_event: "win32.INPUT_RECORD",
+                        prev_button_state: int) -> List[str]:
+    """
+    Convert a native Windows MOUSE_EVENT to SGR escape sequences.
+
+    :param mouse_event: The INPUT_RECORD with EventType == MOUSE_EVENT.
+    :param prev_button_state: Button state from the previous mouse event,
+        used to detect press/release transitions.
+    :returns: List of SGR escape sequence strings, possibly empty.
+    """
+    mouse = mouse_event.Event.MouseEvent
+    x = mouse.dwMousePosition.X + 1  # SGR is 1-indexed
+    y = mouse.dwMousePosition.Y + 1
+    btn_state = mouse.dwButtonState & 0x0007
+    flags = mouse.dwEventFlags
+    ctrl = mouse.dwControlKeyState
+
+    # SGR modifier bits.
+    mods = 0
+    if ctrl & 0x0010:  # SHIFT_PRESSED
+        mods |= 4
+    if ctrl & 0x0003:  # RIGHT_ALT_PRESSED | LEFT_ALT_PRESSED
+        mods |= 8
+    if ctrl & 0x000C:  # RIGHT_CTRL_PRESSED | LEFT_CTRL_PRESSED
+        mods |= 16
+
+    sequences: List[str] = []
+
+    if flags & 0x0004:  # MOUSE_WHEELED
+        # High word of dwButtonState: negative (>= 0x8000) is scroll down.
+        direction = (mouse.dwButtonState >> 16) & 0xFFFF
+        btn = 65 if direction >= 0x8000 else 64
+        sequences.append(f'\x1b[<{btn | mods};{x};{y}M')
+    else:
+        pressed = btn_state & ~prev_button_state
+        released = prev_button_state & ~btn_state
+        is_motion = bool(flags & 0x0001)
+
+        for win_bit, sgr_btn in _WIN32_BUTTON_MAP:
+            if pressed & win_bit:
+                sequences.append(f'\x1b[<{sgr_btn | mods};{x};{y}M')
+            elif released & win_bit:
+                sequences.append(f'\x1b[<{sgr_btn | mods};{x};{y}m')
+
+        if is_motion and not sequences:
+            for win_bit, sgr_btn in _WIN32_BUTTON_MAP:
+                if btn_state & win_bit:
+                    sequences.append(
+                        f'\x1b[<{sgr_btn | 32 | mods};{x};{y}M')
+                    break
+            else:
+                # No button held -- bare motion (SGR button 35 = 3 + 32).
+                sequences.append(f'\x1b[<{35 | mods};{x};{y}M')
+
+    return sequences
+
+
+def _win32_resize_to_seq(fd: int) -> str:
+    """
+    Build an in-band resize sequence from the current terminal size.
+
+    The ``WINDOW_BUFFER_SIZE_EVENT`` itself carries the *screen buffer*
+    dimensions, which may include scroll-back history and differ from
+    the visible window.  We query the actual terminal size instead.
+
+    :param fd: Python file descriptor for the console output.
+    :returns: DEC mode 2048 resize sequence.
+    """
+    size = win32.get_terminal_size(fd)
+    return f'\x1b[48;{size.lines};{size.columns};0;0t'
 
 
 class Terminal(_Terminal):
     """Windows subclass of :class:`Terminal`."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._event_buf: collections.deque = collections.deque()
+        self._prev_button_state: int = 0
+        self._native_mouse: bool = False
+        self._native_resize: bool = False
 
     def getch(self, decode_latin1: bool = False) -> str:
         r"""
@@ -37,7 +126,13 @@ class Terminal(_Terminal):
         For older versions of Windows, msvcrt.getwch() is used. If the received
         character is ``\x00`` or ``\xe0``, the next character is
         automatically retrieved.
+
+        When native console events (mouse, resize) have been synthesized
+        into escape sequences, buffered characters are returned first.
         """
+        if self._event_buf:
+            return self._event_buf.popleft()
+
         if win32.VTMODE_SUPPORTED:
             return super().getch(decode_latin1=decode_latin1)
 
@@ -54,8 +149,12 @@ class Terminal(_Terminal):
         be read using :meth:`getch` without blocking.
 
         Uses :class:`jinxed.win32.ConsoleInput` for efficient, non-polling
-        input detection.  Non-key-down events (key-up releases, resize,
-        mouse) are consumed so they do not cause spurious returns.
+        input detection.  Non-key-down events (key-up releases, resize)
+        are consumed so they do not cause spurious returns.
+
+        When native event handling is enabled, ``MOUSE_EVENT`` and
+        ``WINDOW_BUFFER_SIZE_EVENT`` records are converted to escape
+        sequences and buffered for :meth:`getch`.
 
         :arg float timeout: When ``timeout`` is 0, this call is
             non-blocking, otherwise blocking indefinitely until keypress
@@ -69,10 +168,18 @@ class Terminal(_Terminal):
         if self._keyboard_fd is None:
             return False
 
+        if self._event_buf:
+            return True
+
         console = win32.ConsoleInput(self._keyboard_fd)
         deadline = None if timeout is None else time.monotonic() + timeout
 
         while True:
+            if self._native_mouse or self._native_resize:
+                self._drain_native_events(console)
+                if self._event_buf:
+                    return True
+
             event = console.peek()
 
             if event is not None:
@@ -100,27 +207,79 @@ class Terminal(_Terminal):
         timeout: Optional[float],
     ) -> Optional[bytes]:
         """
-        Read one byte from the keyboard using non-blocking msvcrt polling.
+        Read one byte from the keyboard using non-blocking console polling.
 
         ``ProactorEventLoop`` (the Windows default) does not support
-        ``add_reader``.  ``msvcrt.kbhit()`` is called directly (not via
-        :meth:`kbhit`) to avoid the blocking ``time.sleep`` in the
-        inherited implementation, which would stall the event loop.
+        ``add_reader``, so we poll the console input buffer directly.
+
+        When native event handling is enabled, ``MOUSE_EVENT`` and
+        ``WINDOW_BUFFER_SIZE_EVENT`` records are converted to escape
+        sequences and returned as bytes, interleaved with normal
+        keyboard input.
 
         :arg loop: The running asyncio event loop.
         :arg timeout: Seconds to wait, or ``None`` to wait indefinitely.
         :returns: A single byte, or ``None`` on timeout.
         """
         deadline = loop.time() + timeout if timeout is not None else None
-        iterations = 0
+        console = (win32.ConsoleInput(self._keyboard_fd)
+                   if self._native_mouse or self._native_resize else None)
+
         while True:
+            if self._event_buf:
+                return self._event_buf.popleft().encode('latin-1')
+
+            if console is not None:
+                self._drain_native_events(console)
+                if self._event_buf:
+                    return self._event_buf.popleft().encode('latin-1')
+
             if msvcrt.kbhit():
-                data = os.read(self._keyboard_fd, 1)
-                return data
+                return os.read(self._keyboard_fd, 1)
+
             if deadline is not None and loop.time() >= deadline:
                 return None
-            iterations += 1
+
             await asyncio.sleep(0.005)
+
+    def _drain_native_events(
+        self, console: "win32.ConsoleInput"
+    ) -> None:
+        """
+        Process pending native console events into the SGR buffer.
+
+        Peeks the console input buffer and converts ``MOUSE_EVENT``
+        and ``WINDOW_BUFFER_SIZE_EVENT`` records to escape sequences.
+        Stops at the first key-down event, when the buffer is empty,
+        or after buffering at least one sequence.  Non-key-down events
+        that are not handled are consumed silently.
+        """
+        while True:
+            event = console.peek()
+            if event is None:
+                return
+            if (self._native_mouse
+                    and event.EventType == win32.MOUSE_EVENT):
+                sgr_seqs = _win32_mouse_to_sgr(
+                    event, self._prev_button_state)
+                self._prev_button_state = (
+                    event.Event.MouseEvent.dwButtonState & 0x0007)
+                console.read()
+                for seq in sgr_seqs:
+                    self._event_buf.extend(seq)
+                if self._event_buf:
+                    return
+                continue
+            if (self._native_resize
+                    and event.EventType == win32.WINDOW_BUFFER_SIZE_EVENT):
+                console.read()
+                seq = _win32_resize_to_seq(self._init_descriptor)
+                self._event_buf.extend(seq)
+                return
+            if (event.EventType == win32.KEY_EVENT
+                    and event.Event.KeyEvent.bKeyDown):
+                return
+            console.read()
 
     @staticmethod
     def _winsize(fd: int) -> WINSZ:
@@ -143,6 +302,117 @@ class Terminal(_Terminal):
         window = win32.get_terminal_size(fd)
         return WINSZ(ws_row=window.lines, ws_col=window.columns,
                      ws_xpixel=0, ws_ypixel=0)
+
+    @contextlib.contextmanager
+    def mouse_enabled(self, **kwargs) -> Generator[None, None, None]:
+        """
+        Context manager for enabling mouse tracking.
+
+        Probes the terminal for DEC private mode support (SGR mouse,
+        mode 1006).  If supported, delegates to the base class so that
+        escape-sequence-based mouse tracking is used natively.
+
+        Otherwise, falls back to enabling ``ENABLE_MOUSE_INPUT`` on
+        the console handle and converting native ``MOUSE_EVENT``
+        records into SGR escape sequences so that :meth:`inkey`
+        returns standard :class:`~.Keystroke` objects with
+        ``MOUSE_*`` names.
+
+        Accepts the same keyword arguments as
+        :meth:`~blessed.terminal.Terminal.mouse_enabled`.
+        """
+        if super().does_mouse(**kwargs):
+            with super().mouse_enabled(**kwargs):
+                yield
+            return
+
+        if self._keyboard_fd is None:
+            yield
+            return
+
+        filehandle = msvcrt.get_osfhandle(self._keyboard_fd)
+        save_mode = win32.get_console_mode(filehandle)
+        win32.set_console_mode(
+            filehandle, save_mode | win32.ENABLE_MOUSE_INPUT)
+        self._native_mouse = True
+        self._prev_button_state = 0
+        self._dec_mode_cache[
+            _DecPrivateMode.MOUSE_EXTENDED_SGR] = DecModeResponse.SET
+        try:
+            yield
+        finally:
+            self._native_mouse = False
+            self._event_buf.clear()
+            del self._dec_mode_cache[
+                _DecPrivateMode.MOUSE_EXTENDED_SGR]
+            win32.set_console_mode(filehandle, save_mode)
+
+    def does_mouse(self, **kwargs) -> bool:
+        """
+        Check if the terminal supports mouse tracking.
+
+        Returns ``True`` unconditionally on Windows.  The terminal may
+        support DEC private modes for mouse (probed at enable time),
+        but the native console API is always available as a fallback.
+        """
+        return True
+
+    @contextlib.contextmanager
+    def notify_on_resize(self, **kwargs) -> Generator[None, None, None]:
+        """
+        Context manager for enabling in-band window resize notifications.
+
+        Probes the terminal for DEC private mode 2048 support.  If
+        supported, delegates to the base class.  Otherwise, falls back
+        to enabling ``ENABLE_WINDOW_INPUT`` on the console handle and
+        converting native ``WINDOW_BUFFER_SIZE_EVENT`` records into
+        DEC mode 2048 escape sequences so that :meth:`inkey` returns
+        a :class:`~.Keystroke` with ``name == 'RESIZE_EVENT'``.
+
+        DEC mode 2048 is not yet supported by Windows Terminal
+        (`microsoft/terminal#19618
+        <https://github.com/microsoft/terminal/issues/19618>`_),
+        so the native fallback is currently always used.
+
+        Accepts the same keyword arguments as
+        :meth:`~blessed.terminal.Terminal.notify_on_resize`.
+        """
+        if super().does_inband_resize(**kwargs):
+            with super().notify_on_resize(**kwargs):
+                yield
+            return
+
+        if self._keyboard_fd is None:
+            yield
+            return
+
+        filehandle = msvcrt.get_osfhandle(self._keyboard_fd)
+        save_mode = win32.get_console_mode(filehandle)
+        win32.set_console_mode(
+            filehandle, save_mode | win32.ENABLE_WINDOW_INPUT)
+        self._native_resize = True
+        self._dec_mode_cache[
+            _DecPrivateMode.IN_BAND_WINDOW_RESIZE] = DecModeResponse.SET
+        try:
+            yield
+        finally:
+            self._native_resize = False
+            self._event_buf.clear()
+            del self._dec_mode_cache[
+                _DecPrivateMode.IN_BAND_WINDOW_RESIZE]
+            self._preferred_size_cache = None
+            win32.set_console_mode(filehandle, save_mode)
+
+    def does_inband_resize(self, **kwargs) -> bool:
+        """
+        Check if the terminal supports in-band window resize notifications.
+
+        Returns ``True`` unconditionally on Windows.  The terminal may
+        support DEC mode 2048 (probed at enable time), but the native
+        console ``WINDOW_BUFFER_SIZE_EVENT`` is always available as a
+        fallback.
+        """
+        return True
 
     @contextlib.contextmanager
     def cbreak(self) -> Generator[None, None, None]:
