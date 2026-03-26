@@ -19,6 +19,10 @@ from .terminal import Terminal as _Terminal
 from .dec_modes import DecPrivateMode as _DecPrivateMode
 from .dec_modes import DecModeResponse
 
+# Maximum time to block in WaitForSingleObject before returning
+# to Python for signal processing (e.g. KeyboardInterrupt).
+POLL_KBHIT_PERIOD = 0.25
+
 # Windows button state bits -> SGR button numbers.
 _WIN32_BUTTON_MAP = (
     (0x0001, 0),  # FROM_LEFT_1ST_BUTTON_PRESSED -> left
@@ -163,7 +167,7 @@ class Terminal(_Terminal):
             elapsed (float).
         :rtype: bool
         :returns: True if a keypress is awaiting to be read on the keyboard
-            attached to this terminal.
+            attached to this terminal within the given ``timeout``.
         """
         if self._keyboard_fd is None:
             return False
@@ -191,15 +195,14 @@ class Terminal(_Terminal):
                 continue
 
             # Buffer empty -- wait for something to arrive.
-            if deadline is not None:
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    return False
-            else:
-                remaining = None
-
-            if not console.wait(remaining):
+            remaining = (
+                deadline - time.monotonic() if deadline
+                else POLL_KBHIT_PERIOD)
+            if remaining <= 0:
                 return False
+
+            if not console.wait(min(remaining, POLL_KBHIT_PERIOD)):
+                continue
 
     async def _async_read_byte(
         self,
