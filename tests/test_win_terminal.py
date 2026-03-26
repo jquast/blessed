@@ -328,13 +328,26 @@ def test_drain_tracks_button_state():
     child()
 
 
-def test_mouse_enabled_native_sets_and_clears():
+_NATIVE_CTX_PARAMS = pytest.mark.parametrize(
+    "ctx_method,probe_method,flag,dec_mode,enable_bit", [
+        ('mouse_enabled', 'does_mouse', '_native_mouse',
+         DecPrivateMode.MOUSE_EXTENDED_SGR if IS_WINDOWS else 0,
+         win32.ENABLE_MOUSE_INPUT if IS_WINDOWS else 0),
+        ('notify_on_resize', 'does_inband_resize', '_native_resize',
+         DecPrivateMode.IN_BAND_WINDOW_RESIZE if IS_WINDOWS else 0,
+         win32.ENABLE_WINDOW_INPUT if IS_WINDOWS else 0),
+    ])
+
+
+@_NATIVE_CTX_PARAMS
+def test_native_fallback_sets_and_clears(
+        ctx_method, probe_method, flag, dec_mode, enable_bit):
     @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._keyboard_fd = 0
 
-        with mock.patch.object(type(term), 'does_mouse',
+        with mock.patch.object(type(term), probe_method,
                                return_value=False, create=True), \
                 mock.patch('blessed.win_terminal.msvcrt.get_osfhandle',
                            return_value=42), \
@@ -342,72 +355,31 @@ def test_mouse_enabled_native_sets_and_clears():
                 win32, 'get_console_mode',
                 return_value=0x0201), \
                 mock.patch.object(win32, 'set_console_mode') as mock_set:
-            cache_key = int(DecPrivateMode.MOUSE_EXTENDED_SGR)
-            with term.mouse_enabled():
-                assert term._native_mouse is True
+            cache_key = int(dec_mode)
+            with getattr(term, ctx_method)():
+                assert getattr(term, flag) is True
                 assert cache_key in term._dec_mode_cache
-                mock_set.assert_called_with(
-                    42, 0x0201 | win32.ENABLE_MOUSE_INPUT)
+                mock_set.assert_called_with(42, 0x0201 | enable_bit)
 
-            assert term._native_mouse is False
+            assert getattr(term, flag) is False
             assert len(term._event_buf) == 0
             assert cache_key not in term._dec_mode_cache
             assert mock_set.call_args_list[-1] == mock.call(42, 0x0201)
     child()
 
 
-def test_mouse_enabled_no_keyboard_fd():
+@_NATIVE_CTX_PARAMS
+def test_native_fallback_no_keyboard_fd(
+        ctx_method, probe_method, flag, dec_mode, enable_bit):
     @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._keyboard_fd = None
 
-        with mock.patch.object(type(term), 'does_mouse',
+        with mock.patch.object(type(term), probe_method,
                                return_value=False, create=True):
-            with term.mouse_enabled():
-                assert term._native_mouse is False
-    child()
-
-
-def test_notify_on_resize_native_sets_and_clears():
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._keyboard_fd = 0
-
-        with mock.patch.object(type(term), 'does_inband_resize',
-                               return_value=False, create=True), \
-                mock.patch('blessed.win_terminal.msvcrt.get_osfhandle',
-                           return_value=42), \
-                mock.patch.object(
-                win32, 'get_console_mode',
-                return_value=0x0201), \
-                mock.patch.object(win32, 'set_console_mode') as mock_set:
-            cache_key = int(DecPrivateMode.IN_BAND_WINDOW_RESIZE)
-            with term.notify_on_resize():
-                assert term._native_resize is True
-                assert cache_key in term._dec_mode_cache
-                mock_set.assert_called_with(
-                    42, 0x0201 | win32.ENABLE_WINDOW_INPUT)
-
-            assert term._native_resize is False
-            assert len(term._event_buf) == 0
-            assert cache_key not in term._dec_mode_cache
-            assert term._preferred_size_cache is None
-            assert mock_set.call_args_list[-1] == mock.call(42, 0x0201)
-    child()
-
-
-def test_notify_on_resize_no_keyboard_fd():
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._keyboard_fd = None
-
-        with mock.patch.object(type(term), 'does_inband_resize',
-                               return_value=False, create=True):
-            with term.notify_on_resize():
-                assert term._native_resize is False
+            with getattr(term, ctx_method)():
+                assert getattr(term, flag) is False
     child()
 
 
