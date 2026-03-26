@@ -121,6 +121,13 @@ The :meth:`~.Terminal.does_mouse` method accepts the same parameters as
 :meth:`~.Terminal.mouse_enabled` and returns ``True`` if all of given modes are
 supported.
 
+.. note::
+
+   On Windows, :meth:`~.Terminal.does_mouse` always returns ``True`` because
+   the native console API provides mouse events on all versions.  Native
+   ``MOUSE_EVENT`` records are automatically converted to the same event
+   format used on Unix, so the same code works on all platforms.
+
 Using mouse_enabled()
 ---------------------
 

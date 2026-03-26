@@ -12,6 +12,7 @@ from blessed.keyboard import Keystroke, _match_dec_event
 from blessed.mouse import MouseEvent, MouseSGREvent, MouseLegacyEvent
 from blessed.dec_modes import DecModeResponse
 from .accessories import TestTerminal, as_subprocess, make_enabled_dec_cache
+from .conftest import IS_WINDOWS
 
 
 class TestMouseEventMatching:
@@ -681,6 +682,7 @@ def test_mouse_enabled_no_styling():
     (False, False, True, True, [1006, 1003, 1016]),
     (False, False, False, False, [1006]),
 ])
+@pytest.mark.skipif(IS_WINDOWS, reason="Windows uses native console mouse API")
 def test_does_mouse_supported(clicks, drag, motion, pixels, expected_modes):
     """Test does_mouse returns True when all required modes are supported."""
     @as_subprocess
@@ -703,6 +705,7 @@ def test_does_mouse_supported(clicks, drag, motion, pixels, expected_modes):
     child()
 
 
+@pytest.mark.skipif(IS_WINDOWS, reason="Windows uses native console mouse API")
 def test_does_mouse_unsupported():
     """Test does_mouse returns False when any mode is unsupported."""
     @as_subprocess
@@ -735,6 +738,7 @@ def test_does_mouse_no_styling():
     assert stream.getvalue() == ""
 
 
+@pytest.mark.skipif(IS_WINDOWS, reason="Windows uses native console mouse API")
 def test_does_mouse_default_parameters():
     """Test does_mouse with default parameters checks click tracking."""
     @as_subprocess
@@ -754,6 +758,7 @@ def test_does_mouse_default_parameters():
     child()
 
 
+@pytest.mark.skipif(IS_WINDOWS, reason="Windows uses native console mouse API")
 def test_does_mouse_custom_timeout():
     """Test does_mouse respects custom timeout parameter."""
     @as_subprocess

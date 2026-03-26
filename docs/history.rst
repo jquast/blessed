@@ -2,9 +2,16 @@
 
 Version History
 ===============
+
+1.34
+  * improved: Windows now supports :meth:`~.Terminal.does_mouse`,
+    :meth:`~.Terminal.notify_on_resize`, and :meth:`~.Terminal.mouse_enabled`. More than 100x
+    improvement of response times to keyboard input and automatic response sequences on the Windows
+    platform by using ``WaitForSingleObject`` initially proposed by :ghuser:`cr545l`, :ghpull:`354`.
+  * bugfix: :meth:`~.Terminal.async_inkey` no longer raises NotImplementedError on Windows.
+
 1.33
   * bugfix: :class:`blessed.line_editor.LineEditor` exceed limit when using Yank (Ctrl+Y).
-  * bugfix: :meth:`~.Terminal.async_inkey` no longer raises NotImplementedError on Windows.
 
 1.32
   * bugfix: :meth:`~.Terminal.get_kitty_keyboard_state` should not check for

@@ -10,4 +10,4 @@ else:
         while True:
             inp = term.inkey()
             if inp.name and inp.name.endswith('_MOTION'):
-                print(f"Drag event at ({inp.y}, {inp.x})")
+                print(f"Drag event at ({inp.mouse_yx})")
