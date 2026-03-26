@@ -246,13 +246,17 @@ class Terminal(_Terminal):
         self, console: "win32.ConsoleInput"
     ) -> None:
         """
-        Process pending native console events into the SGR buffer.
+        Process pending native console events into the event buffer.
 
-        Peeks the console input buffer and converts ``MOUSE_EVENT``
-        and ``WINDOW_BUFFER_SIZE_EVENT`` records to escape sequences.
-        Stops at the first key-down event, when the buffer is empty,
-        or after buffering at least one sequence.  Non-key-down events
-        that are not handled are consumed silently.
+        Drains the console input buffer in one pass, converting all
+        pending ``MOUSE_EVENT`` and ``WINDOW_BUFFER_SIZE_EVENT``
+        records to escape sequences.  Consuming events eagerly
+        prevents the console from coalescing mouse positions during
+        fast drags.
+
+        Stops at the first key-down event or when the buffer is
+        empty.  Non-key-down events that are not handled (key-up,
+        focus, menu) are consumed silently.
         """
         while True:
             event = console.peek()
@@ -267,15 +271,13 @@ class Terminal(_Terminal):
                 console.read()
                 for seq in sgr_seqs:
                     self._event_buf.extend(seq)
-                if self._event_buf:
-                    return
                 continue
             if (self._native_resize
                     and event.EventType == win32.WINDOW_BUFFER_SIZE_EVENT):
                 console.read()
                 seq = _win32_resize_to_seq(self._init_descriptor)
                 self._event_buf.extend(seq)
-                return
+                continue
             if (event.EventType == win32.KEY_EVENT
                     and event.Event.KeyEvent.bKeyDown):
                 return
