@@ -370,10 +370,13 @@ class Terminal(_Terminal):
         """
         Check if the terminal supports mouse tracking.
 
-        Returns ``True`` unconditionally on Windows.  The terminal may
-        support DEC private modes for mouse (probed at enable time),
-        but the native console API is always available as a fallback.
+        Returns ``True`` on Windows when connected to a real console
+        with styling enabled.  The terminal may support DEC private
+        modes for mouse (probed at enable time), but the native
+        console API is always available as a fallback.
         """
+        if not self.is_a_tty or not self._does_styling:
+            return False
         return True
 
     @contextlib.contextmanager
@@ -426,11 +429,13 @@ class Terminal(_Terminal):
         """
         Check if the terminal supports in-band window resize notifications.
 
-        Returns ``True`` unconditionally on Windows.  The terminal may
-        support DEC mode 2048 (probed at enable time), but the native
-        console ``WINDOW_BUFFER_SIZE_EVENT`` is always available as a
-        fallback.
+        Returns ``True`` on Windows when connected to a real console
+        with styling enabled.  The terminal may support DEC mode 2048
+        (probed at enable time), but the native console
+        ``WINDOW_BUFFER_SIZE_EVENT`` is always available as a fallback.
         """
+        if not self.is_a_tty or not self._does_styling:
+            return False
         return True
 
     @contextlib.contextmanager

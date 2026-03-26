@@ -25,6 +25,7 @@ from blessed.keyboard import (
     DeviceAttribute,
 )
 from .accessories import TestTerminal, as_subprocess, make_enabled_dec_cache
+from .conftest import IS_WINDOWS
 
 # For backwards compatibility and convenience in tests
 DecPrivateMode = Terminal.DecPrivateMode
@@ -1171,6 +1172,7 @@ def test_sixel_ignores_zero_pixel_cache():
     child()
 
 
+@pytest.mark.skipif(IS_WINDOWS, reason="Windows uses native console resize API")
 @pytest.mark.parametrize("response_value,expected", [
     (DecModeResponse.SET, True),
     (DecModeResponse.NOT_RECOGNIZED, False),
