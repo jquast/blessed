@@ -8,7 +8,7 @@ import msvcrt
 import asyncio
 import contextlib
 import collections
-from typing import List, Optional, Generator
+from typing import IO, List, Union, Optional, Generator
 
 # 3rd party
 from jinxed import win32
@@ -106,9 +106,12 @@ def _win32_resize_to_seq(fd: int) -> str:
 class Terminal(_Terminal):
     """Windows subclass of :class:`Terminal`."""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._event_buf: collections.deque = collections.deque()
+    def __init__(self,
+                 kind: Optional[str] = None,
+                 stream: Optional[IO[str]] = None,
+                 force_styling: Union[bool, None] = False) -> None:
+        super().__init__(kind=kind, stream=stream, force_styling=force_styling)
+        self._event_buf: collections.deque[str] = collections.deque()
         self._prev_button_state: int = 0
         self._native_mouse: bool = False
         self._native_resize: bool = False
@@ -309,7 +312,9 @@ class Terminal(_Terminal):
                      ws_xpixel=0, ws_ypixel=0)
 
     @contextlib.contextmanager
-    def mouse_enabled(self, **kwargs) -> Generator[None, None, None]:
+    def mouse_enabled(self, *, clicks: bool = True, report_pixels: bool = False,
+                      report_drag: bool = False, report_motion: bool = False,
+                      timeout: float = 1.0) -> Generator[None, None, None]:
         """
         Context manager for enabling mouse tracking.
 
@@ -326,8 +331,14 @@ class Terminal(_Terminal):
         Accepts the same keyword arguments as
         :meth:`~blessed.terminal.Terminal.mouse_enabled`.
         """
-        if super().does_mouse(**kwargs):
-            with super().mouse_enabled(**kwargs):
+        if super().does_mouse(clicks=clicks, report_pixels=report_pixels,
+                              report_drag=report_drag,
+                              report_motion=report_motion, timeout=timeout):
+            with super().mouse_enabled(clicks=clicks,
+                                       report_pixels=report_pixels,
+                                       report_drag=report_drag,
+                                       report_motion=report_motion,
+                                       timeout=timeout):
                 yield
             return
 
@@ -352,7 +363,9 @@ class Terminal(_Terminal):
                 _DecPrivateMode.MOUSE_EXTENDED_SGR]
             win32.set_console_mode(filehandle, save_mode)
 
-    def does_mouse(self, **kwargs) -> bool:
+    def does_mouse(self, *, clicks: bool = True, report_pixels: bool = False,
+                   report_drag: bool = False, report_motion: bool = False,
+                   timeout: float = 1.0) -> bool:
         """
         Check if the terminal supports mouse tracking.
 
@@ -363,7 +376,7 @@ class Terminal(_Terminal):
         return True
 
     @contextlib.contextmanager
-    def notify_on_resize(self, **kwargs) -> Generator[None, None, None]:
+    def notify_on_resize(self, timeout: float = 1.0) -> Generator[None, None, None]:
         """
         Context manager for enabling in-band window resize notifications.
 
@@ -382,8 +395,8 @@ class Terminal(_Terminal):
         Accepts the same keyword arguments as
         :meth:`~blessed.terminal.Terminal.notify_on_resize`.
         """
-        if super().does_inband_resize(**kwargs):
-            with super().notify_on_resize(**kwargs):
+        if super().does_inband_resize(timeout=timeout):
+            with super().notify_on_resize(timeout=timeout):
                 yield
             return
 
@@ -408,7 +421,7 @@ class Terminal(_Terminal):
             self._preferred_size_cache = None
             win32.set_console_mode(filehandle, save_mode)
 
-    def does_inband_resize(self, **kwargs) -> bool:
+    def does_inband_resize(self, timeout: float = 1.0) -> bool:
         """
         Check if the terminal supports in-band window resize notifications.
 
