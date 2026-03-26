@@ -31,8 +31,9 @@ _WIN32_BUTTON_MAP = (
 )
 
 
-def _win32_mouse_to_sgr(mouse_event: "win32.INPUT_RECORD",
-                        prev_button_state: int) -> List[str]:
+def _win32_mouse_to_sgr(  # pylint: disable=too-many-locals
+        mouse_event: "win32.INPUT_RECORD",
+        prev_button_state: int) -> List[str]:
     """
     Convert a native Windows MOUSE_EVENT to SGR escape sequences.
 

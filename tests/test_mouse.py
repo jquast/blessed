@@ -758,6 +758,7 @@ def test_does_mouse_default_parameters():
     child()
 
 
+@pytest.mark.skipif(IS_WINDOWS, reason="Windows uses native console mouse API")
 def test_does_mouse_custom_timeout():
     """Test does_mouse respects custom timeout parameter."""
     @as_subprocess

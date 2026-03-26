@@ -169,6 +169,7 @@ def test_kbhit_returns_true_when_buf_has_data():
     @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        term._keyboard_fd = 0
         term._event_buf.extend('x')
         assert term.kbhit(timeout=0) is True
     child()
