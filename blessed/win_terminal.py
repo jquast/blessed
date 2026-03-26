@@ -110,6 +110,7 @@ class Terminal(_Terminal):
                  kind: Optional[str] = None,
                  stream: Optional[IO[str]] = None,
                  force_styling: Union[bool, None] = False) -> None:
+        """Initialize Windows terminal instance."""
         super().__init__(kind=kind, stream=stream, force_styling=force_styling)
         self._event_buf: collections.deque[str] = collections.deque()
         self._prev_button_state: int = 0
