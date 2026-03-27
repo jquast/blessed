@@ -8,9 +8,9 @@ Version History
   * introduced: :meth:`~.Terminal.cursor_shape` context manager and
     :class:`~blessed.cursor_shape.CursorShape` constants for DECSCUSR cursor shape control
     (block, underline, bar -- steady or blinking).
-  * introduced: methods :meth:`~Keystroke.key_name` and :meth:`~Keystroke.key_value` allow for better key
-    and value tracking when using kitty keyboard protocol with pressed, released, and repeated
-    events.
+  * introduced: methods :meth:`~Keystroke.key_name` and :meth:`~Keystroke.key_value` allow for
+    better key and value tracking when using kitty keyboard protocol with pressed, released, and
+    repeated events.
   * improved: Synthesize :attr:`~.Keystroke.name` for "released" and "repeated" key states, when
     using the kitty keyboard protocol.
   * bugfix: :meth:`~.Terminal.get_fgcolor` and :meth:`~.Terminal.get_bgcolor` now correctly
