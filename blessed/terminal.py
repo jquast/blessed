@@ -37,7 +37,6 @@ from .keyboard import (DEFAULT_ESCDELAY,
                        get_keyboard_codes,
                        get_leading_prefixes,
                        get_keyboard_sequences)
-from .cursor_shape import CursorShape as _CursorShape
 from .dec_modes import DecPrivateMode as _DecPrivateMode
 from .dec_modes import DecModeResponse
 from .sequences import Termcap, Sequence
@@ -51,6 +50,7 @@ from .formatters import (COLORS,
                          split_compound,
                          resolve_attribute,
                          resolve_capability)
+from .cursor_shape import CursorShape as _CursorShape
 from ._capabilities import (CAPABILITY_DATABASE,
                             CAPABILITIES_ADDITIVES,
                             CAPABILITIES_RAW_MIXIN,

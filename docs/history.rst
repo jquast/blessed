@@ -4,16 +4,17 @@ Version History
 ===============
 
 1.35
+
   * introduced: :meth:`~.Terminal.cursor_shape` context manager and
     :class:`~blessed.cursor_shape.CursorShape` constants for DECSCUSR cursor shape control
     (block, underline, bar -- steady or blinking).
-  * bugfix: :meth:`~.Terminal.get_fgcolor` and :meth:`~.Terminal.get_bgcolor` now correctly
-    interprets ST-terminated OSC responses in addition to BEL-terminated.
-  * improved: Synthesize :attr:`~.Keystroke.name` for "released" and "repeated" key states, when
-    using the kitty keyboard protocol.
-  * new: methods :meth:`~Keystroke.key_name` and :meth:`~Keystroke.key_value` allow for better key
+  * introduced: methods :meth:`~Keystroke.key_name` and :meth:`~Keystroke.key_value` allow for better key
     and value tracking when using kitty keyboard protocol with pressed, released, and repeated
     events.
+  * improved: Synthesize :attr:`~.Keystroke.name` for "released" and "repeated" key states, when
+    using the kitty keyboard protocol.
+  * bugfix: :meth:`~.Terminal.get_fgcolor` and :meth:`~.Terminal.get_bgcolor` now correctly
+    interprets ST-terminated OSC responses in addition to BEL-terminated.
 
 1.34
   * improved: Windows now supports :meth:`~.Terminal.does_mouse`,

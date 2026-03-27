@@ -65,8 +65,7 @@ class CursorShape:
         """
         Return the DECSCUSR escape sequence for the given cursor style.
 
-        :arg style: An integer constant (0-6) or a string name
-            (e.g. ``'blinking_bar'``).
+        :arg style: An integer constant (0-6) or a string name (e.g. ``'blinking_bar'``).
         :returns: The escape sequence string.
         :raises ValueError: If *style* is not a valid cursor shape.
         """
