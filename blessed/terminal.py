@@ -37,6 +37,7 @@ from .keyboard import (DEFAULT_ESCDELAY,
                        get_keyboard_codes,
                        get_leading_prefixes,
                        get_keyboard_sequences)
+from .cursor_shape import CursorShape as _CursorShape
 from .dec_modes import DecPrivateMode as _DecPrivateMode
 from .dec_modes import DecModeResponse
 from .sequences import Termcap, Sequence
@@ -163,6 +164,9 @@ class Terminal():
         'terminal_enquire': 'u9',
         'change_scroll_region': 'csr',
     }
+
+    #: DECSCUSR cursor shape constants accessible via Terminal.CursorShape or term.CursorShape
+    CursorShape = _CursorShape
 
     #: DEC Private Mode constants accessible via Terminal.DecPrivateMode or term.DecPrivateMode
     DecPrivateMode = _DecPrivateMode
@@ -2453,6 +2457,41 @@ class Terminal():
         finally:
             self.stream.write(self.normal_cursor)
             self.stream.flush()
+
+    @contextlib.contextmanager
+    def cursor_shape(self, style: Union[int, str] = _CursorShape.STEADY_BLOCK
+                     ) -> Generator[None, None, None]:
+        """
+        Context manager that sets cursor shape, restoring default on exit.
+
+        :arg style: A :class:`CursorShape` constant or string name
+            (e.g. ``'blinking_bar'``).
+
+        Uses DECSCUSR (DEC Set Cursor Style) escape sequences::
+
+            with term.cursor_shape(term.CursorShape.BLINKING_BAR):
+                main()
+
+        String names are also accepted::
+
+            with term.cursor_shape('steady_underline'):
+                main()
+
+        On exit, the cursor is reset to the terminal default (DECSCUSR 0).
+
+        .. note:: DECSCUSR is supported by most modern terminals including
+            xterm, VTE-based terminals, iTerm2, Windows Terminal, kitty,
+            ghostty, alacritty, and WezTerm.
+        """
+        if self.does_styling:
+            self.stream.write(_CursorShape.sequence(style))
+            self.stream.flush()
+        try:
+            yield
+        finally:
+            if self.does_styling:
+                self.stream.write(_CursorShape.sequence(_CursorShape.DEFAULT))
+                self.stream.flush()
 
     @contextlib.contextmanager
     def no_line_wrap(self) -> Generator[None, None, None]:

@@ -4,6 +4,9 @@ Version History
 ===============
 
 1.35
+  * introduced: :meth:`~.Terminal.cursor_shape` context manager and
+    :class:`~blessed.cursor_shape.CursorShape` constants for DECSCUSR cursor shape control
+    (block, underline, bar -- steady or blinking).
   * bugfix: :meth:`~.Terminal.get_fgcolor` and :meth:`~.Terminal.get_bgcolor` now correctly
     interprets ST-terminated OSC responses in addition to BEL-terminated.
   * improved: Synthesize :attr:`~.Keystroke.name` for "released" and "repeated" key states, when
