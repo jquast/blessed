@@ -145,6 +145,8 @@ CAPABILITIES_ADDITIVES: typing.Dict[
     'clr_eol0': (rf'{_CSI}0K', ''),
     'clr_bol': (rf'{_CSI}1K', ''),
     'clr_eosK': (rf'{_CSI}2K', ''),
+    'cursor_shape': (rf'{_CSI}[0-6] q', ''),
+    'cursor_color_reset': (rf'{_ESC}\]112(?:{_ESC}\\|\x07)', ''),
 }
 
 CAPABILITIES_HORIZONTAL_DISTANCE: typing.Dict[str, int] = {

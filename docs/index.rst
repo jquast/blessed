@@ -12,6 +12,7 @@ Welcome to Blessed documentation!
    keyboard_kitty
    line_editor
    mouse
+   cursor
    dec_modes
    location
    measuring
