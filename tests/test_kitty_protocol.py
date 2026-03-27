@@ -1529,3 +1529,58 @@ def test_kitty_state_boundary_kitty_only_response(response, expected_flags):
         assert flags.value == expected_flags
         assert term._kitty_kb_first_query_failed is False
     child()
+
+
+@pytest.mark.parametrize("sequence,expected_key_name,expected_key_value", [
+    # Press: key_name == name, key_value == value
+    ('\x1b[97;5u', 'KEY_CTRL_A', 'a'),
+    ('\x1b[122;3u', 'KEY_ALT_Z', 'z'),
+
+    # Repeat: key_name strips _REPEATED
+    ('\x1b[97;1:2u', 'KEY_A', 'a'),
+    ('\x1b[97;3:2u', 'KEY_ALT_A', 'a'),
+    ('\x1b[106;5:2u', 'KEY_CTRL_J', 'j'),
+
+    # Release: key_name strips _RELEASED, key_value returns the character
+    ('\x1b[97;1:3u', 'KEY_A', 'a'),
+    ('\x1b[97;3:3u', 'KEY_ALT_A', 'a'),
+    ('\x1b[122;7:3u', 'KEY_CTRL_ALT_Z', 'z'),
+    ('\x1b[49;5:3u', 'KEY_CTRL_1', '1'),
+    ('\x1b[111;1:3u', 'KEY_O', 'o'),
+])
+def test_key_name_and_key_value(sequence, expected_key_name, expected_key_value):
+    """Test key_name strips event suffix and key_value works for releases."""
+    ks = _match_kitty_key(sequence)
+    assert ks.key_name == expected_key_name
+    assert ks.key_value == expected_key_value
+
+
+@pytest.mark.parametrize("sequence,expected_name,expected_key_value", [
+    # Control char keys: key_value returns the control character for releases
+    ('\x1b[27;1:3u', 'KEY_ESCAPE', '\x1b'),
+    ('\x1b[13;1:3u', 'KEY_ENTER', '\n'),
+    ('\x1b[9;1:3u', 'KEY_TAB', '\t'),
+])
+def test_key_value_control_keys_released(sequence, expected_name, expected_key_value):
+    """Test key_value returns control char for released control keys."""
+    ks = _match_kitty_key(sequence)
+    assert ks.released
+    assert ks.key_name == expected_name
+    assert ks.key_value == expected_key_value
+    assert ks.value == ''
+
+
+def test_key_name_plain_text():
+    """Test key_name is None for plain text press (no name synthesized)."""
+    ks = Keystroke('a')
+    assert ks.name is None
+    assert ks.key_name is None
+    assert ks.key_value == 'a'
+
+
+def test_key_name_key_value_press_identity():
+    """Test key_name == name and key_value == value for press events."""
+    ks = _match_kitty_key('\x1b[97;5u')
+    assert ks.pressed
+    assert ks.key_name == ks.name
+    assert ks.key_value == ks.value

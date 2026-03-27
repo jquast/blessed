@@ -145,6 +145,15 @@ The :class:`~.Keystroke` class provides properties about key events:
 * :attr:`~.Keystroke.repeated` - ``True`` if this is a key repeat event
 * :attr:`~.Keystroke.released` - ``True`` if this is a key release event
 
+For press/release tracking, two additional properties provide stable identifiers
+across event types:
+
+* :attr:`~.Keystroke.key_name` - like :attr:`~.Keystroke.name`, but without the
+  ``_RELEASED`` or ``_REPEATED`` suffix, so that the same key always returns the
+  same name regardless of event type.
+* :attr:`~.Keystroke.key_value` - like :attr:`~.Keystroke.value`, but returns the
+  character even for release events (where :attr:`~.Keystroke.value` returns ``''``).
+
 **Note:** These event types can only be distinguished when using the :doc:`Kitty
 Keyboard Protocol <keyboard_kitty>`. Without it, all keystrokes will have
 ``pressed=True`` and ``repeated=False``, ``released=False``.
