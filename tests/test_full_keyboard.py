@@ -629,13 +629,14 @@ def test_get_fgcolor_0s():
     child()
 
 
-def test_get_fgcolor_0s_reply_via_ungetch():
-    """0-second get_fgcolor call with response."""
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_get_fgcolor_0s_reply_via_ungetch(terminator):
+    """0-second get_fgcolor call with BEL or ST terminated response."""
     @as_subprocess
     def child():
         term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         stime = time.time()
-        term.ungetch('\x1b]10;rgb:a0/52/2d\x07')  # sienna
+        term.ungetch('\x1b]10;rgb:a0/52/2d' + terminator)  # sienna
 
         rgb = term.get_fgcolor(timeout=0.01, bits=8)
         assert math.floor(time.time() - stime) == 0.0
@@ -643,12 +644,13 @@ def test_get_fgcolor_0s_reply_via_ungetch():
     child()
 
 
-def test_get_fgcolor_requires_styling():
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_get_fgcolor_requires_styling(terminator):
     """get_fgcolor returns (-1, -1, -1) when does_styling is False."""
     @as_subprocess
     def child():
         term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        term.ungetch('\x1b]10;rgb:d2/b4/8c\x07')  # tan
+        term.ungetch('\x1b]10;rgb:d2/b4/8c' + terminator)  # tan
         rgb = term.get_fgcolor(timeout=0.01, bits=8)
         assert rgb == (210, 180, 140)
 
@@ -658,12 +660,13 @@ def test_get_fgcolor_requires_styling():
     child()
 
 
-def test_get_fgcolor_16bit_reply_via_ungetch():
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_get_fgcolor_16bit_reply_via_ungetch(terminator):
     """get_fgcolor call with default 16-bit response."""
     @as_subprocess
     def child():
         term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        term.ungetch('\x1b]10;rgb:a099/5277/2d44\x07')  # sienna-ish
+        term.ungetch('\x1b]10;rgb:a099/5277/2d44' + terminator)  # sienna-ish
         rgb = term.get_fgcolor(timeout=0.01)
         assert rgb == (0xa099, 0x5277, 0x2d44)
     child()
@@ -681,13 +684,14 @@ def test_get_bgcolor_0s():
     child()
 
 
-def test_get_bgcolor_0s_reply_via_ungetch():
-    """0-second get_bgcolor call with response."""
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_get_bgcolor_0s_reply_via_ungetch(terminator):
+    """0-second get_bgcolor call with BEL or ST terminated response."""
     @as_subprocess
     def child():
         term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         stime = time.time()
-        term.ungetch('\x1b]11;rgb:99/32/cc\x07')  # darkorchid
+        term.ungetch('\x1b]11;rgb:99/32/cc' + terminator)  # darkorchid
 
         rgb = term.get_bgcolor(timeout=0.01, bits=8)
         assert math.floor(time.time() - stime) == 0.0
@@ -695,12 +699,13 @@ def test_get_bgcolor_0s_reply_via_ungetch():
     child()
 
 
-def test_get_bgcolor_requires_styling():
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_get_bgcolor_requires_styling(terminator):
     """get_bgcolor returns (-1, -1, -1) when does_styling is False."""
     @as_subprocess
     def child():
         term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        term.ungetch('\x1b]11;rgb:ff/e4/c4\x07')  # bisque
+        term.ungetch('\x1b]11;rgb:ff/e4/c4' + terminator)  # bisque
         rgb = term.get_bgcolor(timeout=0.01, bits=8)
         assert rgb == (255, 228, 196)
 
@@ -710,12 +715,13 @@ def test_get_bgcolor_requires_styling():
     child()
 
 
-def test_get_bgcolor_16bit_reply_via_ungetch():
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_get_bgcolor_16bit_reply_via_ungetch(terminator):
     """get_bgcolor call with default 16-bit response."""
     @as_subprocess
     def child():
         term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        term.ungetch('\x1b]11;rgb:9988/3255/cc11\x07')  # darkorchid-ish
+        term.ungetch('\x1b]11;rgb:9988/3255/cc11' + terminator)  # darkorchid-ish
         rgb = term.get_bgcolor(timeout=0.01)
         assert rgb == (0x9988, 0x3255, 0xcc11)
     child()

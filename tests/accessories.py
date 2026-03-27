@@ -18,7 +18,7 @@ from .conftest import IS_WINDOWS
 
 if IS_WINDOWS:
     # 3rd party
-    import jinxed as curses  # pylint: disable=import-error
+    import jinxed as curses
 else:
     # std imports
     import pty
@@ -27,7 +27,7 @@ else:
 
 MAX_SUBPROC_TIME_SECONDS = 2  # no test should ever take over 2 seconds
 # extra time given for timeout-related tests for CI/slow machines, by percent
-PCT_MAXWAIT_KEYSTROKE = 1.2
+PCT_MAXWAIT_KEYSTROKE = 1.5
 
 test_kind = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
 

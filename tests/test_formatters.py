@@ -22,7 +22,7 @@ if platform.system() != 'Windows':
     import curses
 else:
     # 3rd party
-    import jinxed as curses  # pylint: disable=import-error
+    import jinxed as curses
 
 
 def fn_tparm(*args):

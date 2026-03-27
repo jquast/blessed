@@ -4,16 +4,21 @@ from blessed import Terminal
 term = Terminal()
 
 print("Press and hold keys to see raw kitty keystrokes and their names (press 'q' to quit)")
-with term.enable_kitty_keyboard(report_events=True):
+with term.enable_kitty_keyboard(report_events=True, report_all_keys=True):
     with term.cbreak():
         while True:
             key = term.inkey()
 
-            if key.pressed:
-                print(f"Key {key.name} pressed, value={key.value}, sequence={key!r}")
-                if key == 'q':
-                    break
-            elif key.repeated:
-                print(f"Key repeating, sequence={key!r}")
-            elif key.released:
-                print(f"Key released, sequence={key!r}")
+            kind = ("pressed" if key.pressed
+                    else "repeated" if key.repeated
+                    else "released" if key.released
+                    else "???")
+            if key.pressed and key.value == 'q':
+                break
+            print(
+                f"Key name={
+                    key.name} value={
+                    key.value}, key_name={
+                    key.key_name} key_value={
+                    key.key_value} kind={kind}, sequence={
+                        key!r}")

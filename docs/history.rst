@@ -3,6 +3,15 @@
 Version History
 ===============
 
+1.35
+  * bugfix: :meth:`~.Terminal.get_fgcolor` and :meth:`~.Terminal.get_bgcolor` now correctly
+    interprets ST-terminated OSC responses in addition to BEL-terminated.
+  * improved: Synthesize :attr:`~.Keystroke.name` for "released" and "repeated" key states, when
+    using the kitty keyboard protocol.
+  * new: methods :meth:`~Keystroke.key_name` and :meth:`~Keystroke.key_value` allow for better key
+    and value tracking when using kitty keyboard protocol with pressed, released, and repeated
+    events.
+
 1.34
   * improved: Windows now supports :meth:`~.Terminal.does_mouse`,
     :meth:`~.Terminal.notify_on_resize`, and :meth:`~.Terminal.mouse_enabled`. More than 100x

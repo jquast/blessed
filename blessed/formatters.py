@@ -15,7 +15,7 @@ if TYPE_CHECKING:  # pragma: no cover
 # isort: off
 # curses
 if platform.system() == 'Windows':
-    import jinxed as curses   # pylint: disable=import-error
+    import jinxed as curses
 else:
     import curses
 

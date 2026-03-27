@@ -72,6 +72,17 @@ The :attr:`~.Keystroke.name` attribute also includes event type suffixes:
 ``KEY_CTRL_J`` for press, ``KEY_CTRL_J_REPEATED`` for repeat, and
 ``KEY_CTRL_J_RELEASED`` for release events.
 
+For press/release tracking (e.g., key maps), use :attr:`~.Keystroke.key_name`
+instead -- it returns the same name regardless of event type (``KEY_CTRL_J``
+for press, repeat, and release).  Similarly, :attr:`~.Keystroke.key_value`
+returns the character even for release events, where :attr:`~.Keystroke.value`
+returns ``''``.
+
+**Note:** To distinguish press, repeat, and release for plain text keys like
+``a`` or ``5``, you must also enable ``report_all_keys=True``. Without it, only
+release events are encoded with the protocol -- press and repeat arrive as plain
+characters with no event-type information.
+
 Example use case - detect only initial key presses and ignore repeats:
 
 .. code-block:: python
@@ -174,3 +185,5 @@ See Also
 * :attr:`Keystroke.pressed` - Check if key was pressed
 * :attr:`Keystroke.repeated` - Check if key is repeating
 * :attr:`Keystroke.released` - Check if key was released
+* :attr:`Keystroke.key_name` - Key identity without event-type suffix
+* :attr:`Keystroke.key_value` - Character for the key, even for release events
