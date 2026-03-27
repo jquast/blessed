@@ -13,7 +13,7 @@ if platform.system() != 'Windows':
     import tty  # pylint: disable=unused-import  # NOQA
     import curses
 else:
-    import jinxed as curses  # pylint: disable=import-error
+    import jinxed as curses
 
 
 def assert_ctrl_alt_modifiers(ks):

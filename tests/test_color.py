@@ -432,27 +432,27 @@ def test_on_color_hex():
     child()
 
 
-def test_get_fgcolor_hex():
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_get_fgcolor_hex(terminator):
     """Test get_fgcolor_hex returns hex string."""
     from io import StringIO
 
     @as_subprocess
     def child():
         t = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        t.ungetch('\x1b]10;rgb:ffff/ffff/ffff\x07')
+        t.ungetch('\x1b]10;rgb:ffff/ffff/ffff' + terminator)
         assert t.get_fgcolor_hex(timeout=0.01) == '#ffffff'
 
-        t.ungetch('\x1b]10;rgb:2828/2c2c/3434\x07')
+        t.ungetch('\x1b]10;rgb:2828/2c2c/3434' + terminator)
         assert t.get_fgcolor_hex(timeout=0.01) == '#282c34'
 
-        # XParseColor shorthand formats (1, 2, 3 hex digits)
-        t.ungetch('\x1b]10;rgb:f/f/f\x07')
+        t.ungetch('\x1b]10;rgb:f/f/f' + terminator)
         assert t.get_fgcolor_hex(timeout=0.01) == '#ffffff'
 
-        t.ungetch('\x1b]10;rgb:e5/e5/e5\x07')
+        t.ungetch('\x1b]10;rgb:e5/e5/e5' + terminator)
         assert t.get_fgcolor_hex(timeout=0.01) == '#e5e5e5'
 
-        t.ungetch('\x1b]10;rgb:abc/abc/abc\x07')
+        t.ungetch('\x1b]10;rgb:abc/abc/abc' + terminator)
         assert t.get_fgcolor_hex(timeout=0.01) == '#ababab'
     child()
 
@@ -469,21 +469,22 @@ def test_get_fgcolor_hex_timeout():
     child()
 
 
-def test_get_bgcolor_hex():
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_get_bgcolor_hex(terminator):
     """Test get_bgcolor_hex returns hex string."""
     from io import StringIO
 
     @as_subprocess
     def child():
         t = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        t.ungetch('\x1b]11;rgb:2828/2c2c/3434\x07')
+        t.ungetch('\x1b]11;rgb:2828/2c2c/3434' + terminator)
         assert t.get_bgcolor_hex(timeout=0.01) == '#282c34'
 
-        t.ungetch('\x1b]11;rgb:aaaa/bbbb/cccc\x07')
+        t.ungetch('\x1b]11;rgb:aaaa/bbbb/cccc' + terminator)
         assert t.get_bgcolor_hex(timeout=0.01, maybe_short=True) == '#abc'
 
         # XParseColor shorthand: 3 digits have nibble wrap (abc -> abca -> ab)
-        t.ungetch('\x1b]11;rgb:abc/de0/123\x07')
+        t.ungetch('\x1b]11;rgb:abc/de0/123' + terminator)
         assert t.get_bgcolor_hex(timeout=0.01) == '#abde12'
     child()
 

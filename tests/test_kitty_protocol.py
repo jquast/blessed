@@ -20,7 +20,6 @@ from tests.conftest import IS_WINDOWS, TEST_KEYBOARD
 # isort: off
 # curses
 if platform.system() == 'Windows':
-    # pylint: disable=import-error
     from jinxed import KEY_EXIT, KEY_ENTER, KEY_BACKSPACE
 else:
     from curses import KEY_EXIT, KEY_ENTER, KEY_BACKSPACE
@@ -702,6 +701,14 @@ def test_kitty_name_synthesis_edge_cases(sequence, expected_name, expected_value
     # Repeat event tests
     ('\x1b[106;5:2u', 'KEY_CTRL_J_REPEATED'),
     ('\x1b[97;3:2u', 'KEY_ALT_A_REPEATED'),
+
+    # Unmodified release/repeat events
+    ('\x1b[111;1:3u', 'KEY_O_RELEASED'),
+    ('\x1b[111;1:2u', 'KEY_O_REPEATED'),
+    ('\x1b[97;1:3u', 'KEY_A_RELEASED'),
+    ('\x1b[97;1:2u', 'KEY_A_REPEATED'),
+    ('\x1b[49;1:3u', 'KEY_1_RELEASED'),
+    ('\x1b[49;1:2u', 'KEY_1_REPEATED'),
 ])
 def test_kitty_name_synthesis_special_cases(sequence, expected_name):
     """Test special cases in Kitty protocol name synthesis including event types."""

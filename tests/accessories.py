@@ -18,7 +18,7 @@ from .conftest import IS_WINDOWS
 
 if IS_WINDOWS:
     # 3rd party
-    import jinxed as curses  # pylint: disable=import-error
+    import jinxed as curses
 else:
     # std imports
     import pty

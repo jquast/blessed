@@ -64,8 +64,8 @@ from ._capabilities import (CAPABILITY_DATABASE,
 HAS_TTY = True  # pylint: disable=invalid-name
 if platform.system() == 'Windows':
     IS_WINDOWS = True
-    import jinxed as curses  # pylint: disable=import-error
-    from jinxed.win32 import get_console_input_encoding  # pylint: disable=import-error
+    import jinxed as curses
+    from jinxed.win32 import get_console_input_encoding
 else:
     IS_WINDOWS = False
     import curses
@@ -87,9 +87,9 @@ else:
 
 _CUR_TERM = None  # See comments at end of file
 RE_GET_FGCOLOR_RESPONSE = re.compile(
-    '\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+    '\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)(?:\x07|\x1b\\\\)')
 RE_GET_BGCOLOR_RESPONSE = re.compile(
-    '\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)\x07')
+    '\x1b]11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)(?:\x07|\x1b\\\\)')
 # XTSMGRAPHICS - Query sixel graphics geometry: ESC[?2;0;<width>;<height>S
 _RE_XTSMGRAPHICS_RESPONSE = re.compile(r'\x1b\[\?2;0;(\d+);(\d+)S')
 # XTSMGRAPHICS - Query sixel color registers: ESC[?1;0;<colors>S

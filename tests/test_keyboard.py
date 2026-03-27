@@ -19,7 +19,7 @@ if platform.system() != 'Windows':
     import tty  # pylint: disable=unused-import  # NOQA
     import curses
 else:
-    import jinxed as curses  # pylint: disable=import-error
+    import jinxed as curses
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")

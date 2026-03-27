@@ -28,7 +28,6 @@ _T = TypeVar('_T', bound='Keystroke')
 # isort: off
 # curses
 if platform.system() == 'Windows':
-    # pylint: disable=import-error
     import jinxed as curses
     from jinxed.has_key import _capability_names as capability_names
 else:
@@ -321,11 +320,16 @@ class Keystroke(str):
             if getattr(self, f'_{mod_name}'):
                 mod_parts.append(mod_name.upper())
 
-        # Only synthesize name if at least one modifier is present
-        if not mod_parts:
+        # For press events, only synthesize name if modifiers are present
+        # (plain text presses like 'a' don't need a name, value suffices).
+        # For release/repeat events, always synthesize a name since value
+        # is empty for releases and name is the only way to identify the key.
+        if not mod_parts and not (self.released or self.repeated):
             return None
 
-        base_result = f"KEY_{'_'.join(mod_parts)}_{char}"
+        base_result = (f"KEY_{'_'.join(mod_parts)}_{char}"
+                       if mod_parts
+                       else f"KEY_{char}")
 
         # Append event type suffix if not a press event
         if self.repeated:
