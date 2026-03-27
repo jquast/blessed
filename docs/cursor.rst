@@ -79,21 +79,6 @@ raw escape string for manual use::
     sys.stdout.write(CursorShape.sequence(CursorShape.DEFAULT))
     sys.stdout.flush()
 
-Terminal Compatibility
-----------------------
-
-DECSCUSR is widely supported by modern terminal emulators:
-
-* xterm (since patch 282)
-* VTE-based terminals (GNOME Terminal, Tilix, Terminator)
-* iTerm2
-* Windows Terminal
-* kitty
-* ghostty
-* alacritty
-* WezTerm
-* foot
-
 Example
 -------
 
