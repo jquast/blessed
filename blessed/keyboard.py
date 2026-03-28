@@ -120,7 +120,44 @@ ALT_CONTROL_NAMES = {
     0x7f: 'KEY_ALT_BACKSPACE',  # DEL
     0x0d: 'KEY_ALT_ENTER',      # CR
     0x09: 'KEY_ALT_TAB',        # TAB
-    0x5b: 'CSI'                 # CSI '['
+}
+
+# Human-readable names for ASCII punctuation and symbols, used by kitty
+# keyboard protocol name synthesis to produce names like KEY_LEFT_SQUARE_BRACKET.
+ASCII_SYMBOL_NAMES = {
+    32: 'SPACE',
+    33: 'EXCLAMATION_MARK',
+    34: 'DOUBLE_QUOTE',
+    35: 'HASH',
+    36: 'DOLLAR',
+    37: 'PERCENT',
+    38: 'AMPERSAND',
+    39: 'APOSTROPHE',
+    40: 'LEFT_PARENTHESIS',
+    41: 'RIGHT_PARENTHESIS',
+    42: 'ASTERISK',
+    43: 'PLUS',
+    44: 'COMMA',
+    45: 'MINUS',
+    46: 'PERIOD',
+    47: 'SLASH',
+    58: 'COLON',
+    59: 'SEMICOLON',
+    60: 'LESS_THAN',
+    61: 'EQUALS',
+    62: 'GREATER_THAN',
+    63: 'QUESTION_MARK',
+    64: 'AT',
+    91: 'LEFT_SQUARE_BRACKET',
+    92: 'BACKSLASH',
+    93: 'RIGHT_SQUARE_BRACKET',
+    94: 'CARET',
+    95: 'UNDERSCORE',
+    96: 'GRAVE_ACCENT',
+    123: 'LEFT_CURLY_BRACKET',
+    124: 'PIPE',
+    125: 'RIGHT_CURLY_BRACKET',
+    126: 'TILDE',
 }
 
 
@@ -282,8 +319,9 @@ class Keystroke(str):
         """
         Get base name for Kitty keyboard protocol letter/digit/symbol.
 
-        Returns name like 'KEY_CTRL_ALT_A', 'KEY_ALT_SHIFT_5' without
-        event-type suffix.  The suffix is applied by :attr:`name`.
+        Returns name like 'KEY_CTRL_ALT_A', 'KEY_ALT_SHIFT_5',
+        'KEY_LEFT_SQUARE_BRACKET' without event-type suffix.
+        The suffix is applied by :attr:`name`.
         """
         if self._mode != DecPrivateMode.SpecialInternalKitty:
             return None
@@ -292,34 +330,20 @@ class Keystroke(str):
         base_codepoint = (self._match.base_key if self._match.base_key is not None
                           else self._match.unicode_key)
 
-        # Special case: '[' always returns 'CSI' regardless of modifiers
-        if base_codepoint == 91:  # '['
-            return 'CSI'
-
-        # Only proceed if it's an ASCII letter or digit
-        if not ((65 <= base_codepoint <= 90) or   # A-Z
-                (97 <= base_codepoint <= 122) or  # a-z
-                (48 <= base_codepoint <= 57)):    # 0-9
+        # Determine the character name component (ASCII alphanumerics only)
+        if ((65 <= base_codepoint <= 90) or (97 <= base_codepoint <= 122)
+                or (48 <= base_codepoint <= 57)):
+            char = chr(base_codepoint).upper()
+        elif base_codepoint in ASCII_SYMBOL_NAMES:
+            char = ASCII_SYMBOL_NAMES[base_codepoint]
+        else:
             return None
-
-        # For letters: convert to uppercase for consistent naming
-        # For digits: use as-is
-        char = (chr(base_codepoint).upper()
-                if (65 <= base_codepoint <= 90 or 97 <= base_codepoint <= 122)
-                else chr(base_codepoint))
 
         # Build modifier prefix list in order: CTRL, ALT, SHIFT, SUPER, HYPER, META
         mod_parts = []
         for mod_name in KittyModifierBits.names_modifiers_only:
             if getattr(self, f'_{mod_name}'):
                 mod_parts.append(mod_name.upper())
-
-        # For press events, only synthesize name if modifiers are present
-        # (plain text presses like 'a' don't need a name, value suffices).
-        # For release/repeat events, always synthesize a name since value
-        # is empty for releases and name is the only way to identify the key.
-        if not mod_parts and not (self.released or self.repeated):
-            return None
 
         return (f"KEY_{'_'.join(mod_parts)}_{char}"
                 if mod_parts
@@ -531,8 +555,9 @@ class Keystroke(str):
 
         When non-None, all phrases begin with either 'KEY', 'MOUSE', 'FOCUS_IN', 'FOCUS_OUT',
         'BRACKETED_PASTE', or 'RESIZE_EVENT', with one exception: 'CSI' is returned for '\\x1b['
-        to indicate the beginning of a presumed unsupported input sequence. The phrase 'KEY_ALT_['
-        is never returned and unsupported.
+        in legacy (non-kitty-protocol) mode to indicate the beginning of a presumed unsupported
+        input sequence. In kitty keyboard protocol mode, the '[' key uses the name
+        'KEY_LEFT_SQUARE_BRACKET' (with modifier and event-type suffixes as appropriate).
 
         If this value is None, then it can probably be assumed that the value is an unsurprising
         textual character without any modifiers, like the letter ``'a'``.

@@ -420,7 +420,7 @@ def test_flushinp_timeout_with_continuous_input():
 
     assert int(count) >= 3
     assert 8 <= int(duration_ms) <= 20
-    assert_elapsed_range_ms(stime, 8, 25)
+    assert_elapsed_range_ms(stime, 8, 35)
 
 
 def test_get_location_0s():

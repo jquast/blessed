@@ -1196,20 +1196,6 @@ def test_alphanum_predicate_value_multi_char():
     assert ks.is_alt('a') is False
 
 
-def test_get_alt_only_control_name_csi():
-    """Test _get_alt_only_control_name returns CSI for bracket."""
-    ks = Keystroke('\x1b[')
-    result = ks._get_alt_only_control_name(0x5b)
-    assert result == 'CSI'
-
-
-def test_meta_escape_name_csi_special_case():
-    """Test metaSendsEscape correctly identifies CSI sequence."""
-    ks = Keystroke('\x1b[')
-    result = ks._get_meta_escape_name()
-    assert result == 'CSI'
-
-
 def test_terminal_inkey_csi_sequence():
     """Test term.inkey() returns single CSI keystroke for unmatched sequences."""
     @as_subprocess
