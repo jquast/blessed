@@ -3,6 +3,15 @@
 Version History
 ===============
 
+1.36
+
+  * bugfix: ``[`` key returned :attr:`~.Keystroke.name` of value ``CSI`` in Kitty keyboard protocol
+    mode, it now returns ``KEY_LEFT_SQUARE_BRACKET``.
+  * improved: Kitty keyboard protocol now synthesizes :attr:`~.Keystroke.name` for all ASCII
+    alphanumeric and punctuation keys, including unmodified press events (e.g., ``KEY_A``,
+    ``KEY_PERIOD``, ``KEY_LEFT_SQUARE_BRACKET``). Previously, only modified or released/repeated
+    keys received synthesized names.
+
 1.35
 
   * introduced: :meth:`~.Terminal.cursor_shape` context manager and
@@ -340,8 +349,7 @@ Version History
     curses errors are legitimate errors and should be reported as a bug.
   * enhancement: converted nose tests to pytest, merged travis and tox.
   * enhancement: pytest fixtures, paired with a new ``@as_subprocess``
-    decorator
-    are used to test a multitude of terminal types.
+    decorator are used to test a multitude of terminal types.
   * enhancement: test accessories ``@as_subprocess`` resolves various issues
     with different terminal types that previously went untested.
   * deprecation: python2.5 is no longer supported (as tox does not supported).

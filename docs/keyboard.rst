@@ -85,7 +85,10 @@ Common key names include:
 * ``KEY_PGUP``, ``KEY_PGDOWN`` - Page Up and Page Down
 * ``KEY_HOME``, ``KEY_END`` - Home and End keys
 
-For regular characters without modifiers, :attr:`~.Keystroke.name` returns ``None``.
+For regular characters without modifiers, :attr:`~.Keystroke.name` returns
+``None`` in legacy mode. In :doc:`Kitty keyboard protocol <keyboard_kitty>`
+mode, all ASCII alphanumeric and punctuation keys receive synthesized names
+-- see :ref:`kitty_name_synthesis`.
 
 Feel free to try the demonstration program, :ref:`keymatrix.py` to experiment
 with possible keyboard inputs and combinations.
@@ -122,9 +125,8 @@ in the following order:
 - ``ALT``
 - ``SHIFT``
 
-The escape sequence, ``'\x1b['``, is always decoded as name ``CSI`` when it
-arrives without any known matching sequence. There are not any matches
-for Keystroke name ``KEY_ALT_[``.
+The escape sequence ``'\x1b['`` is always decoded as name ``CSI`` in legacy
+mode when it arrives without any known matching sequence.
 
 The :attr:`~.Keystroke.value` property returns the text character for keys that
 produce text, stripping away modifier information.

@@ -33,11 +33,10 @@ The protocol is automatically detected and enabled when you use the
 doesn't support it, your code continues to work normally using standard
 keyboard input.
 
-Like standard keyboard input, Kitty protocol keystrokes provide a
-:attr:`~.Keystroke.name` attribute for special keys (``KEY_ESCAPE``, ``KEY_F1``,
-``KEY_UP``) and modified alphanumeric keys (``KEY_CTRL_A``, ``KEY_ALT_5``).
-Plain text input like typing 'a' or '5' has no name, making it easy to
-distinguish between commands and regular text.
+Unlike standard keyboard input where :attr:`~.Keystroke.name` is ``None``
+for plain characters, the Kitty protocol synthesizes names for all ASCII
+alphanumeric and punctuation keys. See :ref:`kitty_name_synthesis` for
+details.
 
 Getting Started
 ---------------
@@ -143,6 +142,81 @@ Feel free to try the demonstration program, :ref:`keymatrix.py` to experiment
 with combining any or all possible kitty protocol features using Shift+F1
 through Shift+F5.
 
+.. _kitty_name_synthesis:
+
+Key Name Synthesis
+------------------
+
+The :attr:`~.Keystroke.name` is synthesized for all ASCII alphanumeric keys, punctuation,
+and symbols while in kitty keyboard mode.
+
+Some example **Alphanumeric keys**::
+
+    KEY_A, KEY_Z, KEY_0, KEY_9
+    KEY_CTRL_A, KEY_ALT_5, KEY_CTRL_ALT_SHIFT_M
+
+**Punctuation and symbols** use descriptive names::
+
+    KEY_SPACE, KEY_PERIOD, KEY_COMMA, KEY_MINUS, KEY_EQUALS
+    KEY_LEFT_SQUARE_BRACKET, KEY_RIGHT_SQUARE_BRACKET
+    KEY_SLASH, KEY_BACKSLASH, KEY_SEMICOLON, KEY_APOSTROPHE
+    KEY_GRAVE_ACCENT, KEY_TILDE, KEY_EXCLAMATION_MARK
+    KEY_AT, KEY_HASH, KEY_DOLLAR, KEY_PERCENT, KEY_CARET
+    KEY_AMPERSAND, KEY_ASTERISK, KEY_PLUS, KEY_PIPE
+    KEY_LEFT_PARENTHESIS, KEY_RIGHT_PARENTHESIS
+    KEY_LEFT_CURLY_BRACKET, KEY_RIGHT_CURLY_BRACKET
+    KEY_LESS_THAN, KEY_GREATER_THAN, KEY_QUESTION_MARK
+    KEY_DOUBLE_QUOTE, KEY_COLON, KEY_UNDERSCORE
+
+Modifiers and event-type suffixes combine as expected::
+
+    KEY_ALT_LEFT_SQUARE_BRACKET
+    KEY_CTRL_PERIOD
+    KEY_SPACE_RELEASED
+    KEY_ALT_MINUS_REPEATED
+
+Shifted Key Reporting
+~~~~~~~~~~~~~~~~~~~~~
+
+The Kitty protocol reports the *base key* and modifiers separately rather
+than the resulting character. On a US keyboard layout, pressing Shift+3
+produces ``#``, but the terminal reports codepoint 51 (digit ``3``) with the
+Shift modifier. This means:
+
+- The name is ``KEY_SHIFT_3``, not ``KEY_HASH``
+- The :attr:`~.Keystroke.value` is the actual character ``#``
+
+Symbol names like ``KEY_HASH``, ``KEY_AMPERSAND``, and ``KEY_TILDE`` are
+still reachable when a terminal sends the symbol codepoint directly, but
+on most layouts Shift+digit combinations will produce names based on the
+base digit key.
+
+Layout-Independent Key Handling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+By default, the protocol reports whichever key the current keyboard layout
+maps to a given position. This means the keys of a physical position on
+the keyboard will produce different codepoints on different layouts,
+QWERTY, Dvorak, AZERTY, or many non-US layouts.
+
+The ``report_alternates`` flag solves this by requesting the terminal to
+also report the *base layout key* -- the key identity independent of the
+active layout. When ``report_alternates=True``, blessed uses the base
+layout key for name synthesis, so a shortcut like ``KEY_CTRL_Z`` works
+regardless of whether the user's layout places ``Z`` in the QWERTY
+position or elsewhere.
+
+.. code-block:: python
+
+    with term.enable_kitty_keyboard(report_alternates=True):
+        with term.cbreak():
+            key = term.inkey()
+            if key.name == 'KEY_CTRL_Z':
+                undo()
+
+This is especially useful for applications that bind shortcuts to physical
+key positions (like Ctrl+Z for undo) rather than to specific characters.
+
 Compatibility
 -------------
 
@@ -153,9 +227,7 @@ You can optionally check for protocol support:
     from blessed import Terminal
 
     term = Terminal()
-
     state = term.get_kitty_keyboard_state()
-
     if state is not None:
         print("Kitty keyboard protocol is supported")
     else:
