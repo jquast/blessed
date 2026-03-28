@@ -3,6 +3,12 @@
 Version History
 ===============
 
+1.37
+
+  * bugfix: legacy CSI letter-form sequences with explicit modifiers and event type (e.g.,
+    ``\x1b[1;1:1A`` for arrow key press) were not resolved to key names, this affected only some
+    terminals, such as Ghostty.
+
 1.36
 
   * bugfix: ``[`` key returned :attr:`~.Keystroke.name` of value ``CSI`` in Kitty keyboard protocol
