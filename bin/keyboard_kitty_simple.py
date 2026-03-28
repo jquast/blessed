@@ -4,7 +4,7 @@ from blessed import Terminal
 term = Terminal()
 
 print("Press and hold keys to see raw kitty keystrokes and their names (press 'q' to quit)")
-with term.enable_kitty_keyboard(report_events=True, report_all_keys=True):
+with term.enable_kitty_keyboard(report_events=True, report_all_keys=True, report_alternates=True):
     with term.cbreak():
         while True:
             key = term.inkey()

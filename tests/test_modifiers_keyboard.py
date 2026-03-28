@@ -1096,7 +1096,7 @@ def test_getattr_property_getter():
 
 
 def test_get_modified_keycode_name_no_modifiers():
-    """Test modified keycode name returns None when no modifiers present."""
+    """Test modified keycode name resolves for unmodified press events."""
     @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
@@ -1106,7 +1106,7 @@ def test_get_modified_keycode_name_no_modifiers():
         assert ks._mode == -3
         assert ks.modifiers == 1
         result = ks._get_modified_keycode_name()
-        assert result is None
+        assert result == 'KEY_UP'
 
     child()
 
@@ -1229,7 +1229,7 @@ def test_legacy_csi_modifiers_no_modifiers_integration():
         assert ks.modifiers == 1
         assert ks.code == curses.KEY_F1
         result = ks._get_modified_keycode_name()
-        assert result is None
+        assert result == 'KEY_F1'
         assert ks._ctrl is False
         assert ks._alt is False
         assert ks._shift is False

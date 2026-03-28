@@ -975,6 +975,25 @@ def test_event_type_name_suffixes(sequence, expected_name, expected_value):
     assert ks.value == expected_value
 
 
+@pytest.mark.parametrize("sequence,expected_name", [
+    ('\x1b[1;1:1A', 'KEY_UP'),
+    ('\x1b[1;1:1B', 'KEY_DOWN'),
+    ('\x1b[1;1:1C', 'KEY_RIGHT'),
+    ('\x1b[1;1:1D', 'KEY_LEFT'),
+    ('\x1b[1;1:3A', 'KEY_UP_RELEASED'),
+    ('\x1b[1;1:3D', 'KEY_LEFT_RELEASED'),
+    ('\x1b[1;1:2A', 'KEY_UP_REPEATED'),
+    ('\x1b[1;1:1P', 'KEY_F1'),
+    ('\x1b[1;1:1H', 'KEY_HOME'),
+    ('\x1b[1;1:1F', 'KEY_END'),
+])
+def test_unmodified_press_legacy_csi_arrow_keys(sequence, expected_name):
+    """Test unmodified press events resolve names for legacy CSI sequences."""
+    ks = _match_legacy_csi_letter_form(sequence)
+    assert ks is not None
+    assert ks.name == expected_name
+
+
 def test_event_type_dynamic_predicates():
     """Test dynamic predicates with event types."""
     ks_release = _match_legacy_csi_letter_form('\x1b[1;2:3Q')

@@ -301,15 +301,6 @@ class Keystroke(str):
             if getattr(self, f'_{mod_name}'):        # 'if self._shift'
                 mod_parts.append(mod_name.upper())   # -> 'SHIFT'
 
-        # For press events with no modifiers, check if this is a PUA functional
-        # key or a control character key (Escape, Tab, Enter, Backspace).
-        is_control_char_key = self._code in _KITTY_CONTROL_CHAR_TO_KEYCODE.values()
-        if (not mod_parts
-                and not (self.released or self.repeated)
-                and not _is_kitty_functional_key(self._code)
-                and not is_control_char_key):
-            return None
-
         # Build base result with modifiers (if any)
         return (f"KEY_{'_'.join(mod_parts)}_{base_name}"
                 if mod_parts
