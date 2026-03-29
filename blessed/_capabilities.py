@@ -249,6 +249,9 @@ XTGETTCAP_CAPABILITIES = (
     ("u7", "CPR request"),
     ("u8", "DA response format"),
     ("u9", "DA request"),
+    # Extended capabilities -- modern terminal features
+    ("Smulx", "Set extended underline style"),
+    ("Setulc", "Set underline color"),
 )
 
 

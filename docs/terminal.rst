@@ -118,6 +118,42 @@ You can check whether your terminal supports sixel graphics using the
 Default ``timeout`` argument of 1 second is used to avoid blocking indefinitely
 when the terminal fails to respond to DA1 queries.
 
+OSC 52 Clipboard
+-----------------
+
+The OSC 52 protocol allows terminal applications to read from and write to the
+system clipboard without requiring platform-specific clipboard tools. Many
+modern terminals support this protocol, including xterm, kitty, WezTerm, and
+iTerm2.
+
+You can check whether your terminal supports OSC 52 clipboard access using the
+:meth:`~.Terminal.does_osc52_clipboard` method:
+
+    >>> if term.does_osc52_clipboard():
+    ...     print("Terminal supports clipboard access")
+
+Default ``timeout`` argument of 1 second is used to avoid blocking indefinitely
+when the terminal fails to respond. Results are cached after the first query.
+
+Styled and Colored Underlines
+------------------------------
+
+Modern terminals can render underline styles beyond the standard single
+underline, such as curly (``CSI 4:3 m``), dotted, and dashed underlines.
+Some also support colored underlines (``CSI 58;2;r;g;b m``), where the
+underline color differs from the text color.
+
+You can detect these capabilities via XTGETTCAP:
+
+    >>> if term.does_styled_underlines():
+    ...     print("Curly, dotted, and dashed underlines supported")
+
+    >>> if term.does_colored_underlines():
+    ...     print("Colored underlines supported")
+
+These methods query the terminal's ``Smulx`` and ``Setulc`` terminfo
+capabilities, respectively. Default ``timeout`` argument of 1 second is used.
+
 Terminal Software Version
 -------------------------
 

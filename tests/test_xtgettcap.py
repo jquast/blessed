@@ -252,6 +252,107 @@ class TestGetXtgettcap:
         child()
 
 
+class TestStyledUnderlines:
+    """Terminal.does_styled_underlines() and does_colored_underlines()."""
+
+    def test_styled_underlines_supported(self):
+        """Returns True when Smulx is in XTGETTCAP capabilities."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._xtgettcap_cache = TermcapResponse(
+                supported=True,
+                capabilities={'TN': 'xterm', 'Smulx': '\x1b[4:%p1%dm'})
+            assert term.does_styled_underlines() is True
+        child()
+
+    def test_styled_underlines_unsupported(self):
+        """Returns False when Smulx is not in capabilities."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._xtgettcap_cache = TermcapResponse(
+                supported=True, capabilities={'TN': 'xterm'})
+            assert term.does_styled_underlines() is False
+        child()
+
+    def test_styled_underlines_no_xtgettcap(self):
+        """Returns False when XTGETTCAP is not supported."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._xtgettcap_first_query_failed = True
+            assert term.does_styled_underlines() is False
+        child()
+
+    def test_colored_underlines_supported(self):
+        """Returns True when Setulc is in XTGETTCAP capabilities."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._xtgettcap_cache = TermcapResponse(
+                supported=True,
+                capabilities={'Setulc': '\x1b[58;2;%p1%d;%p2%d;%p3%dm'})
+            assert term.does_colored_underlines() is True
+        child()
+
+    def test_colored_underlines_unsupported(self):
+        """Returns False when Setulc is not in capabilities."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._xtgettcap_cache = TermcapResponse(
+                supported=True, capabilities={'TN': 'xterm'})
+            assert term.does_colored_underlines() is False
+        child()
+
+
+class TestOsc52Clipboard:
+    """Terminal.does_osc52_clipboard() detection."""
+
+    def test_not_a_tty(self):
+        """Returns False when not a TTY."""
+        @as_subprocess
+        def child():
+            term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                                is_a_tty=False)
+            assert term.does_osc52_clipboard(timeout=0.01) is False
+        child()
+
+    def test_cached_result(self):
+        """Returns cached result without re-querying."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._osc52_clipboard_supported = True
+            assert term.does_osc52_clipboard() is True
+        child()
+
+    def test_force_bypasses_cache(self):
+        """force=True bypasses cached result."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._osc52_clipboard_supported = True
+            result = term.does_osc52_clipboard(timeout=0.01, force=True)
+            assert result is False
+        child()
+
+
 pytestmark_pty = pytest.mark.skipif(
     IS_WINDOWS, reason="ungetch and PTY testing not supported on Windows")
 
@@ -334,4 +435,53 @@ def test_get_xtgettcap_batch_empty_flushinp():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_get_xtgettcap_batch_empty_flushinp')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_osc52_clipboard_supported():
+    """OSC 52 clipboard detected when terminal responds."""
+    def child(term):
+        osc52_resp = '\x1b]52;c;SGVsbG8=\x07'
+        cpr = '\x1b[10;20R'
+        term.ungetch(osc52_resp + cpr)
+        result = term.does_osc52_clipboard(timeout=1)
+        assert result is True
+        assert term._osc52_clipboard_supported is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_osc52_clipboard_supported')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_osc52_clipboard_unsupported():
+    """OSC 52 clipboard not detected when only CPR arrives."""
+    def child(term):
+        cpr = '\x1b[10;20R'
+        term.ungetch(cpr)
+        result = term.does_osc52_clipboard(timeout=1)
+        assert result is False
+        assert term._osc52_clipboard_supported is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_osc52_clipboard_unsupported')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_osc52_clipboard_empty_response():
+    """OSC 52 with empty data still indicates support."""
+    def child(term):
+        osc52_resp = '\x1b]52;c;\x07'
+        cpr = '\x1b[10;20R'
+        term.ungetch(osc52_resp + cpr)
+        result = term.does_osc52_clipboard(timeout=1)
+        assert result is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_osc52_clipboard_empty_response')
     assert 'OK' in output

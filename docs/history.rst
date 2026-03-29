@@ -3,6 +3,14 @@
 Version History
 ===============
 
+1.38
+
+  * introduced: :meth:`~.Terminal.does_osc52_clipboard` -- detect OSC 52 clipboard protocol support.
+  * introduced: :meth:`~.Terminal.does_styled_underlines` and
+    :meth:`~.Terminal.does_colored_underlines` -- detect extended underline styles (``Smulx``) and
+    colored underlines (``Setulc``) via XTGETTCAP.
+  * improved: ``Smulx`` and ``Setulc`` added to XTGETTCAP capability list.
+
 1.37
 
   * bugfix: legacy CSI letter-form sequences with explicit modifiers and event type (e.g.,

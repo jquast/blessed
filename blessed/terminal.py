@@ -111,6 +111,7 @@ _RE_KITTY_NOTIFICATIONS_RESPONSE = re.compile(
 _RE_CPR_BOUNDARY = re.compile(r'\x1b\[[0-9]+;[0-9]+R')
 _RE_KITTY_CLIPBOARD = re.compile(r'\x1b\[\?5522;(\d+)\$y')
 _RE_KITTY_POINTER = re.compile(r'\x1b\]22;([^\x07\x1b]+)[\x07\x1b]')
+_RE_OSC52_RESPONSE = re.compile(r'\x1b\]52;[a-z]*;([^\x07\x1b]*)[\x07\x1b]')
 
 
 class Terminal():
@@ -314,6 +315,9 @@ class Terminal():
 
         # Text sizing (OSC 66) detection cache
         self._text_sizing_cache: Optional[TextSizingResult] = None
+
+        # OSC 52 clipboard detection cache
+        self._osc52_clipboard_supported: Optional[bool] = None
 
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
@@ -1826,6 +1830,57 @@ class Terminal():
             return shape
         self._kitty_pointer_shapes_result = (False, '')
         return None
+
+    def does_osc52_clipboard(self, timeout: Optional[float] = 1,
+                             force: bool = False) -> bool:
+        """
+        Detect OSC 52 clipboard access support.
+
+        Sends an OSC 52 clipboard read request and checks whether the
+        terminal responds.  A response (even with empty data) indicates
+        the terminal supports the OSC 52 clipboard protocol.
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        if self._osc52_clipboard_supported is not None and not force:
+            return self._osc52_clipboard_supported
+        match = self._query_with_boundary(
+            '\x1b]52;c;?\x07', _RE_OSC52_RESPONSE, timeout)
+        supported = match is not None
+        self._osc52_clipboard_supported = supported
+        return supported
+
+    def does_styled_underlines(self, timeout: Optional[float] = 1,
+                               force: bool = False) -> bool:
+        """
+        Detect extended underline style support (curly, dotted, dashed).
+
+        Queries the terminal's ``Smulx`` terminfo capability via XTGETTCAP.
+        When supported, the terminal can render underline styles beyond the
+        standard single underline, such as ``CSI 4:3 m`` (curly).
+
+        :arg float timeout: Timeout in seconds for XTGETTCAP query.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        tc = self.get_xtgettcap(timeout=timeout, force=force)
+        return tc is not None and 'Smulx' in tc
+
+    def does_colored_underlines(self, timeout: Optional[float] = 1,
+                                force: bool = False) -> bool:
+        """
+        Detect colored underline support (``CSI 58;2;r;g;b m``).
+
+        Queries the terminal's ``Setulc`` terminfo capability via XTGETTCAP.
+
+        :arg float timeout: Timeout in seconds for XTGETTCAP query.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        tc = self.get_xtgettcap(timeout=timeout, force=force)
+        return tc is not None and 'Setulc' in tc
 
     def does_text_sizing(self, timeout: float = 1,
                          force: bool = False) -> TextSizingResult:
