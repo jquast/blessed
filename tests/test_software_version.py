@@ -212,6 +212,85 @@ def test_get_software_version_not_a_tty():
     child()
 
 
+def test_get_software_version_env_fallback():
+    """Test get_software_version() falls back to TERM_PROGRAM env vars."""
+    def child(term):
+        import os
+        os.environ['TERM_PROGRAM'] = 'iTerm.app'
+        os.environ['TERM_PROGRAM_VERSION'] = '3.5.0'
+        try:
+            sv = term.get_software_version(timeout=0.01)
+            assert sv is not None
+            assert sv.name == 'iTerm.app'
+            assert sv.version == '3.5.0'
+            assert sv.raw == 'iTerm.app 3.5.0'
+        finally:
+            del os.environ['TERM_PROGRAM']
+            del os.environ['TERM_PROGRAM_VERSION']
+        return b'ENV_FALLBACK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_software_version_env_fallback')
+    assert output == '\x1b[>q\x1b[6nENV_FALLBACK'
+
+
+def test_get_software_version_env_fallback_no_version():
+    """Test env fallback works when TERM_PROGRAM_VERSION is unset."""
+    def child(term):
+        import os
+        os.environ['TERM_PROGRAM'] = 'Apple_Terminal'
+        os.environ.pop('TERM_PROGRAM_VERSION', None)
+        try:
+            sv = term.get_software_version(timeout=0.01)
+            assert sv is not None
+            assert sv.name == 'Apple_Terminal'
+            assert sv.version == ''
+            assert sv.raw == 'Apple_Terminal'
+        finally:
+            del os.environ['TERM_PROGRAM']
+        return b'ENV_NO_VER'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_software_version_env_fallback_no_version')
+    assert output == '\x1b[>q\x1b[6nENV_NO_VER'
+
+
+def test_get_software_version_env_fallback_version_only():
+    """Test env fallback works when only TERM_PROGRAM_VERSION is set."""
+    def child(term):
+        import os
+        os.environ.pop('TERM_PROGRAM', None)
+        os.environ['TERM_PROGRAM_VERSION'] = '1.2.3'
+        try:
+            sv = term.get_software_version(timeout=0.01)
+            assert sv is not None
+            assert sv.name == ''
+            assert sv.version == '1.2.3'
+            assert sv.raw == '1.2.3'
+        finally:
+            del os.environ['TERM_PROGRAM_VERSION']
+        return b'ENV_VER_ONLY'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_software_version_env_fallback_version_only')
+    assert output == '\x1b[>q\x1b[6nENV_VER_ONLY'
+
+
+def test_get_software_version_no_env_no_response():
+    """Test get_software_version() returns None with no XTVERSION and no env vars."""
+    def child(term):
+        import os
+        os.environ.pop('TERM_PROGRAM', None)
+        os.environ.pop('TERM_PROGRAM_VERSION', None)
+        sv = term.get_software_version(timeout=0.01)
+        assert sv is None
+        return b'NO_ENV'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_software_version_no_env_no_response')
+    assert output == '\x1b[>q\x1b[6nNO_ENV'
+
+
 def test_software_version_init():
     """Test SoftwareVersion.__init__() stores all parameters."""
     sv = SoftwareVersion('\x1bP>|kitty(0.24.2)\x1b\\', 'kitty', '0.24.2')
