@@ -214,7 +214,7 @@ class Terminal():
             .. _CLICOLOR_FORCE: https://bixense.com/clicolors/
             .. _NO_COLOR: https://no-color.org/
         """
-        # pylint: disable=global-statement
+        # pylint: disable=global-statement,too-many-statements
         global _CUR_TERM
         self.errors = [
             f'parameters: kind={kind!r}, stream={stream!r}, force_styling={force_styling!r}',
@@ -226,6 +226,7 @@ class Terminal():
 
         self._stream = stream
         self._keyboard_fd = None
+        self._keyboard_eof = False
         self._init_descriptor = None
         self._is_a_tty = False
         self.__init__streams()
@@ -3111,6 +3112,7 @@ class Terminal():
         :rtype: unicode
         :returns: a single unicode character, or ``''`` if a multi-byte
             sequence has not yet been fully received.
+        :raises EOFError: When the keyboard stream has reached end-of-file.
 
         This method name and behavior mimics curses ``getch(void)``, and
         it supports :meth:`inkey`, reading only one byte from
@@ -3122,6 +3124,9 @@ class Terminal():
         """
         assert self._keyboard_fd is not None
         byte = os.read(self._keyboard_fd, 1)
+        if not byte:
+            self._keyboard_eof = True
+            raise EOFError
         if decode_latin1:
             # Latin-1 is a simple 1:1 byte-to-character mapping (0-255)
             # No incremental decoder needed
@@ -3155,6 +3160,9 @@ class Terminal():
             attached to this terminal.  When input is not a terminal, False is
             always returned.
         """
+        if self._keyboard_eof:
+            return False
+
         ready_r = [None, ]
         check_r = [self._keyboard_fd] if self._keyboard_fd is not None else []
 
@@ -3297,7 +3305,10 @@ class Terminal():
             # contain high bytes (≥0x80) for coordinates > 127. Only check for
             # '\x1b[M' when not already found (performance optimization).
             decode_latin1 = decode_latin1 or '\x1b[M' in ucs
-            ucs += self.getch(decode_latin1=decode_latin1)
+            try:
+                ucs += self.getch(decode_latin1=decode_latin1)
+            except EOFError:
+                break
         return ucs
 
     def _is_incomplete_keystroke(self, text: str) -> bool:
