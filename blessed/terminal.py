@@ -52,12 +52,12 @@ from .formatters import (COLORS,
                          resolve_attribute,
                          resolve_capability)
 from .cursor_shape import CursorShape as _CursorShape
-from ._capabilities import (DecrqssSettings,
-                            CAPABILITY_DATABASE,
+from ._capabilities import (CAPABILITY_DATABASE,
                             CAPABILITIES_ADDITIVES,
                             CAPABILITIES_RAW_MIXIN,
                             XTGETTCAP_CAPABILITIES,
                             CAPABILITIES_HORIZONTAL_DISTANCE,
+                            DecrqssSettings,
                             TermcapResponse,
                             TextSizingResult,
                             ITerm2Capabilities)
