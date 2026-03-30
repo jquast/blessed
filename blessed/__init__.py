@@ -13,7 +13,6 @@ else:
     from blessed.terminal import Terminal  # type: ignore[assignment]
 
 from blessed.line_editor import LineEditor, LineHistory
-from blessed._capabilities import DecrqssSettings
 
-__all__ = ('Terminal', 'LineEditor', 'LineHistory', 'DecrqssSettings')
+__all__ = ('Terminal', 'LineEditor', 'LineHistory')
 __version__ = "1.38.0"

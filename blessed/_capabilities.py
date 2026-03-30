@@ -12,7 +12,7 @@ __all__ = (
     'CAPABILITIES_HORIZONTAL_DISTANCE',
     'CAPABILITIES_CAUSE_MOVEMENT',
     'XTGETTCAP_CAPABILITIES',
-    'DecrqssSettings',
+    'Decrqss',
     'TermcapResponse',
     'ITerm2Capabilities',
 )
@@ -257,7 +257,7 @@ XTGETTCAP_CAPABILITIES = (
 )
 
 
-class DecrqssSettings:
+class Decrqss:
     """
     DECRQSS setting identifiers for querying terminal state.
 

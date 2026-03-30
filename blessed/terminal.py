@@ -57,7 +57,7 @@ from ._capabilities import (CAPABILITY_DATABASE,
                             CAPABILITIES_RAW_MIXIN,
                             XTGETTCAP_CAPABILITIES,
                             CAPABILITIES_HORIZONTAL_DISTANCE,
-                            DecrqssSettings,
+                            Decrqss,
                             TermcapResponse,
                             TextSizingResult,
                             ITerm2Capabilities)
@@ -174,6 +174,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
     #: DECSCUSR cursor shape constants accessible via Terminal.CursorShape or term.CursorShape
     CursorShape = _CursorShape
+
+    #: DECRQSS setting identifiers accessible via Terminal.Decrqss
+    Decrqss = Decrqss
 
     #: DEC Private Mode constants accessible via Terminal.DecPrivateMode or term.DecPrivateMode
     DecPrivateMode = _DecPrivateMode
@@ -2007,7 +2010,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._kitty_query_supported = supported
         return supported
 
-    def get_decrqss(self, setting_id: str = DecrqssSettings.SGR,
+    def get_decrqss(self, setting_id: str = Decrqss.SGR,
                     timeout: Optional[float] = 1) -> Optional[str]:
         """
         Query terminal state via DECRQSS (Request Status String).
@@ -2020,13 +2023,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         Results are not cached -- DECRQSS queries runtime state that
         may change between calls (cursor style, margins, SGR, etc.).
 
-        Use :class:`~blessed.DecrqssSettings` for setting
+        Use :class:`~blessed.Terminal.Decrqss` for setting
         identifiers::
 
-            from blessed import Terminal, DecrqssSettings
             term = Terminal()
-            term.get_decrqss(DecrqssSettings.DECSCUSR)  # cursor style
-            term.get_decrqss(DecrqssSettings.DECSTBM)   # scroll region
+            term.get_decrqss(term.Decrqss.DECSCUSR)  # cursor style
+            term.get_decrqss(term.Decrqss.DECSTBM)   # scroll region
 
         .. seealso::
 
@@ -2066,7 +2068,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         if self._decrqss_supported is not None and not force:
             return self._decrqss_supported
 
-        supported = self.get_decrqss(DecrqssSettings.SGR, timeout) is not None
+        supported = self.get_decrqss(Decrqss.SGR, timeout) is not None
         self._decrqss_supported = supported
         return supported
 

@@ -6,7 +6,7 @@ import io
 import pytest
 
 # local
-from blessed import DecrqssSettings
+from blessed._capabilities import Decrqss
 from blessed._capabilities import TermcapResponse, ITerm2Capabilities
 from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, as_subprocess, pty_test
@@ -480,27 +480,27 @@ class TestGetDecrqss:
         def child():
             term = TestTerminal(stream=io.StringIO(), force_styling=True,
                                 is_a_tty=False)
-            assert DecrqssSettings.SGR == 'm'
+            assert Decrqss.SGR == 'm'
             assert term.get_decrqss() is None
         child()
 
 
-class TestDecrqssSettings:
-    """DecrqssSettings constant values."""
+class TestDecrqss:
+    """Decrqss constant values."""
 
     def test_common_settings(self):
         """Common setting identifiers match VT510 spec."""
-        assert DecrqssSettings.SGR == 'm'
-        assert DecrqssSettings.DECSCUSR == ' q'
-        assert DecrqssSettings.DECSTBM == 'r'
-        assert DecrqssSettings.DECSLRM == 's'
-        assert DecrqssSettings.DECSCL == '"p'
-        assert DecrqssSettings.DECSCA == '"q'
-        assert DecrqssSettings.DECSCPP == '$|'
-        assert DecrqssSettings.DECSLPP == 't'
-        assert DecrqssSettings.DECSNLS == '*|'
-        assert DecrqssSettings.DECSASD == '$}'
-        assert DecrqssSettings.DECSSDT == '$~'
+        assert Decrqss.SGR == 'm'
+        assert Decrqss.DECSCUSR == ' q'
+        assert Decrqss.DECSTBM == 'r'
+        assert Decrqss.DECSLRM == 's'
+        assert Decrqss.DECSCL == '"p'
+        assert Decrqss.DECSCA == '"q'
+        assert Decrqss.DECSCPP == '$|'
+        assert Decrqss.DECSLPP == 't'
+        assert Decrqss.DECSNLS == '*|'
+        assert Decrqss.DECSASD == '$}'
+        assert Decrqss.DECSSDT == '$~'
 
 
 pytestmark_pty = pytest.mark.skipif(
@@ -906,7 +906,7 @@ def test_get_decrqss_sgr():
         resp = '\x1bP1$r0m\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.get_decrqss(DecrqssSettings.SGR, timeout=1)
+        result = term.get_decrqss(Decrqss.SGR, timeout=1)
         assert result == '0'
         return b'OK'
 
@@ -922,7 +922,7 @@ def test_get_decrqss_sgr_with_attrs():
         resp = '\x1bP1$r1;4;38;5;12m\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.get_decrqss(DecrqssSettings.SGR, timeout=1)
+        result = term.get_decrqss(Decrqss.SGR, timeout=1)
         assert result == '1;4;38;5;12'
         return b'OK'
 
@@ -938,7 +938,7 @@ def test_get_decrqss_cursor_style():
         resp = '\x1bP1$r2 q\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.get_decrqss(DecrqssSettings.DECSCUSR, timeout=1)
+        result = term.get_decrqss(Decrqss.DECSCUSR, timeout=1)
         assert result == '2'
         return b'OK'
 
@@ -954,7 +954,7 @@ def test_get_decrqss_scroll_region():
         resp = '\x1bP1$r1;24r\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.get_decrqss(DecrqssSettings.DECSTBM, timeout=1)
+        result = term.get_decrqss(Decrqss.DECSTBM, timeout=1)
         assert result == '1;24'
         return b'OK'
 
@@ -969,7 +969,7 @@ def test_get_decrqss_unsupported():
     def child(term):
         cpr = '\x1b[10;20R'
         term.ungetch(cpr)
-        result = term.get_decrqss(DecrqssSettings.SGR, timeout=1)
+        result = term.get_decrqss(Decrqss.SGR, timeout=1)
         assert result is None
         return b'OK'
 
@@ -985,7 +985,7 @@ def test_get_decrqss_invalid():
         resp = '\x1bP0$r\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.get_decrqss(DecrqssSettings.SGR, timeout=1)
+        result = term.get_decrqss(Decrqss.SGR, timeout=1)
         assert result is None
         return b'OK'
 

@@ -12,7 +12,7 @@ Usage::
 import sys
 
 # local
-from blessed import Terminal, DecrqssSettings
+from blessed import Terminal
 
 
 def _yn(term, val):
@@ -142,18 +142,18 @@ def display_decrqss(term):
         return
 
     settings = [
-        (DecrqssSettings.SGR, 'SGR', 'Select Graphic Rendition'),
-        (DecrqssSettings.DECSCUSR, 'DECSCUSR', 'Cursor Style'),
-        (DecrqssSettings.DECSTBM, 'DECSTBM', 'Top/Bottom Margins'),
-        (DecrqssSettings.DECSLRM, 'DECSLRM', 'Left/Right Margins'),
-        (DecrqssSettings.DECSCL, 'DECSCL', 'Conformance Level'),
-        (DecrqssSettings.DECSCA, 'DECSCA', 'Character Protection'),
-        (DecrqssSettings.DECSCPP, 'DECSCPP', 'Columns Per Page'),
-        (DecrqssSettings.DECSLPP, 'DECSLPP', 'Lines Per Page'),
-        (DecrqssSettings.DECSNLS, 'DECSNLS', 'Lines Per Screen'),
-        (DecrqssSettings.DECSASD, 'DECSASD', 'Active Status Display'),
-        (DecrqssSettings.DECSSDT, 'DECSSDT', 'Status Line Type'),
-        (DecrqssSettings.DECSACE, 'DECSACE', 'Attribute Change Extent'),
+        (Terminal.Decrqss.SGR, 'SGR', 'Select Graphic Rendition'),
+        (Terminal.Decrqss.DECSCUSR, 'DECSCUSR', 'Cursor Style'),
+        (Terminal.Decrqss.DECSTBM, 'DECSTBM', 'Top/Bottom Margins'),
+        (Terminal.Decrqss.DECSLRM, 'DECSLRM', 'Left/Right Margins'),
+        (Terminal.Decrqss.DECSCL, 'DECSCL', 'Conformance Level'),
+        (Terminal.Decrqss.DECSCA, 'DECSCA', 'Character Protection'),
+        (Terminal.Decrqss.DECSCPP, 'DECSCPP', 'Columns Per Page'),
+        (Terminal.Decrqss.DECSLPP, 'DECSLPP', 'Lines Per Page'),
+        (Terminal.Decrqss.DECSNLS, 'DECSNLS', 'Lines Per Screen'),
+        (Terminal.Decrqss.DECSASD, 'DECSASD', 'Active Status Display'),
+        (Terminal.Decrqss.DECSSDT, 'DECSSDT', 'Status Line Type'),
+        (Terminal.Decrqss.DECSACE, 'DECSACE', 'Attribute Change Extent'),
     ]
 
     for setting_id, mnemonic, desc in settings:

@@ -6,7 +6,7 @@ Version History
 1.38
 
   * introduced: :meth:`~.Terminal.does_osc52_clipboard`, :meth:`~.Terminal.clipboard_copy`, and
-    :meth:`~.Terminal.clipboard_paste` to detect, copy, and read form clipboard.
+    :meth:`~.Terminal.clipboard_paste` to detect, copy, and read from clipboard.
   * introduced: :meth:`~.Terminal.get_color_scheme`.
   * introduced: :meth:`~.Terminal.does_kitty_query` for Kitty's XTGETTCAP query extensions.
   * introduced: :meth:`~.Terminal.does_decrqss` for DECRQSS (Request Status String).
@@ -23,7 +23,8 @@ Version History
     :ghpull:`366`.
   * bugfix: Background SGR not applying to text/suggestion content in
     :class:`blessed.line_editor.LineEditor`, now prepend bg_sgr before each content SGR sequence.
-  * bugfix: OSC responses to iTerm2 capabilities, Kitty notifications, Kitty pointer shape responses
+  * bugfix: OSC responses for 'ST' in addition to 'BEL' terminated iTerm2 capabilities,
+    Kitty notifications, Kitty pointer shapes responses
 
 1.37
 
