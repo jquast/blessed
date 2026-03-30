@@ -483,6 +483,97 @@ def test_hyperlink_with_id():
     child()
 
 
+def test_set_window_title_nostyling():
+    """Test set_window_title returns empty when styling is disabled."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=None)
+        result = term.set_window_title('hello')
+        assert result == ''
+
+    child()
+
+
+def test_set_window_title_default():
+    """Test set_window_title returns OSC 0 sequence."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        result = term.set_window_title('My Title')
+        assert result == '\x1b]0;My Title\x07'
+
+    child()
+
+
+@pytest.mark.parametrize("mode,expected_prefix", [
+    (0, '\x1b]0;'),
+    (1, '\x1b]1;'),
+    (2, '\x1b]2;'),
+])
+def test_set_window_title_modes(mode, expected_prefix):
+    """Test set_window_title OSC mode parameter."""
+    @as_subprocess
+    def child(mode=mode, expected_prefix=expected_prefix):
+        term = TestTerminal(force_styling=True)
+        result = term.set_window_title('test', mode=mode)
+        assert result == f'{expected_prefix}test\x07'
+
+    child()
+
+
+def test_set_window_title_sanitizes():
+    """Test set_window_title strips ESC and BEL from title text."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        result = term.set_window_title('bad\x1b[31mtitle\x07end')
+        assert result == '\x1b]0;bad[31mtitleend\x07'
+
+    child()
+
+
+def test_set_window_title_invalid_mode():
+    """Test set_window_title rejects invalid mode values."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        try:
+            term.set_window_title('test', mode=3)
+            assert False
+        except AssertionError:
+            pass
+
+    child()
+
+
+def test_window_title_context_manager():
+    """Test title context manager writes push/pop sequences."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True, stream=StringIO())
+        with term.window_title('My App'):
+            pass
+        output = term.stream.getvalue()
+        assert '\x1b[22;0t' in output
+        assert '\x1b]0;My App\x07' in output
+        assert '\x1b[23;0t' in output
+
+    child()
+
+
+def test_window_title_context_manager_nostyling():
+    """Test title context manager is a no-op without styling."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=None, stream=StringIO())
+        with term.window_title('My App'):
+            pass
+        output = term.stream.getvalue()
+        assert output == ''
+
+    child()
+
+
 def test_sequence_is_movement_false(all_terms):
     """Test parser about sequences that do not move the cursor."""
     @as_subprocess

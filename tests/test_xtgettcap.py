@@ -648,7 +648,6 @@ def test_get_color_scheme_unsupported():
 def test_does_kitty_query_supported():
     """Kitty query extensions detected from DCS 1+r response."""
     def child(term):
-        from blessed._capabilities import TermcapResponse
         capname = 'kitty-query-name'
         hex_cap = TermcapResponse.hex_encode(capname)
         hex_val = TermcapResponse.hex_encode('kitty')
@@ -684,7 +683,6 @@ def test_does_kitty_query_unsupported():
 def test_does_kitty_query_rejected():
     """Kitty query returns False on DCS 0+r (not recognized)."""
     def child(term):
-        from blessed._capabilities import TermcapResponse
         capname = 'kitty-query-name'
         hex_cap = TermcapResponse.hex_encode(capname)
         resp = f'\x1bP0+r{hex_cap}\x1b\\'

@@ -100,6 +100,28 @@ Hover your cursor over ``documentation``, and it should highlight as a clickable
 .. figure:: https://dxtz6bzwq9sxx.cloudfront.net/demo_basic_hyperlink.gif
    :alt: Animation of running code example and clicking a hyperlink
 
+Window Title
+------------
+
+You can set the terminal window title using
+:meth:`~.Terminal.set_window_title`, which returns the appropriate xterm OSC
+escape sequence:
+
+    >>> print(term.set_window_title('My Application'))
+
+The ``mode`` parameter controls what is set: 0 (default) sets both icon name
+and window title, 1 sets icon name only, 2 sets window title only.
+
+For temporary title changes, use the :meth:`~.Terminal.window_title` context
+manager, which pushes the current title onto the xterm title stack and restores
+it on exit:
+
+.. code-block:: python
+
+    with term.window_title('Working...'):
+        do_long_task()
+    # previous title is restored
+
 Sixel Graphics Support
 ----------------------
 

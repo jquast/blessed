@@ -118,7 +118,7 @@ _RE_COLOR_SCHEME_MODE_RESPONSE = re.compile(r'\x1b\[\?997;([12])n')
 _RE_DECRQSS_RESPONSE = re.compile(r'\x1bP([01])\$r([^\x1b]*)\x1b\\')
 
 
-class Terminal():
+class Terminal():  # pylint: disable=attribute-defined-outside-init
     """
     An abstraction for color, style, positioning, and input in the terminal.
 
@@ -273,6 +273,9 @@ class Terminal():
         self.__init__keycodes()
         self.__init__dec_private_modes()
 
+        self.__init__query_caches()
+
+    def __init__query_caches(self) -> None:
         # Initialize Kitty keyboard protocol tracking
         self._kitty_kb_first_query_failed = False
 
@@ -1934,7 +1937,6 @@ class Terminal():
         if self._kitty_query_supported is not None and not force:
             return self._kitty_query_supported
 
-        from blessed._capabilities import TermcapResponse
         capname = 'kitty-query-name'
         query = f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\'
         match = self._query_with_boundary(
@@ -2989,6 +2991,51 @@ class Terminal():
         if not self.does_styling:
             return text
         return f'\x1b]8;{params};{url}\x1b\\{text}\x1b]8;;\x1b\\'
+
+    def set_window_title(self, title: str, mode: int = 0) -> str:
+        """
+        Return sequence to set the terminal title.
+
+        Uses xterm OSC (Operating System Command) sequences to set the
+        window and/or icon title.
+
+        :param str title: Title text. Any embedded escape or BEL characters
+            are stripped to prevent sequence injection.
+        :param int mode: OSC mode -- 0 sets both icon name and window title,
+            1 sets icon name only, 2 sets window title only.
+        :rtype: str
+        :returns: Escape sequence string that sets the terminal title,
+            or empty string when :attr:`does_styling` is ``False``.
+        """
+        assert mode in {0, 1, 2}, f"mode must be 0, 1, or 2, got {mode!r}"
+        if not self.does_styling:
+            return ''
+        sanitized = title.replace('\x1b', '').replace('\x07', '')
+        return f'\x1b]{mode};{sanitized}\x07'
+
+    @contextlib.contextmanager
+    def window_title(self, title: str, mode: int = 0) -> Generator[None, None, None]:
+        """
+        Context manager that sets terminal title, restoring on exit.
+
+        Uses the xterm title stack (XTWINOPS push/pop) to save and
+        restore the previous title. Not all terminals support the title
+        stack -- those that do not will simply set the title without
+        restoring it on exit.
+
+        :param str title: Title text.
+        :param int mode: OSC mode -- 0 sets both icon name and window title,
+            1 sets icon name only, 2 sets window title only.
+        """
+        if self.does_styling:
+            self.stream.write(f'\x1b[22;0t{self.set_window_title(title, mode)}')
+            self.stream.flush()
+        try:
+            yield
+        finally:
+            if self.does_styling:
+                self.stream.write('\x1b[23;0t')
+                self.stream.flush()
 
     @property
     def stream(self) -> IO[str]:
