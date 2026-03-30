@@ -1855,22 +1855,10 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         r"""
         Detect OSC 52 clipboard support without reading the clipboard.
 
-        This method uses two non-intrusive detection strategies that avoid triggering user-facing
-        clipboard permission prompts:
-
-        1. **DA1 extension 52**
-        2. **XTGETTCAP ``Ms``**
-
-        These methods are preferred over sending an actual OSC 52 read request
-        (``\x1b]52;c;?\a``), which may trigger a clipboard permission dialog in many modern
-        terminals.
-
-        .. note::
-
-            Detection indicates the terminal *understands* OSC 52, but not a guarantee that
-            clipboard access will succeed, the user may deny access.
-
-            If neither DA1 nor XTGETTCAP reports OSC 52 support, this method returns ``False``.
+        This method uses non-intrusive detection to avoid triggering user-facing clipboard
+        permission prompts, **DA1 extension 52** and **XTGETTCAP ``Ms``** fields.  These methods are
+        preferred over sending an actual OSC 52 read request (``\x1b]52;c;?\a``), which may trigger
+        a clipboard permission dialog in many modern terminals.
 
         :arg float timeout: Timeout in seconds for each sub-query.
         :arg bool force: Bypass cached result.

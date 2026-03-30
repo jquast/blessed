@@ -185,6 +185,7 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
         self.keymap: Dict[str, Optional[Callable[..., LineEditResult]]] = dict(DEFAULT_KEYMAP)
         if keymap:
             self.keymap.update(keymap)
+        self._col_offset: int = 0
         self._prev_cursor: int = 0
         self._prev_content_w: int = 0
         self._prev_overflow: Tuple[bool, bool] = (False, False)
@@ -240,18 +241,21 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
         self._prev_overflow = (cur.overflow_left, cur.overflow_right)
         self._prev_scroll_offset = self._scroll_offset
 
-    def render(self, term: Terminal, row: int, width: int) -> str:
+    def render(self, term: Terminal, row: int, width: int,
+               col: int = 0) -> str:
         """
         Build escape sequences to render the current display state.
 
         :param term: Blessed :class:`~.Terminal` instance for cursor/SGR.
         :param row: Terminal row for the input line.
         :param width: Available columns.
+        :param col: Starting column offset (default 0).
         :returns: Escape-sequence string; caller writes/encodes it.
         """
+        self._col_offset = col
         cur = self.display
         ellipsis_w = wcswidth(self.ellipsis)
-        parts: List[str] = [term.move_yx(row, 0), cur.bg_sgr]
+        parts: List[str] = [term.move_yx(row, col), cur.bg_sgr]
         rendered = 0
 
         if cur.overflow_left:
@@ -259,22 +263,22 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
             rendered += ellipsis_w
 
         if cur.text:
-            parts.extend((cur.text_sgr, cur.text))
+            parts.extend((cur.bg_sgr, cur.text_sgr, cur.text))
             rendered += wcswidth(cur.text)
 
         if cur.suggestion:
-            parts.extend((cur.suggestion_sgr, cur.suggestion))
+            parts.extend((cur.bg_sgr, cur.suggestion_sgr, cur.suggestion))
             rendered += wcswidth(cur.suggestion)
 
         if cur.overflow_right:
-            parts.extend((cur.ellipsis_sgr, self.ellipsis))
+            parts.extend((cur.bg_sgr, cur.ellipsis_sgr, self.ellipsis))
             rendered += ellipsis_w
 
         pad = width - rendered
         if pad > 0:
             parts.extend((cur.bg_sgr, " " * pad))
 
-        parts.extend((term.normal, term.move_yx(row, cur.cursor)))
+        parts.extend((term.normal, term.move_yx(row, col + cur.cursor)))
         self._update_render_state(cur, rendered)
         return "".join(parts)
 
@@ -296,15 +300,17 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
             return None
         if self._scroll_offset != self._prev_scroll_offset:
             return None
+        off = self._col_offset
         col = self._prev_cursor
-        parts: List[str] = [term.move_yx(row, col), cur.text_sgr, grapheme]
+        parts: List[str] = [term.move_yx(row, off + col),
+                            cur.bg_sgr, cur.text_sgr, grapheme]
         new_content_w = wcswidth(cur.text) + wcswidth(cur.suggestion)
         if cur.suggestion:
-            parts.extend((cur.suggestion_sgr, cur.suggestion))
+            parts.extend((cur.bg_sgr, cur.suggestion_sgr, cur.suggestion))
         trail = self._prev_content_w - new_content_w
         if trail > 0:
             parts.extend((cur.bg_sgr, " " * trail))
-        parts.extend((term.normal, term.move_yx(row, cur.cursor)))
+        parts.extend((term.normal, term.move_yx(row, off + cur.cursor)))
         self._update_render_state(cur, new_content_w)
         return "".join(parts)
 
@@ -323,15 +329,16 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
             return None
         if self._scroll_offset != self._prev_scroll_offset:
             return None
+        off = self._col_offset
         col = cur.cursor
         new_content_w = wcswidth(cur.text) + wcswidth(cur.suggestion)
         erase = self._prev_content_w - new_content_w
-        parts: List[str] = [term.move_yx(row, col)]
+        parts: List[str] = [term.move_yx(row, off + col)]
         if cur.suggestion:
-            parts.extend((cur.suggestion_sgr, cur.suggestion))
+            parts.extend((cur.bg_sgr, cur.suggestion_sgr, cur.suggestion))
         if erase > 0:
             parts.extend((cur.bg_sgr, " " * erase))
-        parts.extend((term.normal, term.move_yx(row, cur.cursor)))
+        parts.extend((term.normal, term.move_yx(row, off + cur.cursor)))
         self._update_render_state(cur, new_content_w)
         return "".join(parts)
 
