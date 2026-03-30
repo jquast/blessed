@@ -694,6 +694,22 @@ def test_clipboard_paste_no_response():
 
 
 @pytestmark_pty
+def test_clipboard_paste_invalid_base64():
+    """clipboard_paste returns None for invalid base64 data."""
+    def child(term):
+        osc52_resp = '\x1b]52;c;!!!not-base64!!!\x07'
+        cpr = '\x1b[10;20R'
+        term.ungetch(osc52_resp + cpr)
+        result = term.clipboard_paste(timeout=1)
+        assert result is None
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_clipboard_paste_invalid_base64')
+    assert 'OK' in output
+
+
+@pytestmark_pty
 def test_get_color_scheme_dark():
     """Dark mode detected from CSI ? 997 ; 1 n response."""
     def child(term):
