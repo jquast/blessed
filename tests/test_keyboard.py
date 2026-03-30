@@ -23,6 +23,100 @@ else:
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
+def test_getch_raises_eoferror_on_eof():
+    """getch() raises EOFError when keyboard fd is at EOF."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        read_fd, write_fd = os.pipe()
+        os.close(write_fd)
+        term._keyboard_fd = read_fd
+        try:
+            with pytest.raises(EOFError):
+                term.getch()
+        finally:
+            os.close(read_fd)
+    child()
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
+def test_flushinp_handles_eof():
+    """flushinp() returns buffered data when keyboard fd reaches EOF."""
+    @as_subprocess
+    def child():
+        import codecs
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        read_fd, write_fd = os.pipe()
+        os.write(write_fd, b'xy')
+        os.close(write_fd)
+        term._keyboard_fd = read_fd
+        term._keyboard_decoder = codecs.getincrementaldecoder('utf-8')()
+        try:
+            result = term.flushinp(timeout=1)
+            assert 'x' in result
+            assert 'y' in result
+        finally:
+            os.close(read_fd)
+    child()
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
+def test_getch_sets_eof_flag():
+    """getch() sets _keyboard_eof flag on EOF."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        read_fd, write_fd = os.pipe()
+        os.close(write_fd)
+        term._keyboard_fd = read_fd
+        try:
+            assert term._keyboard_eof is False
+            with pytest.raises(EOFError):
+                term.getch()
+            assert term._keyboard_eof is True
+        finally:
+            os.close(read_fd)
+    child()
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
+def test_kbhit_returns_false_after_eof():
+    """kbhit() returns False once _keyboard_eof is set."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        read_fd, write_fd = os.pipe()
+        os.close(write_fd)
+        term._keyboard_fd = read_fd
+        try:
+            term._keyboard_eof = True
+            assert term.kbhit(timeout=0) is False
+        finally:
+            os.close(read_fd)
+    child()
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
+def test_inkey_returns_empty_on_eof():
+    """inkey() returns empty Keystroke when keyboard fd is at EOF."""
+    @as_subprocess
+    def child():
+        import codecs
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        read_fd, write_fd = os.pipe()
+        os.close(write_fd)
+        term._keyboard_fd = read_fd
+        term._keyboard_decoder = codecs.getincrementaldecoder('utf-8')()
+        try:
+            ks = term.inkey(timeout=0)
+            assert ks == ''
+            assert term._keyboard_eof is True
+        finally:
+            os.close(read_fd)
+    child()
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_break_input_no_kb():
     """cbreak() should not call tty.setcbreak() without keyboard."""
     @as_subprocess
