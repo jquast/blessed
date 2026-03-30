@@ -72,15 +72,13 @@ def build_lookup(term, cal_row, usable_cols):
 
     while offset < len(PRINTABLE):
         batch = PRINTABLE[offset:offset + usable_cols]
-
-        # write batch as a contiguous row, then spray DECRQCRA queries
-        s = f"\x1b[{cal_row};1H" + "".join(chr(c) for c in batch)
+        s = term.move_yx(cal_row - 1, 0) + "".join(chr(c) for c in batch)
         for i, code in enumerate(batch):
             s += DECRQCRA.format(pid=code, r=cal_row, c=i + 1)
         emit(s)
 
         results = blast_collect(fd, len(batch))
-        emit(f"\x1b[{cal_row};1H\x1b[2K")
+        emit(term.move_yx(cal_row - 1, 0) + term.clear_eol)
 
         if len(results) < len(batch):
             return {}
@@ -137,7 +135,7 @@ def main():
 
     with term.raw():
         cpr_match = term._query_response('\x1b[6n', CPR_RE, timeout=1)
-        start_row = int(cpr_match.group(1)) if cpr_match else rows
+        start_row = int(cpr_match.group(1)) - 1 if cpr_match else rows
 
         cal_row = rows
         # set XTerm-compatible checksum mode, then flush any response
@@ -145,24 +143,24 @@ def main():
         term.flushinp(timeout=0.1)
 
         # probe DECRQCRA support with a single-cell test
-        emit(f"\x1b[{cal_row};1HA")
+        emit(term.move_yx(cal_row - 1, 0) + "A")
         cksum = query_checksum(term, cal_row, 1, pid=9999, timeout=2.0)
-        emit(f"\x1b[{cal_row};1H\x1b[2K")
+        emit(term.move_yx(cal_row - 1, 0) + term.clear_eol)
         if cksum is None:
-            print("DECRQCRA not supported.", file=sys.stderr)
+            print("DECRQCRA not supported.", end='\r\n', file=sys.stderr)
             return 1
 
         lookup = build_lookup(term, cal_row, usable_cols)
         if not lookup:
-            print("Failed to build lookup table.", file=sys.stderr)
+            print("Failed to build lookup table.", end='\r\n', file=sys.stderr)
             return 1
 
         # verify round-trip
-        emit(f"\x1b[{cal_row};1HZ")
+        emit(term.move_yx(cal_row - 1, 0) + "Z")
         verify = query_checksum(term, cal_row, 1, pid=1, timeout=1)
-        emit(f"\x1b[{cal_row};1H\x1b[2K")
+        emit(term.move_yx(cal_row - 1, 0) + term.clear_eol)
         if lookup.get(verify) != "Z":
-            print("Lookup verification failed.", file=sys.stderr)
+            print("Lookup verification failed.", end='\r\n', file=sys.stderr)
             return 1
 
         normal = blast_scrape(term, rows, cols, lookup)
@@ -183,10 +181,9 @@ def main():
         with open(args.save_json, "w", encoding="utf-8") as f:
             json.dump(result, f, indent=2)
     else:
-        emit(f"\x1b[{start_row};1H\x1b[2K")
-        print(f"screen 0: {repr(normal)}", end='', flush=True)
-        print(f"\nscreen 1: {repr(alt)}", end='', flush=True)
-        print(flush=True)
+        emit(term.move_yx(start_row, 0) + term.clear_eol)
+        print(f"screen 0: {repr(normal)}")
+        print(f"screen 1: {repr(alt)}")
 
     return 0
 
