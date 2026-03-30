@@ -1849,9 +1849,8 @@ class Terminal():
         """
         Detect OSC 52 clipboard access support.
 
-        Sends an OSC 52 clipboard read request and checks whether the
-        terminal responds.  A response (even with empty data) indicates
-        the terminal supports the OSC 52 clipboard protocol.
+        Sends an OSC 52 clipboard read request and checks whether the terminal responds.  A response
+        (even with empty data) indicates the terminal supports the OSC 52 clipboard protocol.
 
         :arg float timeout: Timeout in seconds.
         :arg bool force: Bypass cached result.

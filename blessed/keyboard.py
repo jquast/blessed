@@ -2185,8 +2185,8 @@ class DeviceAttribute():
         """
         Whether the terminal advertises OSC 52 clipboard support.
 
-        Extension 52 in DA1 indicates the terminal supports writing to the
-        system clipboard via the OSC 52 protocol.
+        Extension 52 in DA1 indicates the terminal supports writing to the system clipboard via the
+        OSC 52 protocol.
 
         :rtype: bool
         :returns: True if extension 52 is present in device attributes
