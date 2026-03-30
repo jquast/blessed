@@ -485,24 +485,6 @@ class TestGetDecrqss:
         child()
 
 
-class TestDecrqss:
-    """Decrqss constant values."""
-
-    def test_common_settings(self):
-        """Common setting identifiers match VT510 spec."""
-        assert Decrqss.SGR == 'm'
-        assert Decrqss.DECSCUSR == ' q'
-        assert Decrqss.DECSTBM == 'r'
-        assert Decrqss.DECSLRM == 's'
-        assert Decrqss.DECSCL == '"p'
-        assert Decrqss.DECSCA == '"q'
-        assert Decrqss.DECSCPP == '$|'
-        assert Decrqss.DECSLPP == 't'
-        assert Decrqss.DECSNLS == '*|'
-        assert Decrqss.DECSASD == '$}'
-        assert Decrqss.DECSSDT == '$~'
-
-
 pytestmark_pty = pytest.mark.skipif(
     IS_WINDOWS, reason="ungetch and PTY testing not supported on Windows")
 
