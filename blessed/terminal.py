@@ -1116,10 +1116,6 @@ class Terminal():
             if sv is not None:
                 print(f"Terminal: {sv.name} {sv.version}")
         """
-        # Return None if not a TTY
-        if not self.is_a_tty:
-            return None
-
         # Return cached result unless force=True
         if self._software_version_cache is not None and not force:
             return self._software_version_cache
