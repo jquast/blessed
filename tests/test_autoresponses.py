@@ -229,10 +229,11 @@ def test_detection_timeout(method_name, expected):
     assert 'OK' in output
 
 
-def test_get_iterm2_capabilities_full():
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_get_iterm2_capabilities_full(terminator):
     """get_iterm2_capabilities parses Capabilities response."""
     def child(term):
-        term.ungetch('\x1b]1337;Capabilities=T2CwBF\x07\x1b[10;20R')
+        term.ungetch('\x1b]1337;Capabilities=T2CwBF' + terminator + '\x1b[10;20R')
         result = term.get_iterm2_capabilities(timeout=0.01)
         assert result is not None
         assert result.supported is True
@@ -260,10 +261,11 @@ def test_get_iterm2_capabilities_timeout():
     assert 'OK' in output
 
 
-def test_does_kitty_notifications_supported():
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_does_kitty_notifications_supported(terminator):
     """does_kitty_notifications returns True with OSC 99 response."""
     def child(term):
-        term.ungetch('\x1b]99;i=blessed\x1b\\\x1b[10;20R')
+        term.ungetch('\x1b]99;i=blessed' + terminator + '\x1b[10;20R')
         result = term.does_kitty_notifications(timeout=0.01)
         assert result is True
         return b'OK'
@@ -312,10 +314,11 @@ def test_does_kitty_clipboard_decrqm_values(ps, expected):
     assert 'OK' in output
 
 
-def test_does_kitty_pointer_shapes_supported():
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_does_kitty_pointer_shapes_supported(terminator):
     """does_kitty_pointer_shapes returns shape name with OSC 22 response."""
     def child(term):
-        term.ungetch('\x1b]22;default\x07\x1b[10;20R')
+        term.ungetch('\x1b]22;default' + terminator + '\x1b[10;20R')
         result = term.does_kitty_pointer_shapes(timeout=0.01)
         assert result == 'default'
         return b'OK'

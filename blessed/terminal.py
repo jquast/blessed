@@ -107,13 +107,13 @@ _RE_XTGETTCAP_RESPONSE = re.compile(
     r'\x1bP([01])\+r([0-9a-fA-F]+)(?:=([0-9a-fA-F]*))?\x1b\\')
 _RE_KITTY_GRAPHICS_RESPONSE = re.compile(r'\x1b_Gi=31;(.+?)\x1b\\')
 _RE_ITERM2_CAPABILITIES_RESPONSE = re.compile(
-    r'\x1b\]1337;Capabilities=([^\x07\x1b]+)[\x07\x1b]')
+    r'\x1b\]1337;Capabilities=([^\x07\x1b]+)(?:\x07|\x1b\\)')
 _RE_KITTY_NOTIFICATIONS_RESPONSE = re.compile(
-    r'\x1b\]99;([^\x07\x1b]*?)[\x07\x1b]')
+    r'\x1b\]99;([^\x07\x1b]*?)(?:\x07|\x1b\\)')
 _RE_CPR_BOUNDARY = re.compile(r'\x1b\[[0-9]+;[0-9]+R')
 _RE_KITTY_CLIPBOARD = re.compile(r'\x1b\[\?5522;(\d+)\$y')
-_RE_KITTY_POINTER = re.compile(r'\x1b\]22;([^\x07\x1b]+)[\x07\x1b]')
-_RE_OSC52_RESPONSE = re.compile(r'\x1b\]52;[a-z]*;([^\x07\x1b]*)[\x07\x1b]')
+_RE_KITTY_POINTER = re.compile(r'\x1b\]22;([^\x07\x1b]+)(?:\x07|\x1b\\)')
+_RE_OSC52_RESPONSE = re.compile(r'\x1b\]52;[a-z]*;([^\x07\x1b]*)(?:\x07|\x1b\\)')
 # Color scheme (dark/light mode): CSI ? 997 ; Ps n
 _RE_COLOR_SCHEME_MODE_RESPONSE = re.compile(r'\x1b\[\?997;([12])n')
 # DECRQSS: DCS Ps $ r Pt ST (Ps=1 means valid)
@@ -1928,8 +1928,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :rtype: str or None
         :returns: The clipboard text, or ``None`` if denied or timeout is reached.
         """
-        match = self._query_with_boundary(
-            f'\x1b]52;{selection};?\x07', _RE_OSC52_RESPONSE, timeout)
+        match = self._query_response(
+            f'\x1b]52;{selection};?\x07', _RE_OSC52_RESPONSE.pattern, timeout)
         if match is None:
             return None
         b64_data = match.group(1)

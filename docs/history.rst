@@ -23,6 +23,7 @@ Version History
     :ghpull:`366`.
   * bugfix: Background SGR not applying to text/suggestion content in
     :class:`blessed.line_editor.LineEditor`, now prepend bg_sgr before each content SGR sequence.
+  * bugfix: OSC responses to iTerm2 capabilities, Kitty notifications, Kitty pointer shape responses
 
 1.37
 

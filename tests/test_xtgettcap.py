@@ -689,12 +689,12 @@ def test_clipboard_copy_nostyling():
 
 
 @pytestmark_pty
-def test_clipboard_paste_success():
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_clipboard_paste_success(terminator):
     """clipboard_paste decodes base64 clipboard response."""
     def child(term):
-        osc52_resp = '\x1b]52;c;SGVsbG8=\x07'
-        cpr = '\x1b[10;20R'
-        term.ungetch(osc52_resp + cpr)
+        osc52_resp = '\x1b]52;c;SGVsbG8=' + terminator
+        term.ungetch(osc52_resp)
         result = term.clipboard_paste(timeout=1)
         assert result == 'Hello'
         return b'OK'
@@ -705,12 +705,12 @@ def test_clipboard_paste_success():
 
 
 @pytestmark_pty
-def test_clipboard_paste_empty():
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_clipboard_paste_empty(terminator):
     """clipboard_paste returns empty string for empty clipboard."""
     def child(term):
-        osc52_resp = '\x1b]52;c;\x07'
-        cpr = '\x1b[10;20R'
-        term.ungetch(osc52_resp + cpr)
+        osc52_resp = '\x1b]52;c;' + terminator
+        term.ungetch(osc52_resp)
         result = term.clipboard_paste(timeout=1)
         assert result == ''
         return b'OK'
@@ -724,8 +724,6 @@ def test_clipboard_paste_empty():
 def test_clipboard_paste_no_response():
     """clipboard_paste returns None when terminal does not respond."""
     def child(term):
-        cpr = '\x1b[10;20R'
-        term.ungetch(cpr)
         result = term.clipboard_paste(timeout=0.1)
         assert result is None
         return b'OK'
@@ -736,12 +734,12 @@ def test_clipboard_paste_no_response():
 
 
 @pytestmark_pty
-def test_clipboard_paste_invalid_base64():
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_clipboard_paste_invalid_base64(terminator):
     """clipboard_paste returns None for invalid base64 data."""
     def child(term):
-        osc52_resp = '\x1b]52;c;!!!not-base64!!!\x07'
-        cpr = '\x1b[10;20R'
-        term.ungetch(osc52_resp + cpr)
+        osc52_resp = '\x1b]52;c;!!!not-base64!!!' + terminator
+        term.ungetch(osc52_resp)
         result = term.clipboard_paste(timeout=1)
         assert result is None
         return b'OK'
