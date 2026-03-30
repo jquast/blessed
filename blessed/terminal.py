@@ -1089,7 +1089,9 @@ class Terminal():
         :class:`SoftwareVersion` instance with the terminal's name and version.
 
         If an XTVERSION query fails to respond within the ``timeout``
-        specified, ``None`` is returned.
+        specified, falls back to the ``TERM_PROGRAM`` and
+        ``TERM_PROGRAM_VERSION`` environment variables. Returns ``None``
+        only if both methods fail.
 
         **Successful responses are cached indefinitely** unless ``force=True`` is
         specified. Unlike other query methods, there is no sticky failure mechanism -
@@ -1114,10 +1116,6 @@ class Terminal():
             if sv is not None:
                 print(f"Terminal: {sv.name} {sv.version}")
         """
-        # Return None if not a TTY
-        if not self.is_a_tty:
-            return None
-
         # Return cached result unless force=True
         if self._software_version_cache is not None and not force:
             return self._software_version_cache
@@ -1127,13 +1125,23 @@ class Terminal():
 
         match = self._query_with_boundary(query, _RE_GET_SOFTWARE_VERSION_RESPONSE, timeout)
 
-        # invalid or no response (timeout)
-        if match is None:
-            return None
+        if match is not None:
+            # parse, cache, and return the XTVERSION response
+            self._software_version_cache = SoftwareVersion.from_match(match)
+            return self._software_version_cache
 
-        # parse, cache, and return the response
-        self._software_version_cache = SoftwareVersion.from_match(match)
-        return self._software_version_cache
+        # Fallback: use TERM_PROGRAM and TERM_PROGRAM_VERSION environment
+        # variables, set by many modern terminal emulators (iTerm2, Apple
+        # Terminal, VS Code, WezTerm, Hyper, mintty, etc.)
+        term_program = os.environ.get('TERM_PROGRAM', '')
+        term_version = os.environ.get('TERM_PROGRAM_VERSION', '')
+        raw = ' '.join(filter(None, (term_program, term_version)))
+        if raw:
+            self._software_version_cache = SoftwareVersion(
+                raw=raw, name=term_program, version=term_version)
+            return self._software_version_cache
+
+        return None
 
     def does_sixel(self, timeout: Optional[float] = 1, force: bool = False) -> bool:
         """
