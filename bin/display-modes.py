@@ -12,7 +12,7 @@ Usage::
 import sys
 
 # local
-from blessed import Terminal
+from blessed import Terminal, DecrqssSettings
 
 
 def _yn(term, val):
@@ -132,6 +132,40 @@ def display_sugar_methods(term):
           f"Kitty desktop notifications (OSC 99)" + term.clear_eol)
 
 
+def display_decrqss(term):
+    """Query and display terminal state via DECRQSS."""
+    print(term.bold("DECRQSS State Queries (DCS $ q):"))
+    print("-" * 40)
+
+    if not term.does_decrqss():
+        print("  " + term.bright_red("DECRQSS not supported"))
+        return
+
+    settings = [
+        (DecrqssSettings.SGR, 'SGR', 'Select Graphic Rendition'),
+        (DecrqssSettings.DECSCUSR, 'DECSCUSR', 'Cursor Style'),
+        (DecrqssSettings.DECSTBM, 'DECSTBM', 'Top/Bottom Margins'),
+        (DecrqssSettings.DECSLRM, 'DECSLRM', 'Left/Right Margins'),
+        (DecrqssSettings.DECSCL, 'DECSCL', 'Conformance Level'),
+        (DecrqssSettings.DECSCA, 'DECSCA', 'Character Protection'),
+        (DecrqssSettings.DECSCPP, 'DECSCPP', 'Columns Per Page'),
+        (DecrqssSettings.DECSLPP, 'DECSLPP', 'Lines Per Page'),
+        (DecrqssSettings.DECSNLS, 'DECSNLS', 'Lines Per Screen'),
+        (DecrqssSettings.DECSASD, 'DECSASD', 'Active Status Display'),
+        (DecrqssSettings.DECSSDT, 'DECSSDT', 'Status Line Type'),
+        (DecrqssSettings.DECSACE, 'DECSACE', 'Attribute Change Extent'),
+    ]
+
+    for setting_id, mnemonic, desc in settings:
+        print(f'  Testing {mnemonic}...' + term.clear_eol, end='\r', flush=True)
+        result = term.get_decrqss(setting_id)
+        if result is not None:
+            value = term.bright_cyan(repr(result))
+            print(f"  {mnemonic:<10} {value:<20} {desc}" + term.clear_eol)
+        else:
+            print(f"  {mnemonic:<10} {term.bright_black('--'):<20} {desc}" + term.clear_eol)
+
+
 def display_all_dec_modes(term):
     """Query and display all DEC Private Mode information."""
     print(term.bold("All DEC Private Modes:"))
@@ -200,6 +234,10 @@ def main():
 
     # Display sugar methods and advanced protocols
     display_sugar_methods(term)
+    print()
+
+    # Display DECRQSS state queries
+    display_decrqss(term)
     print()
 
     # Display all DEC Private Modes (only with --all)

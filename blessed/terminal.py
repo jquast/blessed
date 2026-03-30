@@ -52,7 +52,8 @@ from .formatters import (COLORS,
                          resolve_attribute,
                          resolve_capability)
 from .cursor_shape import CursorShape as _CursorShape
-from ._capabilities import (CAPABILITY_DATABASE,
+from ._capabilities import (DecrqssSettings,
+                            CAPABILITY_DATABASE,
                             CAPABILITIES_ADDITIVES,
                             CAPABILITIES_RAW_MIXIN,
                             XTGETTCAP_CAPABILITIES,
@@ -2018,22 +2019,57 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._kitty_query_supported = supported
         return supported
 
-    def does_decrqss(self, timeout: Optional[float] = 1,
-                     force: bool = False) -> bool:
+    def get_decrqss(self, setting_id: str = DecrqssSettings.SGR,
+                    timeout: Optional[float] = 1) -> Optional[str]:
         """
-        Detect DECRQSS (Request Status String) support.
+        Query terminal state via DECRQSS (Request Status String).
 
-        Sends a ``DECRQSS`` query for the current SGR (Select Graphic
-        Rendition) state (``DCS $ q m ST``).  A valid response
-        (``DCS 1 $ r ... ST``) indicates the terminal supports status
-        string queries for SGR, DECSCL, DECSCUSR, and other attributes.
+        Sends ``DCS $ q <setting_id> ST`` and decodes the response.
+        Returns the parameter value string on success, with the echoed
+        setting identifier stripped.  Returns ``None`` when the terminal
+        does not support DECRQSS or the setting is invalid.
+
+        Results are not cached -- DECRQSS queries runtime state that
+        may change between calls (cursor style, margins, SGR, etc.).
+
+        Use :class:`~blessed.DecrqssSettings` for setting
+        identifiers::
+
+            from blessed import Terminal, DecrqssSettings
+            term = Terminal()
+            term.get_decrqss(DecrqssSettings.DECSCUSR)  # cursor style
+            term.get_decrqss(DecrqssSettings.DECSTBM)   # scroll region
 
         .. seealso::
 
             `DECRQSS specification
             <https://vt100.net/docs/vt510-rm/DECRQSS.html>`_
 
-        Supported by xterm, Contour, kitty, VTE, and others.
+        :arg str setting_id: Setting identifier to query (default: SGR).
+        :arg float timeout: Timeout in seconds.
+        :rtype: str or None
+        """
+        query = f'\x1bP$q{setting_id}\x1b\\'
+        match = self._query_with_boundary(query, _RE_DECRQSS_RESPONSE, timeout)
+        if match is not None and match.group(1) == '1':
+            pt = match.group(2)
+            if pt.endswith(setting_id):
+                return pt[:-len(setting_id)]
+            return pt
+        return None
+
+    def does_decrqss(self, timeout: Optional[float] = 1,
+                     force: bool = False) -> bool:
+        """
+        Detect DECRQSS (Request Status String) support.
+
+        Sends a ``DECRQSS`` query for the current SGR state.  A valid
+        response indicates the terminal supports status string queries.
+
+        .. seealso::
+
+            `DECRQSS specification
+            <https://vt100.net/docs/vt510-rm/DECRQSS.html>`_
 
         :arg float timeout: Timeout in seconds.
         :arg bool force: Bypass cached result.
@@ -2042,9 +2078,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         if self._decrqss_supported is not None and not force:
             return self._decrqss_supported
 
-        match = self._query_with_boundary(
-            '\x1bP$qm\x1b\\', _RE_DECRQSS_RESPONSE, timeout)
-        supported = match is not None and match.group(1) == '1'
+        supported = self.get_decrqss(DecrqssSettings.SGR, timeout) is not None
         self._decrqss_supported = supported
         return supported
 

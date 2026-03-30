@@ -163,7 +163,6 @@ ASCII_SYMBOL_NAMES = {
 
 class KittyModifierBits:
     """Standard modifier bit flags (compatible with Kitty keyboard protocol)."""
-    # pylint: disable=too-few-public-methods
 
     shift = 0b1
     alt = 0b10
