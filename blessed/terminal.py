@@ -220,7 +220,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             .. _CLICOLOR_FORCE: https://bixense.com/clicolors/
             .. _NO_COLOR: https://no-color.org/
         """
-        # pylint: disable=global-statement,too-many-statements
+        # pylint: disable=global-statement
         global _CUR_TERM
         self.errors = [
             f'parameters: kind={kind!r}, stream={stream!r}, force_styling={force_styling!r}',
@@ -1948,7 +1948,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return ''
         try:
             return base64.b64decode(b64_data).decode('utf-8')
-        except (ValueError, UnicodeDecodeError):
+        except ValueError:
             return None
 
     def get_color_scheme(self, timeout: Optional[float] = 1,

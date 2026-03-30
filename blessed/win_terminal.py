@@ -104,7 +104,7 @@ def _win32_resize_to_seq(fd: int) -> str:
     return f'\x1b[48;{size.lines};{size.columns};0;0t'
 
 
-class Terminal(_Terminal):  # pylint: disable=attribute-defined-outside-init
+class Terminal(_Terminal):
     """Windows subclass of :class:`Terminal`."""
 
     def __init__(self,
