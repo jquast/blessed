@@ -154,6 +154,60 @@ You can detect these capabilities via XTGETTCAP:
 These methods query the terminal's ``Smulx`` and ``Setulc`` terminfo
 capabilities, respectively. Default ``timeout`` argument of 1 second is used.
 
+Color Scheme Detection
+----------------------
+
+Some terminals can report whether they are in dark or light mode via the
+color-scheme DSR query (``CSI ? 996 n``). This is supported by Contour,
+Ghostty, Kitty (0.38.1+), and VTE (0.82.0+).
+
+Use :meth:`~.Terminal.get_color_scheme` to query the current preference:
+
+    >>> scheme = term.get_color_scheme()
+    >>> if scheme == 'dark':
+    ...     use_dark_palette()
+    ... elif scheme == 'light':
+    ...     use_light_palette()
+    ... else:
+    ...     use_default_palette()
+
+Returns ``'dark'``, ``'light'``, or ``None`` if the terminal does not support
+the query. Default ``timeout`` argument of 1 second is used.
+
+Unlike most detection methods, the result value is not cached -- only whether
+the terminal *supports* the query is remembered. This means repeated calls
+always return the current scheme, while terminals that do not respond only incur
+the timeout delay once.
+
+To receive unsolicited notifications when the color scheme changes, enable DEC
+private mode 2031 (``COLOR_PALETTE_UPDATES``) separately.
+
+Kitty Query Extensions
+----------------------
+
+Kitty extends the standard XTGETTCAP (``DCS +q``) mechanism with
+``kitty-query-*`` keys that expose runtime metadata such as the terminal name,
+version, font family, DPI, and clipboard control policy.
+
+You can detect whether these extensions are available using
+:meth:`~.Terminal.does_kitty_query`:
+
+    >>> if term.does_kitty_query():
+    ...     print("Kitty query extensions available")
+
+DECRQSS Support
+---------------
+
+DECRQSS (Request Status String) allows applications to query the current state
+of terminal attributes such as SGR (Select Graphic Rendition), cursor style
+(DECSCUSR), and conformance level (DECSCL). This is supported by xterm,
+Contour, kitty, VTE, and others.
+
+You can detect DECRQSS support using :meth:`~.Terminal.does_decrqss`:
+
+    >>> if term.does_decrqss():
+    ...     print("DECRQSS queries supported")
+
 Terminal Software Version
 -------------------------
 

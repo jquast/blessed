@@ -365,25 +365,25 @@ class TestColorScheme:
             assert term.get_color_scheme(timeout=0.01) is None
         child()
 
-    def test_cached_result(self):
-        """Returns cached result without re-querying."""
+    def test_negative_cache(self):
+        """Returns None immediately when previously unsupported."""
         @as_subprocess
         def child():
             stream = io.StringIO()
             term = TestTerminal(stream=stream, force_styling=True)
             term._is_a_tty = True
-            term._color_scheme_cache = 'dark'
-            assert term.get_color_scheme() == 'dark'
+            term._color_scheme_supported = False
+            assert term.get_color_scheme() is None
         child()
 
-    def test_force_bypasses_cache(self):
-        """force=True bypasses cached result."""
+    def test_force_bypasses_negative_cache(self):
+        """force=True bypasses negative cache."""
         @as_subprocess
         def child():
             stream = io.StringIO()
             term = TestTerminal(stream=stream, force_styling=True)
             term._is_a_tty = True
-            term._color_scheme_cache = 'dark'
+            term._color_scheme_supported = False
             result = term.get_color_scheme(timeout=0.01, force=True)
             assert result is None
         child()
@@ -604,7 +604,7 @@ def test_get_color_scheme_dark():
         term.ungetch(resp + cpr)
         result = term.get_color_scheme(timeout=1)
         assert result == 'dark'
-        assert term._color_scheme_cache == 'dark'
+        assert term._color_scheme_supported is True
         return b'OK'
 
     output = pty_test(child, parent_func=None,
@@ -621,7 +621,7 @@ def test_get_color_scheme_light():
         term.ungetch(resp + cpr)
         result = term.get_color_scheme(timeout=1)
         assert result == 'light'
-        assert term._color_scheme_cache == 'light'
+        assert term._color_scheme_supported is True
         return b'OK'
 
     output = pty_test(child, parent_func=None,

@@ -323,8 +323,8 @@ class Terminal():
         # OSC 52 clipboard detection cache
         self._osc52_clipboard_supported: Optional[bool] = None
 
-        # Color scheme (dark/light mode) detection cache
-        self._color_scheme_cache: Optional[str] = None
+        # Color scheme (dark/light mode) -- whether query is supported
+        self._color_scheme_supported: Optional[bool] = None
 
         # Kitty XTGETTCAP query extensions detection cache
         self._kitty_query_supported: Optional[bool] = None
@@ -1876,6 +1876,11 @@ class Terminal():
         for light mode.  Uses a CPR boundary guard for fast negative
         detection.
 
+        The result is not cached because the color scheme can change at
+        any time (e.g. when the user toggles dark mode).  Only the
+        *supported* state is cached so that terminals that do not
+        respond incur the timeout delay only once.
+
         Mode 2031 (``COLOR_PALETTE_UPDATES``) can be enabled separately
         to receive unsolicited notifications when the scheme changes.
 
@@ -1891,16 +1896,16 @@ class Terminal():
         :rtype: str or None
         :returns: ``'dark'``, ``'light'``, or ``None`` if unsupported.
         """
-        if self._color_scheme_cache is not None and not force:
-            return self._color_scheme_cache
+        if self._color_scheme_supported is False and not force:
+            return None
 
         match = self._query_with_boundary(
             '\x1b[?996n', _RE_COLOR_SCHEME_MODE_RESPONSE, timeout)
         if match:
+            self._color_scheme_supported = True
             ps = match.group(1)
-            scheme = 'dark' if ps == '1' else 'light'
-            self._color_scheme_cache = scheme
-            return scheme
+            return 'dark' if ps == '1' else 'light'
+        self._color_scheme_supported = False
         return None
 
     def does_kitty_query(self, timeout: Optional[float] = 1,

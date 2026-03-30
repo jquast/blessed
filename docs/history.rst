@@ -6,6 +6,12 @@ Version History
 1.38
 
   * introduced: :meth:`~.Terminal.does_osc52_clipboard` -- detect OSC 52 clipboard protocol support.
+  * introduced: :meth:`~.Terminal.get_color_scheme` -- query dark or light mode preference via
+    ``CSI ? 996 n`` DSR. Supported by Contour, Ghostty, Kitty (0.38.1+), and VTE (0.82.0+).
+  * introduced: :meth:`~.Terminal.does_kitty_query` -- detect Kitty XTGETTCAP query extensions
+    (``kitty-query-*`` keys for terminal name, version, font, DPI, etc.).
+  * introduced: :meth:`~.Terminal.does_decrqss` -- detect DECRQSS (Request Status String) support
+    for querying SGR, DECSCUSR, DECSCL, and other terminal attributes.
   * introduced: :meth:`~.Terminal.does_styled_underlines` and
     :meth:`~.Terminal.does_colored_underlines` -- detect extended underline styles (``Smulx``) and
     colored underlines (``Setulc``) via XTGETTCAP.
