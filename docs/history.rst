@@ -16,12 +16,14 @@ Version History
     :meth:`~.Terminal.does_colored_underlines` -- detect extended underline styles (``Smulx``) and
     colored underlines (``Setulc``) via XTGETTCAP.
   * improved: ``Smulx`` and ``Setulc`` added to XTGETTCAP capability list.
+  * bugfix: ``EOF`` when stdin is connected to a Pipe (eg. pytest capture) caused infinite loop
+    :ghpull:`366`.
 
 1.37
 
   * bugfix: legacy CSI letter-form sequences with explicit modifiers and event type (e.g.,
     ``\x1b[1;1:1A`` for arrow key press) were not resolved to key names, this affected only some
-    terminals, such as Ghostty.
+    terminals, such as Ghostty. :ghpull:`363`.
 
 1.36
 
