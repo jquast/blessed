@@ -22,9 +22,11 @@ def paste_line(ed):
     return ed.insert_text(text) if text else LineEditResult()
 
 
-with term.raw(), term.hidden_cursor(), term.bracketed_paste():
+with term.raw(), term.cursor_shape(term.CursorShape.BLINKING_BLOCK), term.bracketed_paste():
     if has_clipboard:
-        echo("press ^C and ^V for OS clipboard")
+        echo("press ^C and ^V for OS clipboard, type 'quit' to exit")
+    else:
+        echo("type 'quit' to exit")
     echo()
     while True:
         margin = max(1, term.width // 5)
