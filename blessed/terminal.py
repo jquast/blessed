@@ -12,6 +12,7 @@ import struct
 import asyncio
 import platform
 import warnings
+import base64
 import contextlib
 import collections
 from typing import IO, Dict, List, Match, Tuple, Union, Optional, Generator, SupportsIndex
@@ -1851,48 +1852,123 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     def does_osc52_clipboard(self, timeout: Optional[float] = 1,
                              force: bool = False) -> bool:
         """
-        Detect OSC 52 clipboard access support.
+        Detect OSC 52 clipboard support without reading the clipboard.
 
-        Sends an OSC 52 clipboard read request and checks whether the terminal responds.  A response
-        (even with empty data) indicates the terminal supports the OSC 52 clipboard protocol.
+        This method uses two non-intrusive detection strategies that avoid triggering user-facing
+        clipboard permission prompts:
 
-        :arg float timeout: Timeout in seconds.
+        1. **DA1 extension 52**
+        2. **XTGETTCAP ``Ms``**
+
+        These methods are preferred over sending an actual OSC 52 read request
+        (``\\x1b]52;c;?\\a``), which may trigger a clipboard permission dialog in many modern
+        terminals.
+
+        .. note::
+
+            Detection indicates the terminal *understands* OSC 52, but not a guarantee that
+            clipboard access will succeed, the user may deny access.
+
+            If neither DA1 nor XTGETTCAP reports OSC 52 support, this method returns ``False`` --
+            but the terminal may still support OSC 52 via configuration.
+
+        :arg float timeout: Timeout in seconds for each sub-query.
         :arg bool force: Bypass cached result.
         :rtype: bool
         """
         if self._osc52_clipboard_supported is not None and not force:
             return self._osc52_clipboard_supported
+
+        # Strategy 1: DA1 extension 52
+        da = self.get_device_attributes(timeout=timeout)
+        if da is not None and da.supports_osc52:
+            self._osc52_clipboard_supported = True
+            return True
+
+        # Strategy 2: XTGETTCAP Ms capability
+        tcap = self.get_xtgettcap(timeout=timeout)
+        if tcap is not None and 'Ms' in tcap.capabilities:
+            self._osc52_clipboard_supported = True
+            return True
+
+        self._osc52_clipboard_supported = False
+        return False
+
+    def clipboard_copy(self, text: str, selection: str = 'c') -> None:
+        """
+        Copy text to the system clipboard via OSC 52.
+
+        Writes an OSC 52 set sequence to the terminal output stream.
+        Most modern terminals accept clipboard writes without any user
+        prompt.
+
+        The sequence is written unconditionally when :attr:`does_styling` is ``True``.  If the
+        terminal does not support OSC 52, the sequence should be ignored by the terminal.
+
+        :arg str text: The text to copy to the clipboard.
+        :arg str selection: The X11 selection target -- ``'c'`` for
+            clipboard (default), ``'p'`` for primary selection, or
+            ``'s'`` for secondary.  Most terminals only honor ``'c'``.
+        """
+        if not self.does_styling:
+            return
+        encoded = base64.b64encode(text.encode('utf-8')).decode('ascii')
+        self.stream.write(f'\x1b]52;{selection};{encoded}\x07')
+        self.stream.flush()
+
+    def clipboard_paste(self, timeout: Optional[float] = 10,
+                        selection: str = 'c') -> Optional[str]:
+        """
+        Read the system clipboard via OSC 52.
+
+        Sends an OSC 52 query (``\\x1b]52;c;?\\a``) and waits for
+        the terminal to respond with the clipboard contents.
+
+        .. warning::
+
+            Many modern terminals display a permission dialog when an application reads the
+            clipboard.  The user must approve the dialog before the terminal sends a response.
+
+            The default timeout of 10 seconds allows time for human interaction.  If the user denies
+            the dialog, or no response is received within given timeout, this method returns
+            ``None``.
+
+        :arg float timeout: Timeout in seconds.  A generous timeout
+            is recommended because the user may need to interact
+            with a permission dialog.
+        :arg str selection: The X11 selection target -- ``'c'`` for
+            clipboard (default), ``'p'`` for primary.
+        :rtype: str or None
+        :returns: The clipboard text, or ``None`` if the terminal did
+            not respond (unsupported, denied, or timed out).
+        """
         match = self._query_with_boundary(
-            '\x1b]52;c;?\x07', _RE_OSC52_RESPONSE, timeout)
-        supported = match is not None
-        self._osc52_clipboard_supported = supported
-        return supported
+            f'\x1b]52;{selection};?\x07', _RE_OSC52_RESPONSE, timeout)
+        if match is None:
+            return None
+        b64_data = match.group(1)
+        if not b64_data:
+            return ''
+        try:
+            return base64.b64decode(b64_data).decode('utf-8')
+        except (ValueError, UnicodeDecodeError):
+            return None
 
     def get_color_scheme(self, timeout: Optional[float] = 1,
                          force: bool = False) -> Optional[str]:
         """
         Query the terminal's color scheme preference (dark or light mode).
 
-        Sends a ``CSI ? 996 n`` Device Status Report query.  Terminals
-        that support color-scheme reporting respond with
-        ``CSI ? 997 ; Ps n`` where *Ps* is ``1`` for dark mode or ``2``
-        for light mode.  Uses a CPR boundary guard for fast negative
-        detection.
+        Sends a ``CSI ? 996 n`` Device Status Report query.  Terminals that support color-scheme
+        reporting respond with ``CSI ? 997 ; Ps n`` where *Ps* is ``1`` for dark mode or ``2`` for
+        light mode.  Uses a CPR boundary guard for fast negative detection.
 
-        The result is not cached because the color scheme can change at
-        any time (e.g. when the user toggles dark mode).  Only the
-        *supported* state is cached so that terminals that do not
-        respond incur the timeout delay only once.
-
-        Mode 2031 (``COLOR_PALETTE_UPDATES``) can be enabled separately
-        to receive unsolicited notifications when the scheme changes.
+        This relates to Mode 2031 (``COLOR_PALETTE_UPDATES``) (not implemented).
 
         .. seealso::
 
             `Color palette update notifications
             <https://contour-terminal.org/vt-extensions/color-palette-update-notifications/>`_
-
-        Supported by Contour, Ghostty, Kitty (0.38.1+), and VTE (0.82.0+).
 
         :arg float timeout: Timeout in seconds.
         :arg bool force: Bypass cached result.

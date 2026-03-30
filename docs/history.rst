@@ -5,7 +5,9 @@ Version History
 
 1.38
 
-  * introduced: :meth:`~.Terminal.does_osc52_clipboard` -- detect OSC 52 clipboard protocol support.
+  * introduced: :meth:`~.Terminal.does_osc52_clipboard`, :meth:`~.Terminal.clipboard_copy`, and
+    :meth:`~.Terminal.clipboard_paste` -- detect, copy to, and read from the system clipboard
+    via OSC 52. Detection avoids triggering clipboard permission dialogs.
   * introduced: :meth:`~.Terminal.get_color_scheme` -- query dark or light mode preference via
     ``CSI ? 996 n`` DSR. Supported by Contour, Ghostty, Kitty (0.38.1+), and VTE (0.82.0+).
   * introduced: :meth:`~.Terminal.does_kitty_query` -- detect Kitty XTGETTCAP query extensions

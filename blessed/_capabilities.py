@@ -250,6 +250,7 @@ XTGETTCAP_CAPABILITIES = (
     ("u8", "DA response format"),
     ("u9", "DA request"),
     # Extended capabilities -- modern terminal features
+    ("Ms", "Clipboard via OSC 52"),
     ("Smulx", "Set extended underline style"),
     ("Setulc", "Set underline color"),
 )

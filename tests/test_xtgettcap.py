@@ -547,28 +547,58 @@ def test_get_xtgettcap_batch_empty_flushinp():
 
 
 @pytestmark_pty
-def test_does_osc52_clipboard_supported():
-    """OSC 52 clipboard detected when terminal responds."""
+def test_does_osc52_clipboard_via_da1():
+    """OSC 52 detected via DA1 extension 52."""
     def child(term):
-        osc52_resp = '\x1b]52;c;SGVsbG8=\x07'
+        # DA1 with extension 52 (OSC 52 support)
+        da1_resp = '\x1b[?64;1;4;52c'
         cpr = '\x1b[10;20R'
-        term.ungetch(osc52_resp + cpr)
+        term.ungetch(da1_resp + cpr)
         result = term.does_osc52_clipboard(timeout=1)
         assert result is True
         assert term._osc52_clipboard_supported is True
         return b'OK'
 
     output = pty_test(child, parent_func=None,
-                      test_name='test_does_osc52_clipboard_supported')
+                      test_name='test_does_osc52_clipboard_via_da1')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_osc52_clipboard_via_xtgettcap():
+    """OSC 52 detected via XTGETTCAP Ms capability."""
+    def child(term):
+        hex_tn = TermcapResponse.hex_encode('TN')
+        hex_ms = TermcapResponse.hex_encode('Ms')
+        ms_val = TermcapResponse.hex_encode(r'\e]52;%p1%s;%p2%s\007')
+        # DA1 without extension 52, so DA1 path returns False
+        da1_resp = '\x1b[?64;1;4c'
+        da1_cpr = '\x1b[10;20R'
+        # XTGETTCAP probe + batch with Ms
+        probe_resp = f'\x1bP1+r{hex_tn}=787465726d\x1b\\'
+        tcap_cpr = '\x1b[11;21R'
+        batch_resp = f'\x1bP1+r{hex_ms}={ms_val}\x1b\\'
+        term.ungetch(da1_resp + da1_cpr + probe_resp + tcap_cpr + batch_resp)
+        result = term.does_osc52_clipboard(timeout=1)
+        assert result is True
+        assert term._osc52_clipboard_supported is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_osc52_clipboard_via_xtgettcap')
     assert 'OK' in output
 
 
 @pytestmark_pty
 def test_does_osc52_clipboard_unsupported():
-    """OSC 52 clipboard not detected when only CPR arrives."""
+    """OSC 52 not detected when neither DA1 nor XTGETTCAP report it."""
     def child(term):
-        cpr = '\x1b[10;20R'
-        term.ungetch(cpr)
+        # DA1 without extension 52
+        da1_resp = '\x1b[?64;1;4c'
+        da1_cpr = '\x1b[10;20R'
+        # XTGETTCAP probe fails (no DCS response)
+        tcap_cpr = '\x1b[11;21R'
+        term.ungetch(da1_resp + da1_cpr + tcap_cpr)
         result = term.does_osc52_clipboard(timeout=1)
         assert result is False
         assert term._osc52_clipboard_supported is False
@@ -580,18 +610,86 @@ def test_does_osc52_clipboard_unsupported():
 
 
 @pytestmark_pty
-def test_does_osc52_clipboard_empty_response():
-    """OSC 52 with empty data still indicates support."""
+def test_clipboard_copy():
+    """clipboard_copy writes base64-encoded OSC 52 set sequence."""
+    def child(term):
+        term.clipboard_copy('Hello')
+        return b''
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_clipboard_copy')
+    assert '\x1b]52;c;SGVsbG8=\x07' in output
+
+
+@pytestmark_pty
+def test_clipboard_copy_primary_selection():
+    """clipboard_copy with selection='p' uses primary selection."""
+    def child(term):
+        term.clipboard_copy('test', selection='p')
+        return b''
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_clipboard_copy_primary_selection')
+    assert '\x1b]52;p;dGVzdA==\x07' in output
+
+
+@pytestmark_pty
+def test_clipboard_copy_nostyling():
+    """clipboard_copy is a no-op without styling."""
+    def child(term):
+        term._does_styling = False
+        term.clipboard_copy('Hello')
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_clipboard_copy_nostyling')
+    assert '\x1b]52' not in output
+
+
+@pytestmark_pty
+def test_clipboard_paste_success():
+    """clipboard_paste decodes base64 clipboard response."""
+    def child(term):
+        osc52_resp = '\x1b]52;c;SGVsbG8=\x07'
+        cpr = '\x1b[10;20R'
+        term.ungetch(osc52_resp + cpr)
+        result = term.clipboard_paste(timeout=1)
+        assert result == 'Hello'
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_clipboard_paste_success')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_clipboard_paste_empty():
+    """clipboard_paste returns empty string for empty clipboard."""
     def child(term):
         osc52_resp = '\x1b]52;c;\x07'
         cpr = '\x1b[10;20R'
         term.ungetch(osc52_resp + cpr)
-        result = term.does_osc52_clipboard(timeout=1)
-        assert result is True
+        result = term.clipboard_paste(timeout=1)
+        assert result == ''
         return b'OK'
 
     output = pty_test(child, parent_func=None,
-                      test_name='test_does_osc52_clipboard_empty_response')
+                      test_name='test_clipboard_paste_empty')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_clipboard_paste_no_response():
+    """clipboard_paste returns None when terminal does not respond."""
+    def child(term):
+        cpr = '\x1b[10;20R'
+        term.ungetch(cpr)
+        result = term.clipboard_paste(timeout=0.1)
+        assert result is None
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_clipboard_paste_no_response')
     assert 'OK' in output
 
 

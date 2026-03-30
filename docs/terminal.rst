@@ -148,14 +148,52 @@ system clipboard without requiring platform-specific clipboard tools. Many
 modern terminals support this protocol, including xterm, kitty, WezTerm, and
 iTerm2.
 
-You can check whether your terminal supports OSC 52 clipboard access using the
-:meth:`~.Terminal.does_osc52_clipboard` method:
+Detection
+~~~~~~~~~
+
+Use :meth:`~.Terminal.does_osc52_clipboard` to check whether your terminal
+advertises OSC 52 support:
 
     >>> if term.does_osc52_clipboard():
     ...     print("Terminal supports clipboard access")
 
-Default ``timeout`` argument of 1 second is used to avoid blocking indefinitely
-when the terminal fails to respond. Results are cached after the first query.
+Detection uses DA1 extension 52 and XTGETTCAP ``Ms`` queries, which do not
+trigger user-facing clipboard permission dialogs. Detection indicates the
+terminal *understands* OSC 52, not that any particular read will succeed.
+
+Copying to Clipboard
+~~~~~~~~~~~~~~~~~~~~
+
+Use :meth:`~.Terminal.clipboard_copy` to copy text to the system clipboard:
+
+    >>> term.clipboard_copy('Hello from blessed!')
+
+Most modern terminals accept clipboard writes without any user prompt, even
+when clipboard reads are restricted. No detection query is needed for
+write-only use -- the sequence is silently ignored by terminals that do not
+support it.
+
+Reading from Clipboard
+~~~~~~~~~~~~~~~~~~~~~~
+
+Use :meth:`~.Terminal.clipboard_paste` to read the clipboard contents:
+
+    >>> text = term.clipboard_paste()
+    >>> if text is not None:
+    ...     print(f"Clipboard: {text}")
+
+.. warning::
+
+    Many modern terminals display a permission dialog when an application
+    reads the clipboard. The user must approve the dialog before the
+    terminal sends a response. The default timeout of 10 seconds allows
+    time for this interaction. If the user denies the dialog or the
+    terminal does not support clipboard reads, ``None`` is returned.
+
+Example program demonstrating clipboard copy and paste:
+
+.. literalinclude:: ../bin/clipboard.py
+   :language: python
 
 Styled and Colored Underlines
 ------------------------------
