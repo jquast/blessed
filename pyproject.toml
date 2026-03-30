@@ -97,6 +97,7 @@ disable= [
     'suppressed-message',
     'wrong-import-order',
     'wrong-import-position',
+    'too-few-public-methods',
     'use-implicit-booleaness-not-comparison-to-zero',
 ]
 

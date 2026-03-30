@@ -4,8 +4,27 @@ Version History
 ===============
 
 1.38
+
+  * introduced: :meth:`~.Terminal.does_osc52_clipboard`, :meth:`~.Terminal.clipboard_copy`, and
+    :meth:`~.Terminal.clipboard_paste` to detect, copy, and read from clipboard.
+  * introduced: :meth:`~.Terminal.get_color_scheme`.
+  * introduced: :meth:`~.Terminal.does_kitty_query` for Kitty's XTGETTCAP query extensions.
+  * introduced: :meth:`~.Terminal.does_decrqss` for DECRQSS (Request Status String).
+  * introduced: :meth:`~.Terminal.does_styled_underlines` and
+    :meth:`~.Terminal.does_colored_underlines` -- detect extended underline styles (``Smulx``) and
+    colored underlines (``Setulc``) via XTGETTCAP.
+  * introduced: :meth:`~.Terminal.set_window_title` and :meth:`~.Terminal.window_title` -- set the
+    terminal window and/or icon title via xterm OSC sequences, with a context manager that pushes
+    and pops the title stack (XTWINOPS).
+  * introduced: :attr:`DecModeResponse.recognized` and :attr:`DecModeResponse.supported`
+    properties -- distinguish modes the terminal acknowledges from those it can actually use.
+  * improved: ``Smulx`` and ``Setulc`` added to XTGETTCAP capability list.
   * bugfix: ``EOF`` when stdin is connected to a Pipe (eg. pytest capture) caused infinite loop
     :ghpull:`366`.
+  * bugfix: Background SGR not applying to text/suggestion content in
+    :class:`blessed.line_editor.LineEditor`, now prepend bg_sgr before each content SGR sequence.
+  * bugfix: OSC responses for 'ST' in addition to 'BEL' terminated iTerm2 capabilities,
+    Kitty notifications, Kitty pointer shapes responses
 
 1.37
 

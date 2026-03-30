@@ -100,6 +100,28 @@ Hover your cursor over ``documentation``, and it should highlight as a clickable
 .. figure:: https://dxtz6bzwq9sxx.cloudfront.net/demo_basic_hyperlink.gif
    :alt: Animation of running code example and clicking a hyperlink
 
+Window Title
+------------
+
+You can set the terminal window title using
+:meth:`~.Terminal.set_window_title`, which returns the appropriate xterm OSC
+escape sequence:
+
+    >>> print(term.set_window_title('My Application'))
+
+The ``mode`` parameter controls what is set: 0 (default) sets both icon name
+and window title, 1 sets icon name only, 2 sets window title only.
+
+For temporary title changes, use the :meth:`~.Terminal.window_title` context
+manager, which pushes the current title onto the xterm title stack and restores
+it on exit:
+
+.. code-block:: python
+
+    with term.window_title('Working...'):
+        do_long_task()
+    # previous title is restored
+
 Sixel Graphics Support
 ----------------------
 
@@ -117,6 +139,134 @@ You can check whether your terminal supports sixel graphics using the
 
 Default ``timeout`` argument of 1 second is used to avoid blocking indefinitely
 when the terminal fails to respond to DA1 queries.
+
+OSC 52 Clipboard
+-----------------
+
+The OSC 52 protocol allows terminal applications to read from and write to the
+system clipboard without requiring platform-specific clipboard tools. Many
+modern terminals support this protocol, including xterm, kitty, WezTerm, and
+iTerm2.
+
+Detection
+~~~~~~~~~
+
+Use :meth:`~.Terminal.does_osc52_clipboard` to check whether your terminal
+advertises OSC 52 support:
+
+    >>> if term.does_osc52_clipboard():
+    ...     print("Terminal supports clipboard access")
+
+Detection uses DA1 extension 52 and XTGETTCAP ``Ms`` queries, which do not
+trigger user-facing clipboard permission dialogs. Detection indicates the
+terminal *understands* OSC 52, not that any particular read will succeed.
+
+Copying to Clipboard
+~~~~~~~~~~~~~~~~~~~~
+
+Use :meth:`~.Terminal.clipboard_copy` to copy text to the system clipboard:
+
+    >>> term.clipboard_copy('Hello from blessed!')
+
+Most modern terminals accept clipboard writes without any user prompt, even
+when clipboard reads are restricted. No detection query is needed for
+write-only use -- the sequence is silently ignored by terminals that do not
+support it.
+
+Reading from Clipboard
+~~~~~~~~~~~~~~~~~~~~~~
+
+Use :meth:`~.Terminal.clipboard_paste` to read the clipboard contents:
+
+    >>> text = term.clipboard_paste()
+    >>> if text is not None:
+    ...     print(f"Clipboard: {text}")
+
+.. warning::
+
+    Many modern terminals display a permission dialog when an application
+    reads the clipboard. The user must approve the dialog before the
+    terminal sends a response. The default timeout of 10 seconds allows
+    time for this interaction. If the user denies the dialog or the
+    terminal does not support clipboard reads, ``None`` is returned.
+
+Example program demonstrating clipboard copy and paste:
+
+.. literalinclude:: ../bin/clipboard.py
+   :language: python
+
+Styled and Colored Underlines
+------------------------------
+
+Modern terminals can render underline styles beyond the standard single
+underline, such as curly (``CSI 4:3 m``), dotted, and dashed underlines.
+Some also support colored underlines (``CSI 58;2;r;g;b m``), where the
+underline color differs from the text color.
+
+You can detect these capabilities via XTGETTCAP:
+
+    >>> if term.does_styled_underlines():
+    ...     print("Curly, dotted, and dashed underlines supported")
+
+    >>> if term.does_colored_underlines():
+    ...     print("Colored underlines supported")
+
+These methods query the terminal's ``Smulx`` and ``Setulc`` terminfo
+capabilities, respectively. Default ``timeout`` argument of 1 second is used.
+
+Color Scheme Detection
+----------------------
+
+Some terminals can report whether they are in dark or light mode via the
+color-scheme DSR query (``CSI ? 996 n``). This is supported by Contour,
+Ghostty, Kitty (0.38.1+), and VTE (0.82.0+).
+
+Use :meth:`~.Terminal.get_color_scheme` to query the current preference:
+
+    >>> scheme = term.get_color_scheme()
+    >>> if scheme == 'dark':
+    ...     use_dark_palette()
+    ... elif scheme == 'light':
+    ...     use_light_palette()
+    ... else:
+    ...     use_default_palette()
+
+Returns ``'dark'``, ``'light'``, or ``None`` if the terminal does not support
+the query. Default ``timeout`` argument of 1 second is used.
+
+Unlike most detection methods, the result value is not cached -- only whether
+the terminal *supports* the query is remembered. This means repeated calls
+always return the current scheme, while terminals that do not respond only incur
+the timeout delay once.
+
+To receive unsolicited notifications when the color scheme changes, enable DEC
+private mode 2031 (``COLOR_PALETTE_UPDATES``) separately.
+
+Kitty Query Extensions
+----------------------
+
+Kitty extends the standard XTGETTCAP (``DCS +q``) mechanism with
+``kitty-query-*`` keys that expose runtime metadata such as the terminal name,
+version, font family, DPI, and clipboard control policy.
+
+You can detect whether these extensions are available using
+:meth:`~.Terminal.does_kitty_query`:
+
+    >>> if term.does_kitty_query():
+    ...     print("Kitty query extensions available")
+
+DECRQSS Support
+---------------
+
+DECRQSS (Request Status String) allows applications to query the current state
+of terminal attributes such as SGR (Select Graphic Rendition), cursor style
+(DECSCUSR), and conformance level (DECSCL). This is supported by xterm,
+Contour, kitty, VTE, and others.
+
+You can detect DECRQSS support using :meth:`~.Terminal.does_decrqss`:
+
+    >>> if term.does_decrqss():
+    ...     print("DECRQSS queries supported")
 
 Terminal Software Version
 -------------------------

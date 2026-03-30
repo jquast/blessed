@@ -815,7 +815,7 @@ def test_supports_index(all_terms):
         from blessed.terminal import Terminal
         from blessed.sequences import Sequence
 
-        class Indexable:  # pylint: disable=too-few-public-methods
+        class Indexable:
             """Custom class implementing __index__()"""
 
             def __index__(self):

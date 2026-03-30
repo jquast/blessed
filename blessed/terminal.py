@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import time
+import base64
 import codecs
 import locale
 import select
@@ -56,6 +57,7 @@ from ._capabilities import (CAPABILITY_DATABASE,
                             CAPABILITIES_RAW_MIXIN,
                             XTGETTCAP_CAPABILITIES,
                             CAPABILITIES_HORIZONTAL_DISTANCE,
+                            Decrqss,
                             TermcapResponse,
                             TextSizingResult,
                             ITerm2Capabilities)
@@ -105,15 +107,20 @@ _RE_XTGETTCAP_RESPONSE = re.compile(
     r'\x1bP([01])\+r([0-9a-fA-F]+)(?:=([0-9a-fA-F]*))?\x1b\\')
 _RE_KITTY_GRAPHICS_RESPONSE = re.compile(r'\x1b_Gi=31;(.+?)\x1b\\')
 _RE_ITERM2_CAPABILITIES_RESPONSE = re.compile(
-    r'\x1b\]1337;Capabilities=([^\x07\x1b]+)[\x07\x1b]')
+    r'\x1b\]1337;Capabilities=([^\x07\x1b]+)(?:\x07|\x1b\\)')
 _RE_KITTY_NOTIFICATIONS_RESPONSE = re.compile(
-    r'\x1b\]99;([^\x07\x1b]*?)[\x07\x1b]')
+    r'\x1b\]99;([^\x07\x1b]*?)(?:\x07|\x1b\\)')
 _RE_CPR_BOUNDARY = re.compile(r'\x1b\[[0-9]+;[0-9]+R')
 _RE_KITTY_CLIPBOARD = re.compile(r'\x1b\[\?5522;(\d+)\$y')
-_RE_KITTY_POINTER = re.compile(r'\x1b\]22;([^\x07\x1b]+)[\x07\x1b]')
+_RE_KITTY_POINTER = re.compile(r'\x1b\]22;([^\x07\x1b]+)(?:\x07|\x1b\\)')
+_RE_OSC52_RESPONSE = re.compile(r'\x1b\]52;[a-z]*;([^\x07\x1b]*)(?:\x07|\x1b\\)')
+# Color scheme (dark/light mode): CSI ? 997 ; Ps n
+_RE_COLOR_SCHEME_MODE_RESPONSE = re.compile(r'\x1b\[\?997;([12])n')
+# DECRQSS: DCS Ps $ r Pt ST (Ps=1 means valid)
+_RE_DECRQSS_RESPONSE = re.compile(r'\x1bP([01])\$r([^\x1b]*)\x1b\\')
 
 
-class Terminal():
+class Terminal():  # pylint: disable=attribute-defined-outside-init
     """
     An abstraction for color, style, positioning, and input in the terminal.
 
@@ -168,6 +175,9 @@ class Terminal():
     #: DECSCUSR cursor shape constants accessible via Terminal.CursorShape or term.CursorShape
     CursorShape = _CursorShape
 
+    #: DECRQSS setting identifiers accessible via Terminal.Decrqss
+    Decrqss = Decrqss
+
     #: DEC Private Mode constants accessible via Terminal.DecPrivateMode or term.DecPrivateMode
     DecPrivateMode = _DecPrivateMode
 
@@ -214,7 +224,7 @@ class Terminal():
             .. _CLICOLOR_FORCE: https://bixense.com/clicolors/
             .. _NO_COLOR: https://no-color.org/
         """
-        # pylint: disable=global-statement,too-many-statements
+        # pylint: disable=global-statement
         global _CUR_TERM
         self.errors = [
             f'parameters: kind={kind!r}, stream={stream!r}, force_styling={force_styling!r}',
@@ -268,6 +278,9 @@ class Terminal():
         self.__init__keycodes()
         self.__init__dec_private_modes()
 
+        self.__init__query_caches()
+
+    def __init__query_caches(self) -> None:
         # Initialize Kitty keyboard protocol tracking
         self._kitty_kb_first_query_failed = False
 
@@ -315,6 +328,18 @@ class Terminal():
 
         # Text sizing (OSC 66) detection cache
         self._text_sizing_cache: Optional[TextSizingResult] = None
+
+        # OSC 52 clipboard detection cache
+        self._osc52_clipboard_supported: Optional[bool] = None
+
+        # Color scheme (dark/light mode) -- whether query is supported
+        self._color_scheme_supported: Optional[bool] = None
+
+        # Kitty XTGETTCAP query extensions detection cache
+        self._kitty_query_supported: Optional[bool] = None
+
+        # DECRQSS detection cache
+        self._decrqss_supported: Optional[bool] = None
 
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
@@ -1836,6 +1861,255 @@ class Terminal():
         self._kitty_pointer_shapes_result = (False, '')
         return None
 
+    def does_osc52_clipboard(self, timeout: Optional[float] = 1,
+                             force: bool = False) -> bool:
+        r"""
+        Detect OSC 52 clipboard support without reading the clipboard.
+
+        This method uses non-intrusive detection to avoid triggering user-facing clipboard
+        permission prompts, **DA1 extension 52** and **XTGETTCAP ``Ms``** fields.  These methods are
+        preferred over sending an actual OSC 52 read request (``\x1b]52;c;?\a``), which may trigger
+        a clipboard permission dialog in many modern terminals.
+
+        :arg float timeout: Timeout in seconds for each sub-query.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        if self._osc52_clipboard_supported is not None and not force:
+            return self._osc52_clipboard_supported
+
+        # Strategy 1: DA1 extension 52
+        da = self.get_device_attributes(timeout=timeout)
+        if da is not None and da.supports_osc52:
+            self._osc52_clipboard_supported = True
+            return True
+
+        # Strategy 2: XTGETTCAP Ms capability
+        tcap = self.get_xtgettcap(timeout=timeout)
+        if tcap is not None and 'Ms' in tcap.capabilities:
+            self._osc52_clipboard_supported = True
+            return True
+
+        self._osc52_clipboard_supported = False
+        return False
+
+    def clipboard_copy(self, text: str, selection: str = 'c') -> None:
+        """
+        Copy text to the system clipboard via OSC 52.
+
+        Writes an OSC 52 set sequence to the terminal output stream.
+        Most modern terminals accept clipboard writes without any user
+        prompt.
+
+        The sequence is written unconditionally when :attr:`does_styling` is ``True``.  If the
+        terminal does not support OSC 52, the sequence should be ignored by the terminal.
+
+        :arg str text: The text to copy to the clipboard.
+        :arg str selection: The X11 selection target -- ``'c'`` for
+            clipboard (default), ``'p'`` for primary selection, or
+            ``'s'`` for secondary.  Most terminals only honor ``'c'``.
+        """
+        if not self.does_styling:
+            return
+        encoded = base64.b64encode(text.encode('utf-8')).decode('ascii')
+        self.stream.write(f'\x1b]52;{selection};{encoded}\x07')
+        self.stream.flush()
+
+    def clipboard_paste(self, timeout: Optional[float] = 10,
+                        selection: str = 'c') -> Optional[str]:
+        r"""
+        Read the system clipboard via OSC 52.
+
+        Sends an OSC 52 query (``\x1b]52;c;?\a``) and waits for the terminal to respond with the
+        clipboard contents.
+
+        .. warning::
+
+            Many modern terminals display a permission dialog when an application reads the
+            clipboard.  The user must approve the dialog before the terminal sends a response.
+
+            The default timeout of 10 seconds allows time for human interaction.  If the user denies
+            the dialog, or no response is received within given timeout, this method returns
+            ``None``.
+
+        :arg float timeout: Timeout in seconds.  A generous timeout is recommended because the user
+            may need to interact with a permission dialog.
+        :arg str selection: The X11 selection target -- ``'c'`` for clipboard (default),
+            ``'p'`` for primary.
+        :rtype: str or None
+        :returns: The clipboard text, or ``None`` if denied or timeout is reached.
+        """
+        match = self._query_response(
+            f'\x1b]52;{selection};?\x07', _RE_OSC52_RESPONSE.pattern, timeout)
+        if match is None:
+            return None
+        b64_data = match.group(1)
+        if not b64_data:
+            return ''
+        try:
+            return base64.b64decode(b64_data).decode('utf-8')
+        except ValueError:
+            return None
+
+    def get_color_scheme(self, timeout: Optional[float] = 1,
+                         force: bool = False) -> Optional[str]:
+        """
+        Query the terminal's color scheme preference (dark or light mode).
+
+        Sends a ``CSI ? 996 n`` Device Status Report query.  Terminals that support color-scheme
+        reporting respond with ``CSI ? 997 ; Ps n`` where *Ps* is ``1`` for dark mode or ``2`` for
+        light mode.  Uses a CPR boundary guard for fast negative detection.
+
+        This relates to Mode 2031 (``COLOR_PALETTE_UPDATES``) (not implemented).
+
+        .. seealso::
+
+            `Color palette update notifications
+            <https://contour-terminal.org/vt-extensions/color-palette-update-notifications/>`_
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cached result.
+        :rtype: str or None
+        :returns: ``'dark'``, ``'light'``, or ``None`` if unsupported.
+        """
+        if self._color_scheme_supported is False and not force:
+            return None
+
+        match = self._query_with_boundary(
+            '\x1b[?996n', _RE_COLOR_SCHEME_MODE_RESPONSE, timeout)
+        if match:
+            self._color_scheme_supported = True
+            ps = match.group(1)
+            return 'dark' if ps == '1' else 'light'
+        self._color_scheme_supported = False
+        return None
+
+    def does_kitty_query(self, timeout: Optional[float] = 1,
+                         force: bool = False) -> bool:
+        """
+        Detect Kitty XTGETTCAP query extensions.
+
+        Kitty extends the standard ``XTGETTCAP`` (``DCS +q``) mechanism
+        with ``kitty-query-*`` keys that expose runtime metadata such as
+        the terminal name, version, font family, DPI, and clipboard
+        control policy.
+
+        This method probes for ``kitty-query-name`` support.  A
+        successful response indicates the full set of Kitty query
+        extensions is available.
+
+        .. seealso::
+
+            `Query terminal -- kitty
+            <https://sw.kovidgoyal.net/kitty/kittens/query_terminal/>`_
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        if self._kitty_query_supported is not None and not force:
+            return self._kitty_query_supported
+
+        capname = 'kitty-query-name'
+        query = f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\'
+        match = self._query_with_boundary(
+            query, _RE_XTGETTCAP_RESPONSE, timeout)
+        supported = match is not None and match.group(1) == '1'
+        self._kitty_query_supported = supported
+        return supported
+
+    def get_decrqss(self, setting_id: str = Decrqss.SGR,
+                    timeout: Optional[float] = 1) -> Optional[str]:
+        """
+        Query terminal state via DECRQSS (Request Status String).
+
+        Sends ``DCS $ q <setting_id> ST`` and decodes the response.
+        Returns the parameter value string on success, with the echoed
+        setting identifier stripped.  Returns ``None`` when the terminal
+        does not support DECRQSS or the setting is invalid.
+
+        Results are not cached -- DECRQSS queries runtime state that
+        may change between calls (cursor style, margins, SGR, etc.).
+
+        Use :class:`~blessed.Terminal.Decrqss` for setting
+        identifiers::
+
+            term = Terminal()
+            term.get_decrqss(term.Decrqss.DECSCUSR)  # cursor style
+            term.get_decrqss(term.Decrqss.DECSTBM)   # scroll region
+
+        .. seealso::
+
+            `DECRQSS specification
+            <https://vt100.net/docs/vt510-rm/DECRQSS.html>`_
+
+        :arg str setting_id: Setting identifier to query (default: SGR).
+        :arg float timeout: Timeout in seconds.
+        :rtype: str or None
+        """
+        query = f'\x1bP$q{setting_id}\x1b\\'
+        match = self._query_with_boundary(query, _RE_DECRQSS_RESPONSE, timeout)
+        if match is not None and match.group(1) == '1':
+            pt = match.group(2)
+            if pt.endswith(setting_id):
+                return pt[:-len(setting_id)]
+            return pt
+        return None
+
+    def does_decrqss(self, timeout: Optional[float] = 1,
+                     force: bool = False) -> bool:
+        """
+        Detect DECRQSS (Request Status String) support.
+
+        Sends a ``DECRQSS`` query for the current SGR state.  A valid
+        response indicates the terminal supports status string queries.
+
+        .. seealso::
+
+            `DECRQSS specification
+            <https://vt100.net/docs/vt510-rm/DECRQSS.html>`_
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        if self._decrqss_supported is not None and not force:
+            return self._decrqss_supported
+
+        supported = self.get_decrqss(Decrqss.SGR, timeout) is not None
+        self._decrqss_supported = supported
+        return supported
+
+    def does_styled_underlines(self, timeout: Optional[float] = 1,
+                               force: bool = False) -> bool:
+        """
+        Detect extended underline style support (curly, dotted, dashed).
+
+        Queries the terminal's ``Smulx`` terminfo capability via XTGETTCAP.
+        When supported, the terminal can render underline styles beyond the
+        standard single underline, such as ``CSI 4:3 m`` (curly).
+
+        :arg float timeout: Timeout in seconds for XTGETTCAP query.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        tc = self.get_xtgettcap(timeout=timeout, force=force)
+        return tc is not None and 'Smulx' in tc
+
+    def does_colored_underlines(self, timeout: Optional[float] = 1,
+                                force: bool = False) -> bool:
+        """
+        Detect colored underline support (``CSI 58;2;r;g;b m``).
+
+        Queries the terminal's ``Setulc`` terminfo capability via XTGETTCAP.
+
+        :arg float timeout: Timeout in seconds for XTGETTCAP query.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        tc = self.get_xtgettcap(timeout=timeout, force=force)
+        return tc is not None and 'Setulc' in tc
+
     def does_text_sizing(self, timeout: float = 1,
                          force: bool = False) -> TextSizingResult:
         """
@@ -2822,6 +3096,51 @@ class Terminal():
         if not self.does_styling:
             return text
         return f'\x1b]8;{params};{url}\x1b\\{text}\x1b]8;;\x1b\\'
+
+    def set_window_title(self, title: str, mode: int = 0) -> str:
+        """
+        Return sequence to set the terminal title.
+
+        Uses xterm OSC (Operating System Command) sequences to set the
+        window and/or icon title.
+
+        :param str title: Title text. Any embedded escape or BEL characters
+            are stripped to prevent sequence injection.
+        :param int mode: OSC mode -- 0 sets both icon name and window title,
+            1 sets icon name only, 2 sets window title only.
+        :rtype: str
+        :returns: Escape sequence string that sets the terminal title,
+            or empty string when :attr:`does_styling` is ``False``.
+        """
+        assert mode in {0, 1, 2}, f"mode must be 0, 1, or 2, got {mode!r}"
+        if not self.does_styling:
+            return ''
+        sanitized = title.replace('\x1b', '').replace('\x07', '')
+        return f'\x1b]{mode};{sanitized}\x07'
+
+    @contextlib.contextmanager
+    def window_title(self, title: str, mode: int = 0) -> Generator[None, None, None]:
+        """
+        Context manager that sets terminal title, restoring on exit.
+
+        Uses the xterm title stack (XTWINOPS push/pop) to save and
+        restore the previous title. Not all terminals support the title
+        stack -- those that do not will simply set the title without
+        restoring it on exit.
+
+        :param str title: Title text.
+        :param int mode: OSC mode -- 0 sets both icon name and window title,
+            1 sets icon name only, 2 sets window title only.
+        """
+        if self.does_styling:
+            self.stream.write(f'\x1b[22;0t{self.set_window_title(title, mode)}')
+            self.stream.flush()
+        try:
+            yield
+        finally:
+            if self.does_styling:
+                self.stream.write('\x1b[23;0t')
+                self.stream.flush()
 
     @property
     def stream(self) -> IO[str]:

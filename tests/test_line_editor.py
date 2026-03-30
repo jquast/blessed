@@ -13,7 +13,7 @@ from blessed.line_editor import (DisplayState,
                                  _apply_hscroll)
 
 
-class MockTerminal:  # pylint: disable=too-few-public-methods
+class MockTerminal:
     """Minimal terminal stub for render method tests."""
 
     normal = "<NORMAL>"

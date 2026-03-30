@@ -80,7 +80,7 @@ def init_subproc_coverage(run_note):
     return cov
 
 
-class as_subprocess():  # pylint: disable=too-few-public-methods
+class as_subprocess():
     """This helper executes test cases in a child process, avoiding a python-internal bug of
     _curses: setupterm() may not be called more than once per process."""
     _CHILD_PID = 0
@@ -414,7 +414,7 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
     return output
 
 
-class MockTigetstr():  # pylint: disable=too-few-public-methods
+class MockTigetstr():
     """
     Wraps curses.tigetstr() to override specific capnames
 

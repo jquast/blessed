@@ -157,6 +157,7 @@ def test_dec_private_mode_descriptions_consistency():
 
 @pytest.mark.parametrize("value,expected", [
     (DecModeResponse.SET, {
+        "recognized": True,
         "supported": True,
         "enabled": True,
         "disabled": False,
@@ -165,6 +166,7 @@ def test_dec_private_mode_descriptions_consistency():
         "failed": False
     }),
     (DecModeResponse.RESET, {
+        "recognized": True,
         "supported": True,
         "enabled": False,
         "disabled": True,
@@ -173,6 +175,7 @@ def test_dec_private_mode_descriptions_consistency():
         "failed": False
     }),
     (DecModeResponse.PERMANENTLY_SET, {
+        "recognized": True,
         "supported": True,
         "enabled": True,
         "disabled": False,
@@ -181,7 +184,8 @@ def test_dec_private_mode_descriptions_consistency():
         "failed": False
     }),
     (DecModeResponse.PERMANENTLY_RESET, {
-        "supported": True,
+        "recognized": True,
+        "supported": False,
         "enabled": False,
         "disabled": True,
         "permanent": True,
@@ -189,6 +193,7 @@ def test_dec_private_mode_descriptions_consistency():
         "failed": False
     }),
     (DecModeResponse.NOT_RECOGNIZED, {
+        "recognized": False,
         "supported": False,
         "enabled": False,
         "disabled": False,
@@ -197,6 +202,7 @@ def test_dec_private_mode_descriptions_consistency():
         "failed": False
     }),
     (DecModeResponse.NO_RESPONSE, {
+        "recognized": False,
         "supported": False,
         "enabled": False,
         "disabled": False,
@@ -205,6 +211,7 @@ def test_dec_private_mode_descriptions_consistency():
         "failed": True
     }),
     (DecModeResponse.NOT_QUERIED, {
+        "recognized": False,
         "supported": False,
         "enabled": False,
         "disabled": False,
@@ -217,6 +224,7 @@ def test_dec_mode_response_predicates(value, expected):
     """Test predicates for all possible response values (-2 through 4)."""
     response = DecModeResponse(_DPM.DECTCEM, value)
 
+    assert response.recognized is expected["recognized"]
     assert response.supported is expected["supported"]
     assert response.enabled is expected["enabled"]
     assert response.disabled is expected["disabled"]
@@ -271,7 +279,7 @@ def test_dec_mode_response_to_dict():
     (DecModeResponse.NOT_RECOGNIZED, False, False, False),
     (DecModeResponse.RESET, True, False, True),
     (DecModeResponse.PERMANENTLY_SET, True, True, False),
-    (DecModeResponse.PERMANENTLY_RESET, True, False, False),
+    (DecModeResponse.PERMANENTLY_RESET, False, False, False),
     (DecModeResponse.NO_RESPONSE, False, False, False),
 ])
 def test_dec_mode_response_to_dict_values(

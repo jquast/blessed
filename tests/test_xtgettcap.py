@@ -6,6 +6,7 @@ import io
 import pytest
 
 # local
+from blessed._capabilities import Decrqss
 from blessed._capabilities import TermcapResponse, ITerm2Capabilities
 from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, as_subprocess, pty_test
@@ -252,6 +253,238 @@ class TestGetXtgettcap:
         child()
 
 
+class TestStyledUnderlines:
+    """Terminal.does_styled_underlines() and does_colored_underlines()."""
+
+    def test_styled_underlines_supported(self):
+        """Returns True when Smulx is in XTGETTCAP capabilities."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._xtgettcap_cache = TermcapResponse(
+                supported=True,
+                capabilities={'TN': 'xterm', 'Smulx': '\x1b[4:%p1%dm'})
+            assert term.does_styled_underlines() is True
+        child()
+
+    def test_styled_underlines_unsupported(self):
+        """Returns False when Smulx is not in capabilities."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._xtgettcap_cache = TermcapResponse(
+                supported=True, capabilities={'TN': 'xterm'})
+            assert term.does_styled_underlines() is False
+        child()
+
+    def test_styled_underlines_no_xtgettcap(self):
+        """Returns False when XTGETTCAP is not supported."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._xtgettcap_first_query_failed = True
+            assert term.does_styled_underlines() is False
+        child()
+
+    def test_colored_underlines_supported(self):
+        """Returns True when Setulc is in XTGETTCAP capabilities."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._xtgettcap_cache = TermcapResponse(
+                supported=True,
+                capabilities={'Setulc': '\x1b[58;2;%p1%d;%p2%d;%p3%dm'})
+            assert term.does_colored_underlines() is True
+        child()
+
+    def test_colored_underlines_unsupported(self):
+        """Returns False when Setulc is not in capabilities."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._xtgettcap_cache = TermcapResponse(
+                supported=True, capabilities={'TN': 'xterm'})
+            assert term.does_colored_underlines() is False
+        child()
+
+
+class TestOsc52Clipboard:
+    """Terminal.does_osc52_clipboard() detection."""
+
+    def test_not_a_tty(self):
+        """Returns False when not a TTY."""
+        @as_subprocess
+        def child():
+            term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                                is_a_tty=False)
+            assert term.does_osc52_clipboard(timeout=0.01) is False
+        child()
+
+    def test_cached_result(self):
+        """Returns cached result without re-querying."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._osc52_clipboard_supported = True
+            assert term.does_osc52_clipboard() is True
+        child()
+
+    def test_force_bypasses_cache(self):
+        """force=True bypasses cached result."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._osc52_clipboard_supported = True
+            result = term.does_osc52_clipboard(timeout=0.01, force=True)
+            assert result is False
+        child()
+
+
+class TestColorScheme:
+    """Terminal.get_color_scheme() detection."""
+
+    def test_not_a_tty(self):
+        """Returns None when not a TTY."""
+        @as_subprocess
+        def child():
+            term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                                is_a_tty=False)
+            assert term.get_color_scheme(timeout=0.01) is None
+        child()
+
+    def test_negative_cache(self):
+        """Returns None immediately when previously unsupported."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._color_scheme_supported = False
+            assert term.get_color_scheme() is None
+        child()
+
+    def test_force_bypasses_negative_cache(self):
+        """force=True bypasses negative cache."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._color_scheme_supported = False
+            result = term.get_color_scheme(timeout=0.01, force=True)
+            assert result is None
+        child()
+
+
+class TestKittyQuery:
+    """Terminal.does_kitty_query() detection."""
+
+    def test_not_a_tty(self):
+        """Returns False when not a TTY."""
+        @as_subprocess
+        def child():
+            term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                                is_a_tty=False)
+            assert term.does_kitty_query(timeout=0.01) is False
+        child()
+
+    def test_cached_result(self):
+        """Returns cached result without re-querying."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._kitty_query_supported = True
+            assert term.does_kitty_query() is True
+        child()
+
+    def test_force_bypasses_cache(self):
+        """force=True bypasses cached result."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._kitty_query_supported = True
+            result = term.does_kitty_query(timeout=0.01, force=True)
+            assert result is False
+        child()
+
+
+class TestDecrqss:
+    """Terminal.does_decrqss() detection."""
+
+    def test_not_a_tty(self):
+        """Returns False when not a TTY."""
+        @as_subprocess
+        def child():
+            term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                                is_a_tty=False)
+            assert term.does_decrqss(timeout=0.01) is False
+        child()
+
+    def test_cached_result(self):
+        """Returns cached result without re-querying."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._decrqss_supported = True
+            assert term.does_decrqss() is True
+        child()
+
+    def test_force_bypasses_cache(self):
+        """force=True bypasses cached result."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._decrqss_supported = True
+            result = term.does_decrqss(timeout=0.01, force=True)
+            assert result is False
+        child()
+
+
+class TestGetDecrqss:
+    """Terminal.get_decrqss() state queries."""
+
+    def test_not_a_tty(self):
+        """Returns None when not a TTY."""
+        @as_subprocess
+        def child():
+            term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                                is_a_tty=False)
+            assert term.get_decrqss(timeout=0.01) is None
+        child()
+
+    def test_default_setting_is_sgr(self):
+        """Default setting_id is SGR ('m')."""
+        @as_subprocess
+        def child():
+            term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                                is_a_tty=False)
+            assert Decrqss.SGR == 'm'
+            assert term.get_decrqss() is None
+        child()
+
+
 pytestmark_pty = pytest.mark.skipif(
     IS_WINDOWS, reason="ungetch and PTY testing not supported on Windows")
 
@@ -334,4 +567,410 @@ def test_get_xtgettcap_batch_empty_flushinp():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_get_xtgettcap_batch_empty_flushinp')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_osc52_clipboard_via_da1():
+    """OSC 52 detected via DA1 extension 52."""
+    def child(term):
+        # DA1 with extension 52 (OSC 52 support)
+        da1_resp = '\x1b[?64;1;4;52c'
+        cpr = '\x1b[10;20R'
+        term.ungetch(da1_resp + cpr)
+        result = term.does_osc52_clipboard(timeout=1)
+        assert result is True
+        assert term._osc52_clipboard_supported is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_osc52_clipboard_via_da1')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_osc52_clipboard_via_xtgettcap():
+    """OSC 52 detected via XTGETTCAP Ms capability."""
+    def child(term):
+        hex_tn = TermcapResponse.hex_encode('TN')
+        hex_ms = TermcapResponse.hex_encode('Ms')
+        ms_val = TermcapResponse.hex_encode(r'\e]52;%p1%s;%p2%s\007')
+        # DA1 without extension 52, so DA1 path returns False
+        da1_resp = '\x1b[?64;1;4c'
+        da1_cpr = '\x1b[10;20R'
+        # XTGETTCAP probe + batch with Ms
+        probe_resp = f'\x1bP1+r{hex_tn}=787465726d\x1b\\'
+        tcap_cpr = '\x1b[11;21R'
+        batch_resp = f'\x1bP1+r{hex_ms}={ms_val}\x1b\\'
+        term.ungetch(da1_resp + da1_cpr + probe_resp + tcap_cpr + batch_resp)
+        result = term.does_osc52_clipboard(timeout=1)
+        assert result is True
+        assert term._osc52_clipboard_supported is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_osc52_clipboard_via_xtgettcap')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_osc52_clipboard_unsupported():
+    """OSC 52 not detected when neither DA1 nor XTGETTCAP report it."""
+    def child(term):
+        # DA1 without extension 52
+        da1_resp = '\x1b[?64;1;4c'
+        da1_cpr = '\x1b[10;20R'
+        # XTGETTCAP probe fails (no DCS response)
+        tcap_cpr = '\x1b[11;21R'
+        term.ungetch(da1_resp + da1_cpr + tcap_cpr)
+        result = term.does_osc52_clipboard(timeout=1)
+        assert result is False
+        assert term._osc52_clipboard_supported is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_osc52_clipboard_unsupported')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_clipboard_copy():
+    """clipboard_copy writes base64-encoded OSC 52 set sequence."""
+    def child(term):
+        term.clipboard_copy('Hello')
+        return b''
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_clipboard_copy')
+    assert '\x1b]52;c;SGVsbG8=\x07' in output
+
+
+@pytestmark_pty
+def test_clipboard_copy_primary_selection():
+    """clipboard_copy with selection='p' uses primary selection."""
+    def child(term):
+        term.clipboard_copy('test', selection='p')
+        return b''
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_clipboard_copy_primary_selection')
+    assert '\x1b]52;p;dGVzdA==\x07' in output
+
+
+@pytestmark_pty
+def test_clipboard_copy_nostyling():
+    """clipboard_copy is a no-op without styling."""
+    def child(term):
+        term._does_styling = False
+        term.clipboard_copy('Hello')
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_clipboard_copy_nostyling')
+    assert '\x1b]52' not in output
+
+
+@pytestmark_pty
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_clipboard_paste_success(terminator):
+    """clipboard_paste decodes base64 clipboard response."""
+    def child(term):
+        osc52_resp = '\x1b]52;c;SGVsbG8=' + terminator
+        term.ungetch(osc52_resp)
+        result = term.clipboard_paste(timeout=1)
+        assert result == 'Hello'
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_clipboard_paste_success')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_clipboard_paste_empty(terminator):
+    """clipboard_paste returns empty string for empty clipboard."""
+    def child(term):
+        osc52_resp = '\x1b]52;c;' + terminator
+        term.ungetch(osc52_resp)
+        result = term.clipboard_paste(timeout=1)
+        assert result == ''
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_clipboard_paste_empty')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_clipboard_paste_no_response():
+    """clipboard_paste returns None when terminal does not respond."""
+    def child(term):
+        result = term.clipboard_paste(timeout=0.1)
+        assert result is None
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_clipboard_paste_no_response')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+@pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
+def test_clipboard_paste_invalid_base64(terminator):
+    """clipboard_paste returns None for invalid base64 data."""
+    def child(term):
+        osc52_resp = '\x1b]52;c;!!!not-base64!!!' + terminator
+        term.ungetch(osc52_resp)
+        result = term.clipboard_paste(timeout=1)
+        assert result is None
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_clipboard_paste_invalid_base64')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_get_color_scheme_dark():
+    """Dark mode detected from CSI ? 997 ; 1 n response."""
+    def child(term):
+        resp = '\x1b[?997;1n'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.get_color_scheme(timeout=1)
+        assert result == 'dark'
+        assert term._color_scheme_supported is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_color_scheme_dark')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_get_color_scheme_light():
+    """Light mode detected from CSI ? 997 ; 2 n response."""
+    def child(term):
+        resp = '\x1b[?997;2n'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.get_color_scheme(timeout=1)
+        assert result == 'light'
+        assert term._color_scheme_supported is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_color_scheme_light')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_get_color_scheme_unsupported():
+    """Returns None when terminal does not respond to CSI ? 996 n."""
+    def child(term):
+        cpr = '\x1b[10;20R'
+        term.ungetch(cpr)
+        result = term.get_color_scheme(timeout=1)
+        assert result is None
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_color_scheme_unsupported')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_kitty_query_supported():
+    """Kitty query extensions detected from DCS 1+r response."""
+    def child(term):
+        capname = 'kitty-query-name'
+        hex_cap = TermcapResponse.hex_encode(capname)
+        hex_val = TermcapResponse.hex_encode('kitty')
+        resp = f'\x1bP1+r{hex_cap}={hex_val}\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.does_kitty_query(timeout=1)
+        assert result is True
+        assert term._kitty_query_supported is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_kitty_query_supported')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_kitty_query_unsupported():
+    """Kitty query not detected when only CPR arrives."""
+    def child(term):
+        cpr = '\x1b[10;20R'
+        term.ungetch(cpr)
+        result = term.does_kitty_query(timeout=1)
+        assert result is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_kitty_query_unsupported')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_kitty_query_rejected():
+    """Kitty query returns False on DCS 0+r (not recognized)."""
+    def child(term):
+        capname = 'kitty-query-name'
+        hex_cap = TermcapResponse.hex_encode(capname)
+        resp = f'\x1bP0+r{hex_cap}\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.does_kitty_query(timeout=1)
+        assert result is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_kitty_query_rejected')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_decrqss_supported():
+    """DECRQSS detected from DCS 1 $ r response."""
+    def child(term):
+        resp = '\x1bP1$r0m\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.does_decrqss(timeout=1)
+        assert result is True
+        assert term._decrqss_supported is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_decrqss_supported')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_decrqss_unsupported():
+    """DECRQSS not detected when only CPR arrives."""
+    def child(term):
+        cpr = '\x1b[10;20R'
+        term.ungetch(cpr)
+        result = term.does_decrqss(timeout=1)
+        assert result is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_decrqss_unsupported')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_decrqss_invalid():
+    """DECRQSS returns False on DCS 0 $ r (invalid request)."""
+    def child(term):
+        resp = '\x1bP0$r\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.does_decrqss(timeout=1)
+        assert result is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_decrqss_invalid')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_get_decrqss_sgr():
+    """get_decrqss returns SGR parameter value with setting_id stripped."""
+    def child(term):
+        resp = '\x1bP1$r0m\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.get_decrqss(Decrqss.SGR, timeout=1)
+        assert result == '0'
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_decrqss_sgr')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_get_decrqss_sgr_with_attrs():
+    """get_decrqss returns compound SGR values."""
+    def child(term):
+        resp = '\x1bP1$r1;4;38;5;12m\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.get_decrqss(Decrqss.SGR, timeout=1)
+        assert result == '1;4;38;5;12'
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_decrqss_sgr_with_attrs')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_get_decrqss_cursor_style():
+    """get_decrqss returns cursor style value for DECSCUSR."""
+    def child(term):
+        resp = '\x1bP1$r2 q\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.get_decrqss(Decrqss.DECSCUSR, timeout=1)
+        assert result == '2'
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_decrqss_cursor_style')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_get_decrqss_scroll_region():
+    """get_decrqss returns top/bottom margins for DECSTBM."""
+    def child(term):
+        resp = '\x1bP1$r1;24r\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.get_decrqss(Decrqss.DECSTBM, timeout=1)
+        assert result == '1;24'
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_decrqss_scroll_region')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_get_decrqss_unsupported():
+    """get_decrqss returns None when terminal does not respond."""
+    def child(term):
+        cpr = '\x1b[10;20R'
+        term.ungetch(cpr)
+        result = term.get_decrqss(Decrqss.SGR, timeout=1)
+        assert result is None
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_decrqss_unsupported')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_get_decrqss_invalid():
+    """get_decrqss returns None on DCS 0 $ r (invalid request)."""
+    def child(term):
+        resp = '\x1bP0$r\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.get_decrqss(Decrqss.SGR, timeout=1)
+        assert result is None
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_decrqss_invalid')
     assert 'OK' in output

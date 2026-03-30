@@ -12,6 +12,7 @@ __all__ = (
     'CAPABILITIES_HORIZONTAL_DISTANCE',
     'CAPABILITIES_CAUSE_MOVEMENT',
     'XTGETTCAP_CAPABILITIES',
+    'Decrqss',
     'TermcapResponse',
     'ITerm2Capabilities',
 )
@@ -249,7 +250,60 @@ XTGETTCAP_CAPABILITIES = (
     ("u7", "CPR request"),
     ("u8", "DA response format"),
     ("u9", "DA request"),
+    # Extended capabilities -- modern terminal features
+    ("Ms", "Clipboard via OSC 52"),
+    ("Smulx", "Set extended underline style"),
+    ("Setulc", "Set underline color"),
 )
+
+
+class Decrqss:
+    """
+    DECRQSS setting identifiers for querying terminal state.
+
+    Each attribute is the "final character(s)" sent inside
+    ``DCS $ q <setting_id> ST`` to request the current value
+    of a particular terminal setting.
+
+    .. seealso::
+
+        `DECRQSS specification
+        <https://vt100.net/docs/vt510-rm/DECRQSS.html>`_
+    """
+
+    # Display and rendering
+    SGR = 'm'                  # Select Graphic Rendition
+    DECSCUSR = ' q'            # Set Cursor Style
+    DECSTBM = 'r'              # Set Top and Bottom Margins
+    DECSLRM = 's'              # Set Left and Right Margins
+    DECSCL = '"p'              # Set Conformance Level
+    DECSCA = '"q'              # Set Character Protection Attribute
+    DECSCPP = '$|'             # Set Columns Per Page
+    DECSLPP = 't'              # Set Lines Per Page
+    DECSNLS = '*|'             # Set Number of Lines per Screen
+    DECSASD = '$}'             # Select Active Status Display
+    DECSSDT = '$~'             # Set Status Line Type
+
+    # Selection and extent
+    DECSACE = '*x'             # Select Attribute Change Extent
+
+    # Communication and hardware (VT510-specific)
+    DECSSL = 'p'               # Select Set-Up Language
+    DECSPRTT = '$s'            # Select Printer Type
+    DECSRFR = '"t'             # Select Refresh Rate
+    DECSDPT = '(p'             # Select Digital Printed Data Type
+    DECSPPCS = '*p'            # Select ProPrinter Character Set
+    DECSCS = '*r'              # Select Communication Speed
+    DECSCP = '*u'              # Select Communication Port
+    DECSSCLS = ' p'            # Set Scroll Speed
+    DECSKCV = ' r'             # Set Key Click Volume
+    DECSWBV = ' t'             # Set Warning Bell Volume
+    DECSMBV = ' u'             # Set Margin Bell Volume
+    DECSLCK = ' v'             # Set Lock Key Style
+    DECSFC = '*s'              # Select Flow Control Type
+    DECSDDT = '$q'             # Select Disconnect Delay Time
+    DECSTRL = '"u'             # Set Transmit Rate Limit
+    DECSPP = '+w'              # Set Port Parameter
 
 
 class TermcapResponse:

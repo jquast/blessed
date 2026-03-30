@@ -163,7 +163,6 @@ ASCII_SYMBOL_NAMES = {
 
 class KittyModifierBits:
     """Standard modifier bit flags (compatible with Kitty keyboard protocol)."""
-    # pylint: disable=too-few-public-methods
 
     shift = 0b1
     alt = 0b10
@@ -2180,6 +2179,19 @@ class DeviceAttribute():
         """
         return 4 in self.extensions
 
+    @property
+    def supports_osc52(self) -> bool:
+        """
+        Whether the terminal advertises OSC 52 clipboard support.
+
+        Extension 52 in DA1 indicates the terminal supports writing to the system clipboard via the
+        OSC 52 protocol.
+
+        :rtype: bool
+        :returns: True if extension 52 is present in device attributes
+        """
+        return 52 in self.extensions
+
     @classmethod
     def from_match(cls, match: Match[str]) -> 'DeviceAttribute':
         """
@@ -2205,7 +2217,8 @@ class DeviceAttribute():
     def __repr__(self) -> str:
         """String representation of DeviceAttribute."""
         return (f'DeviceAttribute(service_class={self.service_class}, '
-                f'extensions={self.extensions}, supports_sixel={self.supports_sixel})')
+                f'extensions={self.extensions}, supports_sixel={self.supports_sixel}, '
+                f'supports_osc52={self.supports_osc52})')
 
 
 class SoftwareVersion:

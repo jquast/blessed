@@ -74,14 +74,33 @@ class DecModeResponse:
         return self._value
 
     @property
-    def supported(self) -> bool:
+    def recognized(self) -> bool:
         """
-        Check if the mode is supported by the terminal.
+        Check if the terminal recognizes this mode.
+
+        True for any DECRPM response value > 0 (SET, RESET, PERMANENTLY_SET, or PERMANENTLY_RESET).
+        This indicates the terminal knows about the mode, but does not guarantee the application can
+        use or control it.
 
         :rtype: bool
-        :returns: True if terminal recognizes and supports this mode
+        :returns: True if terminal acknowledges this mode
         """
         return self.value > 0
+
+    @property
+    def supported(self) -> bool:
+        """
+        Check if the mode is supported and usable by the terminal.
+
+        True for values SET (1), RESET (2), and PERMANENTLY_SET (3). PERMANENTLY_RESET (4) is
+        excluded: the terminal acknowledges the mode but it is permanently off and cannot be
+        enabled, so it is not usable by applications.  See also xterm patch #395 and the Contour
+        synchronized-output spec which both treat value 4 as effectively unsupported.
+
+        :rtype: bool
+        :returns: True if mode is usable (changeable or permanently enabled)
+        """
+        return self.value in {1, 2, 3}
 
     @property
     def enabled(self) -> bool:

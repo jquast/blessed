@@ -1,8 +1,6 @@
 """Module providing DECSCUSR cursor shape support."""
 from __future__ import annotations
 
-# pylint: disable=too-few-public-methods
-
 
 class CursorShape:
     """
