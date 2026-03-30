@@ -112,6 +112,10 @@ _RE_CPR_BOUNDARY = re.compile(r'\x1b\[[0-9]+;[0-9]+R')
 _RE_KITTY_CLIPBOARD = re.compile(r'\x1b\[\?5522;(\d+)\$y')
 _RE_KITTY_POINTER = re.compile(r'\x1b\]22;([^\x07\x1b]+)[\x07\x1b]')
 _RE_OSC52_RESPONSE = re.compile(r'\x1b\]52;[a-z]*;([^\x07\x1b]*)[\x07\x1b]')
+# Color scheme (dark/light mode): CSI ? 997 ; Ps n
+_RE_COLOR_SCHEME_MODE_RESPONSE = re.compile(r'\x1b\[\?997;([12])n')
+# DECRQSS: DCS Ps $ r Pt ST (Ps=1 means valid)
+_RE_DECRQSS_RESPONSE = re.compile(r'\x1bP([01])\$r([^\x1b]*)\x1b\\')
 
 
 class Terminal():
@@ -318,6 +322,15 @@ class Terminal():
 
         # OSC 52 clipboard detection cache
         self._osc52_clipboard_supported: Optional[bool] = None
+
+        # Color scheme (dark/light mode) detection cache
+        self._color_scheme_cache: Optional[str] = None
+
+        # Kitty XTGETTCAP query extensions detection cache
+        self._kitty_query_supported: Optional[bool] = None
+
+        # DECRQSS detection cache
+        self._decrqss_supported: Optional[bool] = None
 
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
@@ -1850,6 +1863,109 @@ class Terminal():
             '\x1b]52;c;?\x07', _RE_OSC52_RESPONSE, timeout)
         supported = match is not None
         self._osc52_clipboard_supported = supported
+        return supported
+
+    def get_color_scheme(self, timeout: Optional[float] = 1,
+                         force: bool = False) -> Optional[str]:
+        """
+        Query the terminal's color scheme preference (dark or light mode).
+
+        Sends a ``CSI ? 996 n`` Device Status Report query.  Terminals
+        that support color-scheme reporting respond with
+        ``CSI ? 997 ; Ps n`` where *Ps* is ``1`` for dark mode or ``2``
+        for light mode.  Uses a CPR boundary guard for fast negative
+        detection.
+
+        Mode 2031 (``COLOR_PALETTE_UPDATES``) can be enabled separately
+        to receive unsolicited notifications when the scheme changes.
+
+        .. seealso::
+
+            `Color palette update notifications
+            <https://contour-terminal.org/vt-extensions/color-palette-update-notifications/>`_
+
+        Supported by Contour, Ghostty, Kitty (0.38.1+), and VTE (0.82.0+).
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cached result.
+        :rtype: str or None
+        :returns: ``'dark'``, ``'light'``, or ``None`` if unsupported.
+        """
+        if self._color_scheme_cache is not None and not force:
+            return self._color_scheme_cache
+
+        match = self._query_with_boundary(
+            '\x1b[?996n', _RE_COLOR_SCHEME_MODE_RESPONSE, timeout)
+        if match:
+            ps = match.group(1)
+            scheme = 'dark' if ps == '1' else 'light'
+            self._color_scheme_cache = scheme
+            return scheme
+        return None
+
+    def does_kitty_query(self, timeout: Optional[float] = 1,
+                         force: bool = False) -> bool:
+        """
+        Detect Kitty XTGETTCAP query extensions.
+
+        Kitty extends the standard ``XTGETTCAP`` (``DCS +q``) mechanism
+        with ``kitty-query-*`` keys that expose runtime metadata such as
+        the terminal name, version, font family, DPI, and clipboard
+        control policy.
+
+        This method probes for ``kitty-query-name`` support.  A
+        successful response indicates the full set of Kitty query
+        extensions is available.
+
+        .. seealso::
+
+            `Query terminal -- kitty
+            <https://sw.kovidgoyal.net/kitty/kittens/query_terminal/>`_
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        if self._kitty_query_supported is not None and not force:
+            return self._kitty_query_supported
+
+        from blessed._capabilities import TermcapResponse
+        capname = 'kitty-query-name'
+        query = f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\'
+        match = self._query_with_boundary(
+            query, _RE_XTGETTCAP_RESPONSE, timeout)
+        supported = match is not None and match.group(1) == '1'
+        self._kitty_query_supported = supported
+        return supported
+
+    def does_decrqss(self, timeout: Optional[float] = 1,
+                     force: bool = False) -> bool:
+        """
+        Detect DECRQSS (Request Status String) support.
+
+        Sends a ``DECRQSS`` query for the current SGR (Select Graphic
+        Rendition) state (``DCS $ q m ST``).  A valid response
+        (``DCS 1 $ r ... ST``) indicates the terminal supports status
+        string queries for SGR, DECSCL, DECSCUSR, and other attributes.
+
+        .. seealso::
+
+            `DECRQSS specification
+            <https://vt100.net/docs/vt510-rm/DECRQSS.html>`_
+
+        Supported by xterm, Contour, kitty, VTE, and others.
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cached result.
+        :rtype: bool
+        """
+        if self._decrqss_supported is not None and not force:
+            return self._decrqss_supported
+
+        match = self._query_with_boundary(
+            '\x1bP$qm\x1b\\', _RE_DECRQSS_RESPONSE, timeout)
+        supported = match is not None and match.group(1) == '1'
+        self._decrqss_supported = supported
         return supported
 
     def does_styled_underlines(self, timeout: Optional[float] = 1,

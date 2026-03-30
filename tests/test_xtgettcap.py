@@ -353,6 +353,114 @@ class TestOsc52Clipboard:
         child()
 
 
+class TestColorScheme:
+    """Terminal.get_color_scheme() detection."""
+
+    def test_not_a_tty(self):
+        """Returns None when not a TTY."""
+        @as_subprocess
+        def child():
+            term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                                is_a_tty=False)
+            assert term.get_color_scheme(timeout=0.01) is None
+        child()
+
+    def test_cached_result(self):
+        """Returns cached result without re-querying."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._color_scheme_cache = 'dark'
+            assert term.get_color_scheme() == 'dark'
+        child()
+
+    def test_force_bypasses_cache(self):
+        """force=True bypasses cached result."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._color_scheme_cache = 'dark'
+            result = term.get_color_scheme(timeout=0.01, force=True)
+            assert result is None
+        child()
+
+
+class TestKittyQuery:
+    """Terminal.does_kitty_query() detection."""
+
+    def test_not_a_tty(self):
+        """Returns False when not a TTY."""
+        @as_subprocess
+        def child():
+            term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                                is_a_tty=False)
+            assert term.does_kitty_query(timeout=0.01) is False
+        child()
+
+    def test_cached_result(self):
+        """Returns cached result without re-querying."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._kitty_query_supported = True
+            assert term.does_kitty_query() is True
+        child()
+
+    def test_force_bypasses_cache(self):
+        """force=True bypasses cached result."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._kitty_query_supported = True
+            result = term.does_kitty_query(timeout=0.01, force=True)
+            assert result is False
+        child()
+
+
+class TestDecrqss:
+    """Terminal.does_decrqss() detection."""
+
+    def test_not_a_tty(self):
+        """Returns False when not a TTY."""
+        @as_subprocess
+        def child():
+            term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                                is_a_tty=False)
+            assert term.does_decrqss(timeout=0.01) is False
+        child()
+
+    def test_cached_result(self):
+        """Returns cached result without re-querying."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._decrqss_supported = True
+            assert term.does_decrqss() is True
+        child()
+
+    def test_force_bypasses_cache(self):
+        """force=True bypasses cached result."""
+        @as_subprocess
+        def child():
+            stream = io.StringIO()
+            term = TestTerminal(stream=stream, force_styling=True)
+            term._is_a_tty = True
+            term._decrqss_supported = True
+            result = term.does_decrqss(timeout=0.01, force=True)
+            assert result is False
+        child()
+
+
 pytestmark_pty = pytest.mark.skipif(
     IS_WINDOWS, reason="ungetch and PTY testing not supported on Windows")
 
@@ -484,4 +592,156 @@ def test_does_osc52_clipboard_empty_response():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_does_osc52_clipboard_empty_response')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_get_color_scheme_dark():
+    """Dark mode detected from CSI ? 997 ; 1 n response."""
+    def child(term):
+        resp = '\x1b[?997;1n'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.get_color_scheme(timeout=1)
+        assert result == 'dark'
+        assert term._color_scheme_cache == 'dark'
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_color_scheme_dark')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_get_color_scheme_light():
+    """Light mode detected from CSI ? 997 ; 2 n response."""
+    def child(term):
+        resp = '\x1b[?997;2n'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.get_color_scheme(timeout=1)
+        assert result == 'light'
+        assert term._color_scheme_cache == 'light'
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_color_scheme_light')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_get_color_scheme_unsupported():
+    """Returns None when terminal does not respond to CSI ? 996 n."""
+    def child(term):
+        cpr = '\x1b[10;20R'
+        term.ungetch(cpr)
+        result = term.get_color_scheme(timeout=1)
+        assert result is None
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_color_scheme_unsupported')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_kitty_query_supported():
+    """Kitty query extensions detected from DCS 1+r response."""
+    def child(term):
+        from blessed._capabilities import TermcapResponse
+        capname = 'kitty-query-name'
+        hex_cap = TermcapResponse.hex_encode(capname)
+        hex_val = TermcapResponse.hex_encode('kitty')
+        resp = f'\x1bP1+r{hex_cap}={hex_val}\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.does_kitty_query(timeout=1)
+        assert result is True
+        assert term._kitty_query_supported is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_kitty_query_supported')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_kitty_query_unsupported():
+    """Kitty query not detected when only CPR arrives."""
+    def child(term):
+        cpr = '\x1b[10;20R'
+        term.ungetch(cpr)
+        result = term.does_kitty_query(timeout=1)
+        assert result is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_kitty_query_unsupported')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_kitty_query_rejected():
+    """Kitty query returns False on DCS 0+r (not recognized)."""
+    def child(term):
+        from blessed._capabilities import TermcapResponse
+        capname = 'kitty-query-name'
+        hex_cap = TermcapResponse.hex_encode(capname)
+        resp = f'\x1bP0+r{hex_cap}\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.does_kitty_query(timeout=1)
+        assert result is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_kitty_query_rejected')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_decrqss_supported():
+    """DECRQSS detected from DCS 1 $ r response."""
+    def child(term):
+        resp = '\x1bP1$r0m\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.does_decrqss(timeout=1)
+        assert result is True
+        assert term._decrqss_supported is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_decrqss_supported')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_decrqss_unsupported():
+    """DECRQSS not detected when only CPR arrives."""
+    def child(term):
+        cpr = '\x1b[10;20R'
+        term.ungetch(cpr)
+        result = term.does_decrqss(timeout=1)
+        assert result is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_decrqss_unsupported')
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_does_decrqss_invalid():
+    """DECRQSS returns False on DCS 0 $ r (invalid request)."""
+    def child(term):
+        resp = '\x1bP0$r\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.does_decrqss(timeout=1)
+        assert result is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_decrqss_invalid')
     assert 'OK' in output
