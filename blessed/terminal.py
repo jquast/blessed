@@ -214,7 +214,7 @@ class Terminal():
             .. _CLICOLOR_FORCE: https://bixense.com/clicolors/
             .. _NO_COLOR: https://no-color.org/
         """
-        # pylint: disable=global-statement
+        # pylint: disable=global-statement,too-many-statements
         global _CUR_TERM
         self.errors = [
             f'parameters: kind={kind!r}, stream={stream!r}, force_styling={force_styling!r}',
