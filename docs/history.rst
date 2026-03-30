@@ -21,6 +21,8 @@ Version History
   * improved: ``Smulx`` and ``Setulc`` added to XTGETTCAP capability list.
   * bugfix: ``EOF`` when stdin is connected to a Pipe (eg. pytest capture) caused infinite loop
     :ghpull:`366`.
+  * bugfix: Background SGR not applying to text/suggestion content in
+    :class:`blessed.line_editor.LineEditor`, now prepend bg_sgr before each content SGR sequence.
 
 1.37
 
