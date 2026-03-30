@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import time
+import base64
 import codecs
 import locale
 import select
@@ -12,7 +13,6 @@ import struct
 import asyncio
 import platform
 import warnings
-import base64
 import contextlib
 import collections
 from typing import IO, Dict, List, Match, Tuple, Union, Optional, Generator, SupportsIndex
@@ -1851,7 +1851,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
     def does_osc52_clipboard(self, timeout: Optional[float] = 1,
                              force: bool = False) -> bool:
-        """
+        r"""
         Detect OSC 52 clipboard support without reading the clipboard.
 
         This method uses two non-intrusive detection strategies that avoid triggering user-facing
@@ -1861,7 +1861,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         2. **XTGETTCAP ``Ms``**
 
         These methods are preferred over sending an actual OSC 52 read request
-        (``\\x1b]52;c;?\\a``), which may trigger a clipboard permission dialog in many modern
+        (``\x1b]52;c;?\a``), which may trigger a clipboard permission dialog in many modern
         terminals.
 
         .. note::
@@ -1869,8 +1869,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             Detection indicates the terminal *understands* OSC 52, but not a guarantee that
             clipboard access will succeed, the user may deny access.
 
-            If neither DA1 nor XTGETTCAP reports OSC 52 support, this method returns ``False`` --
-            but the terminal may still support OSC 52 via configuration.
+            If neither DA1 nor XTGETTCAP reports OSC 52 support, this method returns ``False``.
 
         :arg float timeout: Timeout in seconds for each sub-query.
         :arg bool force: Bypass cached result.
@@ -1918,11 +1917,11 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
     def clipboard_paste(self, timeout: Optional[float] = 10,
                         selection: str = 'c') -> Optional[str]:
-        """
+        r"""
         Read the system clipboard via OSC 52.
 
-        Sends an OSC 52 query (``\\x1b]52;c;?\\a``) and waits for
-        the terminal to respond with the clipboard contents.
+        Sends an OSC 52 query (``\x1b]52;c;?\a``) and waits for the terminal to respond with the
+        clipboard contents.
 
         .. warning::
 
@@ -1933,14 +1932,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             the dialog, or no response is received within given timeout, this method returns
             ``None``.
 
-        :arg float timeout: Timeout in seconds.  A generous timeout
-            is recommended because the user may need to interact
-            with a permission dialog.
-        :arg str selection: The X11 selection target -- ``'c'`` for
-            clipboard (default), ``'p'`` for primary.
+        :arg float timeout: Timeout in seconds.  A generous timeout is recommended because the user
+            may need to interact with a permission dialog.
+        :arg str selection: The X11 selection target -- ``'c'`` for clipboard (default),
+            ``'p'`` for primary.
         :rtype: str or None
-        :returns: The clipboard text, or ``None`` if the terminal did
-            not respond (unsupported, denied, or timed out).
+        :returns: The clipboard text, or ``None`` if denied or timeout is reached.
         """
         match = self._query_with_boundary(
             f'\x1b]52;{selection};?\x07', _RE_OSC52_RESPONSE, timeout)
