@@ -165,8 +165,9 @@ def main():
 
         normal = blast_scrape(term, rows, cols, lookup)
 
-        # the alt screen already has content from whatever was displayed before
-        # entering raw mode -- DECRQCRA reads it even from the normal screen
+        # the alt screen already has content from whatever was displayed in
+        # any last program that was in 'alternate' screen, eg. vim or less,
+        # DECRQCRA can read it by switching to alternate screen during scrape
         emit(ALT_SCREEN_ON)
         alt = blast_scrape(term, rows, cols, lookup)
         emit(ALT_SCREEN_OFF)
