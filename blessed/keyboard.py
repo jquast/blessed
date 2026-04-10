@@ -78,6 +78,10 @@ RE_PATTERN_FOCUS = re.compile(r'\x1b\[(?P<io>[IO])')
 # Resize notification (mode 2048): ESC [ 48 ; height ; width ; height_px ; width_px t
 RE_PATTERN_RESIZE = re.compile(r'\x1b\[48;(?P<height_chars>\d+);(?P<width_chars>\d+)'
                                r';(?P<height_pixels>\d+);(?P<width_pixels>\d+)t')
+# CPR (Cursor Position Report): ESC [ row ; column R
+# Row 1 excluded -- ambiguously matches RE_PATTERN_LEGACY_CSI_MODIFIERS 
+RE_PATTERN_CPR = re.compile(
+    r'\x1b\[(?P<row>[2-9]\d*|[1-9]\d+);(?P<column>\d+)R')
 
 # DEC event pattern container
 DECEventPattern = namedtuple("DECEventPattern", ["mode", "pattern"])
@@ -542,6 +546,10 @@ class Keystroke(str):
         - Focus events: 'FOCUS_IN' or 'FOCUS_OUT'
         - Bracketed paste: 'BRACKETED_PASTE'
         - Resize events: 'RESIZE_EVENT'
+
+        For terminal query responses:
+        - Cursor position report: 'KEY_CPR_RESPONSE' (row >= 2 only;
+          row 1 is ambiguous with F3+modifier)
 
         When non-None, all phrases begin with either 'KEY', 'MOUSE', 'FOCUS_IN', 'FOCUS_OUT',
         'BRACKETED_PASTE', or 'RESIZE_EVENT', with one exception: 'CSI' is returned for '\\x1b['
@@ -1393,6 +1401,7 @@ def resolve_sequence(text: str,
             functools.partial(_match_dec_event, dec_mode_cache=dec_mode_cache),
             _match_kitty_key,
             _match_modify_other_keys,
+            _match_cpr_response,
             _match_legacy_csi_letter_form,
             _match_legacy_csi_tilde_form,
             _match_legacy_ss3_fkey_form):
@@ -1536,6 +1545,26 @@ def _match_dec_event(text: str,
         match = pattern.match(text)
         if match:
             return Keystroke(ucs=match.group(0), mode=mode, match=match)
+    return None
+
+
+def _match_cpr_response(text: str) -> Optional[Keystroke]:
+    """
+    Match CPR (Cursor Position Report): ESC [ row ; column R.
+
+    :arg str text: Input text to match against CPR pattern.
+    :rtype: Keystroke or None
+    :returns: :class:`Keystroke` if matched, ``None`` otherwise.
+
+    Matches terminal CPR responses where row >= 2. Row 1 is not
+    matched on input, preferring to match F3 + Modifier in the
+    legacy CSI letter form.
+    """
+    match = RE_PATTERN_CPR.match(text)
+    if match:
+        return Keystroke(ucs=match.group(0),
+                         code=KEY_CPR_RESPONSE,
+                         name='KEY_CPR_RESPONSE')
     return None
 
 
@@ -1742,6 +1771,7 @@ KEY_KP_7 = 527
 KEY_KP_8 = 528
 KEY_KP_9 = 529
 KEY_MENU = 530
+KEY_CPR_RESPONSE = 531
 
 # Kitty protocol control character to keycode mapping
 # Maps common control character unicode values to their curses keycodes
