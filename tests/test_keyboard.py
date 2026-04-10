@@ -285,7 +285,8 @@ def test_get_keyboard_codes():
                          # Modifier keys
                          'LEFT_SHIFT', 'LEFT_CONTROL', 'LEFT_ALT', 'LEFT_SUPER',
                          'LEFT_HYPER', 'LEFT_META', 'RIGHT_SHIFT', 'RIGHT_CONTROL',
-                         'RIGHT_ALT', 'RIGHT_SUPER', 'RIGHT_HYPER', 'RIGHT_META')
+                         'RIGHT_ALT', 'RIGHT_SUPER', 'RIGHT_HYPER', 'RIGHT_META',
+                         'CPR_RESPONSE')
     for value, keycode in blessed.keyboard.get_keyboard_codes().items():
         if keycode in exemptions:
             assert value == exemptions[keycode]
@@ -457,6 +458,44 @@ def test_resolve_sequence_order():
     assert ks.is_sequence
     assert ks.mode is None
     assert repr(ks) == "KEY_L"
+
+
+@pytest.mark.parametrize("sequence", [
+    '\x1b[3;4R',
+    '\x1b[2;1R',
+    '\x1b[100;200R',
+    '\x1b[24;80R',
+    '\x1b[10;1R',
+])
+def test_cpr_response(sequence):
+    """CPR response matched as single KEY_CPR_RESPONSE keystroke."""
+    from blessed.keyboard import (resolve_sequence,
+                                  KEY_CPR_RESPONSE, OrderedDict)
+    ks = resolve_sequence(sequence, OrderedDict(), {})
+    assert ks == sequence
+    assert ks.name == 'KEY_CPR_RESPONSE'
+    assert ks.code == KEY_CPR_RESPONSE
+    assert ks.is_sequence
+    assert not ks.uses_keyboard_protocol
+
+
+@pytest.mark.parametrize("sequence,expected_name", [
+    ('\x1b[1;2R', 'KEY_SHIFT_F3'),
+    ('\x1b[0;5R', 'CSI'),
+])
+def test_cpr_response_not_matched(sequence, expected_name):
+    """Row 0 and row 1 are not matched as CPR."""
+    from blessed.keyboard import resolve_sequence, OrderedDict
+    ks = resolve_sequence(sequence, OrderedDict(), {})
+    assert ks.name == expected_name
+
+
+def test_cpr_response_with_trailing_text():
+    """CPR matcher consumes only the CPR sequence."""
+    from blessed.keyboard import resolve_sequence, OrderedDict
+    ks = resolve_sequence('\x1b[5;10Rextra', OrderedDict(), {})
+    assert ks == '\x1b[5;10R'
+    assert ks.name == 'KEY_CPR_RESPONSE'
 
 
 def test_keyboard_prefixes():
