@@ -492,3 +492,91 @@ def test_does_text_sizing_scale_location_timeout():
     output = pty_test(child, parent_func=None,
                       test_name='test_does_text_sizing_scale_location_timeout')
     assert 'OK' in output
+
+
+@pytest.mark.parametrize('kwargs,expected', [
+    ({}, ''),
+    ({'scale': 2}, 's=2'),
+    ({'width': 3}, 'w=3'),
+    ({'numerator': 1}, 'n=1'),
+    ({'denominator': 2}, 'd=2'),
+    ({'vertical_align': 1}, 'v=1'),
+    ({'horizontal_align': 2}, 'h=2'),
+    ({'scale': 2, 'width': 3, 'numerator': 1, 'denominator': 2,
+      'vertical_align': 1, 'horizontal_align': 2},
+     's=2:w=3:n=1:d=2:v=1:h=2'),
+])
+def test_text_sizing_params_str(kwargs, expected):
+    """_text_sizing_params_str builds colon-separated metadata."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        assert term._text_sizing_params_str(**kwargs) == expected
+    child()
+
+
+def _sizing_term(supported):
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._is_a_tty = True
+    term._text_sizing_cache = (
+        TextSizingResult(width=True, scale=True) if supported
+        else TextSizingResult())
+    return term
+
+
+@pytest.mark.parametrize('supported,kwargs,expected,measured', [
+    (False, {'scale': 2}, 'hello', None),
+    (True, {}, '\x1b]66;;hello\x07', 5),
+    (True, {'scale': 2, 'width': 3, 'numerator': 1, 'denominator': 2,
+            'vertical_align': 1, 'horizontal_align': 2},
+     '\x1b]66;s=2:w=3:n=1:d=2:v=1:h=2;hello\x07', 6),
+])
+def test_text_sized(supported, kwargs, expected, measured):
+    """text_sized wraps OSC 66 when supported, returns text as-is otherwise."""
+    @as_subprocess
+    def child():
+        from wcwidth import width as wcwidth_width
+        term = _sizing_term(supported)
+        result = term.text_sized('hello', **kwargs)
+        assert result == expected
+        if measured is not None:
+            assert wcwidth_width(result) == measured
+    child()
+
+
+@pytest.mark.parametrize('supported,expected,measured', [
+    (False, 'hi', None),
+    (True, '\x1b]66;s=3;hi\x07', 6),
+])
+def test_scaled(supported, expected, measured):
+    """scaled wraps OSC 66 when supported, returns text as-is otherwise."""
+    @as_subprocess
+    def child():
+        from wcwidth import width as wcwidth_width
+        term = _sizing_term(supported)
+        result = term.scaled('hi', 3)
+        assert result == expected
+        if measured is not None:
+            assert wcwidth_width(result) == measured
+    child()
+
+
+@pytest.mark.parametrize('supported,kwargs,expected', [
+    (False, {}, 'abc\n==='),
+    (True, {}, '\x1b]66;s=2;abc\x07\n\n======'),
+    (True, {'scale': 1}, '\x1b]66;;abc\x07\n==='),
+    (True, {'scale': 3}, '\x1b]66;s=3;abc\x07\n\n\n========='),
+    (True, {'scale': 2, 'underline_char': '-'}, '\x1b]66;s=2;abc\x07\n\n------'),
+])
+def test_heading(supported, kwargs, expected):
+    """heading scales text and renders a wcwidth-sized underline."""
+    @as_subprocess
+    def child():
+        from wcwidth import width as wcwidth_width
+        term = _sizing_term(supported)
+        result = term.heading('abc', **kwargs)
+        assert result == expected
+        sized = result.split('\n', 1)[0]
+        underline = result.rsplit('\n', 1)[-1]
+        assert len(underline) == wcwidth_width(sized)
+    child()

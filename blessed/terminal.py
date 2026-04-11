@@ -3265,6 +3265,135 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             width = self.width
         return wcwidth_center(text, width.__index__(), fillchar, control_codes='ignore')
 
+    @staticmethod
+    def _text_sizing_params_str(
+        scale: int = 1,
+        width: int = 0,
+        numerator: int = 0,
+        denominator: int = 0,
+        vertical_align: int = 0,
+        horizontal_align: int = 0,
+    ) -> str:
+        """Build colon-separated metadata for an OSC 66 sequence."""
+        # arguments are in the order described in specification
+        parts = []
+        if scale != 1:
+            parts.append(f's={scale}')
+        if width != 0:
+            parts.append(f'w={width}')
+        if numerator != 0:
+            parts.append(f'n={numerator}')
+        if denominator != 0:
+            parts.append(f'd={denominator}')
+        if vertical_align != 0:
+            parts.append(f'v={vertical_align}')
+        if horizontal_align != 0:
+            parts.append(f'h={horizontal_align}')
+        return ':'.join(parts)
+
+    def text_sized(
+        self,
+        text: str,
+        *,
+        scale: int = 1,
+        width: int = 0,
+        numerator: int = 0,
+        denominator: int = 0,
+        vertical_align: int = 0,
+        horizontal_align: int = 0,
+    ) -> str:
+        """
+        Wrap ``text`` in a text sizing escape sequence (OSC 66).
+
+        Returns ``text`` unchanged when the terminal does not support text sizing, providing
+        graceful degradation.
+
+        :arg str text: Text payload.
+        :arg int scale: Scale factor (1--7).
+        :arg int width: Width in cells (0--7). 0 means auto-calculate
+            from the inner text.
+        :arg int numerator: Fractional scaling numerator (0--15).
+        :arg int denominator: Fractional scaling denominator (0--15).
+        :arg int vertical_align: Vertical alignment (0=top, 1=bottom, 2=center).
+        :arg int horizontal_align: Horizontal alignment (0=left, 1=right, 2=center).
+        :rtype: str
+        :returns: Text wrapped in an OSC 66 escape sequence, or plain
+            ``text`` on unsupported terminals.
+
+        .. seealso:: `Kitty Text Sizing Protocol
+            <https://sw.kovidgoyal.net/kitty/text-sizing-protocol/>`_
+        """
+        if not self.does_text_sizing():
+            return text
+        params = self._text_sizing_params_str(
+            scale=scale, width=width, numerator=numerator,
+            denominator=denominator, vertical_align=vertical_align,
+            horizontal_align=horizontal_align,
+        )
+        return f'\x1b]66;{params};{text}\x07'
+
+    def scaled(self, text: str, scale: int) -> str:
+        """
+        Scale ``text`` using the text sizing protocol with auto-calculatwidth.
+
+        This is the most common use case: render ``text`` at ``scale``
+        times its natural size. Returns ``text`` unchanged when the
+        terminal does not support text sizing.
+
+        :arg str text: Text payload.
+        :arg int scale: Scale factor (1 to 7).
+        :rtype: str
+        :returns: Text wrapped in an OSC 66 escape sequence with
+            auto-calculated width, or plain ``text`` on unsupported
+            terminals.
+
+        .. seealso:: `Kitty Text Sizing Protocol
+            <https://sw.kovidgoyal.net/kitty/text-sizing-protocol/>`_
+        """
+        if not self.does_text_sizing():
+            return text
+        params = self._text_sizing_params_str(scale=scale)
+        return f'\x1b]66;{params};{text}\x07'
+
+    # XXX TODO: I think we should cut this ..
+    def heading(
+        self,
+        text: str,
+        scale: int = 2,
+        underline_char: str = '=',
+    ) -> str:
+        r"""
+        Return ``text`` scaled as a heading with a correctly-sized underline.
+
+        When text sizing is supported, the heading is rendered at ``scale`` times its natural size
+        (2x by default), followed by a newline and an underline of the correct measured width.
+
+        When unsupported, returns text plain and underlined.
+
+        :arg str text: Heading text.
+        :arg int scale: Scale factor (1--7). Default is 2.
+        :arg str underline_char: Character for the underline. Default
+            is ``'='``.
+        :rtype: str
+        :returns: Multi-line string: scaled heading + blank lines for
+            multi-row rendering + underline.
+
+        Example::
+
+            >>> term.heading('Chapter One')
+            '\x1b]66;s=2:Chapter One\x07\n\n======================'
+
+        .. seealso:: `Kitty Text Sizing Protocol
+            <https://sw.kovidgoyal.net/kitty/text-sizing-protocol/>`_
+        """
+        sized = self.scaled(text, scale)
+        w = wcwidth_width(sized)
+        lines = sized + '\n'
+        if self.does_text_sizing() and scale > 1:
+            lines += '\n' * (scale - 1)
+        lines += underline_char * w
+        return lines
+
     def truncate(self, text: str, width: Optional[SupportsIndex] = None) -> str:
         r"""
         Truncate ``text`` to ``width`` printable characters, retaining terminal sequences.
