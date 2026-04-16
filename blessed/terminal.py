@@ -3640,7 +3640,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         r"""
         Read and return the next keyboard event within given timeout.
 
-        Generally, this should be used inside the :meth:`raw` context manager.
+        Generally, this should be used inside the :meth:`raw` or :meth:`cbreak` context manager.
 
         :arg float timeout: Number of seconds to wait for a keystroke before
             returning.  When ``None`` (default), this method may block
@@ -3672,6 +3672,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         _`ncurses(3)`: https://www.man7.org/linux/man-pages/man3/ncurses.3x.html
         """
+        # pylint: disable=missing-raises-doc
         stime = time.time()
         ucs = self.flushinp()
 
@@ -3736,6 +3737,18 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 ws_col=event_vals.width_chars,
                 ws_xpixel=event_vals.width_pixels,
                 ws_ypixel=event_vals.height_pixels)
+
+        # EOFError is not reachable through normal use, it is provided only for the special case of
+        # a derived "not a tty" implementations, like a serial, telnet, or ssh service where
+        # _keyboard_fd is connected to a pipe or socket or StreamIO and not a terminal keyboard,
+        # and, that derived implementation does not wish to test the protocol's EOF methods, but
+        # to depend on blessed's base class for throwing EOFError to detect such a condition.
+        #
+        # https://github.com/jquast/blessed/issues/370 it *should* be harmless to host this code
+        # for this situation, as EOFError is not reachable on an interactive terminal in raw or
+        # cbreak mode.
+        if not ks and self._keyboard_eof:
+            raise EOFError
 
         return ks
 
