@@ -82,7 +82,7 @@ RE_PATTERN_RESIZE = re.compile(r'\x1b\[48;(?P<height_chars>\d+);(?P<width_chars>
 # Row 1 ambiguously matches RE_PATTERN_LEGACY_CSI_MODIFIERS, see 'capture_cpr=True'
 # to prefer matches of KEY_CPR_RESPONSE over KEY_SHIFT_F3 and others.
 RE_PATTERN_CPR = re.compile(
-    r'\x1b\[(?P<row>[1-9]\d*|[1-9]\d+);(?P<column>\d+)R')
+    r'\x1b\[(?P<row>[1-9]\d*|[1-9]\d+);(?P<column>[1-9]\d*|[1-9]\d+)R')
 
 # DEC event pattern container
 DECEventPattern = namedtuple("DECEventPattern", ["mode", "pattern"])
