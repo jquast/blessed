@@ -1,25 +1,25 @@
 #!/usr/bin/env python
-#
-# This script interactively demonstrates the many possible Cursor Position Report sequences that are
-# in conflict with vt220 function key F3, eg:
-#
-# KEY_F3 : ['\x1b[1;1R', '\x1b[1;65R']
-# KEY_SHIFT_F3 : ['\x1b[1;2R', '\x1b[1;66R']
-# KEY_ALT_F3 : ['\x1b[1;3R', '\x1b[1;67R']
-#
-# The "F3 with modifier" is a bit rare but still common for anything "vt220"-derived, we call this
-# sequence "Legacy CSI modifier", CSI_FINAL_CHAR_TO_KEYCODE in blessed/keyboard.py,
-#
-# http://xahlee.info/kbd/vt220_terminal.html
-#
-# These specific keys on a vt220 are encoding partly because they were special and local to the
-# vt220, "Hold Screen" (F1), Print Screen (F2), Setup(F3), and Break (F5) are special keys along
-# with UP, DOWN, HOME, END, and CENTER/BEGIN. Older programs and emulators may still sometimes use
-# this form.
-#
-# This program runs in two passes, first, using default argument to inkey(capture_cpr=False),
-# then in second pass with capture_cpr=True. In the first case, many "false matches" of
-# KEY_modifier_F3 is matched, and in the second case, only coordinates.
+"""
+This script interactively demonstrates the many possible Cursor Position Report sequences that are
+in conflict with vt220 function key F3, eg:
+
+    KEY_F3 : ['\x1b[1;1R', '\x1b[1;65R']
+    KEY_SHIFT_F3 : ['\x1b[1;2R', '\x1b[1;66R']
+    KEY_ALT_F3 : ['\x1b[1;3R', '\x1b[1;67R']
+
+The "F3 with modifier" is a bit rare but possible for anything "vt220"-derived, blessed
+labels it under "Legacy CSI modifier", CSI_FINAL_CHAR_TO_KEYCODE in blessed/keyboard.py,
+
+See vt220 keyboard, http://xahlee.info/kbd/vt220_terminal.html
+
+"Hold Screen" (F1), Print Screen (F2), Setup(F3), and Break (F5) are special keys along with UP,
+DOWN, HOME, END, and CENTER/BEGIN. Older programs and emulators may still sometimes use this form,
+it's partly why the first few function keys are encoded in so many different forms.
+
+This program runs in two passes, first, using default argument of ``capture_cpr=False`` for
+call to inkey(), then in second pass with ``capture_cpr=True``. In the first case, many "false
+matches" of KEY_modifier_F3 is matched, and in the second case, only coordinates.
+"""
 import blessed
 import blessed.keyboard
 
