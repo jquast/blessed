@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 """Example of Terminal.inkey(capture_cpr=True)."""
-import blessed, time
+import blessed
+import time
 
 term = blessed.Terminal()
 
+
 def msg(term, txt):
-    ypos = term.height // 2
     print(term.move_yx(term.height // 2, 0) + term.center(txt))
 
 

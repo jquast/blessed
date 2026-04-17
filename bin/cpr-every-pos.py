@@ -78,7 +78,7 @@ def main():
                 cap.capture(term.inkey(timeout=1, capture_cpr=True))
         cap.display()
 
-        # verify number transmitted to coordinates received 
+        # verify number transmitted to coordinates received
         assert len(cap.coords) == term.height * term.width
         # verify all coordinate numbers received are unique
         assert len(cap.coords.keys()) == len(set(cap.coords.keys()))
