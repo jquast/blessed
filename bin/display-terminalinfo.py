@@ -206,8 +206,12 @@ def main():
                         value=lflag)
         display_ctl_chars(index=CTLCHAR_INDEX,
                           ctlc=ctlc)
-        print(f'os.ttyname({fd}) => {os.ttyname(fd)}')
-        print(f'os.ctermid() => {os.ttyname(fd)}')
+        try:
+            tty_name = os.ttyname(fd)
+        except OSError as exc:
+            tty_name = f'OSError: {exc}'
+        print(f'os.ttyname({fd}) => {tty_name}')
+        print(f'os.ctermid() => {os.ctermid()}')
 
 
 if __name__ == '__main__':
