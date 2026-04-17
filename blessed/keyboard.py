@@ -1134,7 +1134,7 @@ class Keystroke(str):
     @property
     def cpr_yx(self) -> Tuple[int, int]:
         """
-        Cursor position as (y, x) tuple for Cursor Position Report
+        Cursor position as (y, x) tuple for Cursor Position Report.
 
         :rtype: tuple of (int, int)
         :returns: (y, x) coordinate tuple (0-indexed) for cursor position report,
@@ -1148,7 +1148,7 @@ class Keystroke(str):
     @property
     def cpr_xy(self) -> Tuple[int, int]:
         """
-        Cursor position as (x, y) tuple for Cursor Position Report
+        Cursor position as (x, y) tuple for Cursor Position Report.
 
         :rtype: tuple of (int, int)
         :returns: (x, y) coordinate tuple (0-indexed) for cursor position report,
@@ -1405,6 +1405,8 @@ def resolve_sequence(text: str,
     :arg set prefixes: Set of all valid sequence prefixes for quick matching
     :arg bool final: Whether this is the final resolution attempt (no more input expected)
     :arg dict dec_mode_cache: Dictionary of DEC private mode states (mode number -> state value)
+    :arg bool capture_cpr: Prefer matches of ``KEY_CPR_RESPONSE`` over conflicting vt220 Legacy
+        function keys (eg. ``KEY_F3``, ``KEY_SHIFT_F3``).
     :rtype: Keystroke
     :returns: Keystroke instance for the given sequence
 

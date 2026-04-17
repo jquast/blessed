@@ -3656,6 +3656,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
            `ncurses(3)`_ section labeled *ESCDELAY* for details.  Setting
            the value as an argument to this function will override any
            such preference.
+        :arg bool capture_cpr: Prefer matches of ``KEY_CPR_RESPONSE`` over conflicting vt220 Legacy
+            function keys (eg. ``KEY_F3``, ``KEY_SHIFT_F3``).
         :rtype: :class:`~.Keystroke`.
         :returns: :class:`~.Keystroke`, which may be empty (``''``) if
            ``timeout`` is specified and keystroke is not received.

@@ -52,6 +52,7 @@ class CaptureResponses:
             if count != 1:
                 print(count, ':', coord)
 
+
 def heading(msg):
     print()
     print(msg)
@@ -77,6 +78,7 @@ def main():
                 cap.capture(term.inkey(timeout=1, capture_cpr=True))
         cap.display()
         assert len(cap.coords) == term.height * term.width
+
 
 if __name__ == '__main__':
     main()
