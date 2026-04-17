@@ -495,6 +495,7 @@ def test_cpr_response(seq, capture_cpr, expected_name, expected_yx):
         assert str(ks) == seq
     assert ks.name == expected_name
     assert ks.cpr_yx == expected_yx
+    assert ks.cpr_xy == (expected_yx[1], expected_yx[0])
     assert ks.is_sequence
     assert ks.uses_keyboard_protocol == expected_kb_proto
 
