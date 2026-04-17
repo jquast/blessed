@@ -80,7 +80,7 @@ RE_PATTERN_RESIZE = re.compile(r'\x1b\[48;(?P<height_chars>\d+);(?P<width_chars>
                                r';(?P<height_pixels>\d+);(?P<width_pixels>\d+)t')
 # CPR (Cursor Position Report): ESC [ row ; column R
 # Row 1 ambiguously matches RE_PATTERN_LEGACY_CSI_MODIFIERS, see 'capture_cpr=True'
-# to prefer matches of KEY_CPR_RESPONSE over KEY_SHIFT_F3 and others.
+# to prefer matches of CPR_RESPONSE over KEY_SHIFT_F3 and others.
 RE_PATTERN_CPR = re.compile(
     r'\x1b\[(?P<row>[1-9]\d*|[1-9]\d+);(?P<column>[1-9]\d*|[1-9]\d+)R')
 
@@ -551,7 +551,7 @@ class Keystroke(str):
 
         For terminal query responses:
 
-        - Cursor position report: 'KEY_CPR_RESPONSE' (row >= 2 only;
+        - Cursor position report: 'CPR_RESPONSE' (row >= 2 only;
           row 1 is ambiguous with F3+modifier)
 
         When non-None, all phrases begin with either 'KEY', 'MOUSE', 'FOCUS_IN', 'FOCUS_OUT',
@@ -1140,7 +1140,7 @@ class Keystroke(str):
 
         :rtype: tuple of (int, int)
         :returns: (y, x) coordinate tuple (0-indexed) for cursor position report,
-            or ``(-1, -1)`` if not a KEY_CPR_RESPONSE
+            or ``(-1, -1)`` if not a CPR_RESPONSE
         """
         match = RE_PATTERN_CPR.match(self)
         if match:
@@ -1154,7 +1154,7 @@ class Keystroke(str):
 
         :rtype: tuple of (int, int)
         :returns: (x, y) coordinate tuple (0-indexed) for cursor position report,
-            or ``(-1, -1)`` if not a KEY_CPR_RESPONSE
+            or ``(-1, -1)`` if not a CPR_RESPONSE
         """
         match = RE_PATTERN_CPR.match(self)
         if match:
@@ -1407,7 +1407,7 @@ def resolve_sequence(text: str,
     :arg set prefixes: Set of all valid sequence prefixes for quick matching
     :arg bool final: Whether this is the final resolution attempt (no more input expected)
     :arg dict dec_mode_cache: Dictionary of DEC private mode states (mode number -> state value)
-    :arg bool capture_cpr: Prefer matches of ``KEY_CPR_RESPONSE`` over conflicting vt220 Legacy
+    :arg bool capture_cpr: Prefer matches of ``CPR_RESPONSE`` over conflicting vt220 Legacy
         function keys (eg. ``KEY_F3``, ``KEY_SHIFT_F3``).
     :rtype: Keystroke
     :returns: Keystroke instance for the given sequence
@@ -1440,7 +1440,7 @@ def resolve_sequence(text: str,
         _match_legacy_ss3_fkey_form,
         _match_cpr_response]
     if capture_cpr:
-        # prioritize capturing KEY_CPR_RESPONSE over legacy CSI Modifiers
+        # prioritize capturing CPR_RESPONSE over legacy CSI Modifiers
         match_funcs.insert(3, match_funcs.pop())
     for match_fn in match_funcs:
         ks = match_fn(text)
@@ -1600,9 +1600,7 @@ def _match_cpr_response(text: str) -> Optional[Keystroke]:
     """
     match = RE_PATTERN_CPR.match(text)
     if match:
-        return Keystroke(ucs=match.group(0),
-                         code=KEY_CPR_RESPONSE,
-                         name='KEY_CPR_RESPONSE')
+        return Keystroke(ucs=match.group(0), name='CPR_RESPONSE')
     return None
 
 
@@ -1786,10 +1784,10 @@ def _match_legacy_ss3_fkey_form(text: str) -> Optional[Keystroke]:
     return Keystroke(ucs=matched_text, code=keycode, mode=-3, match=legacy_event)
 
 
-# We invent a few to fixup for missing keys in curses, these aren't especially
-# required or useful except to survive as API compatibility for the earliest
-# versions of this software. They must be these values in this order, used as
-# constants for equality checks to Keystroke.code.
+# We invent a few to fixup for missing keys in curses, these aren't especially required or useful
+# except to survive as API compatibility for the earliest versions of this software, before
+# "synthesized names" were created. They must be these values in this order, used as constants for
+# equality checks to Keystroke.code.
 KEY_TAB = 512
 KEY_KP_MULTIPLY = 513
 KEY_KP_ADD = 514
@@ -1809,7 +1807,6 @@ KEY_KP_7 = 527
 KEY_KP_8 = 528
 KEY_KP_9 = 529
 KEY_MENU = 530
-KEY_CPR_RESPONSE = 531
 
 # Kitty protocol control character to keycode mapping
 # Maps common control character unicode values to their curses keycodes

@@ -21,7 +21,7 @@ with term.cbreak(), term.fullscreen():
             cpr_last_sent = time.time()
         inp = term.inkey(timeout=0.1, capture_cpr=True)
         print(inp)
-        if inp.name == 'KEY_CPR_RESPONSE':
+        if inp.name == 'CPR_RESPONSE':
             elapsed_ms = (time.time() - cpr_last_sent) * 1000
             msg(term, f'CPR {elapsed_ms:3.2f}ms rtt; yx={inp.cpr_yx}')
         elif inp:

@@ -464,12 +464,12 @@ def test_resolve_sequence_order():
 
 @pytest.mark.parametrize("seq,capture_cpr,expected_name,expected_yx", [
     # any legal row2+ CPR response,
-    ('\x1b[3;4R', True, 'KEY_CPR_RESPONSE', (2, 3)),
-    ('\x1b[2;1R', True, 'KEY_CPR_RESPONSE', (1, 0)),
-    ('\x1b[100;200R', True, 'KEY_CPR_RESPONSE', (99, 199)),
-    ('\x1b[3;4R', False, 'KEY_CPR_RESPONSE', (2, 3)),
-    ('\x1b[2;1R', False, 'KEY_CPR_RESPONSE', (1, 0)),
-    ('\x1b[100;200R', False, 'KEY_CPR_RESPONSE', (99, 199)),
+    ('\x1b[3;4R', True, 'CPR_RESPONSE', (2, 3)),
+    ('\x1b[2;1R', True, 'CPR_RESPONSE', (1, 0)),
+    ('\x1b[100;200R', True, 'CPR_RESPONSE', (99, 199)),
+    ('\x1b[3;4R', False, 'CPR_RESPONSE', (2, 3)),
+    ('\x1b[2;1R', False, 'CPR_RESPONSE', (1, 0)),
+    ('\x1b[100;200R', False, 'CPR_RESPONSE', (99, 199)),
     # CPR response with 0-index is invalid ('CSI')
     ('\x1b[0;100R', True, 'CSI', (-1, -1)),
     ('\x1b[0;100R', False, 'CSI', (-1, -1)),
@@ -477,18 +477,16 @@ def test_resolve_sequence_order():
     ('\x1b[100;0R', False, 'CSI', (-1, -1)),
     # row 1 may be ambigious with 'KEY*F3' depending on capture_cpr argument
     ('\x1b[1;1R', False, 'KEY_F3', (0, 0)),
-    ('\x1b[1;1R', True, 'KEY_CPR_RESPONSE', (0, 0)),
+    ('\x1b[1;1R', True, 'CPR_RESPONSE', (0, 0)),
     ('\x1b[1;2R', False, 'KEY_SHIFT_F3', (0, 1)),
-    ('\x1b[1;2R', True, 'KEY_CPR_RESPONSE', (0, 1)),
+    ('\x1b[1;2R', True, 'CPR_RESPONSE', (0, 1)),
     ('\x1b[1;3R', False, 'KEY_ALT_F3', (0, 2)),
-    ('\x1b[1;3R', True, 'KEY_CPR_RESPONSE', (0, 2)),
+    ('\x1b[1;3R', True, 'CPR_RESPONSE', (0, 2)),
 ])
 def test_cpr_response(seq, capture_cpr, expected_name, expected_yx):
-    """CPR response matched as single KEY_CPR_RESPONSE keystroke."""
+    """CPR response matched as single CPR_RESPONSE keystroke."""
     from blessed.keyboard import resolve_sequence
-    expected_kb_proto = (
-            not expected_name.startswith('KEY_CPR') and
-            not expected_name == 'CSI')
+    expected_kb_proto = not expected_name in ('CPR_RESPONSE', 'CSI')
     mapper = collections.OrderedDict()
     ks = resolve_sequence(seq, mapper, {}, capture_cpr=capture_cpr)
     if expected_name == 'CSI':
@@ -519,7 +517,7 @@ def test_cpr_response_with_trailing_text():
     mapper = collections.OrderedDict()
     ks = resolve_sequence('\x1b[5;10Rextra', mapper, {})
     assert ks == '\x1b[5;10R'
-    assert ks.name == 'KEY_CPR_RESPONSE'
+    assert ks.name == 'CPR_RESPONSE'
 
 
 def test_keyboard_prefixes():

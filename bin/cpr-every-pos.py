@@ -62,7 +62,7 @@ def heading(msg):
 def main():
     cpr = term.u7 or '\x1b[6n'
     with term.cbreak():
-        heading("Testing KEY_CPR_RESPONSE vs. Ambiguous vt220")
+        heading("Testing CPR_RESPONSE vs. Ambiguous vt220")
         cap = CaptureResponses()
         for y in range(0, term.height):
             for x in range(0, term.width):
@@ -70,7 +70,7 @@ def main():
                 cap.capture(term.inkey(timeout=1))
         cap.display()
 
-        heading("Testing KEY_CPR_RESPONSE with capture_cpr=True")
+        heading("Testing CPR_RESPONSE with capture_cpr=True")
         cap = CaptureResponses()
         for y in range(0, term.height):
             for x in range(0, term.width):
