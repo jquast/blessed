@@ -80,7 +80,7 @@ RE_PATTERN_RESIZE = re.compile(r'\x1b\[48;(?P<height_chars>\d+);(?P<width_chars>
                                r';(?P<height_pixels>\d+);(?P<width_pixels>\d+)t')
 # CPR (Cursor Position Report): ESC [ row ; column R
 # Row 1 ambiguously matches RE_PATTERN_LEGACY_CSI_MODIFIERS, see 'capture_cpr=True'
-# to prefer matches of cursor position report over KEY_SHIFT_F3 and others
+# to prefer matches of KEY_CPR_RESPONSE over KEY_SHIFT_F3 and others.
 RE_PATTERN_CPR = re.compile(
     r'\x1b\[(?P<row>[1-9]\d*|[1-9]\d+);(?P<column>\d+)R')
 
@@ -1142,8 +1142,22 @@ class Keystroke(str):
         """
         match = RE_PATTERN_CPR.match(self)
         if match:
-            return match.group(0)
-        return None
+            return (int(match.group(1)) - 1, int(match.group(2)) - 1)
+        return (-1, -1)
+
+    @property
+    def cpr_xy(self) -> Tuple[int, int]:
+        """
+        Cursor position as (x, y) tuple for Cursor Position Report
+
+        :rtype: tuple of (int, int)
+        :returns: (x, y) coordinate tuple (0-indexed) for cursor position report,
+            or ``(-1, -1)`` if not a KEY_CPR_RESPONSE
+        """
+        match = RE_PATTERN_CPR.match(self)
+        if match:
+            return (int(match.group(2)) - 1, int(match.group(1)) - 1)
+        return (-1, -1)
 
     @property
     def text(self) -> Optional[str]:
@@ -1424,7 +1438,7 @@ def resolve_sequence(text: str,
     if capture_cpr:
         # prioritize capturing KEY_CPR_RESPONSE over legacy CSI Modifiers
         match_funcs.insert(3, match_funcs.pop())
-    for match_fn in match_func:
+    for match_fn in match_funcs:
         ks = match_fn(text)
         if ks:
             break
