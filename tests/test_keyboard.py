@@ -399,14 +399,14 @@ def test_resolve_sequence_order():
     """Test resolve_sequence for order-dependent mapping."""
     from blessed.keyboard import resolve_sequence
     mapper = collections.OrderedDict(
-            (('SEQ1', 1),
-             ('SEQ2', 2),
-             # takes precedence over LONGSEQ, first-match
-             ('LONGSEQ', 4),
-             # won't match, LONGSEQ is first-match in this order
-             ('LONGSEQ_longer', 5),
-             # falls through for L{anything_else}
-             ('L', 6)))
+        (('SEQ1', 1),
+         ('SEQ2', 2),
+         # takes precedence over LONGSEQ, first-match
+         ('LONGSEQ', 4),
+         # won't match, LONGSEQ is first-match in this order
+         ('LONGSEQ_longer', 5),
+         # falls through for L{anything_else}
+         ('L', 6)))
     codes = {1: 'KEY_SEQ1',
              2: 'KEY_SEQ2',
              3: 'KEY_LONGSEQ_longest',
@@ -475,7 +475,7 @@ def test_resolve_sequence_order():
     ('\x1b[0;100R', False, 'CSI', (-1, -1)),
     ('\x1b[100;0R', True, 'CSI', (-1, -1)),
     ('\x1b[100;0R', False, 'CSI', (-1, -1)),
-    # row 1 may be ambigious with 'KEY*F3' depending on capture_cpr argument
+    # row 1 may be ambiguous with 'KEY*F3' depending on capture_cpr argument
     ('\x1b[1;1R', False, 'KEY_F3', (0, 0)),
     ('\x1b[1;1R', True, 'CPR_RESPONSE', (0, 0)),
     ('\x1b[1;2R', False, 'KEY_SHIFT_F3', (0, 1)),
@@ -486,7 +486,7 @@ def test_resolve_sequence_order():
 def test_cpr_response(seq, capture_cpr, expected_name, expected_yx):
     """CPR response matched as single CPR_RESPONSE keystroke."""
     from blessed.keyboard import resolve_sequence
-    expected_kb_proto = not expected_name in ('CPR_RESPONSE', 'CSI')
+    expected_kb_proto = expected_name not in ('CPR_RESPONSE', 'CSI')
     mapper = collections.OrderedDict()
     ks = resolve_sequence(seq, mapper, {}, capture_cpr=capture_cpr)
     if expected_name == 'CSI':
