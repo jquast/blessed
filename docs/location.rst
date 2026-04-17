@@ -111,6 +111,31 @@ Although this wouldn't be suggested in most applications because of its latency,
 simplifies many applications, and, can also be timed, to make a determination of the round-trip
 time, perhaps even the bandwidth constraints, of a remote terminal!
 
+CPR_RESPONSE
+------------
+
+The :meth:`~.Terminal.get_location` method is blocking, sending a cursor position report sequence
+and awaiting the response. It may sometimes be necessary send and capture Cursor Position Report
+responses asynchronously as keyboard input events.
+
+- Print Cursor Position Report sequence, ``term.u7 or '\x1b[6n'``
+- Call :meth:`~Terminal.inkey` with ``capture_cpr=True``
+- When return :attr:`~Keystroke.name` is ``CPR_RESPONSE``, use the :meth:`~Keystroke.cpr_yx`
+  or :meth:`~Keystroke.cpr_xy` methods to receive the coordinates.
+
+Although :meth:`~Terminal.inkey` is capable of receiving *most* Cursor Position Report (CPR)
+sequences as Keystroke of name ``CPR_RESPONSE``, Some coordinate responses are in conflict with
+the "F3" key of the DEC vt220, but few very terminals transmit them in this conflicting form. If not
+bound or legacy vt220 key compatibility is not required, but asynchronous receipt of CPR Responses
+with correct coordinates are, use :meth:`~Terminal.inkey` argument ``capture_cpr=True``.
+
+In the following example, keyboard input is rapidly polled for and displayed,
+CPR Sequences are sent at a fixed interval, and the response or round-trip time is displayed.
+
+.. literalinclude:: ../bin/cpr-async.py
+   :language: python
+   :lines: 2-
+
 Scroll Region
 -------------
 

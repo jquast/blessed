@@ -2,16 +2,17 @@
 #
 # Demonstrates silent screen-reading via DECRQCRA (DEC Request Checksum of Rectangular Area).
 #
-# Only mlterm and WezTerm are known to be afflicted by default. This sequence is very useful for
-# automatic testing like with `vttest`, likely used while developing an emulator, but most make the
-# correct choice of using a disabled-by-default compile-time option. iTerm2 makes a runtime prompt
-# that clearly warns, "this allows screen scraping", while ghostty displays 'DECRQCRA' with
-# allow/deny.
+# Only mlterm, WezTerm (fixed in HEAD), and SyncTERM (fixed in HEAD) are known to be afflicted by
+# default. This sequence is very useful for automatic testing like with `vttest`, likely used while
+# developing an emulator, but most make the correct choice of using a disabled-by-default
+# compile-time option. iTerm2 makes a runtime prompt that clearly warns, "this allows screen
+# scraping", while ghostty displays only "DECRQCRA" with an allow/deny.
 #
 # https://vt100.net/docs/vt510-rm/DECRQCRA.html allows to silently read the contents of the visible
 # screen as a "checksum", but we can pre-compute expected checksums for printable ASCII, building a
 # reverse lookup table that recovers the original characters.
 #
+from blessed import Terminal
 import argparse
 import json
 import os
@@ -19,7 +20,8 @@ import re
 import select
 import sys
 
-from blessed import Terminal
+UNKNOWN_CKSUM_RE = re.compile(r"\?0x[0-9A-Fa-f]{4}")
+
 
 DECRQCRA = "\x1b[{pid};1;{r};{c};{r};{c}*y"
 DECCKSR_RE = re.compile(r"\x1bP(\d+)!~([0-9A-Fa-f]{4})\x1b\\")
@@ -172,19 +174,34 @@ def main():
         alt = blast_scrape(term, rows, cols, lookup)
         emit(ALT_SCREEN_OFF)
 
+    normal_clean = UNKNOWN_CKSUM_RE.sub(" ", normal)
+    alt_clean = UNKNOWN_CKSUM_RE.sub(" ", alt)
+
+    # If both screens are identical, the terminal doesn't support
+    # alternate buffer — store only screen 0.
+    if normal_clean == alt_clean:
+        alt_clean = None
+        alt = None
+
     if args.save_json:
         result = {
-            "screen_0": normal,
-            "screen_1": alt,
+            "screen_0": normal_clean,
+            "screen_0_with_unknown_checksums": normal,
             "rows": rows,
             "cols": cols,
         }
+        if alt_clean is not None:
+            result["screen_1"] = alt_clean
+            result["screen_1_with_unknown_checksums"] = alt
         with open(args.save_json, "w", encoding="utf-8") as f:
             json.dump(result, f, indent=2)
     else:
         emit(term.move_yx(start_row, 0) + term.clear_eol)
-        print(f"screen 0: {repr(normal)}")
-        print(f"screen 1: {repr(alt)}")
+        print(f"screen 0: {repr(normal_clean)}")
+        if alt_clean is not None:
+            print(f"screen 1: {repr(alt_clean)}")
+        else:
+            print("screen 1: (same as screen 0, no alternate buffer)")
 
     return 0
 

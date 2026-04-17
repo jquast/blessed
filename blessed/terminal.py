@@ -3636,7 +3636,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 any(p.startswith(text) for p in self._keymap_prefixes))
 
     def inkey(self, timeout: Optional[float] = None,
-              esc_delay: float = DEFAULT_ESCDELAY) -> Keystroke:
+              esc_delay: float = DEFAULT_ESCDELAY,
+              capture_cpr: bool = False) -> Keystroke:
         r"""
         Read and return the next keyboard event within given timeout.
 
@@ -3655,6 +3656,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
            `ncurses(3)`_ section labeled *ESCDELAY* for details.  Setting
            the value as an argument to this function will override any
            such preference.
+        :arg bool capture_cpr: Prefer matches of ``CPR_RESPONSE`` over conflicting vt220 Legacy
+            function keys (eg. ``KEY_F3``, ``KEY_SHIFT_F3``).
         :rtype: :class:`~.Keystroke`.
         :returns: :class:`~.Keystroke`, which may be empty (``''``) if
            ``timeout`` is specified and keystroke is not received.
@@ -3678,7 +3681,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         # decode buffered keystroke, if any
         ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
-                              final=False, dec_mode_cache=self._dec_mode_cache)
+                              final=False, dec_mode_cache=self._dec_mode_cache,
+                              capture_cpr=capture_cpr)
 
         # so long as the most immediately received or buffered keystroke is
         # incomplete, (which may be a multibyte encoding), block until until
@@ -3693,7 +3697,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
             # and then resolve for sequence
             ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
-                                  final=False, dec_mode_cache=self._dec_mode_cache)
+                                  final=False, dec_mode_cache=self._dec_mode_cache,
+                                  capture_cpr=capture_cpr)
 
         # handle escape key (KEY_ESCAPE) vs. escape sequence (like those
         # that begin with \x1b[ or \x1bO) up to esc_delay when
@@ -3717,13 +3722,15 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 # re-check 'final' after reading more bytes
                 final = bool(ucs) and not self._is_incomplete_keystroke(ucs)
                 ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
-                                      final=final, dec_mode_cache=self._dec_mode_cache)
+                                      final=final, dec_mode_cache=self._dec_mode_cache,
+                                      capture_cpr=capture_cpr)
 
             # If we still have KEY_ESCAPE and ucs is a prefix, resolve with final=True
             # to handle unmatched sequences like '\x1b[' (CSI)
             if ks.code == self.KEY_ESCAPE and self._is_incomplete_keystroke(ucs):
                 ks = resolve_sequence(ucs, self._keymap, self._keycodes, self._keymap_prefixes,
-                                      final=True, dec_mode_cache=self._dec_mode_cache)
+                                      final=True, dec_mode_cache=self._dec_mode_cache,
+                                      capture_cpr=capture_cpr)
 
         # buffer any remaining text received
         self.ungetch(ucs[len(ks):])
@@ -3755,6 +3762,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     async def async_inkey(
         self, timeout: Optional[float] = None,
         esc_delay: float = DEFAULT_ESCDELAY,
+        capture_cpr: bool = False,
     ) -> Keystroke:
         r"""
         Asynchronous version of :meth:`inkey` for use with :mod:`asyncio`.
@@ -3775,6 +3783,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             indefinitely.
         :arg float esc_delay: Time in seconds to wait after Escape key
             is received to disambiguate bare Escape from escape sequences.
+        :arg bool capture_cpr: TODO
         :rtype: :class:`~.Keystroke`
         :returns: :class:`~.Keystroke`, which may be empty (``''``) if
             ``timeout`` is specified and keystroke is not received.
@@ -3788,7 +3797,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # resolve any buffered keystroke
         ks = resolve_sequence(ucs, self._keymap, self._keycodes,
                               self._keymap_prefixes, final=False,
-                              dec_mode_cache=self._dec_mode_cache)
+                              dec_mode_cache=self._dec_mode_cache,
+                              capture_cpr=capture_cpr)
 
         # read bytes until a complete keystroke is resolved
         while not ks:
@@ -3808,7 +3818,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
             ks = resolve_sequence(ucs, self._keymap, self._keycodes,
                                   self._keymap_prefixes, final=False,
-                                  dec_mode_cache=self._dec_mode_cache)
+                                  dec_mode_cache=self._dec_mode_cache,
+                                  capture_cpr=capture_cpr)
 
         # escape key disambiguation: wait esc_delay for more bytes
         if ks.code == self.KEY_ESCAPE and len(ks) == 1:
@@ -3830,13 +3841,15 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 ks = resolve_sequence(
                     ucs, self._keymap, self._keycodes,
                     self._keymap_prefixes, final=final,
-                    dec_mode_cache=self._dec_mode_cache)
+                    dec_mode_cache=self._dec_mode_cache,
+                    capture_cpr=capture_cpr)
 
             if ks.code == self.KEY_ESCAPE and self._is_incomplete_keystroke(ucs):
                 ks = resolve_sequence(
                     ucs, self._keymap, self._keycodes,
                     self._keymap_prefixes, final=True,
-                    dec_mode_cache=self._dec_mode_cache)
+                    dec_mode_cache=self._dec_mode_cache,
+                    capture_cpr=capture_cpr)
 
         # buffer any remaining text
         self.ungetch(ucs[len(ks):])

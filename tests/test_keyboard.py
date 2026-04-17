@@ -5,6 +5,7 @@ import os
 import platform
 import sys
 import tempfile
+import collections
 from unittest import mock
 
 # 3rd party
@@ -285,7 +286,8 @@ def test_get_keyboard_codes():
                          # Modifier keys
                          'LEFT_SHIFT', 'LEFT_CONTROL', 'LEFT_ALT', 'LEFT_SUPER',
                          'LEFT_HYPER', 'LEFT_META', 'RIGHT_SHIFT', 'RIGHT_CONTROL',
-                         'RIGHT_ALT', 'RIGHT_SUPER', 'RIGHT_HYPER', 'RIGHT_META')
+                         'RIGHT_ALT', 'RIGHT_SUPER', 'RIGHT_HYPER', 'RIGHT_META',
+                         'CPR_RESPONSE')
     for value, keycode in blessed.keyboard.get_keyboard_codes().items():
         if keycode in exemptions:
             assert value == exemptions[keycode]
@@ -395,15 +397,16 @@ def test_get_keyboard_sequence(monkeypatch):
 
 def test_resolve_sequence_order():
     """Test resolve_sequence for order-dependent mapping."""
-    from blessed.keyboard import resolve_sequence, OrderedDict
-    mapper = OrderedDict((('SEQ1', 1),
-                          ('SEQ2', 2),
-                          # takes precedence over LONGSEQ, first-match
-                          ('LONGSEQ', 4),
-                          # won't match, LONGSEQ is first-match in this order
-                          ('LONGSEQ_longer', 5),
-                          # falls through for L{anything_else}
-                          ('L', 6)))
+    from blessed.keyboard import resolve_sequence
+    mapper = collections.OrderedDict(
+        (('SEQ1', 1),
+         ('SEQ2', 2),
+         # takes precedence over LONGSEQ, first-match
+         ('LONGSEQ', 4),
+         # won't match, LONGSEQ is first-match in this order
+         ('LONGSEQ_longer', 5),
+         # falls through for L{anything_else}
+         ('L', 6)))
     codes = {1: 'KEY_SEQ1',
              2: 'KEY_SEQ2',
              3: 'KEY_LONGSEQ_longest',
@@ -457,6 +460,65 @@ def test_resolve_sequence_order():
     assert ks.is_sequence
     assert ks.mode is None
     assert repr(ks) == "KEY_L"
+
+
+@pytest.mark.parametrize("seq,capture_cpr,expected_name,expected_yx", [
+    # any legal row2+ CPR response,
+    ('\x1b[3;4R', True, 'CPR_RESPONSE', (2, 3)),
+    ('\x1b[2;1R', True, 'CPR_RESPONSE', (1, 0)),
+    ('\x1b[100;200R', True, 'CPR_RESPONSE', (99, 199)),
+    ('\x1b[3;4R', False, 'CPR_RESPONSE', (2, 3)),
+    ('\x1b[2;1R', False, 'CPR_RESPONSE', (1, 0)),
+    ('\x1b[100;200R', False, 'CPR_RESPONSE', (99, 199)),
+    # CPR response with 0-index is invalid ('CSI')
+    ('\x1b[0;100R', True, 'CSI', (-1, -1)),
+    ('\x1b[0;100R', False, 'CSI', (-1, -1)),
+    ('\x1b[100;0R', True, 'CSI', (-1, -1)),
+    ('\x1b[100;0R', False, 'CSI', (-1, -1)),
+    # row 1 may be ambiguous with 'KEY*F3' depending on capture_cpr argument
+    ('\x1b[1;1R', False, 'KEY_F3', (0, 0)),
+    ('\x1b[1;1R', True, 'CPR_RESPONSE', (0, 0)),
+    ('\x1b[1;2R', False, 'KEY_SHIFT_F3', (0, 1)),
+    ('\x1b[1;2R', True, 'CPR_RESPONSE', (0, 1)),
+    ('\x1b[1;3R', False, 'KEY_ALT_F3', (0, 2)),
+    ('\x1b[1;3R', True, 'CPR_RESPONSE', (0, 2)),
+])
+def test_cpr_response(seq, capture_cpr, expected_name, expected_yx):
+    """CPR response matched as single CPR_RESPONSE keystroke."""
+    from blessed.keyboard import resolve_sequence
+    expected_kb_proto = expected_name not in ('CPR_RESPONSE', 'CSI')
+    mapper = collections.OrderedDict()
+    ks = resolve_sequence(seq, mapper, {}, capture_cpr=capture_cpr)
+    if expected_name == 'CSI':
+        assert str(ks).startswith('\x1b[')
+    else:
+        assert str(ks) == seq
+    assert ks.name == expected_name
+    assert ks.cpr_yx == expected_yx
+    assert ks.cpr_xy == (expected_yx[1], expected_yx[0])
+    assert ks.is_sequence
+    assert ks.uses_keyboard_protocol == expected_kb_proto
+
+
+@pytest.mark.parametrize("sequence,expected_name", [
+    ('\x1b[1;2R', 'KEY_SHIFT_F3'),
+    ('\x1b[0;5R', 'CSI'),
+])
+def test_cpr_response_not_matched(sequence, expected_name):
+    """Row 0 or 1 not matched as CPR."""
+    from blessed.keyboard import resolve_sequence
+    mapper = collections.OrderedDict()
+    ks = resolve_sequence(sequence, mapper, {})
+    assert ks.name == expected_name
+
+
+def test_cpr_response_with_trailing_text():
+    """CPR matcher consumes only the CPR sequence."""
+    from blessed.keyboard import resolve_sequence
+    mapper = collections.OrderedDict()
+    ks = resolve_sequence('\x1b[5;10Rextra', mapper, {})
+    assert ks == '\x1b[5;10R'
+    assert ks.name == 'CPR_RESPONSE'
 
 
 def test_keyboard_prefixes():
