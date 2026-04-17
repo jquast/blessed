@@ -97,7 +97,7 @@ def test_kbhit_returns_false_after_eof():
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
-def test_inkey_returns_empty_on_eof():
+def test_inkey_raises_EOF():
     """inkey() returns empty Keystroke when keyboard fd is at EOF."""
     @as_subprocess
     def child():
@@ -108,8 +108,8 @@ def test_inkey_returns_empty_on_eof():
         term._keyboard_fd = read_fd
         term._keyboard_decoder = codecs.getincrementaldecoder('utf-8')()
         try:
-            ks = term.inkey(timeout=0)
-            assert ks == ''
+            with pytest.raises(EOFError):
+                term.inkey(timeout=0)
             assert term._keyboard_eof is True
         finally:
             os.close(read_fd)
