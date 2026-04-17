@@ -544,11 +544,13 @@ class Keystroke(str):
         ``'MOUSE_RIGHT_MOTION'``, ``'MOUSE_LEFT_RELEASED'``.
 
         For other DEC events:
+
         - Focus events: 'FOCUS_IN' or 'FOCUS_OUT'
         - Bracketed paste: 'BRACKETED_PASTE'
         - Resize events: 'RESIZE_EVENT'
 
         For terminal query responses:
+
         - Cursor position report: 'KEY_CPR_RESPONSE' (row >= 2 only;
           row 1 is ambiguous with F3+modifier)
 
