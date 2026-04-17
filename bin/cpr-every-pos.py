@@ -45,8 +45,8 @@ class CaptureResponses:
         for key in sorted(self.key_names.keys(), key=lambda k: self.key_names[k], reverse=True):
             count = self.key_names[key]
             seqs = self.key_seqs[key]
-            txt_seqs = f'{seqs[:10]}..' if len(seqs) > 10 else seqs
-            print(count, key, ':', txt_seqs)
+            txt_seqs = f'{seqs[:6]}…' if len(seqs) > 6 else seqs
+            print(f'{count}x {key}: {txt_seqs}')
         # and, a unique list of coordinates
         for coord, count in sorted(self.coords.items(), key=lambda kv: kv[1]):
             if count != 1:
@@ -60,10 +60,10 @@ def heading(msg):
 
 
 def main():
+    cpr = term.u7 or '\x1b[6n'
     with term.cbreak():
         heading("Testing KEY_CPR_RESPONSE vs. Ambiguous vt220")
         cap = CaptureResponses()
-        cpr = term.u7 or '\x1b[6n'
         for y in range(0, term.height):
             for x in range(0, term.width):
                 print(term.move_yx(y, x) + cpr, end='', flush=True)
@@ -77,7 +77,11 @@ def main():
                 print(term.move_yx(y, x) + cpr, end='', flush=True)
                 cap.capture(term.inkey(timeout=1, capture_cpr=True))
         cap.display()
+
+        # verify number transmitted to coordinates received 
         assert len(cap.coords) == term.height * term.width
+        # verify all coordinate numbers received are unique
+        assert len(cap.coords.keys()) == len(set(cap.coords.keys()))
 
 
 if __name__ == '__main__':
