@@ -79,9 +79,10 @@ RE_PATTERN_FOCUS = re.compile(r'\x1b\[(?P<io>[IO])')
 RE_PATTERN_RESIZE = re.compile(r'\x1b\[48;(?P<height_chars>\d+);(?P<width_chars>\d+)'
                                r';(?P<height_pixels>\d+);(?P<width_pixels>\d+)t')
 # CPR (Cursor Position Report): ESC [ row ; column R
-# Row 1 excluded -- ambiguously matches RE_PATTERN_LEGACY_CSI_MODIFIERS 
+# Row 1 ambiguously matches RE_PATTERN_LEGACY_CSI_MODIFIERS, see 'capture_cpr=True'
+# to prefer matches of cursor position report over KEY_SHIFT_F3 and others
 RE_PATTERN_CPR = re.compile(
-    r'\x1b\[(?P<row>[2-9]\d*|[1-9]\d+);(?P<column>\d+)R')
+    r'\x1b\[(?P<row>[1-9]\d*|[1-9]\d+);(?P<column>\d+)R')
 
 # DEC event pattern container
 DECEventPattern = namedtuple("DECEventPattern", ["mode", "pattern"])
@@ -1131,6 +1132,20 @@ class Keystroke(str):
         return (-1, -1)
 
     @property
+    def cpr_yx(self) -> Tuple[int, int]:
+        """
+        Cursor position as (y, x) tuple for Cursor Position Report
+
+        :rtype: tuple of (int, int)
+        :returns: (y, x) coordinate tuple (0-indexed) for cursor position report,
+            or ``(-1, -1)`` if not a KEY_CPR_RESPONSE
+        """
+        match = RE_PATTERN_CPR.match(self)
+        if match:
+            return match.group(0)
+        return None
+
+    @property
     def text(self) -> Optional[str]:
         """
         Pasted text for bracketed paste events.
@@ -1363,7 +1378,8 @@ def resolve_sequence(text: str,
                      codes: typing.Mapping[int, str],
                      prefixes: Optional[Set[str]] = None,
                      final: bool = False,
-                     dec_mode_cache: Optional[Dict[int, int]] = None) -> Keystroke:
+                     dec_mode_cache: Optional[Dict[int, int]] = None,
+                     capture_cpr: bool = False) -> Keystroke:
     r"""
     Return a single :class:`Keystroke` instance for given sequence ``text``.
 
@@ -1397,14 +1413,18 @@ def resolve_sequence(text: str,
 
     # First try advanced keyboard protocol matchers and DEC events
     ks = None
-    for match_fn in (
-            functools.partial(_match_dec_event, dec_mode_cache=dec_mode_cache),
-            _match_kitty_key,
-            _match_modify_other_keys,
-            _match_cpr_response,
-            _match_legacy_csi_letter_form,
-            _match_legacy_csi_tilde_form,
-            _match_legacy_ss3_fkey_form):
+    match_funcs = [
+        functools.partial(_match_dec_event, dec_mode_cache=dec_mode_cache),
+        _match_kitty_key,
+        _match_modify_other_keys,
+        _match_legacy_csi_letter_form,
+        _match_legacy_csi_tilde_form,
+        _match_legacy_ss3_fkey_form,
+        _match_cpr_response]
+    if capture_cpr:
+        # prioritize capturing KEY_CPR_RESPONSE over legacy CSI Modifiers
+        match_funcs.insert(3, match_funcs.pop())
+    for match_fn in match_func:
         ks = match_fn(text)
         if ks:
             break
