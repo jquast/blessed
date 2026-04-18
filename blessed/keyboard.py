@@ -1807,7 +1807,6 @@ KEY_KP_7 = 527
 KEY_KP_8 = 528
 KEY_KP_9 = 529
 KEY_MENU = 530
-KEY_CPR_RESPONSE = 531
 
 # Kitty protocol control character to keycode mapping
 # Maps common control character unicode values to their curses keycodes

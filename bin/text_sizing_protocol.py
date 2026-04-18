@@ -67,12 +67,12 @@ def show_scale_factors(term):
 
 def show_char_types():
     types = [
-        ('N',    'A',                            1),
-        ('VS15', '\u231a\ufe0e',                  1),
-        ('CJK',  '\u6f22',                        2),
-        ('VS16', '\u00a9\ufe0f',                  2),
-        ('ZWJ',  '\U0001f468\u200d\U0001f469',    2),
-        ('flag', '\U0001f1ef\U0001f1f5',          2),
+        ('N', 'A', 1),
+        ('VS15', '\u231a\ufe0e', 1),
+        ('CJK', '\u6f22', 2),
+        ('VS16', '\u00a9\ufe0f', 2),
+        ('ZWJ', '\U0001f468\u200d\U0001f469', 2),
+        ('flag', '\U0001f1ef\U0001f1f5', 2),
     ]
     tl, tr, bl, br, hz, vt = '\u250c\u2510\u2514\u2518\u2500\u2502'
     gap = '    '
@@ -100,7 +100,7 @@ def show_fractional(term):
     sampled.append((0, 0))
     for n, d in sampled:
         print(make_seq('X', width=1, numerator=n, denominator=d,
-                        vertical_align=1), end='')
+                       vertical_align=1), end='')
     print()
     pcts = {i: (int(n / d * 100) if d else 100) for i, (n, d) in enumerate(sampled)}
     label_at = {}
