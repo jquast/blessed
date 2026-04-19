@@ -3274,6 +3274,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         vertical_align: int = 0,
         horizontal_align: int = 0,
     ) -> str:
+        # pylint: disable=too-many-positional-arguments
         """Build colon-separated metadata for an OSC 66 sequence."""
         # arguments are in the order described in specification
         parts = []

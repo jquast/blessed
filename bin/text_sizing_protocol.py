@@ -132,7 +132,7 @@ def show_alignment(term):
         boxes = [alignment_box(text, rows, cols, v, h) for v, h in params]
         for line_parts in zip(*boxes):
             print(gap.join(line_parts))
-        print(gap.join(f'{l:^{box_w}s}' for l in labels) + f'  ({fixed})')
+        print(gap.join(f'{label:^{box_w}s}' for label in labels) + f'  ({fixed})')
 
         sys.stdout.flush()
         end_y, _ = term.get_location()
