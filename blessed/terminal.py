@@ -3229,11 +3229,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :rtype: str
         :returns: String of ``text``, left-aligned by ``width``.
         """
-        # Left justification is different from left alignment, but we continue
-        # the vocabulary error of the str method for polymorphism.
         if width is None:
             width = self.width
-        return wcwidth_ljust(text, width.__index__(), fillchar, control_codes='ignore')
+        return wcwidth_ljust(text, width.__index__(), fillchar)
 
     def rjust(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
@@ -3248,7 +3246,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         if width is None:
             width = self.width
-        return wcwidth_rjust(text, width.__index__(), fillchar, control_codes='ignore')
+        return wcwidth_rjust(text, width.__index__(), fillchar)
 
     def center(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
@@ -3263,7 +3261,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         if width is None:
             width = self.width
-        return wcwidth_center(text, width.__index__(), fillchar, control_codes='ignore')
+        return wcwidth_center(text, width.__index__(), fillchar)
 
     @staticmethod
     def _text_sizing_params_str(
@@ -3331,6 +3329,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             denominator=denominator, vertical_align=vertical_align,
             horizontal_align=horizontal_align,
         )
+        utf8_len = len(text.encode())
+        if utf8_len > 4096:
+            raise ValueError("'text' must be no longer than 4096 bytes")
         return f'\x1b]66;{params};{text}\x07'
 
     def scaled(self, text: str, scale: int) -> str:
@@ -3355,45 +3356,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return text
         params = self._text_sizing_params_str(scale=scale)
         return f'\x1b]66;{params};{text}\x07'
-
-    # XXX TODO: I think we should cut this ..
-    def heading(
-        self,
-        text: str,
-        scale: int = 2,
-        underline_char: str = '=',
-    ) -> str:
-        r"""
-        Return ``text`` scaled as a heading with a correctly-sized underline.
-
-        When text sizing is supported, the heading is rendered at ``scale`` times its natural size
-        (2x by default), followed by a newline and an underline of the correct measured width.
-
-        When unsupported, returns text plain and underlined.
-
-        :arg str text: Heading text.
-        :arg int scale: Scale factor (1--7). Default is 2.
-        :arg str underline_char: Character for the underline. Default
-            is ``'='``.
-        :rtype: str
-        :returns: Multi-line string: scaled heading + blank lines for
-            multi-row rendering + underline.
-
-        Example::
-
-            >>> term.heading('Chapter One')
-            '\x1b]66;s=2:Chapter One\x07\n\n======================'
-
-        .. seealso:: `Kitty Text Sizing Protocol
-            <https://sw.kovidgoyal.net/kitty/text-sizing-protocol/>`_
-        """
-        sized = self.scaled(text, scale)
-        w = wcwidth_width(sized)
-        lines = sized + '\n'
-        if self.does_text_sizing() and scale > 1:
-            lines += '\n' * (scale - 1)
-        lines += underline_char * w
-        return lines
 
     def truncate(self, text: str, width: Optional[SupportsIndex] = None) -> str:
         r"""

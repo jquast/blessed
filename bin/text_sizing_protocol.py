@@ -1,27 +1,6 @@
 #!/usr/bin/env python
 """Demonstrate the Kitty Text Sizing Protocol (OSC 66) with blessed."""
-import sys
-
-from wcwidth import wcswidth
 from blessed import Terminal
-
-
-def make_seq(text, scale=1, width=0, numerator=0, denominator=0,
-             vertical_align=0, horizontal_align=0):
-    parts = []
-    if scale != 1:
-        parts.append(f's={scale}')
-    if width != 0:
-        parts.append(f'w={width}')
-    if numerator != 0:
-        parts.append(f'n={numerator}')
-    if denominator != 0:
-        parts.append(f'd={denominator}')
-    if vertical_align != 0:
-        parts.append(f'v={vertical_align}')
-    if horizontal_align != 0:
-        parts.append(f'h={horizontal_align}')
-    return f'\x1b]66;{":".join(parts)};{text}\x07'
 
 
 def alignment_box(text, rows, cols, v_align, h_align):
@@ -58,14 +37,13 @@ def detect(term):
 
 def show_scale_factors(term):
     colors = [term.bright_blue, term.bright_red, term.bright_green]
-    for i, (s, text) in enumerate([(1, 'Ol\u00e1'), (2, 'Gr\u00fc\u00dfe'), (3, 'Bj\u00f6rk')]):
-        heading = term.heading(text, scale=s)
-        # color wraps outside the OSC 66 sequence (SGR can't go inside payload)
-        print(colors[i](heading))
-        print()
+    scale_headings = [(1, 'Ol\u00e1'), (2, 'Gr\u00fc\u00dfe'), (3, 'Bj\u00f6rk')]
+    for idx, (s, text) in enumerate(scale_headings):
+        heading = colors[idx](term.text_sized(text, scale=s))
+        newlines =  ('\n' * s) if term.does_text_sizing().scale else '\n'
+        print(heading + newlines + '=' * term.length(heading) + '\n')
 
-
-def show_char_types():
+def show_char_types(term):
     types = [
         ('N', 'A', 1),
         ('VS15', '\u231a\ufe0e', 1),
@@ -76,18 +54,18 @@ def show_char_types():
     ]
     tl, tr, bl, br, hz, vt = '\u250c\u2510\u2514\u2518\u2500\u2502'
     gap = '    '
-    for _, _, w in types:
-        print(f'{tl}{hz * w}{tr}{gap}', end='')
+    for _, _, width in types:
+        print(f'{tl}{hz * width}{tr}{gap}', end='')
     print()
-    for _, char, w in types:
-        print(f'{vt}{make_seq(char, width=w)}{vt}{gap}', end='')
+    for _, ucs, width in types:
+        print(f'{vt}{term.text_sized(ucs, width=width)}{vt}{gap}', end='')
     print()
-    for _, _, w in types:
-        print(f'{bl}{hz * w}{br}{gap}', end='')
+    for _, _, width in types:
+        print(f'{bl}{hz * width}{br}{gap}', end='')
     print()
-    for label, _, w in types:
-        col_w = w + 2 + len(gap)
-        print(f'{label:<{col_w}}', end='')
+    for label, _, width in types:
+        col_width = width + 2 + len(gap)
+        print(f'{label:<{col_width}}', end='')
     print()
 
 
@@ -99,8 +77,7 @@ def show_fractional(term):
     sampled = fracs[::step]
     sampled.append((0, 0))
     for n, d in sampled:
-        print(make_seq('X', width=1, numerator=n, denominator=d,
-                       vertical_align=1), end='')
+        print(term.text_sized('X', width=1, numerator=n, denominator=d, vertical_align=1), end='')
     print()
     pcts = {i: (int(n / d * 100) if d else 100) for i, (n, d) in enumerate(sampled)}
     label_at = {}
@@ -113,6 +90,7 @@ def show_fractional(term):
             if i + c < len(lbl) and lbl[i + c] == ' ':
                 lbl[i + c] = ch
     print(''.join(lbl).rstrip())
+    print()
 
 
 def show_alignment(term):
@@ -134,7 +112,6 @@ def show_alignment(term):
             print(gap.join(line_parts))
         print(gap.join(f'{label:^{box_w}s}' for label in labels) + f'  ({fixed})')
 
-        sys.stdout.flush()
         end_y, _ = term.get_location()
         interior_y = end_y - rows - 3 + 1
         if end_y > 0 and interior_y >= 0:
@@ -153,34 +130,30 @@ def show_ljust_rjust_center(term, supported):
     box_cols = 35
     box_rows = 2 if supported else 1
     tl, tr, bl, br, hz, vt = '\u250c\u2510\u2514\u2518\u2500\u2502'
-    dot = '\u00b7'
 
     colors = [term.bright_blue, term.bright_red, term.bright_green]
     for i, (name, method) in enumerate([('ljust', term.ljust), ('rjust', term.rjust),
                                         ('center', term.center)]):
         scaled = colors[i](term.scaled(f'BIG {name.upper()}', 2))
         mixed = 'little and ' + scaled
-        content = method(mixed, box_cols, dot)
+        content = method(mixed, width=box_cols, fillchar='\u00b7')
         print(f'{tl}{hz * box_cols}{tr}')
         for _ in range(box_rows):
             print(f'{vt}{" " * box_cols}{vt}')
         print(f'{bl}{hz * box_cols}{br}')
-        sys.stdout.flush()
+
         end_y, _ = term.get_location()
-        if end_y > 0:
-            interior_y = end_y - box_rows - 1
-            print(term.move_yx(interior_y, 1) + content, end='')
-            print(term.move_yx(end_y, 0), end='', flush=True)
+        interior_y = max(0, end_y - box_rows - 1)
+        print(term.move_yx(interior_y, 1) + content, end='')
+        print(term.move_yx(end_y, 0), end='', flush=True)
 
 
 def main():
     term = Terminal()
     result = detect(term)
     show_scale_factors(term)
-    show_char_types()
-    print()
+    show_char_types(term)
     show_fractional(term)
-    print()
     show_alignment(term)
     show_ljust_rjust_center(term, bool(result))
 
