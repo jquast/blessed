@@ -7,7 +7,7 @@ The XTVERSION query (CSI > q or ESC [ > q) requests the terminal software
 name and version. Supported by modern terminal emulators including xterm,
 mintty, iTerm2, tmux, kitty, WezTerm, foot, and VTE-based terminals.
 
-Terminal response: DCS > | text ST  (ESC P > | text ESC \)
+Terminal response: DCS > | text ST  (ESC P > | text ESC \\)
 
 Text format varies by terminal:
   - XTerm(367)

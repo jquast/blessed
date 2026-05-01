@@ -281,7 +281,7 @@ def test_async_inkey_incomplete_csi_timeout():
             finally:
                 loop.close()
             # partial CSI \x1b[ arrives, loop iterates reading bytes,
-            # then times out on next read — returns empty Keystroke
+            # then times out on next read and returns empty Keystroke
             assert str(ks) == '' or ks.name is not None
             return b'OK'
 

@@ -1506,7 +1506,7 @@ def _read_until(term: 'Terminal',
         may be :class:`re.MatchObject` if pattern is discovered
         in input stream before timeout has elapsed, otherwise
         None. ``str`` is any remaining text received exclusive
-        of the matching pattern).
+        of the matching pattern.
 
     The reason a tuple containing non-matching data is returned, is that the
     consumer should push such data back into the input buffer by

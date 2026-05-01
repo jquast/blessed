@@ -527,3 +527,12 @@ def test_text_sized(supported, kwargs, expected, measured):
         assert result == expected
         assert wcwidth_width(result) == measured
     child()
+
+
+def test_text_sized_ValueError():
+    @as_subprocess
+    def child():
+        with pytest.raises(ValueError):
+            term.text_sized('X'*4097, scale=2)
+
+    child()

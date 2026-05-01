@@ -104,7 +104,7 @@ class Termcap():
         :arg str name: Variable name given for this pattern.
         :arg str capability: A unicode string representing a terminal
             capability to build for. When ``nparams`` is non-zero, it
-            must be a callable unicode string (such as the result from
+            must be a callable unicode string, such as the result from
             ``getattr(term, 'bold')``.
         :arg str attribute: The terminfo(5) capability name by which this
             pattern is known.

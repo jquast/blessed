@@ -3329,9 +3329,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             denominator=denominator, vertical_align=vertical_align,
             horizontal_align=horizontal_align,
         )
+        # Specification is pretty exact -- text must be utf-8 and no more than 4096 bytes.  Although
+        # we do not enforce utf-8, we do enforce 4096 of encoded bytes and assume utf-8, because any
+        # terminal where does_test_size() is True is presumed utf-8, anyway.
         utf8_len = len(text.encode())
         if utf8_len > 4096:
-            raise ValueError("'text' must be no longer than 4096 bytes")
+            raise ValueError(f"'text' must be no longer than 4096 bytes, got {utf8_len}")
         return f'\x1b]66;{params};{text}\x07'
 
     def scaled(self, text: str, scale: int) -> str:
@@ -3740,7 +3743,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             indefinitely.
         :arg float esc_delay: Time in seconds to block after Escape key
            is received to await another key sequence beginning with
-           escape such as *KEY_LEFT*, sequence ``'\x1b[D'``], before returning a
+           escape such as *KEY_LEFT*, sequence ``'\x1b[D'``, before returning a
            :class:`~.Keystroke` instance for ``KEY_ESCAPE``.
 
            Users may override the default value of ``esc_delay`` in seconds,
