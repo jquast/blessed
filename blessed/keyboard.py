@@ -1047,12 +1047,12 @@ class Keystroke(str):
         Some Examples,
 
         - Plain text: 'a', 'A', '1', ';', ' ', 'Ω', emoji with ZWJ sequences
-        - Alt+printable: Alt+a → 'a', Alt+A → 'A'
-        - Ctrl+letter: Ctrl+A → 'a', Ctrl+Z → 'z'
-        - Ctrl+symbol: Ctrl+@ → '@', Ctrl+? → '?', Ctrl+[ → '['
+        - Alt+printable: Alt+a -> 'a', Alt+A -> 'A'
+        - Ctrl+letter: Ctrl+A -> 'a', Ctrl+Z -> 'z'
+        - Ctrl+symbol: Ctrl+@ -> '@', Ctrl+? -> '?', Ctrl+[ → '['
         - Control chars: '\t', '\n', '\x08', '\x1b' (for Enter/Tab/Backspace/Escape keycodes)
         - Application keys: KEY_UP, KEY_F1, etc. → ''
-        - Release events: always → ''
+        - Release events: always -> ''
         """
         # Release events never have text
         if self.released:

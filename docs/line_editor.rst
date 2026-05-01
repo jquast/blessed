@@ -25,7 +25,7 @@ Feed keystrokes (from :meth:`~.Terminal.inkey` or :meth:`~.Terminal.async_inkey`
 :class:`~blessed.line_editor.LineEditResult` with these fields:
 
 - ``line`` the accepted string when Enter is pressed, otherwise ``None``.
-- ``interrupt`` / ``eof`` — ``True`` on Ctrl+C / Ctrl+D respectively.
+- ``interrupt``, ``eof``: ``True`` on Ctrl+C / Ctrl+D respectively.
 - ``changed`` ``True`` when the display needs redrawing.
 - ``bell`` a bell string to emit (empty when silent).
 

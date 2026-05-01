@@ -876,7 +876,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         The following sequence should cause the cursor to not move at all::
 
             >>> term = Terminal()
-            >>> term.move_yx(*term.get_location()))
+            >>> term.move_yx(*term.get_location())
 
         And the following should assert True with a terminal:
 
