@@ -18,12 +18,12 @@ import collections
 from typing import IO, Dict, List, Match, Tuple, Union, Optional, Generator, SupportsIndex
 
 # 3rd party
+from wcwidth import TextSizing, TextSizingParams
 from wcwidth import wrap as wcwidth_wrap
 from wcwidth import ljust as wcwidth_ljust
 from wcwidth import rjust as wcwidth_rjust
 from wcwidth import width as wcwidth_width
 from wcwidth import center as wcwidth_center
-from wcwidth import TextSizing, TextSizingParams
 
 # local
 from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
@@ -3267,8 +3267,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     def text_sized(
         self,
         text: str,
-        *,
         scale: int = 1,
+        *,
         width: int = 0,
         numerator: int = 0,
         denominator: int = 0,
@@ -3292,6 +3292,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :rtype: str
         :returns: Text wrapped in an OSC 66 escape sequence, or plain
             ``text`` on unsupported terminals.
+        :raises ValueError: when the encoded ``text`` exceeds 4096 bytes.
 
         .. seealso:: `Kitty Text Sizing Protocol
             <https://sw.kovidgoyal.net/kitty/text-sizing-protocol/>`_
@@ -3307,29 +3308,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         params = TextSizingParams(scale=scale, width=width, numerator=numerator,
                                   denominator=denominator, vertical_align=vertical_align,
                                   horizontal_align=horizontal_align)
-        return TextSizing(params, text, '\x07').make_sequence()
-
-    def scaled(self, text: str, scale: int) -> str:
-        """
-        Scale ``text`` using the text sizing protocol with auto-calculatwidth.
-
-        This is the most common use case: render ``text`` at ``scale``
-        times its natural size. Returns ``text`` unchanged when the
-        terminal does not support text sizing.
-
-        :arg str text: Text payload.
-        :arg int scale: Scale factor (1 to 7).
-        :rtype: str
-        :returns: Text wrapped in an OSC 66 escape sequence with
-            auto-calculated width, or plain ``text`` on unsupported
-            terminals.
-
-        .. seealso:: `Kitty Text Sizing Protocol
-            <https://sw.kovidgoyal.net/kitty/text-sizing-protocol/>`_
-        """
-        if not self.does_text_sizing():
-            return text
-        params = TextSizingParams(scale=scale)
         return TextSizing(params, text, '\x07').make_sequence()
 
     def truncate(self, text: str, width: Optional[SupportsIndex] = None) -> str:

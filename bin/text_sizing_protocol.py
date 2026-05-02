@@ -1,7 +1,13 @@
 #!/usr/bin/env python
 """Demonstrate the Kitty Text Sizing Protocol (OSC 66) with blessed."""
+
+# std imports
 import math
+
+# 3rd party
 from wcwidth import TextSizing, TextSizingParams
+
+# local
 from blessed import Terminal
 
 FRACTIONS = [(n, d) for d in range(1, 16) for n in range(0, d)]
@@ -86,8 +92,9 @@ def show_scale_factors(term):
     scale_headings = [(1, 'Ol\u00e1'), (2, 'Gr\u00fc\u00dfe'), (3, 'Bj\u00f6rk')]
     for idx, (s, text) in enumerate(scale_headings):
         heading = colors[idx](term.text_sized(text, scale=s))
-        newlines =  ('\n' * s) if term.does_text_sizing().scale else '\n'
+        newlines = ('\n' * s) if term.does_text_sizing().scale else '\n'
         print(heading + newlines + '=' * term.length(heading) + '\n')
+
 
 def show_char_types(term):
     types = [
@@ -180,7 +187,7 @@ def show_ljust_rjust_center(term, supported):
     colors = [term.bright_blue, term.bright_red, term.bright_green]
     for i, (name, method) in enumerate([('ljust', term.ljust), ('rjust', term.rjust),
                                         ('center', term.center)]):
-        scaled = colors[i](term.scaled(f'BIG {name.upper()}', 2))
+        scaled = colors[i](term.text_sized(f'BIG {name.upper()}', 2))
         mixed = 'little and ' + scaled
         content = method(mixed, width=box_cols, fillchar='\u00b7')
         print(f'{tl}{hz * box_cols}{tr}')
