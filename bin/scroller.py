@@ -66,8 +66,8 @@ _MESSAGE = (
 )
 
 
-def _sized_char(ch, target, v_align=0, h_align=0, sizing_supported=True):
-    if not sizing_supported:
+def _sized_char(ch, target, term, v_align=0, h_align=0):
+    if not term.does_text_sizing().scale:
         return ch, wcswidth(ch)
     s, w, n, d = _scale_params(target)
     if s == 1 and n == 0:
@@ -85,8 +85,6 @@ def main():
     screen_w = term.width
     screen_h = term.height
     vert_amp = screen_h // 3
-
-    sizing_supported = bool(term.does_text_sizing())
 
     graphemes = list(iter_graphemes(_MESSAGE))
     graph_len = len(graphemes)
@@ -145,7 +143,7 @@ def main():
                 else:
                     v = 2
 
-                seq, cw = _sized_char(gr, target, v, v, sizing_supported)
+                seq, cw = _sized_char(gr, target, term, v, v)
                 if col + cw > screen_w:
                     break
 
