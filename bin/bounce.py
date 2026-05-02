@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Classic game of tennis."""
+
 # std imports
 from math import floor
 
