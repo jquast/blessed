@@ -23,6 +23,7 @@ from wcwidth import ljust as wcwidth_ljust
 from wcwidth import rjust as wcwidth_rjust
 from wcwidth import width as wcwidth_width
 from wcwidth import center as wcwidth_center
+from wcwidth import TextSizing, TextSizingParams
 
 # local
 from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
@@ -3263,33 +3264,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             width = self.width
         return wcwidth_center(text, width.__index__(), fillchar)
 
-    @staticmethod
-    def _text_sizing_params_str(
-        scale: int = 1,
-        width: int = 0,
-        numerator: int = 0,
-        denominator: int = 0,
-        vertical_align: int = 0,
-        horizontal_align: int = 0,
-    ) -> str:
-        # pylint: disable=too-many-positional-arguments
-        """Build colon-separated metadata for an OSC 66 sequence."""
-        # arguments are in the order described in specification
-        parts = []
-        if scale != 1:
-            parts.append(f's={scale}')
-        if width != 0:
-            parts.append(f'w={width}')
-        if numerator != 0:
-            parts.append(f'n={numerator}')
-        if denominator != 0:
-            parts.append(f'd={denominator}')
-        if vertical_align != 0:
-            parts.append(f'v={vertical_align}')
-        if horizontal_align != 0:
-            parts.append(f'h={horizontal_align}')
-        return ':'.join(parts)
-
     def text_sized(
         self,
         text: str,
@@ -3324,18 +3298,16 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         if not self.does_text_sizing():
             return text
-        params = self._text_sizing_params_str(
-            scale=scale, width=width, numerator=numerator,
-            denominator=denominator, vertical_align=vertical_align,
-            horizontal_align=horizontal_align,
-        )
         # Specification is pretty exact -- text must be utf-8 and no more than 4096 bytes.  Although
         # we do not enforce utf-8, we do enforce 4096 of encoded bytes and assume utf-8, because any
         # terminal where does_test_size() is True is presumed utf-8, anyway.
         utf8_len = len(text.encode())
         if utf8_len > 4096:
             raise ValueError(f"'text' must be no longer than 4096 bytes, got {utf8_len}")
-        return f'\x1b]66;{params};{text}\x07'
+        params = TextSizingParams(scale=scale, width=width, numerator=numerator,
+                                  denominator=denominator, vertical_align=vertical_align,
+                                  horizontal_align=horizontal_align)
+        return TextSizing(params, text, '\x07').make_sequence()
 
     def scaled(self, text: str, scale: int) -> str:
         """
@@ -3357,8 +3329,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         if not self.does_text_sizing():
             return text
-        params = self._text_sizing_params_str(scale=scale)
-        return f'\x1b]66;{params};{text}\x07'
+        params = TextSizingParams(scale=scale)
+        return TextSizing(params, text, '\x07').make_sequence()
 
     def truncate(self, text: str, width: Optional[SupportsIndex] = None) -> str:
         r"""

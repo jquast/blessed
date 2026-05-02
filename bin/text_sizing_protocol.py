@@ -1,6 +1,52 @@
 #!/usr/bin/env python
 """Demonstrate the Kitty Text Sizing Protocol (OSC 66) with blessed."""
+import math
+from wcwidth import TextSizing, TextSizingParams
 from blessed import Terminal
+
+FRACTIONS = [(n, d) for d in range(1, 16) for n in range(0, d)]
+
+
+def _nearest_fraction(numerator, denominator, fractions):
+    """Return nearest fraction from *fractions* to numerator/denominator."""
+    target = numerator / denominator
+    return min(fractions, key=lambda f: abs(target - f[0] / f[1]))
+
+
+def _params_for_target(target):
+    """Return (scale, numerator, denominator) for a target visual size.
+
+    *scale* is ``ceil(target)`` since *n/d* can only reduce font size.
+    """
+    if target <= 1.0:
+        return 1, 0, 0
+    s = min(7, max(1, math.ceil(target)))
+    if target >= s - 0.03:
+        return s, 0, 0
+    ratio = target / s
+    n, d = _nearest_fraction(round(ratio * 100), 100, FRACTIONS)
+    if n >= d:
+        return s, 0, 0
+    return s, n, d
+
+
+def show_scale_range(term, lo, hi, steps):
+    """Display a row of 'X' characters ranging from *lo* to *hi* in *steps*."""
+    label_top = []
+    label_bot = []
+    chars = []
+    for i in range(steps + 1):
+        target = lo + (hi - lo) * i / steps
+        s, n, d = _params_for_target(target)
+        params = TextSizingParams(scale=s, numerator=n, denominator=d,
+                                  vertical_align=1)
+        chars.append(TextSizing(params, 'X', '\x07').make_sequence())
+        label_top.append(f'{target:.1f}'.center(s * 2))
+        label_bot.append(f's={s}'.center(s * 2))
+    print(''.join(chars))
+    print(''.join(label_top))
+    print(''.join(label_bot))
+    print()
 
 
 def alignment_box(text, rows, cols, v_align, h_align):
@@ -154,6 +200,10 @@ def main():
     show_scale_factors(term)
     show_char_types(term)
     show_fractional(term)
+    print(term.bold('100% -- 200%:'))
+    show_scale_range(term, 1.0, 2.0, 10)
+    print(term.bold('200% -- 300%:'))
+    show_scale_range(term, 2.0, 3.0, 10)
     show_alignment(term)
     show_ljust_rjust_center(term, bool(result))
 
