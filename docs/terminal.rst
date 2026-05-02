@@ -122,6 +122,56 @@ it on exit:
         do_long_task()
     # previous title is restored
 
+Progress Bar (Taskbar / Dock)
+-----------------------------
+
+The ConEmu OSC 9;4 protocol allows applications to display a graphical
+progress indicator in the terminal's taskbar icon or dock tile.
+Supported by **Windows Terminal**, **ConEmu**, and **Ghostty** (1.2.0+).
+Terminals that do not support this sequence silently ignore it.
+
+Use :meth:`~.Terminal.progress_bar` to produce the escape sequence.
+The ``state`` parameter accepts either an integer (0--4) or a string name:
+
+========  ==================  ========================================
+``state`` String               Meaning
+========  ==================  ========================================
+0         ``'clear'``          Remove the progress indicator
+1         ``'normal'``         Set progress to a *value* between 0--100
+2         ``'error'``          Error state (typically a red indicator)
+3         ``'indeterminate'``  Indeterminate / pulsing indicator
+4         ``'paused'``         Paused state (typically a yellow indicator)
+========  ==================  ========================================
+
+The *value* parameter is required for ``'normal'`` state and ignored for
+all others:
+
+.. code-block:: python
+
+    # Normal progress at 60%
+    print(term.progress_bar('normal', 60))
+
+    # Enter error state
+    print(term.progress_bar('error'))
+
+    # Remove the indicator
+    print(term.progress_bar('clear'))
+
+.. important::
+
+    **There is no reliable detection query for OSC 9;4 support.**  No
+    terminal emulator provides a DEC private mode, XTGETTCAP key, DA
+    response bit, or any other mechanism to probe for this feature.
+
+    Applications that wish to avoid emitting unrecognized escape sequences
+    should expose a user-facing configuration option, rather than attempting
+    automatic detection.
+
+Example program demonstrating both ASCII and OSC 9;4 progress bars together:
+
+.. literalinclude:: ../bin/progress_bar.py
+   :language: python
+
 Sixel Graphics Support
 ----------------------
 

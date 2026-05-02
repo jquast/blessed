@@ -574,6 +574,85 @@ def test_window_title_context_manager_nostyling():
     child()
 
 
+def test_progress_bar_normal():
+    """Test progress_bar with state=1 returns OSC 9;4 set sequence."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        assert term.progress_bar(1, 42) == '\x1b]9;4;1;42\x07'
+        assert term.progress_bar('normal', 0) == '\x1b]9;4;1;0\x07'
+        assert term.progress_bar('normal', 100) == '\x1b]9;4;1;100\x07'
+    child()
+
+
+def test_progress_bar_states_no_value():
+    """Test progress_bar for non-normal states returns correct sequence."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        assert term.progress_bar(0) == '\x1b]9;4;0;\x07'
+        assert term.progress_bar('clear') == '\x1b]9;4;0;\x07'
+        assert term.progress_bar(2) == '\x1b]9;4;2;\x07'
+        assert term.progress_bar('error') == '\x1b]9;4;2;\x07'
+        assert term.progress_bar(3) == '\x1b]9;4;3;\x07'
+        assert term.progress_bar('indeterminate') == '\x1b]9;4;3;\x07'
+        assert term.progress_bar(4) == '\x1b]9;4;4;\x07'
+        assert term.progress_bar('paused') == '\x1b]9;4;4;\x07'
+    child()
+
+
+def test_progress_bar_nostyling():
+    """Test progress_bar returns empty string when does_styling is False."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=None)
+        assert term.progress_bar('normal', 50) == ''
+        assert term.progress_bar('clear') == ''
+    child()
+
+
+def test_progress_bar_invalid_state():
+    """Test progress_bar raises ValueError for invalid state."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        with pytest.raises(ValueError):
+            term.progress_bar(5)
+        with pytest.raises(ValueError):
+            term.progress_bar('unknown')
+        with pytest.raises(ValueError):
+            term.progress_bar(-1)
+    child()
+
+
+def test_progress_bar_missing_value():
+    """Test progress_bar raises ValueError when value is missing for normal."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        with pytest.raises(ValueError):
+            term.progress_bar('normal')
+        with pytest.raises(ValueError):
+            term.progress_bar(1)
+    child()
+
+
+def test_progress_bar_invalid_value():
+    """Test progress_bar raises ValueError for out-of-range or non-int value."""
+    @as_subprocess
+    def child():
+        term = TestTerminal(force_styling=True)
+        with pytest.raises(ValueError):
+            term.progress_bar('normal', -1)
+        with pytest.raises(ValueError):
+            term.progress_bar('normal', 101)
+        with pytest.raises(ValueError):
+            term.progress_bar('normal', 'fifty')
+        with pytest.raises(ValueError):
+            term.progress_bar(1, 3.5)
+    child()
+
+
 def test_sequence_is_movement_false(all_terms):
     """Test parser about sequences that do not move the cursor."""
     @as_subprocess

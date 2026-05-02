@@ -3142,6 +3142,74 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 self.stream.write('\x1b[23;0t')
                 self.stream.flush()
 
+    def progress_bar(self, state, value=None):
+        """
+        Return OSC 9;4 sequence for terminal progress bar support.
+
+        Support for 'OSC 9;4' cannot be detected. It is generally safe to write it to unsupported
+        terminals. Some terminals display a graphical progress indicator in the taskbar and window
+        menu or status bar matching the given value (0-100).
+
+        Supported by Windows Terminal.exe, ConEmu, Ghostty, iTerm2 and generally safe to write to
+        any terminal. As an Operating System Command (OSC), unsupporting terminals are expected
+        to disregard and emit no output.
+
+        :param state: Progress state.  Accepts either an integer or a string name:
+
+        - ``0`` or ``'clear'``: Remove progress indicator
+        - ``1`` or ``'normal'``: Set progress to *value* (0 to 100)
+        - ``2`` or ``'error'``: Error state (typically red)
+        - ``3`` or ``'indeterminate'``: Indeterminate / pulsing
+        - ``4`` or ``'paused'``: Paused state (typically yellow)
+        :param int value: Progress value, 0 to 100.  Required when *state*
+            is ``1`` / ``'normal'``; ignored for all other states.
+        :rtype: str
+        :returns: OSC 9;4 escape sequence, or ``''`` when
+            :attr:`does_styling` is ``False``.
+        :raises ValueError: on bad ``state`` identifier or invalid
+            or out of bounds ``value``.
+        """
+        _STATES = {
+            0: 'clear',
+            1: 'normal',
+            2: 'error',
+            3: 'indeterminate',
+            4: 'paused',
+        }
+        _STATE_NAMES = {v: k for k, v in _STATES.items()}
+
+        if isinstance(state, str):
+            state_str = state.lower()
+            if state_str not in _STATE_NAMES:
+                raise ValueError(
+                    f"Invalid state name: {state_str!r}. "
+                    f"Expected one of: {', '.join(_STATE_NAMES)}"
+                )
+            st = _STATE_NAMES[state_str]
+        elif isinstance(state, int) and 0 <= state <= 4:
+            st = state
+        else:
+            raise ValueError(
+                f"state must be 0-4 or a state name string, got {state!r}"
+            )
+
+        if st == 1:
+            if value is None:
+                raise ValueError(
+                    "progress_bar: 'normal' state requires a value (0-100)"
+                )
+            if not isinstance(value, int) or not 0 <= value <= 100:
+                raise ValueError(
+                    f"progress_bar: value must be an integer 0-100, got {value!r}"
+                )
+
+        if not self.does_styling:
+            return ''
+
+        if st == 1:
+            return f'\x1b]9;4;{st};{value}\x07'
+        return f'\x1b]9;4;{st};\x07'
+
     @property
     def stream(self) -> IO[str]:
         """
