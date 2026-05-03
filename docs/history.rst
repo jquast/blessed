@@ -15,6 +15,9 @@ Version History
     return the decoded cursor coordinates.  :ghpull:`369`.
   * improved: :meth:`~.Terminal.inkey` raises :exc:`EOFError` when keyboard fd is at EOF, rather
     than returning an empty :class:`~.Keystroke`.  :ghpull:`371`.
+  * improved: :meth:`~.Terminal.ljust`, :meth:`~.Terminal.rjust`, and :meth:`~.Terminal.center`
+    now measure text containing hyperlinks, Kitty text sizing protocol sequences, and overtyping
+    (backspace/cursor-left with painter's algorithm) introduced in wcwidth 0.7.0.
 
 1.38
 
