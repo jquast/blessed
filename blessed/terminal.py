@@ -3151,7 +3151,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         menu or status bar matching the given value (0-100).
 
         Supported by Windows Terminal.exe, ConEmu, Ghostty, iTerm2 and generally safe to write to
-        any terminal. As an Operating System Command (OSC), unsupporting terminals are expected
+        any terminal. As an Operating System Command (OSC), nonsupporting terminals are expected
         to disregard and emit no output.
 
         :param state: Progress state.  Accepts either an integer or a string name:
