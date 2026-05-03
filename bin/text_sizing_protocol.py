@@ -20,7 +20,8 @@ def _nearest_fraction(numerator, denominator, fractions):
 
 
 def _params_for_target(target):
-    """Return (scale, numerator, denominator) for a target visual size.
+    """
+    Return (scale, numerator, denominator) for a target visual size.
 
     *scale* is ``ceil(target)`` since *n/d* can only reduce font size.
     """

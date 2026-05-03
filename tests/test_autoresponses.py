@@ -530,10 +530,11 @@ def test_text_sized(supported, kwargs, expected, measured):
 
 
 def test_text_sized_ValueError():
+    """text_sized raises ValueError for text exceeding 4096 length limit."""
     @as_subprocess
     def child():
         term = _sizing_term(True)
         with pytest.raises(ValueError):
-            term.text_sized('X'*4097, scale=2)
+            term.text_sized('X' * 4097, scale=2)
 
     child()
