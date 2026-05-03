@@ -3146,13 +3146,10 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         Return OSC 9;4 sequence for terminal progress bar support.
 
-        Support for 'OSC 9;4' cannot be detected. It is generally safe to write it to unsupported
+        Support for 'OSC 9;4' cannot be detected. It is generally safe to write to unsupported
         terminals. Some terminals display a graphical progress indicator in the taskbar and window
-        menu or status bar matching the given value (0-100).
-
-        Supported by Windows Terminal.exe, ConEmu, Ghostty, iTerm2 and generally safe to write to
-        any terminal. As an Operating System Command (OSC), nonsupporting terminals are expected
-        to disregard and emit no output.
+        menu or status bar matching the given value (0-100).  Supported by at least Windows
+        Terminal.exe, ConEmu, Ghostty, kitty, and iTerm2.
 
         :param state: Progress state.  Accepts either an integer or a string name:
 

@@ -120,10 +120,8 @@ progress_bar.py
 ---------------
 https://github.com/jquast/blessed/blob/master/bin/progress_bar.py
 
-This program demonstrates a simple progress bar. All text is written
-to stderr, to avoid the need to "flush" or emit newlines, and makes
-use of the move_x (hpa) capability to "overstrike" the display a
-scrolling progress bar.
+This program demonstrates a simple ascii progress bar along with the ``OSC 9;4`` progress bar
+notification sequence using :meth:`~.Terminal.progress_bar`.
 
 .. _resize.py:
 
@@ -218,3 +216,5 @@ https://github.com/jquast/blessed/blob/master/bin/scroll_region.py
 
 This program demonstrates the :meth:`~.Terminal.scroll_region` context manager to create a
 scrollable area with a fixed header and status bar.
+
+
