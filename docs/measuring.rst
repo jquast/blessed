@@ -61,9 +61,10 @@ visual width:
     2
 
 The length measurements of blessed very accurately matches most popular terminals, but not all. The
-python `wcwidth`_ library provides support of complex emojis, CJK, flags, and complex languages, and
-support for unicode may vary by terminal, as discovered by `the results
-<https://ucs-detect.readthedocs.io/results.html>`_ of the `ucs-detect`_ CLI.
+python `wcwidth <https://wcwidth.readthedocs.io/en/latest/intro.html#discrepancies>`_ library
+provides support of complex emojis, CJK, flags, and complex languages, and support for unicode may
+vary by terminal, as discovered by the `results published by ucs-detect
+<https://ucs-detect.readthedocs.io/results.html>`_.
 
 :meth:`~.Terminal.length` makes a best effort without returning error, even when the cursor position
 is ambiguous, such as text containing ``term.move_x(0)``, or containing vertical movement like
@@ -83,6 +84,7 @@ sequences are ignored. Carriage return, ``'\r'`` is treated like ``term.move_x(0
     3
     >>> print(term.length('abc' + '\n' + 'xyz'))
     6
+
 
 Alignment
 ---------
