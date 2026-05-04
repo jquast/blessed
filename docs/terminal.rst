@@ -125,26 +125,11 @@ it on exit:
 Progress Bar
 ------------
 
-The `ConEmu OSC 9;4 protocol
-<https://ghostty.org/docs/vt/osc/conemu#change-progress-state-(osc-94)>`_ allows applications to
-display a graphical progress indicator in the terminal's taskbar icon or dock tile.  Supported by
-many modern terminals, such as Windows Terminal.exe, ConEmu, ghostty, kitty, and others.  Terminals
-that do not support this sequence silently ignore it.
-
-Use :meth:`~.Terminal.progress_bar` to produce the escape sequence.  The ``state`` parameter accepts
-a string name or protocol integer integer (0 to 4):
-
-========  ==================  ========================================
-``state`` String               Meaning
-========  ==================  ========================================
-0         ``'clear'``          Remove the progress indicator
-1         ``'normal'``         Set progress to a *value* between 0--100
-2         ``'error'``          Error state (typically a red indicator)
-3         ``'indeterminate'``  Indeterminate / pulsing indicator
-4         ``'paused'``         Paused state (typically a yellow indicator)
-========  ==================  ========================================
-
-The *value* parameter is required only for ``'normal'`` state, and ignored for all others:
+Use :meth:`~.Terminal.progress_bar` to produce the `ConEmu OSC 9;4 protocol
+<https://ghostty.org/docs/vt/osc/conemu#change-progress-state-(osc-94)>`_ escape sequence to display
+a graphical progress indicator in the terminal's taskbar and/or status area.  The ``state``
+parameter accepts a 'state' and 'value' argument.  The *value* parameter is required only for
+``'normal'`` state and ignored for all others:
 
 .. code-block:: python
 
@@ -154,10 +139,16 @@ The *value* parameter is required only for ``'normal'`` state, and ignored for a
     # Enter error state
     print(term.progress_bar('error'))
 
+    # Indeterminate
+    print(term.progress_bar('indeterminate'))
+    
+    # Paused
+    print(term.progress_bar('pause'))
+
     # Remove the indicator
     print(term.progress_bar('clear'))
 
-Example program demonstrating both ASCII and OSC 9;4 progress bars together:
+Example program, :ref:`progress_bar.py`:
 
 .. figure:: https://dxtz6bzwq9sxx.cloudfront.net/blessed_progress_bar.gif
 
