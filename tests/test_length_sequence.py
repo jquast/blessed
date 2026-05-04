@@ -611,45 +611,38 @@ def test_progress_bar_nostyling():
     child()
 
 
-def test_progress_bar_invalid_state():
+_missing = object()
+
+
+@pytest.mark.parametrize("state", [5, 'unknown', -1])
+def test_progress_bar_invalid_state(state):
     """Test progress_bar raises ValueError for invalid state."""
     @as_subprocess
-    def child():
+    def child(state=state):
         term = TestTerminal(force_styling=True)
         with pytest.raises(ValueError):
-            term.progress_bar(5)
-        with pytest.raises(ValueError):
-            term.progress_bar('unknown')
-        with pytest.raises(ValueError):
-            term.progress_bar(-1)
+            term.progress_bar(state)
     child()
 
 
-def test_progress_bar_missing_value():
-    """Test progress_bar raises ValueError when value is missing for normal."""
+@pytest.mark.parametrize("state, value", [
+    ('normal', _missing),
+    (1, _missing),
+    ('normal', -1),
+    ('normal', 101),
+    ('normal', 'fifty'),
+    (1, 3.5),
+])
+def test_progress_bar_invalid_value(state, value):
+    """Test progress_bar raises ValueError for invalid or missing value."""
     @as_subprocess
-    def child():
+    def child(state=state, value=value):
         term = TestTerminal(force_styling=True)
         with pytest.raises(ValueError):
-            term.progress_bar('normal')
-        with pytest.raises(ValueError):
-            term.progress_bar(1)
-    child()
-
-
-def test_progress_bar_invalid_value():
-    """Test progress_bar raises ValueError for out-of-range or non-int value."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        with pytest.raises(ValueError):
-            term.progress_bar('normal', -1)
-        with pytest.raises(ValueError):
-            term.progress_bar('normal', 101)
-        with pytest.raises(ValueError):
-            term.progress_bar('normal', 'fifty')
-        with pytest.raises(ValueError):
-            term.progress_bar(1, 3.5)
+            if value is _missing:
+                term.progress_bar(state)
+            else:
+                term.progress_bar(state, value)
     child()
 
 
