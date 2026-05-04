@@ -5,7 +5,7 @@ Version History
 
 1.39
   * introduced: :meth:`~.Terminal.progress_bar`_ for `OSC 9;4 sequence
-    <https://ghostty.org/docs/vt/osc/conemu#change-progress-state-(osc-94)>`.
+    <https://ghostty.org/docs/vt/osc/conemu#change-progress-state-(osc-94)>`_.
   * introduced: :meth:`~.Terminal.text_sized` -- wrap text in Kitty text sizing protocol (OSC 66)
     escape sequences, with graceful fallback to plain text when the terminal does not support
     the protocol.
