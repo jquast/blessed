@@ -8,9 +8,6 @@ unsupported terminals silently ignore them.
 
 Press any key to exit the demo early.
 """
-# std imports
-import time
-
 # local
 from blessed import Terminal
 
@@ -22,6 +19,7 @@ def make_bar(term, state, value=0):
     bar = '[' + '=' * filled + '>' + ' ' * (width - filled - 1) + ']'
     ascii_bar = f'{state.title():>13s}: {bar} {value:3d}%'
     return term.move_x(0) + ascii_bar + term.progress_bar(state, value) + term.clear_eol
+
 
 def dexit(term, delay):
     if term.inkey(delay) == 'q':
@@ -47,7 +45,7 @@ def main():
 
         # Static states
         for state in ('error', 'paused', 'indeterminate'):
-            echo(make_bar(term, state, 100))
+            echo(make_bar(term, state))
             dexit(term, 2)
             echo(make_bar(term, 'clear'))
 

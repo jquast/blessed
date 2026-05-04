@@ -3158,13 +3158,11 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         - ``2`` or ``'error'``: Error state (typically red)
         - ``3`` or ``'indeterminate'``: Indeterminate / pulsing
         - ``4`` or ``'paused'``: Paused state (typically yellow)
-        :param int value: Progress value, 0 to 100.  Required when *state*
-            is ``1`` / ``'normal'``; ignored for all other states.
+        :param int value: Progress value as integer of percent (0 to 100).  Required when state is
+            ``'normal'`` or ``1``.  Terminals are expected to ignore 'value' for all other states.
         :rtype: str
-        :returns: OSC 9;4 escape sequence, or ``''`` when
-            :attr:`does_styling` is ``False``.
-        :raises ValueError: on bad ``state`` identifier or invalid
-            or out of bounds ``value``.
+        :returns: OSC 9;4 escape sequence, or ``''`` when :attr:`does_styling` is ``False``.
+        :raises ValueError: on bad ``state`` identifier or invalid or out of bounds ``value``.
         """
         _STATES = {
             0: 'clear',
