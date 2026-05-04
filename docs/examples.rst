@@ -219,16 +219,23 @@ https://github.com/jquast/blessed/blob/master/bin/scroll_region.py
 This program demonstrates the :meth:`~.Terminal.scroll_region` context manager to create a
 scrollable area with a fixed header and status bar.
 
+.. _text_sizing_protocol.py:
+
 text_sizing_protocol.py
 -----------------------
+
+https://github.com/jquast/blessed/blob/master/bin/text_sizing_protocol.py
 
 This program demonstrates the various uses of :meth:`~.Terminal.text_sized`, the ``OSC 66``
 `kitty text sizing protocol <https://sw.kovidgoyal.net/kitty/text-sizing-protocol/>`_.
 
 .. figure:: https://dxtz6bzwq9sxx.cloudfront.net/blessed_text_sizing_demo.png
 
+.. _scroller.py:
+
 scroller.py
------------------------
+-----------
+https://github.com/jquast/blessed/blob/master/bin/scroller.py
 
 .. figure:: https://dxtz6bzwq9sxx.cloudfront.net/blessed_text_sizing.gif
 

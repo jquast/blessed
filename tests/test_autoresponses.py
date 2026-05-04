@@ -5,6 +5,11 @@ import io
 # 3rd party
 import pytest
 
+try:
+    from unittest import mock
+except ImportError:
+    import mock
+
 # local
 from blessed._capabilities import ITerm2Capabilities, TextSizingResult
 from .conftest import IS_WINDOWS
@@ -492,6 +497,44 @@ def test_does_text_sizing_scale_location_timeout():
     output = pty_test(child, parent_func=None,
                       test_name='test_does_text_sizing_scale_location_timeout')
     assert 'OK' in output
+
+
+def test_does_text_sizing_cleanup_side_effect():
+    """does_text_sizing writes cleanup (backspace+space+backspace) to erase probes."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        with mock.patch.object(term, 'get_location', side_effect=[
+            (5, 10),  # initial: col0=10
+            (5, 12),  # after width probe: col1=12
+            (5, 14),  # after scale probe: col2=14
+        ]):
+            result = term.does_text_sizing(timeout=0.1)
+        assert result == TextSizingResult(width=True, scale=True)
+        output = stream.getvalue()
+        # cleanup: _movement=4 backspaces, 4 spaces, 4 backspaces
+        assert '\b' * 4 + ' ' * 4 + '\b' * 4 in output
+
+    child()
+
+
+def test_does_text_sizing_no_cleanup_when_cached():
+    """does_text_sizing does not write probes/cleanup when cached result exists."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._text_sizing_cache = TextSizingResult(width=True, scale=True)
+        stream.truncate(0)
+        stream.seek(0)
+        result = term.does_text_sizing()
+        assert result == TextSizingResult(width=True, scale=True)
+        assert stream.getvalue() == ''
+
+    child()
 
 
 def _sizing_term(supported):
