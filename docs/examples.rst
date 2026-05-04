@@ -241,4 +241,3 @@ https://github.com/jquast/blessed/blob/master/bin/scroller.py
 
 A classic sine-wave "demoscene" text scroller effect that uses :meth:`~.Terminal.text_sized`, the
 ``OSC 66`` `kitty text sizing protocol <https://sw.kovidgoyal.net/kitty/text-sizing-protocol/>`_.
->>>>>>> origin/master
