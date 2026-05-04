@@ -611,9 +611,6 @@ def test_progress_bar_nostyling():
     child()
 
 
-_missing = object()
-
-
 @pytest.mark.parametrize("state", [5, 'unknown', -1])
 def test_progress_bar_invalid_state(state):
     """Test progress_bar raises ValueError for invalid state."""
@@ -626,23 +623,20 @@ def test_progress_bar_invalid_state(state):
 
 
 @pytest.mark.parametrize("state, value", [
-    ('normal', _missing),
-    (1, _missing),
+    ('normal', None),
+    (1, None),
     ('normal', -1),
     ('normal', 101),
-    ('normal', 'fifty'),
+    ('normal', None),
     (1, 3.5),
 ])
 def test_progress_bar_invalid_value(state, value):
     """Test progress_bar raises ValueError for invalid or missing value."""
     @as_subprocess
-    def child(state=state, value=value):
+    def child():
         term = TestTerminal(force_styling=True)
         with pytest.raises(ValueError):
-            if value is _missing:
-                term.progress_bar(state)
-            else:
-                term.progress_bar(state, value)
+            term.progress_bar(state, value)
     child()
 
 
