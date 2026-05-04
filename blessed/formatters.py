@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 # std imports
-import platform
 from typing import TYPE_CHECKING, Set, Dict, List, Tuple, Union, Callable, Optional
 
 # local
@@ -13,11 +12,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from blessed.terminal import Terminal
 
 # isort: off
-# curses
-if platform.system() == 'Windows':
-    import jinxed as curses
-else:
-    import curses
+import jinxed as curses
 
 
 def _make_colors() -> Set[str]:

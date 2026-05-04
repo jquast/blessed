@@ -17,12 +17,7 @@ except ImportError:
     # 3rd party
     import mock
 
-if platform.system() != 'Windows':
-    # std imports
-    import curses
-else:
-    # 3rd party
-    import jinxed as curses
+import jinxed as curses
 
 
 def fn_tparm(*args):

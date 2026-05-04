@@ -16,11 +16,7 @@ from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, as_subprocess
 
 # isort: off
-if platform.system() != 'Windows':
-    import tty  # pylint: disable=unused-import  # NOQA
-    import curses
-else:
-    import jinxed as curses
+import jinxed as curses
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")

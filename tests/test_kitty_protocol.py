@@ -18,11 +18,7 @@ from tests.accessories import (as_subprocess, SEMAPHORE, TestTerminal,
 from tests.conftest import IS_WINDOWS, TEST_KEYBOARD
 
 # isort: off
-# curses
-if platform.system() == 'Windows':
-    from jinxed import KEY_EXIT, KEY_ENTER, KEY_BACKSPACE
-else:
-    from curses import KEY_EXIT, KEY_ENTER, KEY_BACKSPACE
+from jinxed import KEY_EXIT, KEY_ENTER, KEY_BACKSPACE
 
 # Skip PTY tests on Windows and build farms
 pytestmark = pytest.mark.skipif(
@@ -111,7 +107,7 @@ def test_terminal_inkey_kitty_protocol():
     @as_subprocess
     def child():
         stream = io.StringIO()
-        term = Terminal(stream=stream, force_styling=True)
+        term = TestTerminal(stream=stream, force_styling=True)
 
         term.ungetch('\x1b[97;5u')
         ks = term.inkey(timeout=0)
@@ -407,7 +403,7 @@ def test_get_kitty_keyboard_state_no_tty_or_disabled(force_styling, expected_sti
     @as_subprocess
     def child():
         stream = io.StringIO()
-        term = Terminal(stream=stream, force_styling=force_styling)
+        term = TestTerminal(stream=stream, force_styling=force_styling)
 
         # Should return None immediately without attempting query
         result = term.get_kitty_keyboard_state(timeout=0.01)
@@ -446,7 +442,7 @@ def test_enable_kitty_keyboard(force_styling, force, flags, mode, expected_outpu
     @as_subprocess
     def child():
         stream = io.StringIO()
-        term = Terminal(stream=stream, force_styling=force_styling)
+        term = TestTerminal(stream=stream, force_styling=force_styling)
 
         with term.enable_kitty_keyboard(**flags, mode=mode, force=force, timeout=0.01):
             pass
@@ -578,7 +574,7 @@ def test_get_kitty_keyboard_state_boundary_approach():
         stream = io.StringIO()
 
         # Test 1: Kitty response found via CPR boundary
-        term = Terminal(stream=stream, force_styling=True)
+        term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
         term.ungetch('\x1b[?9u\x1b[10;20R')
         flags = term.get_kitty_keyboard_state(timeout=0.01)
@@ -587,7 +583,7 @@ def test_get_kitty_keyboard_state_boundary_approach():
         assert term._kitty_kb_first_query_failed is False
 
         # Test 2: Timeout with no response sets sticky failure
-        term = Terminal(stream=stream, force_styling=True)
+        term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
         flags = term.get_kitty_keyboard_state(timeout=0.001)
         assert flags is None
@@ -596,7 +592,7 @@ def test_get_kitty_keyboard_state_boundary_approach():
         assert flags2 is None
 
         # Test 3: CPR boundary fast negative (only CPR responds)
-        term = Terminal(stream=stream, force_styling=True)
+        term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
         term.ungetch('\x1b[10;20R')
         flags = term.get_kitty_keyboard_state(timeout=0.5)
@@ -604,7 +600,7 @@ def test_get_kitty_keyboard_state_boundary_approach():
         assert term._kitty_kb_first_query_failed is True
 
         # Test 4: Subsequent call after success
-        term = Terminal(stream=stream, force_styling=True)
+        term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
         term.ungetch('\x1b[?15u\x1b[10;20R')
         flags1 = term.get_kitty_keyboard_state(timeout=0.01)
@@ -616,7 +612,7 @@ def test_get_kitty_keyboard_state_boundary_approach():
         assert flags2.value == 7
 
         # Test 5: force=True bypasses sticky failure
-        term = Terminal(stream=stream, force_styling=True)
+        term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
         term.ungetch('\x1b[?13u\x1b[10;20R')
         flags = term.get_kitty_keyboard_state(timeout=0.01, force=True)
@@ -738,7 +734,7 @@ def test_kitty_letter_name_synthesis_integration(sequence, expected_name):
     """Test letter name synthesis with Terminal.inkey()."""
     @as_subprocess
     def child():
-        term = Terminal(force_styling=True)
+        term = TestTerminal(force_styling=True)
         term.ungetch(sequence)
         ks = term.inkey(timeout=0)
         assert ks == sequence
@@ -756,7 +752,7 @@ def test_disambiguate_f1_f4_csi_sequences(sequence, expected_name):
     """Test F1-F4 recognition in disambiguate mode."""
     @as_subprocess
     def child():
-        term = Terminal(force_styling=True)
+        term = TestTerminal(force_styling=True)
         mapper = term._keymap
         codes = term._keycodes
         prefixes = set()
@@ -779,7 +775,7 @@ def test_disambiguate_f1_f4_via_inkey(sequence, expected_name):
     """Test F1-F4 disambiguate sequences with Terminal.inkey()."""
     @as_subprocess
     def child():
-        term = Terminal(stream=io.StringIO(), force_styling=True)
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term.ungetch(sequence)
         ks = term.inkey(timeout=0)
         assert ks == sequence
@@ -792,7 +788,7 @@ def test_disambiguate_f1_f4_not_confused_with_alt():
     """Test F1-F4 not confused with ALT+[ sequences."""
     @as_subprocess
     def child():
-        term = Terminal(stream=io.StringIO(), force_styling=True)
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
 
         # F1 should be \x1b[P, not confused with ALT+[ followed by P
         term.ungetch('\x1b[P')
@@ -1098,7 +1094,7 @@ def test_kitty_keypad_inkey_integration(
     """Test keypad integration with Terminal.inkey()."""
     @as_subprocess
     def child():
-        term = Terminal(stream=io.StringIO(), force_styling=True)
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term.ungetch(sequence)
         ks = term.inkey(timeout=0)
         if not released and not repeated:
@@ -1380,7 +1376,7 @@ def test_kitty_escape_key_integration(
     """Test ESC key sequences via Terminal.inkey() integration."""
     @as_subprocess
     def child():
-        term = Terminal(stream=io.StringIO(), force_styling=True)
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term.ungetch(sequence)
         ks = term.inkey(timeout=0)
         assert ks == sequence
@@ -1407,7 +1403,7 @@ def test_kitty_control_key_integration(sequence, expected_name, expected_code, e
     """Test control key integration with Terminal.inkey()."""
     @as_subprocess
     def child():
-        term = Terminal(stream=io.StringIO(), force_styling=True)
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term.ungetch(sequence)
         ks = term.inkey(timeout=0)
         assert ks.name == expected_name

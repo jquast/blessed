@@ -233,7 +233,7 @@ def test_force_styling_True_but_NO_COLOR():
 
 
 def test_setupterm_singleton_issue_33():
-    """A warning is emitted if a new terminal ``kind`` is used per process."""
+    """Multiple Terminal instances with different kinds are supported."""
     @as_subprocess
     def child():
         warnings.filterwarnings("error", category=UserWarning)
@@ -243,64 +243,36 @@ def test_setupterm_singleton_issue_33():
         first_kind = term.kind
         next_kind = 'xterm'
 
-        try:
-            # a second instantiation raises UserWarning
-            term = TestTerminal(kind=next_kind, force_styling=True)
-        except UserWarning as err:
-            assert (err.args[0].startswith(
-                f'A terminal of kind "{next_kind}" has been requested')
-            ), err.args[0]
-            assert (
-                f'a terminal of kind "{first_kind}" will continue to be returned' in err.args[0]
-            ), err.args[0]
-        else:
-            # unless term is not a tty and setupterm() is not called
-            assert not term.is_a_tty, 'Should have thrown exception'
-        warnings.resetwarnings()
+        # a second instantiation with a different kind no longer
+        # raises UserWarning (jinxed allows multiple setupterm calls,
+        # unlike the old curses.setupterm limitation).
+        term = TestTerminal(kind=next_kind, force_styling=True)
+        assert term.kind == next_kind
 
     child()
 
 
 def test_setupterm_invalid_issue39():
-    """A warning is emitted if TERM is invalid."""
-    # https://bugzilla.mozilla.org/show_bug.cgi?id=878089
-    #
-    # if TERM is unset, defaults to 'unknown', which should
-    # fail to lookup and emit a warning on *some* systems.
-    # freebsd actually has a termcap entry for 'unknown'
+    """Unknown TERM falls back to kind_fallback silently."""
     @as_subprocess
     def child():
         warnings.filterwarnings("error", category=UserWarning)
-
-        try:
-            term = TestTerminal(kind='unknown', force_styling=True)
-        except UserWarning as err:
-            assert err.args[0] in {
-                "Failed to setupterm(kind='unknown'): "
-                "setupterm: could not find terminal",
-                "Failed to setupterm(kind='unknown'): "
-                "Could not find terminal unknown",
-            }
-        else:
-            if platform.system().lower() != 'freebsd':
-                assert not term.is_a_tty and not term.does_styling, (
-                    'Should have thrown exception')
-        warnings.resetwarnings()
+        # Unknown terminal kind gracefully falls back to kind_fallback.
+        term = TestTerminal(kind='unknown', force_styling=True)
+        assert term.does_styling
 
     child()
 
 
 def test_setupterm_invalid_has_no_styling():
-    """An unknown TERM type does not perform styling."""
-    # https://bugzilla.mozilla.org/show_bug.cgi?id=878089
-
-    # if TERM is unset, defaults to 'unknown', which should
-    # fail to lookup and emit a warning, only.
+    """An unknown TERM with bad fallback disables styling."""
     @as_subprocess
     def child():
         warnings.filterwarnings("ignore", category=UserWarning)
 
-        term = TestTerminal(kind='xxXunknownXxx', force_styling=True)
+        term = TestTerminal(
+            kind='xxXunknownXxx', force_styling=True,
+            kind_fallback='xxXbadXxx')
         assert term.kind is None
         assert not term.does_styling
         assert term.number_of_colors == 0
@@ -536,7 +508,7 @@ def test_termcap_repr():
     def child():
         # local
         import blessed
-        term = blessed.Terminal(given_ttype)
+        term = blessed.Terminal(given_ttype, use_xtgettcap=False)
         given = repr(term.caps[given_capname])
         assert given in expected
 

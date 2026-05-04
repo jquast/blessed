@@ -177,6 +177,7 @@ CAPABILITIES_CAUSE_MOVEMENT: typing.Tuple[str, ...] = tuple(CAPABILITIES_HORIZON
     'scroll_forward',
 )
 
+# NOTE: Keep synchronized with XTGETTCAP_CAPABILITIES in _xtgettcap_lite.py.
 XTGETTCAP_CAPABILITIES = (
     # xterm extensions
     ("TN", "Terminal name"),

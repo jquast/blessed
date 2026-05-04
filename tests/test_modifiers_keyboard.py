@@ -9,11 +9,7 @@ from .accessories import (TestTerminal, as_subprocess, assert_modifiers,
 from blessed.keyboard import Keystroke, LegacyCSIKeyEvent, ModifyOtherKeysEvent, resolve_sequence
 
 
-if platform.system() != 'Windows':
-    import tty  # pylint: disable=unused-import  # NOQA
-    import curses
-else:
-    import jinxed as curses
+import jinxed as curses
 
 
 def assert_ctrl_alt_modifiers(ks):

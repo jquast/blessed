@@ -512,7 +512,7 @@ def test_padd():
         # local
         from blessed import Terminal
         from blessed.sequences import Sequence
-        term = Terminal(kind)
+        term = TestTerminal(kind=kind)
         assert Sequence('xyz\b', term).padd() == 'xy'
         assert Sequence('xyz\b-', term).padd() == 'xy-'
         assert Sequence('xxxx\x1b[3Dzz', term).padd() == 'xzz'
@@ -528,7 +528,7 @@ def test_split_seqs(all_terms):
     def child(kind):
         # local
         from blessed import Terminal
-        term = Terminal(kind)
+        term = TestTerminal(kind=kind)
 
         if term.sc and term.rc:
             given_text = f'{term.sc}AB{term.rc}CD'
@@ -545,7 +545,7 @@ def test_split_seqs_maxsplit1(all_terms):
     def child(kind):
         # local
         from blessed import Terminal
-        term = Terminal(kind)
+        term = TestTerminal(kind=kind)
 
         if term.bold:
             given_text = f'{term.bold}bbq'
@@ -565,7 +565,7 @@ def test_split_seqs_term_right(all_terms):
     def child(kind):
         # local
         from blessed import Terminal
-        term = Terminal(kind)
+        term = TestTerminal(kind=kind)
 
         if term.move_up:
             given_text = f'XY{term.move_right}VK'
@@ -582,7 +582,7 @@ def test_split_seqs_maxsplit3_and_term_right(all_terms):
     def child(kind):
         # local
         from blessed import Terminal
-        term = Terminal(kind)
+        term = TestTerminal(kind=kind)
 
         if term.move_right(32):
             given_text = f'PQ{term.move_right(32)}RS'
@@ -668,7 +668,7 @@ def test_truncate(all_terms):
     def child(kind):
         # local
         from blessed import Terminal
-        term = Terminal(kind)
+        term = TestTerminal(kind=kind)
 
         test_string = (
             f'{term.red("Testing")} {term.yellow("makes")} {term.green("me")} '
@@ -694,7 +694,7 @@ def test_truncate_wide_end(all_terms):
     def child(kind):
         # local
         from blessed import Terminal
-        term = Terminal(kind)
+        term = TestTerminal(kind=kind)
         # ABＣ where Ｃ is width 2 - truncating to 3 fills with space
         test_string = "AB\uff23"
         assert term.truncate(test_string, 3) == "AB "
@@ -709,7 +709,7 @@ def test_truncate_wcwidth_clipping(all_terms):
     def child(kind):
         # local
         from blessed import Terminal
-        term = Terminal(kind)
+        term = TestTerminal(kind=kind)
         assert term.truncate("", 4) == ""
         # Control character \x01 has zero width
         test_string = term.blue("one\x01two")
@@ -726,7 +726,7 @@ def test_truncate_padding(all_terms):
     def child(kind):
         # local
         from blessed import Terminal
-        term = Terminal(kind)
+        term = TestTerminal(kind=kind)
 
         if term.move_right(5):
             test_right_string = term.blue(f"one{term.move_right(5)}two")
@@ -768,7 +768,7 @@ def test_truncate_zwj_emoji(all_terms):
     def child(kind):
         # local
         from blessed import Terminal
-        term = Terminal(kind)
+        term = TestTerminal(kind=kind)
 
         # Family emoji: 👨 + ZWJ + 👩 + ZWJ + 👧 (wcswidth=2)
         given_zwj = '\U0001F468\u200D\U0001F469\u200D\U0001F467'
@@ -792,7 +792,7 @@ def test_truncate_vs16_emoji(all_terms):
     def child(kind):
         # local
         from blessed import Terminal
-        term = Terminal(kind)
+        term = TestTerminal(kind=kind)
 
         # Heart ❤ (U+2764) + VS-16 has width 2; truncating to 1 fills with space
         # since the grapheme cluster cannot be split
@@ -821,7 +821,7 @@ def test_supports_index(all_terms):
             def __index__(self):
                 return 100
 
-        term = Terminal(kind)
+        term = TestTerminal(kind=kind)
         seq = Sequence('abcd', term)
         indexable = Indexable()
 

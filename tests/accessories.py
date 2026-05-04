@@ -22,8 +22,8 @@ if IS_WINDOWS:
 else:
     # std imports
     import pty
-    import curses
     import termios
+    import jinxed as curses
 
 MAX_SUBPROC_TIME_SECONDS = 2  # no test should ever take over 2 seconds
 # extra time given for timeout-related tests for CI/slow machines, by percent
@@ -36,8 +36,11 @@ def TestTerminal(is_a_tty=None, **kwargs):  # type: (...) -> Terminal
     """
     Create a Terminal instance with optional is_a_tty override.
 
-    'is_a_tty' is useful to pass "is a tty" tests without pty_test
+    'is_a_tty' is useful to pass "is a tty" tests without pty_test.
+    XTGETTCAP is disabled by default in tests since no real terminal
+    emulator is available to answer queries.
     """
+    kwargs.setdefault('use_xtgettcap', False)
     if 'kind' not in kwargs:
         kwargs['kind'] = test_kind
     term = Terminal(**kwargs)

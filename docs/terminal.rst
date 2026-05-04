@@ -14,6 +14,31 @@ setup:
 This is the only object, named ``term`` here, that you should need from blessed, for all of the
 remaining examples in our documentation.
 
+Capability Resolution
+---------------------
+
+By default, blessed resolves terminal capabilities in this order:
+
+1. **XTGETTCAP** — queries the terminal's built-in terminfo via ``DCS +q`` escape sequences.
+   This is always the most accurate and up-to-date source.  Controlled by the
+   :paramref:`~.Terminal.use_xtgettcap` parameter (default ``True``).
+
+2. **Virtual terminfo database** — uses the bundled `jinxed`_ library, which ships with
+   capability data for common terminals (xterm, linux, screen, tmux, vt220, etc.).
+   No system curses import required.  The :paramref:`~.Terminal.kind_fallback` parameter
+   (default ``'xterm-256color'``) is used when the requested terminal kind is unknown.
+
+3. **System curses** — only if :paramref:`~.Terminal.use_curses` is explicitly set to
+   ``True`` and both XTGETTCAP and the virtual database fail.  By default, blessed
+   operates entirely without importing the curses module.
+
+Because blessed uses jinxed rather than the system curses library, it is not subject
+to the per-process terminal-kind restriction that curses imposes.  Multiple
+:class:`~.Terminal` instances with different ``kind`` values can coexist within the
+same process — each initializes independently.
+
+.. _jinxed: https://pypi.org/project/jinxed
+
 You can proceed to ask it all sorts of things about the terminal, such as its size:
 
     >>> term.height, term.width

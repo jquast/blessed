@@ -9,13 +9,14 @@ import base64
 import codecs
 import locale
 import select
+import signal
 import struct
 import asyncio
 import platform
 import warnings
 import contextlib
 import collections
-from typing import IO, Dict, List, Match, Tuple, Union, Optional, Generator, SupportsIndex
+from typing import IO, Dict, List, Match, Set, Tuple, Union, Optional, Generator, SupportsIndex
 
 # 3rd party
 from wcwidth import TextSizing, TextSizingParams
@@ -66,14 +67,11 @@ from ._capabilities import (CAPABILITY_DATABASE,
 # isort: off
 
 HAS_TTY = True  # pylint: disable=invalid-name
-if platform.system() == 'Windows':
-    IS_WINDOWS = True
-    import jinxed as curses
+IS_WINDOWS = platform.system() == 'Windows'
+import jinxed as curses
+if IS_WINDOWS:
     from jinxed.win32 import get_console_input_encoding
 else:
-    IS_WINDOWS = False
-    import curses
-
     try:
         import fcntl
         import termios
@@ -185,7 +183,10 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     def __init__(self,
                  kind: Optional[str] = None,
                  stream: Optional[IO[str]] = None,
-                 force_styling: Union[bool, None] = False) -> None:
+                 force_styling: Union[bool, None] = False,
+                 use_xtgettcap: bool = True,
+                 use_curses: bool = False,
+                 kind_fallback: str = 'xterm-256color') -> None:
         """
         Initialize the terminal.
 
@@ -224,16 +225,39 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             .. _FORCE_COLOR: https://force-color.org/
             .. _CLICOLOR_FORCE: https://bixense.com/clicolors/
             .. _NO_COLOR: https://no-color.org/
+
+        :arg bool use_xtgettcap: Whether to query terminal capabilities via
+            XTGETTCAP (DCS +q) at initialization.  When True (default),
+            blessed sprays all capabilities it needs and uses the terminal's
+            built-in terminfo responses, bypassing the local database.  Set
+            to False to skip XTGETTCAP queries entirely.
+
+        :arg bool use_curses: Whether to fall back to the system curses
+            library if XTGETTCAP and the built-in virtual terminfo database
+            both fail.  Default ``False``; blessed operates without importing
+            the curses module unless this is explicitly set to ``True``.
+
+        :arg str kind_fallback: Terminal kind to use as fallback when the
+            requested ``kind`` is not found in the virtual terminfo database.
+            Default ``'xterm-256color'``.  Used only when ``use_curses`` is
+            ``False`` or the curses fallback also fails.
         """
         # pylint: disable=global-statement
         global _CUR_TERM
         self.errors = [
-            f'parameters: kind={kind!r}, stream={stream!r}, force_styling={force_styling!r}',
+            f'parameters: kind={kind!r}, stream={stream!r}, force_styling={force_styling!r}, '
+            f'use_xtgettcap={use_xtgettcap!r}, use_curses={use_curses!r}',
         ]
         self._normal = None  # cache normal attr, preventing recursive lookups
         # we assume our input stream to be line-buffered until either the
         # cbreak of raw context manager methods are entered with an attached tty.
         self._line_buffered = True
+        self._use_xtgettcap = use_xtgettcap
+        self._use_curses = use_curses
+        self._kind_fallback = kind_fallback
+
+        # Shorter timeout for init-time XTGETTCAP probe
+        self._init_xtgettcap_timeout: float = 0.75
 
         self._stream = stream
         self._keyboard_fd = None
@@ -249,35 +273,52 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         self.__init_set_styling(force_styling)
         if self.does_styling:
-            # Initialize curses (call setupterm), so things like tigetstr() work.
+            # Step 1: Try XTGETTCAP first via lightweight query that does
+            # not require curses or jinxed initialization.
+            xtgettcap_data = None
+            if self._use_xtgettcap and self.is_a_tty:
+                xtgettcap_data = self._try_lightweight_xtgettcap()
+                if xtgettcap_data is not None:
+                    # Use XTGETTCAP TN capability as terminal kind if available
+                    tn_kind = xtgettcap_data.terminal_name
+                    if tn_kind:
+                        self._kind = tn_kind
+
+            # Step 2: Initialize jinxed virtual terminfo database.
+            # Try the requested kind first; if not in the virtual DB,
+            # fall back to kind_fallback.
             try:
                 curses.setupterm(self._kind, self._init_descriptor)
-            except curses.error as err:
-                msg = f'Failed to setupterm(kind={self._kind!r}): {err}'
-                warnings.warn(msg)
-                self.errors.append(msg)
-                self._kind = None
-                self._does_styling = False
-            else:
-                if _CUR_TERM is None or self._kind == _CUR_TERM:
-                    _CUR_TERM = self._kind
+            except curses.error:
+                try:
+                    curses.setupterm(
+                        self._kind_fallback, self._init_descriptor)
+                except curses.error as err:
+                    msg = (
+                        f'Failed to setupterm(kind={self._kind!r}'
+                        f' or {self._kind_fallback!r}): {err}')
+                    warnings.warn(msg)
+                    self.errors.append(msg)
+                    self._kind = None
+                    self._does_styling = False
                 else:
-                    # termcap 'kind' is immutable in a python process! Once
-                    # initialized by setupterm, it is unsupported by the
-                    # 'curses' module to change the terminal type again. If you
-                    # are a downstream developer and you need this
-                    # functionality, consider sub-processing, instead.
-                    warnings.warn(
-                        f'A terminal of kind "{kind}" has been requested; due to an'
-                        ' internal python curses bug, terminal capabilities'
-                        f' for a terminal of kind "{_CUR_TERM}" will continue to be'
-                        ' returned for the remainder of this process.'
-                    )
+                    if _CUR_TERM is None:
+                        _CUR_TERM = self._kind_fallback
+            else:
+                if _CUR_TERM is None:
+                    _CUR_TERM = self._kind
 
-        self.__init__color_capabilities()
-        self.__init__capabilities()
+            # Step 3: Inject XTGETTCAP overrides into jinxed
+            if xtgettcap_data is not None:
+                self._inject_xtgettcap_response(xtgettcap_data)
+
+        # Step 4: Initialize keyboard infrastructure
         self.__init__keycodes()
         self.__init__dec_private_modes()
+
+        # Step 5: Finalize capabilities using best available data
+        self.__init__color_capabilities()
+        self.__init__capabilities()
 
         self.__init__query_caches()
 
@@ -1572,6 +1613,76 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         response = self.get_dec_mode(_DecPrivateMode.FOCUS_IN_OUT_EVENTS, timeout=timeout)
         return response.supported
 
+    @staticmethod
+    def _inject_termcap_response(tc: TermcapResponse) -> None:
+        """Convert a TermcapResponse into jinxed XTGETTCAP injection."""
+        from jinxed.terminfo import BOOL_CAPS, NUM_CAPS
+
+        str_caps: Dict[str, str] = {}
+        num_caps: Dict[str, int] = {}
+        bool_caps: Set[str] = set()
+
+        for capname, value in tc.capabilities.items():
+            if not value:
+                # Empty value: boolean capability (present = true)
+                if capname in BOOL_CAPS:
+                    bool_caps.add(capname)
+                continue
+            if capname in NUM_CAPS:
+                try:
+                    num_caps[capname] = int(value)
+                except ValueError:
+                    pass
+                continue
+            # Otherwise treat as string capability
+            str_caps[capname] = value
+
+        curses.inject_xtgettcap(
+            str_caps=str_caps,
+            num_caps=num_caps,
+            bool_caps=bool_caps)
+
+    def _try_lightweight_xtgettcap(self) -> Optional['XtgettcapResponse']:
+        """Query terminal via lightweight XTGETTCAP (no curses required)."""
+        try:
+            from blessed._xtgettcap_lite import (
+                query_xtgettcap,
+                XtgettcapResponse,
+            )
+            fd = self._init_descriptor
+            if fd is None:
+                return None
+            return query_xtgettcap(fd, timeout=self._init_xtgettcap_timeout)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _inject_xtgettcap_response(tc: 'XtgettcapResponse') -> None:
+        """Inject lightweight XTGETTCAP results into jinxed."""
+        from jinxed.terminfo import BOOL_CAPS, NUM_CAPS
+
+        str_caps: Dict[str, str] = {}
+        num_caps: Dict[str, int] = {}
+        bool_caps: Set[str] = set()
+
+        for capname, value in tc.capabilities.items():
+            if not value:
+                if capname in BOOL_CAPS:
+                    bool_caps.add(capname)
+                continue
+            if capname in NUM_CAPS:
+                try:
+                    num_caps[capname] = int(value)
+                except ValueError:
+                    pass
+                continue
+            str_caps[capname] = value
+
+        curses.inject_xtgettcap(
+            str_caps=str_caps,
+            num_caps=num_caps,
+            bool_caps=bool_caps)
+
     def get_xtgettcap(self, timeout: Optional[float] = 1,
                       force: bool = False) -> Optional[TermcapResponse]:
         """
@@ -1613,8 +1724,14 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         if match is None:
             self._xtgettcap_first_query_failed = True
-            # Erase any visible garbage from unsupported terminals
-            self.stream.write(f'\r{self.clear_eol}')
+            # Erase any visible garbage from unsupported terminals.
+            # Before setupterm, capabilities are unavailable; use a
+            # hardcoded escape sequence.
+            try:
+                clear_eol = self.clear_eol
+            except curses.error:
+                clear_eol = '\x1b[K'
+            self.stream.write(f'\r{clear_eol}')
             self.stream.flush()
             return None
 
@@ -3647,22 +3764,28 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             see http://www.unixwiz.net/techtips/termios-vmin-vtime.html
         """
         if HAS_TTY and self._keyboard_fd is not None:
-            # Save current terminal mode:
-            save_mode = termios.tcgetattr(self._keyboard_fd)
-            save_line_buffered = self._line_buffered
-            # pylint: disable-next=possibly-used-before-assignment
-            tty.setcbreak(self._keyboard_fd, termios.TCSANOW)
+            # Temporarily ignore SIGTTOU: when running in a background
+            # process group, tcsetattr() would otherwise stop the process.
+            old_sigttou = signal.signal(signal.SIGTTOU, signal.SIG_IGN)
             try:
-                self._line_buffered = False
-                yield
+                # Save current terminal mode:
+                save_mode = termios.tcgetattr(self._keyboard_fd)
+                save_line_buffered = self._line_buffered
+                # pylint: disable-next=possibly-used-before-assignment
+                tty.setcbreak(self._keyboard_fd, termios.TCSANOW)
+                try:
+                    self._line_buffered = False
+                    yield
+                finally:
+                    # Restore prior mode.  TCSADRAIN (not TCSAFLUSH) so that
+                    # keystrokes buffered during the mode switch are preserved;
+                    # TCSAFLUSH discards unread input, dropping user keystrokes.
+                    termios.tcsetattr(self._keyboard_fd,
+                                      termios.TCSADRAIN,
+                                      save_mode)
+                    self._line_buffered = save_line_buffered
             finally:
-                # Restore prior mode.  TCSADRAIN (not TCSAFLUSH) so that
-                # keystrokes buffered during the mode switch are preserved;
-                # TCSAFLUSH discards unread input, dropping user keystrokes.
-                termios.tcsetattr(self._keyboard_fd,
-                                  termios.TCSADRAIN,
-                                  save_mode)
-                self._line_buffered = save_line_buffered
+                signal.signal(signal.SIGTTOU, old_sigttou)
         else:
             yield
 
@@ -3687,21 +3810,27 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 print("printing in raw mode", end="\r\n")
         """
         if HAS_TTY and self._keyboard_fd is not None:
-            # Save current terminal mode:
-            save_mode = termios.tcgetattr(self._keyboard_fd)
-            save_line_buffered = self._line_buffered
-            tty.setraw(self._keyboard_fd, termios.TCSANOW)
+            # Temporarily ignore SIGTTOU: when running in a background
+            # process group, tcsetattr() would otherwise stop the process.
+            old_sigttou = signal.signal(signal.SIGTTOU, signal.SIG_IGN)
             try:
-                self._line_buffered = False
-                yield
+                # Save current terminal mode:
+                save_mode = termios.tcgetattr(self._keyboard_fd)
+                save_line_buffered = self._line_buffered
+                tty.setraw(self._keyboard_fd, termios.TCSANOW)
+                try:
+                    self._line_buffered = False
+                    yield
+                finally:
+                    # Restore prior mode.  TCSADRAIN (not TCSAFLUSH) so that
+                    # keystrokes buffered during the mode switch are preserved;
+                    # TCSAFLUSH discards unread input, dropping user keystrokes.
+                    termios.tcsetattr(self._keyboard_fd,
+                                      termios.TCSADRAIN,
+                                      save_mode)
+                    self._line_buffered = save_line_buffered
             finally:
-                # Restore prior mode.  TCSADRAIN (not TCSAFLUSH) so that
-                # keystrokes buffered during the mode switch are preserved;
-                # TCSAFLUSH discards unread input, dropping user keystrokes.
-                termios.tcsetattr(self._keyboard_fd,
-                                  termios.TCSADRAIN,
-                                  save_mode)
-                self._line_buffered = save_line_buffered
+                signal.signal(signal.SIGTTOU, old_sigttou)
         else:
             yield
 

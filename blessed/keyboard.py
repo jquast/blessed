@@ -5,7 +5,6 @@ import os
 import re
 import time
 import typing
-import platform
 import functools
 from typing import TYPE_CHECKING, Set, Dict, Match, Tuple, TypeVar, Optional
 from collections import OrderedDict, namedtuple
@@ -27,12 +26,8 @@ _T = TypeVar('_T', bound='Keystroke')
 
 # isort: off
 # curses
-if platform.system() == 'Windows':
-    import jinxed as curses
-    from jinxed.has_key import _capability_names as capability_names
-else:
-    import curses
-    from curses.has_key import _capability_names as capability_names
+import jinxed as curses
+from jinxed.has_key import _capability_names as capability_names
 
 
 # DEC event namedtuples
