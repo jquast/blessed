@@ -84,7 +84,7 @@ Rendering Helpers
 build complete escape-sequence strings from the current display state:
 
 :meth:`~blessed.line_editor.LineEditor.render`
-   Full redraw — always produces correct output.
+   Full redraw, always produces correct output.
 
 :meth:`~blessed.line_editor.LineEditor.render_insert`
    Fast-path after a character insert at end of buffer.  Returns ``None``
