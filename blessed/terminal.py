@@ -3165,48 +3165,24 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :returns: OSC 9;4 escape sequence, or ``''`` when :attr:`does_styling` is ``False``.
         :raises ValueError: on bad ``state`` identifier or invalid or out of bounds ``value``.
         """
-        _states = {
-            0: 'clear',
-            1: 'normal',
-            2: 'error',
-            3: 'indeterminate',
-            4: 'paused',
-        }
-        _state_names = {v: k for k, v in _states.items()}
-
+        _mapping = {'clear': 0, 'normal': 1, 'error': 2, 'indeterminate': 3, 'paused': 4}
         if isinstance(state, str):
-            state_str = state.lower()
-            if state_str not in _state_names:
-                raise ValueError(
-                    f"Invalid state name: {state_str!r}. "
-                    f"Expected one of: {', '.join(_state_names)}"
-                )
-            st = _state_names[state_str]
-        elif isinstance(state, int) and 0 <= state <= 4:
-            st = state
-        else:
-            raise ValueError(
-                f"state must be 0-4 or a state name string, got {state!r}"
-            )
-
-        if st == 1:
+            if state not in _mapping:
+                raise ValueError(f"Invalid name for 'state', got: {state!r}, "
+                                 f"expected one of: {_mapping}")
+            state = _mapping[state]
+        elif not 0 <= state <= 4:
+            raise ValueError(f"'state' value out of range (0-4): {state}")
+        maybe_value = ''
+        if state == 1:
             if value is None:
-                raise ValueError(
-                    "progress_bar: 'normal' state requires a value (0-100)"
-                )
-            if not isinstance(value, int) or not 0 <= value <= 100:
-                raise ValueError(
-                    f"progress_bar: value must be an integer 0-100, got {value!r}"
-                )
-        elif value is None:
-            value = 0
-
+                raise ValueError("'normal' state requires 'value', got None")
+            if not 0 <= value <= 100:
+                raise ValueError(f"'value' out of range (0-100): {value}")
+            maybe_value = str(value)
         if not self.does_styling:
             return ''
-
-        if st == 1:
-            return f'\x1b]9;4;{st};{value}\x07'
-        return f'\x1b]9;4;{st};\x07'
+        return f'\x1b]9;4;{state};{maybe_value}\x07'
 
     @property
     def stream(self) -> IO[str]:

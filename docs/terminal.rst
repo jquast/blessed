@@ -141,7 +141,7 @@ parameter accepts a 'state' and 'value' argument.  The *value* parameter is requ
 
     # Indeterminate
     print(term.progress_bar('indeterminate'))
-    
+
     # Paused
     print(term.progress_bar('pause'))
 
