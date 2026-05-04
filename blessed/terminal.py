@@ -3144,6 +3144,50 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 self.stream.write('\x1b[23;0t')
                 self.stream.flush()
 
+    def progress_bar(self, state: Union[str, int], value: Optional[int] = None) -> str:
+        """
+        Return OSC 9;4 sequence for terminal progress bar support.
+
+        Support for 'OSC 9;4' cannot be detected. It is generally safe to write to unsupported
+        terminals. Some terminals display a graphical progress indicator in the taskbar and window
+        menu or status bar matching the given value (0-100).  Supported by at least Windows
+        Terminal.exe, ConEmu, Ghostty, kitty, and iTerm2.
+
+        :param state: Progress state. Accepts either an integer or a string name:
+
+            - ``0`` or ``'clear'``: Remove progress indicator
+            - ``1`` or ``'normal'``: Set progress to *value* (0 to 100)
+            - ``2`` or ``'error'``: Error state (typically red)
+            - ``3`` or ``'indeterminate'``: Indeterminate / pulsing
+            - ``4`` or ``'paused'``: Paused state (typically yellow)
+
+        :param int value: Progress value as integer of percent (0 to 100).  Required when state is
+            ``'normal'`` or ``1``.  Terminals are expected to ignore 'value' for all other states.
+        :rtype: str
+        :returns: OSC 9;4 escape sequence, or ``''`` when :attr:`does_styling` is ``False``.
+        :raises ValueError: on bad ``state`` identifier or invalid or out of bounds ``value``.
+
+        .. seealso:: https://ghostty.org/docs/vt/osc/conemu#change-progress-state-(osc-94)
+        """
+        _mapping = {'clear': 0, 'normal': 1, 'error': 2, 'indeterminate': 3, 'paused': 4}
+        if isinstance(state, str):
+            if state not in _mapping:
+                raise ValueError(f"Invalid name for 'state', got: {state!r}, "
+                                 f"expected one of: {_mapping}")
+            state = _mapping[state]
+        elif not 0 <= state <= 4:
+            raise ValueError(f"'state' value out of range (0-4): {state}")
+        maybe_value = ''
+        if state == 1:
+            if value is None:
+                raise ValueError("'normal' state requires 'value', got None")
+            if not 0 <= value <= 100:
+                raise ValueError(f"'value' out of range (0-100): {value}")
+            maybe_value = str(value)
+        if not self.does_styling:
+            return ''
+        return f'\x1b]9;4;{state};{maybe_value}\x07'
+
     @property
     def stream(self) -> IO[str]:
         """

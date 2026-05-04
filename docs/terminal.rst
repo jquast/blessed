@@ -122,6 +122,40 @@ it on exit:
         do_long_task()
     # previous title is restored
 
+Progress Bar
+------------
+
+Use :meth:`~.Terminal.progress_bar` to produce the `ConEmu OSC 9;4 protocol
+<https://ghostty.org/docs/vt/osc/conemu#change-progress-state-(osc-94)>`_ escape sequence to display
+a graphical progress indicator in the terminal's taskbar and/or status area.  The ``state``
+parameter accepts a 'state' and 'value' argument.  The *value* parameter is required only for
+``'normal'`` state and ignored for all others:
+
+.. code-block:: python
+
+    # Normal progress at 60%
+    print(term.progress_bar('normal', 60))
+
+    # Enter error state
+    print(term.progress_bar('error'))
+
+    # Indeterminate
+    print(term.progress_bar('indeterminate'))
+
+    # Paused
+    print(term.progress_bar('pause'))
+
+    # Remove the indicator
+    print(term.progress_bar('clear'))
+
+Example program, :ref:`progress_bar.py`:
+
+.. figure:: https://dxtz6bzwq9sxx.cloudfront.net/blessed_progress_bar.gif
+
+.. literalinclude:: ../bin/progress_bar.py
+   :language: python
+   :lines: 4-
+
 Sixel Graphics Support
 ----------------------
 

@@ -120,10 +120,10 @@ progress_bar.py
 ---------------
 https://github.com/jquast/blessed/blob/master/bin/progress_bar.py
 
-This program demonstrates a simple progress bar. All text is written
-to stderr, to avoid the need to "flush" or emit newlines, and makes
-use of the move_x (hpa) capability to "overstrike" the display a
-scrolling progress bar.
+.. figure:: https://dxtz6bzwq9sxx.cloudfront.net/blessed_progress_bar.gif
+
+This program demonstrates a simple ascii progress bar along with the ``OSC 9;4`` progress bar
+notification sequence using :meth:`~.Terminal.progress_bar`.
 
 .. _resize.py:
 
@@ -241,3 +241,4 @@ https://github.com/jquast/blessed/blob/master/bin/scroller.py
 
 A classic sine-wave "demoscene" text scroller effect that uses :meth:`~.Terminal.text_sized`, the
 ``OSC 66`` `kitty text sizing protocol <https://sw.kovidgoyal.net/kitty/text-sizing-protocol/>`_.
+>>>>>>> origin/master
