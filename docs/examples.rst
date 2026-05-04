@@ -120,6 +120,8 @@ progress_bar.py
 ---------------
 https://github.com/jquast/blessed/blob/master/bin/progress_bar.py
 
+.. figure:: https://dxtz6bzwq9sxx.cloudfront.net/blessed_progress_bar.gif
+
 This program demonstrates a simple ascii progress bar along with the ``OSC 9;4`` progress bar
 notification sequence using :meth:`~.Terminal.progress_bar`.
 

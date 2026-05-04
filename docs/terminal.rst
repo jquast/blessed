@@ -159,6 +159,8 @@ The *value* parameter is required only for ``'normal'`` state, and ignored for a
 
 Example program demonstrating both ASCII and OSC 9;4 progress bars together:
 
+.. figure:: https://dxtz6bzwq9sxx.cloudfront.net/blessed_progress_bar.gif
+
 .. literalinclude:: ../bin/progress_bar.py
    :language: python
 
