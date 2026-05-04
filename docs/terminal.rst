@@ -122,16 +122,17 @@ it on exit:
         do_long_task()
     # previous title is restored
 
-Progress Bar (Taskbar / Dock)
------------------------------
+Progress Bar
+------------
 
-The ConEmu OSC 9;4 protocol allows applications to display a graphical
-progress indicator in the terminal's taskbar icon or dock tile.
-Supported by **Windows Terminal**, **ConEmu**, and **Ghostty** (1.2.0+).
-Terminals that do not support this sequence silently ignore it.
+The `ConEmu OSC 9;4 protocol
+<https://ghostty.org/docs/vt/osc/conemu#change-progress-state-(osc-94)>`_ allows applications to
+display a graphical progress indicator in the terminal's taskbar icon or dock tile.  Supported by
+many modern terminals, such as Windows Terminal.exe, ConEmu, ghostty, kitty, and others.  Terminals
+that do not support this sequence silently ignore it.
 
-Use :meth:`~.Terminal.progress_bar` to produce the escape sequence.
-The ``state`` parameter accepts either an integer (0--4) or a string name:
+Use :meth:`~.Terminal.progress_bar` to produce the escape sequence.  The ``state`` parameter accepts
+a string name or protocol integer integer (0 to 4):
 
 ========  ==================  ========================================
 ``state`` String               Meaning
@@ -143,8 +144,7 @@ The ``state`` parameter accepts either an integer (0--4) or a string name:
 4         ``'paused'``         Paused state (typically a yellow indicator)
 ========  ==================  ========================================
 
-The *value* parameter is required for ``'normal'`` state and ignored for
-all others:
+The *value* parameter is required only for ``'normal'`` state, and ignored for all others:
 
 .. code-block:: python
 
@@ -156,16 +156,6 @@ all others:
 
     # Remove the indicator
     print(term.progress_bar('clear'))
-
-.. important::
-
-    **There is no reliable detection query for OSC 9;4 support.**  No
-    terminal emulator provides a DEC private mode, XTGETTCAP key, DA
-    response bit, or any other mechanism to probe for this feature.
-
-    Applications that wish to avoid emitting unrecognized escape sequences
-    should expose a user-facing configuration option, rather than attempting
-    automatic detection.
 
 Example program demonstrating both ASCII and OSC 9;4 progress bars together:
 
