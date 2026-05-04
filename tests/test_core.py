@@ -309,13 +309,6 @@ def test_setupterm_invalid_has_no_styling():
     child()
 
 
-def test_without_dunder():
-    """Ensure dunder does not remain in module (py2x InterruptedError test."""
-    # local
-    import blessed.terminal
-    assert '_' not in dir(blessed.terminal)
-
-
 def test_IOUnsupportedOperation():
     """Ensure stream that throws IOUnsupportedOperation results in non-tty."""
     @as_subprocess

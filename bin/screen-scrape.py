@@ -178,7 +178,7 @@ def main():
     alt_clean = UNKNOWN_CKSUM_RE.sub(" ", alt)
 
     # If both screens are identical, the terminal doesn't support
-    # alternate buffer — store only screen 0.
+    # alternate buffer: store only screen 0.
     if normal_clean == alt_clean:
         alt_clean = None
         alt = None

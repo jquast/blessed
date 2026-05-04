@@ -280,7 +280,7 @@ def test_sequence_length(all_terms):
         # moving backwards and forwards horizontally must be
         # accounted for as a "length", as <x><move right 10><y>
         # will result in a printed column length of 12 (even
-        # though columns 2-11 are non-destructive space
+        # though columns 2-11 are non-destructive space)
 
         # NOTE: As of wcwidth 0.3.0, length() returns "maximum extent" rather
         # than "effective length after destructive cursor movements". So 'x\b'

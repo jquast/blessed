@@ -9,7 +9,7 @@ movement, auto-suggest from history, password masking, and horizontal scrolling.
 
 .. note::
 
-   The editor never writes to the terminal directly — your application
+   The editor never writes to the terminal directly, your application
    controls when and where output appears.
 
    Use the built-in :ref:`render methods <line_editor_render>` to produce
@@ -24,10 +24,10 @@ Feed keystrokes (from :meth:`~.Terminal.inkey` or :meth:`~.Terminal.async_inkey`
 :meth:`~blessed.line_editor.LineEditor.feed_key`.  It returns a
 :class:`~blessed.line_editor.LineEditResult` with these fields:
 
-- ``line`` — the accepted string when Enter is pressed, otherwise ``None``
-- ``interrupt`` / ``eof`` — ``True`` on Ctrl+C / Ctrl+D respectively
-- ``changed`` — ``True`` when the display needs redrawing
-- ``bell`` — a bell string to emit (empty when silent)
+- ``line`` the accepted string when Enter is pressed, otherwise ``None``.
+- ``interrupt``, ``eof``: ``True`` on Ctrl+C / Ctrl+D respectively.
+- ``changed`` ``True`` when the display needs redrawing.
+- ``bell`` a bell string to emit (empty when silent).
 
 For bracketed paste, feed the pasted text through
 :meth:`~blessed.line_editor.LineEditor.insert_text` instead of
@@ -84,7 +84,7 @@ Rendering Helpers
 build complete escape-sequence strings from the current display state:
 
 :meth:`~blessed.line_editor.LineEditor.render`
-   Full redraw — always produces correct output.
+   Full redraw, always produces correct output.
 
 :meth:`~blessed.line_editor.LineEditor.render_insert`
    Fast-path after a character insert at end of buffer.  Returns ``None``

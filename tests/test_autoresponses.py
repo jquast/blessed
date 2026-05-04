@@ -5,6 +5,11 @@ import io
 # 3rd party
 import pytest
 
+try:
+    from unittest import mock
+except ImportError:
+    import mock
+
 # local
 from blessed._capabilities import ITerm2Capabilities, TextSizingResult
 from .conftest import IS_WINDOWS
@@ -492,3 +497,87 @@ def test_does_text_sizing_scale_location_timeout():
     output = pty_test(child, parent_func=None,
                       test_name='test_does_text_sizing_scale_location_timeout')
     assert 'OK' in output
+
+
+def test_does_text_sizing_cleanup_side_effect():
+    """does_text_sizing writes cleanup (backspace+space+backspace) to erase probes."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        with mock.patch.object(term, 'get_location', side_effect=[
+            (5, 10),  # initial: col0=10
+            (5, 12),  # after width probe: col1=12
+            (5, 14),  # after scale probe: col2=14
+        ]):
+            result = term.does_text_sizing(timeout=0.1)
+        assert result == TextSizingResult(width=True, scale=True)
+        output = stream.getvalue()
+        # cleanup: _movement=4 backspaces, 4 spaces, 4 backspaces
+        assert '\b' * 4 + ' ' * 4 + '\b' * 4 in output
+
+    child()
+
+
+def test_does_text_sizing_no_cleanup_when_cached():
+    """does_text_sizing does not write probes/cleanup when cached result exists."""
+    @as_subprocess
+    def child():
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._text_sizing_cache = TextSizingResult(width=True, scale=True)
+        stream.truncate(0)
+        stream.seek(0)
+        result = term.does_text_sizing()
+        assert result == TextSizingResult(width=True, scale=True)
+        assert stream.getvalue() == ''
+
+    child()
+
+
+def _sizing_term(supported):
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._is_a_tty = True
+    term._text_sizing_cache = (
+        TextSizingResult(width=True, scale=True) if supported
+        else TextSizingResult())
+    return term
+
+
+@pytest.mark.parametrize('supported,kwargs,expected,measured', [
+    (False, {}, 'abc', len('abc')),
+    (False, {'scale': 2}, 'abc', len('abc')),
+    (True, {'scale': 2}, '\x1b]66;s=2;abc\x07', len('abc') * 2),
+    (True, {}, '\x1b]66;;abc\x07', len('abc')),
+    (True, {
+        'scale': 2, 'width': 3, 'numerator': 1, 'denominator': 2,
+        'vertical_align': 1, 'horizontal_align': 2},
+     '\x1b]66;s=2:w=3:n=1:d=2:v=1:h=2;abc\x07', 6),
+    (True, {'scale': 3}, '\x1b]66;s=3;abc\x07', len('abc') * 3),
+    (True, {'scale': 4}, '\x1b]66;s=4;abc\x07', len('abc') * 4),
+    (True, {'scale': 5}, '\x1b]66;s=5;abc\x07', len('abc') * 5),
+
+])
+def test_text_sized(supported, kwargs, expected, measured):
+    """text_sized returns OSC 66-wrapped text when supported, as-is otherwise."""
+    @as_subprocess
+    def child():
+        from wcwidth import width as wcwidth_width
+        term = _sizing_term(supported)
+        result = term.text_sized('abc', **kwargs)
+        assert result == expected
+        assert wcwidth_width(result) == measured
+    child()
+
+
+def test_text_sized_ValueError():
+    """text_sized raises ValueError for text exceeding 4096 length limit."""
+    @as_subprocess
+    def child():
+        term = _sizing_term(True)
+        with pytest.raises(ValueError):
+            term.text_sized('X' * 4097, scale=2)
+
+    child()

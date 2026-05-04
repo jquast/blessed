@@ -3,6 +3,22 @@
 Version History
 ===============
 
+1.39
+
+  * introduced: :meth:`~.Terminal.text_sized` -- wrap text in Kitty text sizing protocol (OSC 66)
+    escape sequences, with graceful fallback to plain text when the terminal does not support
+    the protocol.
+  * introduced: :class:`~.Keystroke` of name ``CPR_RESPONSE`` for asynchronous capture of Cursor
+    Position Report responses via :meth:`~.Terminal.inkey`.  New argument
+    ``capture_cpr=True`` resolves the legacy F3 key ambiguity and matches against
+    ``CPR_RESPONSE``.  New properties :attr:`~.Keystroke.cpr_yx` and :attr:`~.Keystroke.cpr_xy`
+    return the decoded cursor coordinates.  :ghpull:`369`.
+  * improved: :meth:`~.Terminal.inkey` raises :exc:`EOFError` when keyboard fd is at EOF, rather
+    than returning an empty :class:`~.Keystroke`.  :ghpull:`371`.
+  * improved: :meth:`~.Terminal.ljust`, :meth:`~.Terminal.rjust`, and :meth:`~.Terminal.center`
+    now measure text containing hyperlinks, Kitty text sizing protocol sequences, and overtyping
+    (backspace/cursor-left with painter's algorithm) introduced in wcwidth 0.7.0.
+
 1.38
 
   * introduced: :meth:`~.Terminal.does_osc52_clipboard`, :meth:`~.Terminal.clipboard_copy`, and

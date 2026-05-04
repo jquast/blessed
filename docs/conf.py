@@ -82,7 +82,7 @@ extensions = ['sphinx.ext.autodoc',
 templates_path = ['_templates']
 
 # The suffix of source filenames.
-source_suffix = '.rst'
+source_suffix = {'.rst': 'restructuredtext'}
 
 # The encoding of source files.
 # source_encoding = 'utf-8-sig'
@@ -127,7 +127,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 add_function_parentheses = True
 
 # If true, the current module name will be prepended to all description
-# unit titles (such as .. function::).
+# unit titles (such as '.. function::').
 add_module_names = False
 
 # If true, sectionauthor and moduleauthor directives will be shown in the

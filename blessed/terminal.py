@@ -18,6 +18,7 @@ import collections
 from typing import IO, Dict, List, Match, Tuple, Union, Optional, Generator, SupportsIndex
 
 # 3rd party
+from wcwidth import TextSizing, TextSizingParams
 from wcwidth import wrap as wcwidth_wrap
 from wcwidth import ljust as wcwidth_ljust
 from wcwidth import rjust as wcwidth_rjust
@@ -863,20 +864,20 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :arg float timeout: Return after time elapsed in seconds with value ``(-1, -1)`` indicating
             that the remote end did not respond.
         :rtype: tuple
-        :returns: cursor position as tuple in form of ``(y, x)``.  When a timeout is specified,
-            always ensure the return value is checked for ``(-1, -1)``.
+        :returns: cursor position as tuple in form of ``(y, x)``.  Always ensure the return value is
+            checked for ``(-1, -1)``.
 
-        The location of the cursor is determined by emitting the ``u7`` terminal capability, or
+        The location of the cursor is determined by emitting the ``u7`` terminal capability for the
         VT100 `Query Cursor Position
-        <https://www2.ccs.neu.edu/research/gpc/VonaUtils/vona/terminal/vtansi.htm#status>`_
-        when such capability is undefined, which elicits a response from a reply string described by
-        capability ``u6``, or again VT100's definition of ``\x1b[%i%d;%dR`` when undefined.
+        <https://www2.ccs.neu.edu/research/gpc/VonaUtils/vona/terminal/vtansi.htm#status>`_.
+        This elicits a response from a reply string described by capability ``u6`` for the VT100
+        response.
 
         The ``(y, x)`` return value matches the parameter order of the :meth:`move_yx` capability.
         The following sequence should cause the cursor to not move at all::
 
             >>> term = Terminal()
-            >>> term.move_yx(*term.get_location()))
+            >>> term.move_yx(*term.get_location())
 
         And the following should assert True with a terminal:
 
@@ -888,24 +889,21 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             >>> assert given_x == result_x, (given_x, result_x)
             >>> assert given_y == result_y, (given_y, result_y)
         """
-        # Local lines attached by termios and remote login protocols such as
-        # ssh and telnet both provide a means to determine the window
-        # dimensions of a connected client, but **no means to determine the
-        # location of the cursor**.
+        # Local lines attached by termios and remote login protocols such as ssh and telnet both
+        # provide a means to determine the window dimensions of a connected client, but **no means
+        # to determine the location of the cursor**.
         #
         # from https://invisible-island.net/ncurses/terminfo.src.html,
         #
-        # > The System V Release 4 and XPG4 terminfo format defines ten string
-        # > capabilities for use by applications, <u0>...<u9>.   In this file,
-        # > we use certain of these capabilities to describe functions which
-        # > are not covered by terminfo.  The mapping is as follows:
+        # > The System V Release 4 and XPG4 terminfo format defines ten string capabilities for
+        # > use by applications, <u0>...<u9>.   In this file, we use certain of these capabilities
+        # > to describe functions which are not covered by terminfo.  The mapping is as follows:
         # >
         # >  u9   terminal enquire string (equiv. to ANSI/ECMA-48 DA)
         # >  u8   terminal answerback description
         # >  u7   cursor position request (equiv. to VT100/ANSI/ECMA-48 DSR 6)
         # >  u6   cursor position report (equiv. to ANSI/ECMA-48 CPR)
 
-        response_str = getattr(self, self.caps['cursor_report'].attribute) or '\x1b[%i%d;%dR'
         match = self._query_response(
             self.u7 or '\x1b[6n', self.caps['cursor_report'].re_compiled, timeout)
 
@@ -913,21 +911,19 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             # return matching sequence response, the cursor location.
             row, col = (int(val) for val in match.groups())
 
-            # Per https://invisible-island.net/ncurses/terminfo.src.html
-            # The cursor position report (<u6>) string must contain two
-            # scanf(3)-style %d format elements.  The first of these must
-            # correspond to the Y coordinate and the second to the %d.
-            # If the string contains the sequence %i, it is taken as an
-            # instruction to decrement each value after reading it (this is
-            # the inverse sense from the cup string).
+            # Per https://invisible-island.net/ncurses/terminfo.src.html The cursor position report
+            # (<u6>) string must contain two scanf(3)-style %d format elements.  The first of these
+            # must correspond to the Y coordinate and the second to the %d.  If the string contains
+            # the sequence %i, it is taken as an instruction to decrement each value after reading
+            # it (this is the inverse sense from the cup string).
+            response_str = getattr(self, self.caps['cursor_report'].attribute) or '\x1b[%i%d;%dR'
             if '%i' in response_str:
                 row -= 1
                 col -= 1
             return row, col
 
-        # We chose to return an illegal value rather than an exception,
-        # favoring that users author function filters, such as max(0, y),
-        # rather than crowbarring such logic into an exception handler.
+        # Return an illegal value (-1) rather than a custom exception, developers should
+        # check or filters, such as if (x, y) != (-1, -1) or max(0, y).
         return -1, -1
 
     def get_fgcolor(self, timeout: float = 1, bits: int = 16) -> Tuple[int, int, int]:
@@ -2122,7 +2118,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         Responses are cached unless *force* is True.
 
-        :arg float timeout: Timeout in seconds for each CPR query.
+        :arg float timeout: Timeout in seconds for each cursor position query.
         :arg bool force: Bypass cached result.
         :rtype: TextSizingResult
         :returns: Result with ``.width`` and ``.scale`` boolean attributes.
@@ -2142,6 +2138,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         _, col1 = self.get_location(timeout)
         if col1 == -1:
             return TextSizingResult()
+        does_width = col1 - col0 == 2
 
         # scale test
         self.stream.write('\x1b]66;s=2; \x07')
@@ -2149,10 +2146,15 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         _, col2 = self.get_location(timeout)
         if col2 == -1:
             return TextSizingResult()
+        does_scale = col2 - col1 == 2
 
-        width = col1 - col0 == 2
-        scale = col2 - col1 == 2
-        result = TextSizingResult(width=width, scale=scale)
+        # erase over any intermediary output, even though we used ' ', we need to draw a ' ' over
+        # the scale=2 ' ', otherwise kitty will favor the scaled ' ' over any text of the next row,
+        # causing surprising effect of 'drawing under'.
+        _movement = max(0, col2 - col0)
+        self.stream.write('\b' * _movement + ' ' * _movement + '\b' * _movement)
+        self.stream.flush()
+        result = TextSizingResult(width=does_width, scale=does_scale)
         self._text_sizing_cache = result
         return result
 
@@ -2298,7 +2300,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         :arg int | DecPrivateMode modes: One or more DEC Private Modes to enable
 
-        Emits the DECSET sequence to the attached stream as a side-effect, to
+        Emits the DECSET sequence to the attached stream as a side effect, to
         enable the specified modes, and cache their known state as 'SET'
         (enabled) for subsequent :meth:`get_dec_mode` queries.
 
@@ -2338,7 +2340,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         :arg int | DecPrivateMode modes: One or more DEC Private Modes to disable
 
-        Emits the DECRST sequence to the attached stream as a side-effect, to
+        Emits the DECRST sequence to the attached stream as a side effect, to
         enable the specified modes, and cache their known state as 'RESET'
         (disabled) for subsequent :meth:`get_dec_mode` queries.
 
@@ -3229,11 +3231,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :rtype: str
         :returns: String of ``text``, left-aligned by ``width``.
         """
-        # Left justification is different from left alignment, but we continue
-        # the vocabulary error of the str method for polymorphism.
         if width is None:
             width = self.width
-        return wcwidth_ljust(text, width.__index__(), fillchar, control_codes='ignore')
+        return wcwidth_ljust(text, width.__index__(), fillchar)
 
     def rjust(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
@@ -3248,7 +3248,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         if width is None:
             width = self.width
-        return wcwidth_rjust(text, width.__index__(), fillchar, control_codes='ignore')
+        return wcwidth_rjust(text, width.__index__(), fillchar)
 
     def center(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
@@ -3263,7 +3263,93 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         if width is None:
             width = self.width
-        return wcwidth_center(text, width.__index__(), fillchar, control_codes='ignore')
+        return wcwidth_center(text, width.__index__(), fillchar)
+
+    def text_sized(
+        self,
+        text: str,
+        scale: int = 1,
+        *,
+        width: int = 0,
+        numerator: int = 0,
+        denominator: int = 0,
+        vertical_align: Union[int, str] = 0,
+        horizontal_align: Union[int, str] = 0,
+    ) -> str:
+        """
+        Wrap ``text`` in a text sizing escape sequence (OSC 66).
+
+        Returns ``text`` unchanged when the terminal does not support text sizing, providing
+        graceful degradation.
+
+        :arg str text: Text payload.
+        :arg int scale: Scale factor (1 to 7).
+        :arg int width: Width in cells (0 to 7). 0 means auto-calculate
+            from the inner text.
+        :arg int numerator: Fractional scaling numerator (0 to 15).
+        :arg int denominator: Fractional scaling denominator (0 to 15).
+        :arg vertical_align: Vertical alignment: ('top', 'bottom', 'center'), or protocol code
+            (0=top, 1=bottom, 2=center).
+        :arg horizontal_align: Horizontal alignment. ('left', 'right', 'center') or protocol code
+            (0=left, 1=right, 2=center).
+        :rtype: str
+        :returns: Text wrapped in an OSC 66 escape sequence, or plain
+            ``text`` on unsupported terminals.
+        :raises ValueError: when the encoded ``text`` exceeds 4096 bytes.
+        :raises ValueError: when ``vertical_align`` or ``horizontal_align`` is an
+            unrecognized string value.
+
+        .. seealso:: `Kitty Text Sizing Protocol
+            <https://sw.kovidgoyal.net/kitty/text-sizing-protocol/>`_
+
+        .. note:: Because the first call to :meth:`Terminal.text_sized` will cause the side effect
+            of writing destructive spaces to the columns and row following the current cursor
+            position as required for detection of `kitty text sizing protocol`_, it is suggested
+            to first call :meth:`Terminal.does_text_sizing` during program initialization.
+
+            The result is permanently cached and all further calls to these methods return
+            immediately without this side effect.
+        """
+        # validation,
+        utf8_len = len(text.encode('utf-8'))
+        if utf8_len > 4096:
+            raise ValueError(f"'text' must be no longer than 4096 bytes, got {utf8_len}")
+
+        pos_esc = text.find('\x1b')
+        if pos_esc >= 0:
+            raise ValueError("'text' must not contain control codes or terminal sequences, "
+                             f"got ESC (\\x1b) at index {pos_esc}")
+
+        if isinstance(vertical_align, int):
+            if not 0 <= vertical_align <= 2:
+                raise ValueError(f"'vertical_align' out of range (0-2), got {vertical_align}")
+        else:
+            mapping_vert = {'top': 0, 'bottom': 1, 'center': 2, 'default': 0}
+            if vertical_align not in mapping_vert:
+                expected_vert = ', '.join(mapping_vert)
+                raise ValueError(f"'vertical_align' invalid, expected: {expected_vert}, "
+                                 f"got {vertical_align}")
+            vertical_align = mapping_vert[vertical_align]
+
+        if isinstance(horizontal_align, int):
+            if not 0 <= horizontal_align <= 2:
+                raise ValueError(f"'horizontal_align' out of range (0-2), got {horizontal_align}")
+        else:
+            mapping_horz = {'left': 0, 'right': 1, 'center': 2, 'default': 0}
+            if horizontal_align not in mapping_horz:
+                expected_horz = ', '.join(mapping_horz)
+                raise ValueError(f"'horizontal_align' invalid, expected: {expected_horz}, "
+                                 f"got {horizontal_align}")
+            horizontal_align = mapping_horz[horizontal_align]
+
+        params = TextSizingParams(scale=scale, width=width, numerator=numerator,
+                                  denominator=denominator, vertical_align=vertical_align,
+                                  horizontal_align=horizontal_align)
+
+        if not self.does_text_sizing():
+            # return text as-is when unsupported
+            return text
+        return TextSizing(params, text, '\x07').make_sequence()
 
     def truncate(self, text: str, width: Optional[SupportsIndex] = None) -> str:
         r"""
@@ -3648,7 +3734,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             indefinitely.
         :arg float esc_delay: Time in seconds to block after Escape key
            is received to await another key sequence beginning with
-           escape such as *KEY_LEFT*, sequence ``'\x1b[D'``], before returning a
+           escape such as *KEY_LEFT*, sequence ``'\x1b[D'``, before returning a
            :class:`~.Keystroke` instance for ``KEY_ESCAPE``.
 
            Users may override the default value of ``esc_delay`` in seconds,

@@ -113,6 +113,8 @@ the same above with the same API, as well as following **enhancements**:
   respectively.
 * Allows sequences to be removed from strings that contain them, using `Terminal.strip_seqs()`_ or
   sequences and whitespace using `Terminal.strip()`_.
+* Per-character text sizing using the `kitty text sizing protocol`_, via `Terminal.text_sized()`_
+  and `Terminal.does_text_sizing()`_.
 
 Before And After
 ----------------
@@ -190,6 +192,8 @@ The same program with *Blessed* is simply:
 .. _`Terminal.cbreak()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.cbreak
 .. _`Terminal.raw()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.raw
 .. _`Terminal.inkey()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.inkey
+.. _`Terminal.text_sized()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.text_sized
+.. _`Terminal.does_text_sizing()`: https://blessed.readthedocs.io/en/stable/api/terminal.html#blessed.terminal.Terminal.does_text_sizing
 .. _Colors: https://blessed.readthedocs.io/en/stable/colors.html
 .. _Styles: https://blessed.readthedocs.io/en/stable/terminal.html#styles
 .. _Location: https://blessed.readthedocs.io/en/stable/location.html
@@ -207,6 +211,7 @@ The same program with *Blessed* is simply:
 .. _Enlighten: https://github.com/Rockhopper-Technologies/enlighten
 .. _macht: https://github.com/rolfmorel/macht
 .. _f-strings: https://docs.python.org/3/reference/lexical_analysis.html#f-strings
+.. _kitty text sizing protocol: https://sw.kovidgoyal.net/kitty/text-sizing-protocol/
 .. |pypi_downloads| image:: https://img.shields.io/pypi/dm/blessed.svg?logo=pypi
     :alt: Downloads
     :target: https://pypi.org/project/blessed/
