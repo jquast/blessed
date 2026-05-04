@@ -3,6 +3,10 @@
 Version History
 ===============
 
+1.39
+  * introduced: :meth:`~.Terminal.progress_bar`_ for `OSC 9;4 sequence
+    <https://ghostty.org/docs/vt/osc/conemu#change-progress-state-(osc-94)>`.
+
 1.38
 
   * introduced: :meth:`~.Terminal.does_osc52_clipboard`, :meth:`~.Terminal.clipboard_copy`, and

@@ -3164,6 +3164,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :rtype: str
         :returns: OSC 9;4 escape sequence, or ``''`` when :attr:`does_styling` is ``False``.
         :raises ValueError: on bad ``state`` identifier or invalid or out of bounds ``value``.
+
+        .. seealso:: https://ghostty.org/docs/vt/osc/conemu#change-progress-state-(osc-94)
         """
         _mapping = {'clear': 0, 'normal': 1, 'error': 2, 'indeterminate': 3, 'paused': 4}
         if isinstance(state, str):
