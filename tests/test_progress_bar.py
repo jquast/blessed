@@ -5,6 +5,7 @@ import pytest
 # local
 from .accessories import TestTerminal, as_subprocess
 
+
 def test_progress_bar_normal():
     """Test progress_bar with state=1 returns OSC 9;4 set sequence."""
     @as_subprocess
@@ -67,6 +68,3 @@ def test_progress_bar_invalid_value(state, value):
         with pytest.raises(ValueError):
             term.progress_bar(state, value)
     child()
-
-
-
