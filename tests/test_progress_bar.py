@@ -57,8 +57,10 @@ def test_progress_bar_invalid_state(state):
 @pytest.mark.parametrize("state, value", [
     ('normal', -1),
     ('normal', 101),
-    (99, None),
+    ('normal', None),
+    ('unknown', 1999),
     ('unknown', None),
+    (99, None),
 ])
 def test_progress_bar_invalid_value(state, value):
     """Test progress_bar raises ValueError for invalid or missing value."""
