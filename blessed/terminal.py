@@ -3321,7 +3321,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                              f"got ESC (\\x1b) at index {pos_esc}")
 
         if isinstance(vertical_align, int):
-            if -1 < vertical_align > 2:
+            if not (0 <= vertical_align <= 2):
                 raise ValueError(f"'vertical_align' out of range (0-2), got {vertical_align}")
         else:
             mapping_vert = {'top': 0, 'bottom': 1, 'center': 2, 'default': 0}
@@ -3332,7 +3332,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             vertical_align = mapping_vert[vertical_align]
 
         if isinstance(horizontal_align, int):
-            if -1 < horizontal_align > 2:
+            if not (0 <= horizontal_align <= 2):
                 raise ValueError(f"'horizontal_align' out of range (0-2), got {horizontal_align}")
         else:
             mapping_horz = {'left': 0, 'right': 1, 'center': 2, 'default': 0}
