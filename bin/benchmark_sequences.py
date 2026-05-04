@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Benchmark blessed text manipulation functions."""
+
 import timeit
 from blessed import Terminal
 

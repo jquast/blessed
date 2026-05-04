@@ -3142,7 +3142,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 self.stream.write('\x1b[23;0t')
                 self.stream.flush()
 
-    def progress_bar(self, state, value=None):
+    def progress_bar(self, state: Union[str, int], value: Optional[int] = None) -> str:
         """
         Return OSC 9;4 sequence for terminal progress bar support.
 
@@ -3151,36 +3151,37 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         menu or status bar matching the given value (0-100).  Supported by at least Windows
         Terminal.exe, ConEmu, Ghostty, kitty, and iTerm2.
 
-        :param state: Progress state.  Accepts either an integer or a string name:
+        :param state: Progress state. Accepts either an integer or a string name:
 
-        - ``0`` or ``'clear'``: Remove progress indicator
-        - ``1`` or ``'normal'``: Set progress to *value* (0 to 100)
-        - ``2`` or ``'error'``: Error state (typically red)
-        - ``3`` or ``'indeterminate'``: Indeterminate / pulsing
-        - ``4`` or ``'paused'``: Paused state (typically yellow)
+            - ``0`` or ``'clear'``: Remove progress indicator
+            - ``1`` or ``'normal'``: Set progress to *value* (0 to 100)
+            - ``2`` or ``'error'``: Error state (typically red)
+            - ``3`` or ``'indeterminate'``: Indeterminate / pulsing
+            - ``4`` or ``'paused'``: Paused state (typically yellow)
+
         :param int value: Progress value as integer of percent (0 to 100).  Required when state is
             ``'normal'`` or ``1``.  Terminals are expected to ignore 'value' for all other states.
         :rtype: str
         :returns: OSC 9;4 escape sequence, or ``''`` when :attr:`does_styling` is ``False``.
         :raises ValueError: on bad ``state`` identifier or invalid or out of bounds ``value``.
         """
-        _STATES = {
+        _states = {
             0: 'clear',
             1: 'normal',
             2: 'error',
             3: 'indeterminate',
             4: 'paused',
         }
-        _STATE_NAMES = {v: k for k, v in _STATES.items()}
+        _state_names = {v: k for k, v in _states.items()}
 
         if isinstance(state, str):
             state_str = state.lower()
-            if state_str not in _STATE_NAMES:
+            if state_str not in _state_names:
                 raise ValueError(
                     f"Invalid state name: {state_str!r}. "
-                    f"Expected one of: {', '.join(_STATE_NAMES)}"
+                    f"Expected one of: {', '.join(_state_names)}"
                 )
-            st = _STATE_NAMES[state_str]
+            st = _state_names[state_str]
         elif isinstance(state, int) and 0 <= state <= 4:
             st = state
         else:
@@ -3197,6 +3198,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 raise ValueError(
                     f"progress_bar: value must be an integer 0-100, got {value!r}"
                 )
+        elif value is None:
+            value = 0
 
         if not self.does_styling:
             return ''
