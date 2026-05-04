@@ -1047,12 +1047,12 @@ class Keystroke(str):
         Some Examples,
 
         - Plain text: 'a', 'A', '1', ';', ' ', 'Ω', emoji with ZWJ sequences
-        - Alt+printable: Alt+a → 'a', Alt+A → 'A'
-        - Ctrl+letter: Ctrl+A → 'a', Ctrl+Z → 'z'
-        - Ctrl+symbol: Ctrl+@ → '@', Ctrl+? → '?', Ctrl+[ → '['
+        - Alt+printable: Alt+a -> 'a', Alt+A -> 'A'
+        - Ctrl+letter: Ctrl+A -> 'a', Ctrl+Z -> 'z'
+        - Ctrl+symbol: Ctrl+@ -> '@', Ctrl+? -> '?', Ctrl+[ → '['
         - Control chars: '\t', '\n', '\x08', '\x1b' (for Enter/Tab/Backspace/Escape keycodes)
         - Application keys: KEY_UP, KEY_F1, etc. → ''
-        - Release events: always → ''
+        - Release events: always -> ''
         """
         # Release events never have text
         if self.released:
@@ -1506,7 +1506,7 @@ def _read_until(term: 'Terminal',
         may be :class:`re.MatchObject` if pattern is discovered
         in input stream before timeout has elapsed, otherwise
         None. ``str`` is any remaining text received exclusive
-        of the matching pattern).
+        of the matching pattern.
 
     The reason a tuple containing non-matching data is returned, is that the
     consumer should push such data back into the input buffer by

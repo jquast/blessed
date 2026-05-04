@@ -46,7 +46,7 @@ classifiers = [
     'Typing :: Typed',
 ]
 dependencies = [
-    'wcwidth>=0.6',
+    'wcwidth>=0.7',
     'jinxed>=1.4.0; platform_system == "Windows"',
 ]
 dynamic = ['version']

@@ -65,7 +65,7 @@ def hex_to_rgb(hex_color: str) -> Tuple[int, int, int]:
         b = int(hex_color[4:6], 16)
     else:
         # 12-digit: #RRRRGGGGBBBB (16-bit) -> convert to 8-bit
-        # eg ('ffff' -> 65536 # -> 256)
+        # eg. ('ffff' -> 65536 -> 256)
         r = int(hex_color[0:4], 16) >> 8
         g = int(hex_color[4:8], 16) >> 8
         b = int(hex_color[8:12], 16) >> 8

@@ -1,0 +1,220 @@
+#!/usr/bin/env python
+"""Demonstrate the Kitty Text Sizing Protocol (OSC 66) with blessed."""
+
+# std imports
+import math
+
+# 3rd party
+from wcwidth import TextSizing, TextSizingParams
+
+# local
+from blessed import Terminal
+
+FRACTIONS = [(n, d) for d in range(1, 16) for n in range(0, d)]
+
+
+def _nearest_fraction(numerator, denominator, fractions):
+    """Return nearest fraction from *fractions* to numerator/denominator."""
+    target = numerator / denominator
+    return min(fractions, key=lambda f: abs(target - f[0] / f[1]))
+
+
+def _params_for_target(target):
+    """
+    Return (scale, numerator, denominator) for a target visual size.
+
+    *scale* is ``ceil(target)`` since *n/d* can only reduce font size.
+    """
+    if target <= 1.0:
+        return 1, 0, 0
+    s = min(7, max(1, math.ceil(target)))
+    if target >= s - 0.03:
+        return s, 0, 0
+    ratio = target / s
+    n, d = _nearest_fraction(round(ratio * 100), 100, FRACTIONS)
+    if n >= d:
+        return s, 0, 0
+    return s, n, d
+
+
+def show_scale_range(term, lo, hi, steps):
+    """Display a row of 'X' characters ranging from *lo* to *hi* in *steps*."""
+    label_top = []
+    label_bot = []
+    chars = []
+    for i in range(steps + 1):
+        target = lo + (hi - lo) * i / steps
+        s, n, d = _params_for_target(target)
+        params = TextSizingParams(scale=s, numerator=n, denominator=d,
+                                  vertical_align=1)
+        chars.append(TextSizing(params, 'X', '\x07').make_sequence())
+        label_top.append(f'{target:.1f}'.center(s * 2))
+        label_bot.append(f's={s}'.center(s * 2))
+    print(''.join(chars))
+    print(''.join(label_top))
+    print(''.join(label_bot))
+    print()
+
+
+def alignment_box(text, rows, cols, v_align, h_align):
+    text_w = len(text)
+    if h_align == 0:
+        content = text + ' ' * (cols - text_w)
+    elif h_align == 1:
+        content = ' ' * (cols - text_w) + text
+    else:
+        left = (cols - text_w) // 2
+        content = ' ' * left + text + ' ' * (cols - text_w - left)
+    empty = ' ' * cols
+    if v_align == 0:
+        text_row = 0
+    elif v_align == 1:
+        text_row = rows - 1
+    else:
+        text_row = rows // 2
+    lines = ['\u250c' + '\u2500' * cols + '\u2510']
+    for r in range(rows):
+        lines.append('\u2502' + (content if r == text_row else empty) + '\u2502')
+    lines.append('\u2514' + '\u2500' * cols + '\u2518')
+    return lines
+
+
+def detect(term):
+    print('term.does_text_sizing() -> ', end='', flush=True)
+    result = term.does_text_sizing(timeout=2)
+    print(f'\r{term.clear_eol}', end='')
+    yn = {True: term.bold_green('YES'), False: term.bold_red('NO')}
+    print(f'Width sizing: {yn[result.width]}   Scale sizing: {yn[result.scale]}')
+    return result
+
+
+def show_scale_factors(term):
+    colors = [term.bright_blue, term.bright_red, term.bright_green]
+    scale_headings = [(1, 'Ol\u00e1'), (2, 'Gr\u00fc\u00dfe'), (3, 'Bj\u00f6rk')]
+    for idx, (s, text) in enumerate(scale_headings):
+        heading = colors[idx](term.text_sized(text, scale=s))
+        newlines = ('\n' * s) if term.does_text_sizing().scale else '\n'
+        print(heading + newlines + '=' * term.length(heading) + '\n')
+
+
+def show_char_types(term):
+    types = [
+        ('N', 'A', 1),
+        ('VS15', '\u231a\ufe0e', 1),
+        ('CJK', '\u6f22', 2),
+        ('VS16', '\u00a9\ufe0f', 2),
+        ('ZWJ', '\U0001f468\u200d\U0001f469', 2),
+        ('flag', '\U0001f1ef\U0001f1f5', 2),
+    ]
+    tl, tr, bl, br, hz, vt = '\u250c\u2510\u2514\u2518\u2500\u2502'
+    gap = '    '
+    for _, _, width in types:
+        print(f'{tl}{hz * width}{tr}{gap}', end='')
+    print()
+    for _, ucs, width in types:
+        print(f'{vt}{term.text_sized(ucs, width=width)}{vt}{gap}', end='')
+    print()
+    for _, _, width in types:
+        print(f'{bl}{hz * width}{br}{gap}', end='')
+    print()
+    for label, _, width in types:
+        col_width = width + 2 + len(gap)
+        print(f'{label:<{col_width}}', end='')
+    print()
+
+
+def show_fractional(term):
+    fracs = sorted([(n, d) for d in range(2, 16) for n in range(1, d)
+                    if n / d >= 0.25], key=lambda nd: nd[0] / nd[1])
+    budget = 43
+    step = max(1, (len(fracs) + budget - 2) // (budget - 1))
+    sampled = fracs[::step]
+    sampled.append((0, 0))
+    for n, d in sampled:
+        print(term.text_sized('X', width=1, numerator=n, denominator=d, vertical_align=1), end='')
+    print()
+    pcts = {i: (int(n / d * 100) if d else 100) for i, (n, d) in enumerate(sampled)}
+    label_at = {}
+    for target in (25, 50, 75, 100):
+        best = min(pcts, key=lambda i: abs(pcts[i] - target))
+        label_at[best] = f'{pcts[best]}%'
+    lbl = [' '] * (len(sampled) + 5)
+    for i, text in sorted(label_at.items()):
+        for c, ch in enumerate(text):
+            if i + c < len(lbl) and lbl[i + c] == ' ':
+                lbl[i + c] = ch
+    print(''.join(lbl).rstrip())
+    print()
+
+
+def show_alignment(term):
+    rows, cols, text = 3, 6, 'Hi'
+    text_w = len(text)
+    gap = '  '
+    box_w = cols + 2
+    gap_w = len(gap)
+    common = dict(scale=rows, width=text_w, numerator=1, denominator=2)
+
+    for params, labels, fixed in [
+        ([(0, 0), (2, 0), (1, 0)],
+         ['v=top', 'v=center', 'v=bottom'], 'h=left'),
+        ([(0, 0), (0, 2), (0, 1)],
+         ['h=left', 'h=center', 'h=right'], 'v=top'),
+    ]:
+        boxes = [alignment_box(text, rows, cols, v, h) for v, h in params]
+        for line_parts in zip(*boxes):
+            print(gap.join(line_parts))
+        print(gap.join(f'{label:^{box_w}s}' for label in labels) + f'  ({fixed})')
+
+        end_y, _ = term.get_location()
+        interior_y = end_y - rows - 3 + 1
+        if end_y > 0 and interior_y >= 0:
+            for i, (v, h) in enumerate(params):
+                raw = term.text_sized(text, **dict(common,
+                                                   vertical_align=v,
+                                                   horizontal_align=h))
+                seq = term.bright_red(raw)
+                interior_x = i * (box_w + gap_w) + 1
+                print(term.move_yx(interior_y, interior_x) + seq, end='')
+            print(term.move_yx(end_y, 0), end='', flush=True)
+        print()
+
+
+def show_ljust_rjust_center(term, supported):
+    box_cols = 35
+    box_rows = 2 if supported else 1
+    tl, tr, bl, br, hz, vt = '\u250c\u2510\u2514\u2518\u2500\u2502'
+
+    colors = [term.bright_blue, term.bright_red, term.bright_green]
+    for i, (name, method) in enumerate([('ljust', term.ljust), ('rjust', term.rjust),
+                                        ('center', term.center)]):
+        scaled = colors[i](term.text_sized(f'BIG {name.upper()}', 2))
+        mixed = 'little and ' + scaled
+        content = method(mixed, width=box_cols, fillchar='\u00b7')
+        print(f'{tl}{hz * box_cols}{tr}')
+        for _ in range(box_rows):
+            print(f'{vt}{" " * box_cols}{vt}')
+        print(f'{bl}{hz * box_cols}{br}')
+
+        end_y, _ = term.get_location()
+        interior_y = max(0, end_y - box_rows - 1)
+        print(term.move_yx(interior_y, 1) + content, end='')
+        print(term.move_yx(end_y, 0), end='', flush=True)
+
+
+def main():
+    term = Terminal()
+    result = detect(term)
+    show_scale_factors(term)
+    show_char_types(term)
+    show_fractional(term)
+    print(term.bold('100% -- 200%:'))
+    show_scale_range(term, 1.0, 2.0, 10)
+    print(term.bold('200% -- 300%:'))
+    show_scale_range(term, 2.0, 3.0, 10)
+    show_alignment(term)
+    show_ljust_rjust_center(term, bool(result))
+
+
+if __name__ == '__main__':
+    main()

@@ -331,7 +331,7 @@ def test_keystroke_20ms_cbreak_with_input():
 
 @pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_esc_delay_cbreak_15ms():
-    """esc_delay=0.15 will cause a single ESC (\\x1b) to delay for 15ms"""
+    r"""esc_delay=0.15 will cause a single ESC ('\x1b') to delay for 15ms"""
     def child(term):
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
