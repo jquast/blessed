@@ -1,13 +1,5 @@
 #!/usr/bin/env python
-"""
-Demonstrate both ASCII in-terminal progress bars and OSC 9;4 taskbar/dock progress.
-
-OSC 9;4 (ConEmo protocol) is supported by Windows Terminal, ConEmu, and Ghostty (1.2.0+). There is
-no detection query for it, so sequences are emitted unconditionally; unsupported terminals silently
-ignore them.
-
-Press any key to exit the demo early.
-"""
+"""Demonstrate both ASCII in-terminal progress bars and OSC 9;4 taskbar/dock progress."""
 # local
 from blessed import Terminal
 

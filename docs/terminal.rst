@@ -154,6 +154,7 @@ Example program, :ref:`progress_bar.py`:
 
 .. literalinclude:: ../bin/progress_bar.py
    :language: python
+   :lines: 4-
 
 Sixel Graphics Support
 ----------------------
