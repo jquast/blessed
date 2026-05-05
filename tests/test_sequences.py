@@ -94,7 +94,6 @@ def test_stream_attr():
 
 def test_location_with_styling(all_terms):
     """Make sure ``location()`` works on all terminals."""
-    @as_subprocess
     def child_with_styling(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location(3, 4):
@@ -111,7 +110,6 @@ def test_location_with_styling(all_terms):
 
 def test_location_without_styling():
     """Make sure ``location()`` silently passes without styling."""
-    @as_subprocess
     def child_without_styling():
         """No side effect for location as a context manager without styling."""
         t = TestTerminal(stream=StringIO(), force_styling=None)
@@ -126,7 +124,6 @@ def test_location_without_styling():
 
 def test_horizontal_location(all_terms):
     """Make sure we can move the cursor horizontally without changing rows."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location(x=5):
@@ -147,7 +144,6 @@ def test_horizontal_location(all_terms):
 
 def test_vertical_location(all_terms):
     """Make sure we can move the cursor vertically without changing columns."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location(y=5):
@@ -169,7 +165,6 @@ def test_vertical_location(all_terms):
 @pytest.mark.skipif(IS_WINDOWS, reason="requires multiprocess")
 def test_inject_move_x():
     """Test injection of hpa attribute for screen/ansi (issue #55)."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         COL = 5
@@ -192,7 +187,6 @@ def test_inject_move_x():
 @pytest.mark.skipif(IS_WINDOWS, reason="requires multiprocess")
 def test_inject_move_y():
     """Test injection of vpa attribute for screen/ansi (issue #55)."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         ROW = 5
@@ -215,7 +209,6 @@ def test_inject_move_y():
 @pytest.mark.skipif(IS_WINDOWS, reason="requires multiprocess")
 def test_inject_civis_and_cnorm_for_ansi():
     """Test injection of civis attribute for ansi."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.hidden_cursor():
@@ -229,7 +222,6 @@ def test_inject_civis_and_cnorm_for_ansi():
 @pytest.mark.skipif(IS_WINDOWS, reason="requires multiprocess")
 def test_inject_sc_and_rc_for_ansi():
     """Test injection of sc and rc (save and restore cursor) for ansi."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location():
@@ -242,7 +234,6 @@ def test_inject_sc_and_rc_for_ansi():
 
 def test_zero_location(all_terms):
     """Make sure ``location()`` pays attention to 0-valued args."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location(0, 0):
@@ -259,7 +250,6 @@ def test_zero_location(all_terms):
 def test_mnemonic_colors(all_terms):
     """Make sure color shortcuts work."""
 
-    @as_subprocess
     def child(kind):
         def color(t, num):
             return t.number_of_colors and unicode_parm('setaf', num, term=t) or ''
@@ -284,7 +274,6 @@ def test_mnemonic_colors(all_terms):
 
 def test_callable_numeric_colors(all_terms):
     """``color(n)`` should return a formatting wrapper."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind)
         if t.magenta:
@@ -317,7 +306,6 @@ def test_callable_numeric_colors(all_terms):
 
 def test_null_callable_numeric_colors(all_terms):
     """``color(n)`` should be a no-op on null terminals."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), kind=kind)
         assert t.color(5)('smoo') == 'smoo'
@@ -328,7 +316,6 @@ def test_null_callable_numeric_colors(all_terms):
 
 def test_naked_color_cap(all_terms):
     """``term.color`` should return a stringlike capability."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind)
         assert f'{t.color}' == f'{t.setaf}'
@@ -338,7 +325,6 @@ def test_naked_color_cap(all_terms):
 
 def test_formatting_functions(all_terms):
     """Test simple and compound formatting wrappers."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind)
         # test simple sugar,
@@ -355,7 +341,6 @@ def test_formatting_functions(all_terms):
 
 def test_compound_formatting(all_terms):
     """Test simple and compound formatting wrappers."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind)
         expected_output = (
@@ -375,7 +360,6 @@ def test_compound_formatting(all_terms):
 
 def test_nested_formatting(all_terms):
     """Test complex nested compound formatting, wow!"""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind)
 
@@ -402,7 +386,6 @@ def test_nested_formatting(all_terms):
 
 def test_formatting_functions_without_tty(all_terms):
     """Test crazy-ass formatting wrappers when there's no tty."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=False)
         assert t.bold('hi') == 'hi'
@@ -431,7 +414,6 @@ def test_formatting_functions_without_tty(all_terms):
 
 def test_nice_formatting_errors(all_terms):
     """Make sure you get nice hints if you misspell a formatting wrapper."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind)
         try:
@@ -464,7 +446,6 @@ def test_nice_formatting_errors(all_terms):
 
 def test_null_callable_string(all_terms):
     """Make sure NullCallableString tolerates all kinds of args."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), kind=kind)
         assert t.clear == ''
@@ -479,7 +460,6 @@ def test_null_callable_string(all_terms):
 
 def test_padd():
     """Test Terminal.padd(seq)."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed import Terminal
@@ -496,7 +476,6 @@ def test_padd():
 
 def test_split_seqs(all_terms):
     """Test Terminal.split_seqs."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed import Terminal
@@ -513,7 +492,6 @@ def test_split_seqs(all_terms):
 
 def test_split_seqs_maxsplit1(all_terms):
     """Test Terminal.split_seqs with maxsplit=1."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed import Terminal
@@ -533,7 +511,6 @@ def test_split_seqs_maxsplit1(all_terms):
 
 def test_split_seqs_term_right(all_terms):
     """Test Terminal.split_seqs with parameterized sequence"""
-    @as_subprocess
     def child(kind):
         # local
         from blessed import Terminal
@@ -550,7 +527,6 @@ def test_split_seqs_term_right(all_terms):
 
 def test_split_seqs_maxsplit3_and_term_right(all_terms):
     """Test Terminal.split_seqs with parameterized sequence."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed import Terminal
@@ -573,7 +549,6 @@ def test_split_seqs_maxsplit3_and_term_right(all_terms):
 
 def test_invalid_params_for_horizontal_distance(all_terms):
     """Raise error if text parametrized horizontal distance is invalid"""
-    @as_subprocess
     def child(kind):
         term = TestTerminal(stream=StringIO(), kind=kind, force_styling=True)
         with pytest.raises(ValueError) as e:
@@ -585,7 +560,6 @@ def test_invalid_params_for_horizontal_distance(all_terms):
 
 def test_formatting_other_string(all_terms):
     """FormattingOtherString output depends on how it's called"""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), kind=kind, force_styling=True)
 
@@ -632,7 +606,6 @@ def test_termcap_match_optional():
 
 def test_truncate(all_terms):
     """Test terminal.truncate and make sure it agrees with terminal.length"""
-    @as_subprocess
     def child(kind):
         # local
         from blessed import Terminal
@@ -658,7 +631,6 @@ def test_truncate(all_terms):
 
 def test_truncate_wide_end(all_terms):
     """Ensure that terminal.truncate has the correct behaviour for wide characters."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed import Terminal
@@ -673,7 +645,6 @@ def test_truncate_wide_end(all_terms):
 
 def test_truncate_wcwidth_clipping(all_terms):
     """Ensure that terminal.truncate has the correct behaviour for control characters."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed import Terminal
@@ -690,7 +661,6 @@ def test_truncate_wcwidth_clipping(all_terms):
 
 def test_truncate_padding(all_terms):
     """Ensure that terminal.truncate correctly handles cursor movement sequences."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed import Terminal
@@ -732,7 +702,6 @@ def test_truncate_default():
 
 def test_truncate_zwj_emoji(all_terms):
     """Test truncate handles ZWJ emoji sequences."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed import Terminal
@@ -756,7 +725,6 @@ def test_truncate_zwj_emoji(all_terms):
 
 def test_truncate_vs16_emoji(all_terms):
     """Test truncate handles VS-16 emoji sequences."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed import Terminal
@@ -777,7 +745,6 @@ def test_truncate_vs16_emoji(all_terms):
 def test_supports_index(all_terms):
     """Ensure sequence formatting methods support objects with __index__()"""
 
-    @as_subprocess
     def child(kind):
         # local
         from blessed.terminal import Terminal

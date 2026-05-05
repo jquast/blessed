@@ -534,7 +534,6 @@ def test_dec_mode_set_with_dec_private_mode_enum(method_name, suffix):
 
 def test_dec_modes_enabled_with_invalid_type():
     """Test dec_modes_enabled raises TypeError with invalid mode type."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -551,7 +550,6 @@ def test_dec_modes_enabled_with_invalid_type():
 
 def test_dec_modes_disabled_with_invalid_type():
     """Test dec_modes_disabled raises TypeError with invalid mode type."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)

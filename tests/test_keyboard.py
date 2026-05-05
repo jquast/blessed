@@ -282,7 +282,6 @@ def test_cuf1_and_cub1_as_RIGHT_LEFT(all_terms):
     """Test that cuf1 and cub1 are assigned KEY_RIGHT and KEY_LEFT."""
     from blessed.keyboard import get_keyboard_sequences
 
-    @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
         keymap = get_keyboard_sequences(term)
@@ -301,7 +300,6 @@ def test_cuf1_and_cub1_as_RIGHT_LEFT(all_terms):
 
 def test_get_keyboard_sequences_sort_order():
     """ordereddict ensures sequences are ordered longest-first."""
-    @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
         maxlen = None
@@ -505,7 +503,6 @@ def test_keypad_mixins_and_aliases():
     # End     ^[[F    ^[OF    ^[[1;mF
     # Home    ^[[H    ^[OH    ^[[1;mH
     # pylint: disable=too-many-statements
-    @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
 
@@ -620,7 +617,6 @@ def test_keypad_mixins_and_aliases():
 @pytest.mark.skipif(IS_WINDOWS, reason="not applicable")
 def test_kp_begin_center_key():
     """Test KP_BEGIN/center key (numpad 5) with modifiers and event types."""
-    @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
 

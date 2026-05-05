@@ -29,7 +29,6 @@ def test_export_only_Terminal():
 
 def test_null_location(all_terms):
     """Make sure ``location()`` with no args just does position restoration."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), force_styling=True)
         with t.location():
@@ -43,7 +42,6 @@ def test_null_location(all_terms):
 
 def test_location_to_move_xy(all_terms):
     """``location()`` and ``move_xy()`` receive complimentary arguments."""
-    @as_subprocess
     def child(kind):
         buf = StringIO()
         t = TestTerminal(stream=buf, force_styling=True)
@@ -58,7 +56,6 @@ def test_location_to_move_xy(all_terms):
 
 def test_yield_keypad():
     """Ensure ``keypad()`` writes keyboard_xmit and keyboard_local."""
-    @as_subprocess
     def child(kind):
         # given,
         t = TestTerminal(stream=StringIO(), force_styling=True)
@@ -76,7 +73,6 @@ def test_yield_keypad():
 
 def test_null_fileno():
     """Make sure ``Terminal`` works when ``fileno`` is ``None``."""
-    @as_subprocess
     def child():
         # This simulates piping output to another program.
         out = StringIO()
@@ -93,17 +89,14 @@ def test_number_of_colors_without_tty():
     if 'COLORTERM' in os.environ:
         del os.environ['COLORTERM']
 
-    @as_subprocess
     def child_256_nostyle():
         t = TestTerminal(stream=StringIO())
         assert t.number_of_colors == 0
 
-    @as_subprocess
     def child_256_forcestyle():
         t = TestTerminal(stream=StringIO(), force_styling=True)
         assert t.number_of_colors == 256
 
-    @as_subprocess
     def child_8_forcestyle():
         # 'ansi' on freebsd returns 0 colors. We use 'cons25', compatible with its kernel tty.c
         kind = 'cons25' if platform.system().lower() == 'freebsd' else 'ansi'
@@ -111,13 +104,11 @@ def test_number_of_colors_without_tty():
                          force_styling=True)
         assert t.number_of_colors == 8
 
-    @as_subprocess
     def child_0_forcestyle():
         t = TestTerminal(kind='vt220', stream=StringIO(),
                          force_styling=True)
         assert t.number_of_colors == 0
 
-    @as_subprocess
     def child_24bit_forcestyle_with_colorterm():
         os.environ['COLORTERM'] = 'truecolor'
         t = TestTerminal(kind='vt220', stream=StringIO(),
@@ -133,19 +124,16 @@ def test_number_of_colors_without_tty():
 @pytest.mark.skipif(IS_WINDOWS, reason="requires more than 1 tty")
 def test_number_of_colors_with_tty():
     """test ``number_of_colors`` 0, 8, and 256."""
-    @as_subprocess
     def child_256():
         t = TestTerminal()
         assert t.number_of_colors == 256
 
-    @as_subprocess
     def child_8():
         # 'ansi' on freebsd returns 0 colors. We use 'cons25', compatible with its kernel tty.c
         kind = 'cons25' if platform.system().lower() == 'freebsd' else 'ansi'
         t = TestTerminal(kind=kind)
         assert t.number_of_colors == 8
 
-    @as_subprocess
     def child_0():
         t = TestTerminal(kind='vt220')
         assert t.number_of_colors == 0
@@ -157,7 +145,6 @@ def test_number_of_colors_with_tty():
 
 def test_init_descriptor_always_initted(all_terms):
     """Test height and width with non-tty Terminals."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO())
         assert t._init_descriptor == sys.__stdout__.fileno()
@@ -171,7 +158,6 @@ def test_init_descriptor_always_initted(all_terms):
 
 def test_force_styling_none(all_terms):
     """If ``force_styling=None`` is used, don't ever do styling."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(force_styling=None)
         assert not t.does_styling
@@ -181,7 +167,6 @@ def test_force_styling_none(all_terms):
 
 def test_force_styling_none_but_FORCE_COLOR(all_terms):
     """``force_styling=None``, but FORCE_COLOR or CLICOLOR_FORCE is non-empty, does styling."""
-    @as_subprocess
     def child(envkey):
         os.environ[envkey] = '1'
         t = TestTerminal(force_styling=None)
@@ -196,7 +181,6 @@ def test_force_styling_none_and_unset_FORCE_COLOR(all_terms):
     """
     ``force_styling=None``, but FORCE_COLOR/CLICOLOR_FORCE is set, but empty, do not style.
     """
-    @as_subprocess
     def child(envkey):
         os.environ[envkey] = ''
         t = TestTerminal(force_styling=None)
@@ -209,7 +193,6 @@ def test_force_styling_none_and_unset_FORCE_COLOR(all_terms):
 
 def test_force_styling_False_but_FORCE_COLOR():
     """``force_styling=False``, but FORCE_COLOR or CLICOLOR_FORCE is non-empty, do styling."""
-    @as_subprocess
     def child(envkey):
         os.environ[envkey] = '1'
         t = TestTerminal(force_styling=False)
@@ -222,7 +205,6 @@ def test_force_styling_False_but_FORCE_COLOR():
 
 def test_force_styling_True_but_NO_COLOR():
     """``force_styling=True``, but NO_COLOR is non-empty, do not style."""
-    @as_subprocess
     def child(envkey):
         os.environ[envkey] = '1'
         t = TestTerminal(force_styling=True)
@@ -234,7 +216,6 @@ def test_force_styling_True_but_NO_COLOR():
 
 def test_setupterm_singleton_issue_33():
     """Multiple Terminal instances with different kinds are supported."""
-    @as_subprocess
     def child():
         warnings.filterwarnings("error", category=UserWarning)
 
@@ -253,7 +234,6 @@ def test_setupterm_singleton_issue_33():
 
 def test_setupterm_invalid_issue39():
     """Unknown TERM falls back to kind_fallback silently."""
-    @as_subprocess
     def child():
         warnings.filterwarnings("error", category=UserWarning)
         # Unknown terminal kind gracefully falls back to kind_fallback.
@@ -265,7 +245,6 @@ def test_setupterm_invalid_issue39():
 
 def test_setupterm_invalid_has_no_styling():
     """An unknown TERM with bad fallback disables styling."""
-    @as_subprocess
     def child():
         warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -282,7 +261,6 @@ def test_setupterm_invalid_has_no_styling():
 
 def test_IOUnsupportedOperation():
     """Ensure stream that throws IOUnsupportedOperation results in non-tty."""
-    @as_subprocess
     def child():
 
         def side_effect():
@@ -302,7 +280,6 @@ def test_IOUnsupportedOperation():
 
 def test_stream_no_fileno():
     """Handle custom stream objects gracefully"""
-    @as_subprocess
     def child():
         stream = object()
         term = TestTerminal(stream=stream)
@@ -319,7 +296,6 @@ def test_stream_no_fileno():
 @pytest.mark.skipif(IS_WINDOWS, reason="has process-wide side-effects")
 def test_winsize_IOError_returns_environ():
     """When _winsize raises IOError, defaults from os.environ given."""
-    @as_subprocess
     def child():
         def side_effect(fd):
             raise OSError
@@ -335,7 +311,6 @@ def test_winsize_IOError_returns_environ():
 
 def test_yield_fullscreen(all_terms):
     """Ensure ``fullscreen()`` writes enter_fullscreen and exit_fullscreen."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), force_styling=True)
         t.enter_fullscreen = 'BEGIN'
@@ -350,7 +325,6 @@ def test_yield_fullscreen(all_terms):
 
 def test_yield_hidden_cursor(all_terms):
     """Ensure ``hidden_cursor()`` writes hide_cursor and normal_cursor."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), force_styling=True)
         t.hide_cursor = 'BEGIN'
@@ -368,7 +342,6 @@ def test_yield_hidden_cursor(all_terms):
 # "Removed - These do not appear to be supported" for rmam + smam
 def test_yield_no_line_wrap():
     """Ensure ``no_line_wrap()`` writes disable and enable VT100 line wrap sequence."""
-    @as_subprocess
     def child():
         t = TestTerminal(stream=StringIO(), force_styling=True)
         with t.no_line_wrap():
@@ -385,7 +358,6 @@ def test_yield_no_line_wrap():
 @pytest.mark.skipif(IS_WINDOWS, reason="windows doesn't work like this")
 def test_no_preferredencoding_fallback():
     """Ensure empty preferredencoding value defaults to ascii."""
-    @as_subprocess
     def child():
         with mock.patch('locale.getpreferredencoding') as get_enc:
             get_enc.return_value = ''
@@ -398,7 +370,6 @@ def test_no_preferredencoding_fallback():
 @pytest.mark.skipif(IS_WINDOWS, reason="requires fcntl")
 def test_unknown_preferredencoding_warned_and_fallback():
     """Ensure a locale without a codec emits a warning."""
-    @as_subprocess
     def child():
         with mock.patch('locale.getpreferredencoding') as get_enc:
             get_enc.return_value = '---unknown--encoding---'
@@ -414,7 +385,6 @@ def test_unknown_preferredencoding_warned_and_fallback():
 @pytest.mark.skipif(IS_WINDOWS, reason="requires fcntl")
 def test_win32_missing_tty_modules(monkeypatch):
     """Ensure dummy exception is used when io is without UnsupportedOperation."""
-    @as_subprocess
     def child():
         OLD_STYLE = False
         try:
@@ -503,7 +473,6 @@ def test_termcap_repr():
                 r"<Termcap cursor_up:'\\\x1b\\[A'>",
                 r"<Termcap cursor_up:'\\\x1b\\[A'>"]
 
-    @as_subprocess
     def child():
         # local
         import blessed
@@ -520,7 +489,6 @@ def test_termcap_repr():
 ])
 def test_query_methods_respect_does_styling_and_is_a_tty(force_styling, is_a_tty):
     """Test that all query methods respect does_styling and is_a_tty guardrails."""
-    @as_subprocess
     def child():
         stream = StringIO()
         term = TestTerminal(stream=stream, force_styling=force_styling)

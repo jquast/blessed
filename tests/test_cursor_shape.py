@@ -104,7 +104,6 @@ def test_sequence_invalid_string():
 
 def test_cursor_shape_writes_sequence(all_terms):
     """Context manager writes enter and reset sequences."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), force_styling=True)
         with t.cursor_shape(t.CursorShape.BLINKING_BAR):
@@ -117,7 +116,6 @@ def test_cursor_shape_writes_sequence(all_terms):
 
 def test_cursor_shape_string_name(all_terms):
     """Context manager accepts string style names."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), force_styling=True)
         with t.cursor_shape('steady_underline'):
@@ -130,7 +128,6 @@ def test_cursor_shape_string_name(all_terms):
 
 def test_cursor_shape_default_style(all_terms):
     """Context manager with no argument uses DEFAULT_STYLE."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), force_styling=True)
         with t.cursor_shape():
@@ -143,7 +140,6 @@ def test_cursor_shape_default_style(all_terms):
 
 def test_cursor_shape_no_styling(all_terms):
     """Context manager is a no-op when styling is disabled."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), force_styling=False)
         with t.cursor_shape(t.CursorShape.BLINKING_BAR):
@@ -163,7 +159,6 @@ def test_cursor_shape_accessible_as_class_attr():
 @pytest.mark.parametrize("style", [0, 1, 2, 3, 4, 5, 6])
 def test_length_strips_decscusr(all_terms, style):
     """Terminal.length() excludes DECSCUSR sequences."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(force_styling=True)
         text = CursorShape.sequence(style) + 'hello'
@@ -174,7 +169,6 @@ def test_length_strips_decscusr(all_terms, style):
 
 def test_length_strips_color_reset_osc(all_terms):
     """Terminal.length() excludes COLOR_RESET_OSC sequence."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(force_styling=True)
         text = CursorShape.COLOR_RESET_OSC + 'hello'

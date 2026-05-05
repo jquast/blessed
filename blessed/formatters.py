@@ -383,7 +383,7 @@ def resolve_capability(term: 'Terminal', attr: str) -> str:
     """
     if not term.does_styling:
         return ''
-    val = term._jinxed_term.tigetstr(
+    val = term._jinxed_term.tigetstr(  # pylint: disable=protected-access
         term._sugar.get(attr, attr))  # pylint: disable=protected-access
     # Decode sequences as latin1, as they are always 8-bit bytes, so when
     # b'\xff' is returned, this is decoded as '\xff'.

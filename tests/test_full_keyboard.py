@@ -163,7 +163,6 @@ def test_kbhit_no_tty():
     ])
 def test_keystroke_cbreak_noinput(use_stream, timeout, expected_cs_range):
     """Test keystroke without input with various timeout/stream combinations."""
-    @as_subprocess
     def child(use_stream, timeout, expected_cs_range):
         stream = StringIO() if use_stream else None
         term = TestTerminal(stream=stream)

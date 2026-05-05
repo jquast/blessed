@@ -52,7 +52,6 @@ def test_SequenceWrapper_invalid_width():
 @pytest.mark.parametrize("kwargs", TEXTWRAP_KEYWORD_COMBINATIONS)
 def test_SequenceWrapper(many_columns, kwargs):
     """Test that text wrapping matches internal extra options."""
-    @as_subprocess
     def child(width, pgraph, kwargs):
         # build a test paragraph, along with a very colorful version
         term = TestTerminal()
@@ -313,7 +312,6 @@ def test_wrap_color_preserved_across_boundary():
 ])
 def test_wrap_hyperlink_osc8(link):
     """Test wrap with OSC 8 hyperlinks using ST and BEL terminators."""
-    @as_subprocess
     def child(link):
         term = TestTerminal(force_styling=True)
         result = term.wrap(link, width=10)

@@ -1315,7 +1315,8 @@ def _alternative_left_right(term: 'Terminal') -> typing.Dict[str, int]:
     return keymap
 
 
-def get_keyboard_sequences(term: 'Terminal') -> typing.OrderedDict[str, int]:
+def get_keyboard_sequences(  # pylint: disable=protected-access
+        term: 'Terminal') -> typing.OrderedDict[str, int]:
     r"""
     Return mapping of keyboard sequences paired by keycodes.
 

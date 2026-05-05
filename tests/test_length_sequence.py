@@ -45,7 +45,6 @@ def test_length_with_zwj():
 
 def test_length_ansiart():
     """Test length of ANSI art"""
-    @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind)
         # this 'ansi' art contributed by xzip!impure for another project,
@@ -67,7 +66,6 @@ def test_length_ansiart():
 def test_sequence_length(all_terms):
     """Ensure T.length(string containing sequence) is correct."""
     # pylint: disable=too-complex,too-many-statements
-    @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
 
@@ -341,7 +339,6 @@ def test_winsize(many_lines, many_columns):
     """Test height and width is appropriately queried in a pty."""
     pixel_width, pixel_height = 1024, 768
 
-    @as_subprocess
     def child(lines=25, cols=80):
         # set the pty's virtual window size
         val = struct.pack('HHHH', lines, cols, pixel_width, pixel_height)
@@ -361,7 +358,6 @@ def test_winsize(many_lines, many_columns):
 
 def test_Sequence_alignment_fixed_width(all_terms):
     """Test alignment methods with width provided"""
-    @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind)
         pony_msg = 'pony express, all aboard, choo, choo!'
@@ -386,7 +382,6 @@ def test_Sequence_alignment_fixed_width(all_terms):
 @pytest.mark.skipif(IS_WINDOWS, reason="requires fcntl")
 def test_Sequence_alignment(all_terms):
     """Tests methods related to Sequence class, namely ljust, rjust, center."""
-    @as_subprocess
     def child(kind, lines=25, cols=80):
         # set the pty's virtual window size
         val = struct.pack('HHHH', lines, cols, 0, 0)
@@ -481,7 +476,6 @@ def test_set_window_title_default():
 ])
 def test_set_window_title_modes(mode, expected_prefix):
     """Test set_window_title OSC mode parameter."""
-    @as_subprocess
     def child(mode=mode, expected_prefix=expected_prefix):
         term = TestTerminal(force_styling=True)
         result = term.set_window_title('test', mode=mode)
@@ -529,7 +523,6 @@ def test_window_title_context_manager_nostyling():
 
 def test_sequence_is_movement_false(all_terms):
     """Test parser about sequences that do not move the cursor."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed.sequences import measure_length
@@ -566,7 +559,6 @@ def test_sequence_is_movement_false(all_terms):
 
 def test_termcap_will_move_false(all_terms):  # pylint: disable=too-complex
     """Test parser about sequences that do not move the cursor."""
-    @as_subprocess
     def child(kind):  # pylint: disable=too-many-branches
         # local
         from blessed.sequences import iter_parse
@@ -605,7 +597,6 @@ def test_termcap_will_move_false(all_terms):  # pylint: disable=too-complex
 
 def test_sequence_is_movement_true(all_terms):
     """Test parsers about sequences that move the cursor."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed.sequences import measure_length
@@ -639,7 +630,6 @@ def test_sequence_is_movement_true(all_terms):
 
 def test_termcap_will_move_true(all_terms):
     """Test parser about sequences that move the cursor."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed.sequences import iter_parse
@@ -664,7 +654,6 @@ def test_termcap_will_move_true(all_terms):
 
 def test_foreign_sequences():
     """Test parsers about sequences received from foreign sources."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed.sequences import measure_length

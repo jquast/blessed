@@ -179,7 +179,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     #: DEC Private Mode constants accessible via Terminal.DecPrivateMode or term.DecPrivateMode
     DecPrivateMode = _DecPrivateMode
 
-    def __init__(self,
+    def __init__(self,  # pylint: disable=too-complex,too-many-statements
                  kind: Optional[str] = None,
                  stream: Optional[IO[str]] = None,
                  force_styling: Union[bool, None] = False,
@@ -242,6 +242,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._stream = stream
         self._keyboard_fd = None
         self._keyboard_eof = False
+        self._encoding = 'UTF-8'
         self._init_descriptor = None
         self._is_a_tty = False
         self.__init__streams()
@@ -298,7 +299,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                     self._does_styling = False
 
             # Step 3: Inject XTGETTCAP overrides into jinxed
-            if xtgettcap_data is not None and hasattr(self, '_jinxed_term'):
+            if xtgettcap_data is not None and self._does_styling:
                 self._inject_xtgettcap_response(xtgettcap_data)
 
         # Step 4: Initialize keyboard infrastructure
@@ -540,7 +541,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             # set input encoding and initialize incremental decoder
 
             if IS_WINDOWS:
-                # pylint: disable-next=possibly-used-before-assignment
                 self._encoding = get_console_input_encoding() \
                     or locale.getpreferredencoding() or 'UTF-8'
             else:
@@ -1631,7 +1631,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             num_caps=num_caps,
             bool_caps=bool_caps)
 
-    def get_xtgettcap(self, timeout: Optional[float] = 1,
+    def get_xtgettcap(self, timeout: Optional[float] = 1,  # pylint: disable=too-complex
                       force: bool = False) -> Optional[TermcapResponse]:
         """
         Query terminal capabilities via XTGETTCAP (DCS +q).

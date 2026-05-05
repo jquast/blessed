@@ -37,7 +37,6 @@ def test_progress_bar_nostyling():
 @pytest.mark.parametrize("state", [5, 'unknown', -1])
 def test_progress_bar_invalid_state(state):
     """Test progress_bar raises ValueError for invalid state."""
-    @as_subprocess
     def child(state=state):
         term = TestTerminal(force_styling=True)
         with pytest.raises(ValueError):
@@ -55,7 +54,6 @@ def test_progress_bar_invalid_state(state):
 ])
 def test_progress_bar_invalid_value(state, value):
     """Test progress_bar raises ValueError for invalid or missing value."""
-    @as_subprocess
     def child(state=state, value=value):
         term = TestTerminal(force_styling=True)
         with pytest.raises(ValueError):
