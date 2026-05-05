@@ -17,7 +17,7 @@ except ImportError:
     # 3rd party
     import mock
 
-import jinxed as curses
+import jinxed
 
 
 def fn_tparm(*args):
@@ -34,7 +34,7 @@ def test_parameterizing_string_args_unspecified(monkeypatch):
 
     # first argument to tparm() is the sequence name, returned as-is;
     # subsequent arguments are usually Integers.
-    monkeypatch.setattr(curses, 'tparm', fn_tparm)
+    monkeypatch.setattr(jinxed, 'tparm', fn_tparm)
 
     # given,
     pstr = ParameterizingString('')
@@ -64,7 +64,7 @@ def test_parameterizing_string_args(monkeypatch):
 
     # first argument to tparm() is the sequence name, returned as-is;
     # subsequent arguments are usually Integers.
-    monkeypatch.setattr(curses, 'tparm', fn_tparm)
+    monkeypatch.setattr(jinxed, 'tparm', fn_tparm)
 
     # given,
     pstr = ParameterizingString('cap', 'norm', 'seq-name')
@@ -95,7 +95,7 @@ def test_parameterizing_string_type_error(monkeypatch):
     def tparm_raises_TypeError(*args):
         raise TypeError('custom_err')
 
-    monkeypatch.setattr(curses, 'tparm', tparm_raises_TypeError)
+    monkeypatch.setattr(jinxed, 'tparm', tparm_raises_TypeError)
 
     # given,
     pstr = ParameterizingString('cap', 'norm', 'cap-name')
@@ -206,7 +206,7 @@ def test_resolve_capability(monkeypatch):
     def tigetstr(attr):
         return f'seq-{attr}'.encode('latin1')
 
-    monkeypatch.setattr(curses, 'tigetstr', tigetstr)
+    monkeypatch.setattr(jinxed, 'tigetstr', tigetstr)
     term = mock.Mock()
     term._sugar = {'mnemonic': 'xyz'}
     jinxed_mock = mock.Mock()
@@ -231,7 +231,7 @@ def test_resolve_capability(monkeypatch):
         assert False, "Should not be called"
 
     term.does_styling = False
-    monkeypatch.setattr(curses, 'tigetstr', raises_exception)
+    monkeypatch.setattr(jinxed, 'tigetstr', raises_exception)
 
     # exercise,
     assert resolve_capability(term, 'natural') == ''
@@ -245,7 +245,7 @@ def test_resolve_color(monkeypatch):
     def color_cap(digit):
         return f'seq-{digit}'
 
-    monkeypatch.setattr(curses, 'COLOR_RED', 1984)
+    monkeypatch.setattr(jinxed, 'COLOR_RED', 1984)
 
     # given, terminal with color capabilities
     term = mock.Mock()
@@ -341,7 +341,7 @@ def test_resolve_attribute_non_compoundables(monkeypatch):
     monkeypatch.setattr(blessed.formatters,
                         'resolve_capability',
                         resolve_cap)
-    monkeypatch.setattr(curses, 'tparm', fn_tparm)
+    monkeypatch.setattr(jinxed, 'tparm', fn_tparm)
 
     term = mock.Mock()
     term.normal = 'seq-normal'
@@ -369,9 +369,9 @@ def test_resolve_attribute_recursive_compoundables(monkeypatch):
     monkeypatch.setattr(blessed.formatters,
                         'resolve_capability',
                         resolve_cap)
-    monkeypatch.setattr(curses, 'tparm', fn_tparm)
-    monkeypatch.setattr(curses, 'COLOR_RED', 6502)
-    monkeypatch.setattr(curses, 'COLOR_BLUE', 6800)
+    monkeypatch.setattr(jinxed, 'tparm', fn_tparm)
+    monkeypatch.setattr(jinxed, 'COLOR_RED', 6502)
+    monkeypatch.setattr(jinxed, 'COLOR_BLUE', 6800)
 
     def color_cap(digit):
         return f'seq-{digit}'
@@ -449,7 +449,7 @@ def test_pickled_parameterizing_string(monkeypatch):
     # pickle.loads(dumps(...)) did not reproduce this issue,
     # first argument to tparm() is the sequence name, returned as-is;
     # subsequent arguments are usually Integers.
-    monkeypatch.setattr(curses, 'tparm', fn_tparm)
+    monkeypatch.setattr(jinxed, 'tparm', fn_tparm)
 
     # given,
     pstr = ParameterizingString('seqname', 'norm', 'cap-name')
@@ -470,48 +470,3 @@ def test_pickled_parameterizing_string(monkeypatch):
         assert zero == pickle.loads(pickle.dumps(zero, protocol=proto_num))
     w.send(zero)
     assert r.recv() == zero
-
-
-def test_tparm_returns_null(monkeypatch):
-    """Test 'tparm() returned NULL' is caught (win32 PDCurses systems)."""
-    # on win32, any calls to tparm raises curses.error with message,
-    # "tparm() returned NULL", function PyCurses_tparm of _cursesmodule.c
-    # local
-    from blessed.formatters import NullCallableString, ParameterizingString
-
-    def tparm(*args):
-        raise curses.error("tparm() returned NULL")
-
-    monkeypatch.setattr(curses, 'tparm', tparm)
-
-    term = mock.Mock()
-    term.normal = 'seq-normal'
-
-    pstr = ParameterizingString('cap', 'norm', 'seq-name')
-
-    value = pstr(0)
-    assert isinstance(value, NullCallableString)
-
-
-def test_tparm_other_exception(monkeypatch):
-    """Test 'tparm() returned NULL' is caught (win32 PDCurses systems)."""
-    # on win32, any calls to tparm raises curses.error with message,
-    # "tparm() returned NULL", function PyCurses_tparm of _cursesmodule.c
-    # local
-    from blessed.formatters import ParameterizingString
-
-    def tparm(*args):
-        raise curses.error("unexpected error in tparm()")
-
-    monkeypatch.setattr(curses, 'tparm', tparm)
-
-    term = mock.Mock()
-    term.normal = 'seq-normal'
-
-    pstr = ParameterizingString('cap', 'norm', 'seq-name')
-
-    try:
-        pstr('x')
-        assert False, "previous call should have raised curses.error"
-    except curses.error:
-        pass

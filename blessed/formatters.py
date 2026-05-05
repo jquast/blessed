@@ -11,8 +11,8 @@ if TYPE_CHECKING:  # pragma: no cover
     # local
     from blessed.terminal import Terminal
 
-# isort: off
-import jinxed as curses
+# 3rd party
+import jinxed
 
 
 def _make_colors() -> Set[str]:
@@ -65,7 +65,7 @@ class ParameterizingString(str):
         """
         Class constructor accepting 3 positional arguments.
 
-        :arg str cap: parameterized string suitable for curses.tparm()
+        :arg str cap: parameterized string suitable for jinxed.tparm()
         :arg str normal: terminating sequence for this capability (optional).
         :arg str name: name of this terminal capability (optional).
         """
@@ -83,7 +83,7 @@ class ParameterizingString(str):
         a :class:`FormattingString` capable of being called.
 
         :raises TypeError: Mismatch between capability and arguments
-        :raises curses.error: :func:`curses.tparm` raised an exception
+        :raises jinxed.error: :func:`jinxed.tparm` raised an exception
         :rtype: :class:`FormattingString` or :class:`NullCallableString`
         :returns: Callable string for given parameters
         """
@@ -91,7 +91,7 @@ class ParameterizingString(str):
             # Re-encode the cap, because tparm() takes a bytestring in Python
             # 3. However, appear to be a plain Unicode string otherwise so
             # concats work.
-            attr = curses.tparm(self.encode('latin1'), *args).decode('latin1')
+            attr = jinxed.tparm(self.encode('latin1'), *args).decode('latin1')
             return FormattingString(attr, self._normal)
         except TypeError as err:
             # If the first non-int (i.e. incorrect) arg was a string, suggest
@@ -103,7 +103,7 @@ class ParameterizingString(str):
             # Somebody passed a non-string; I don't feel confident
             # guessing what they were trying to do.
             raise
-        except curses.error as err:
+        except jinxed.error as err:
             # ignore 'tparm() returned NULL', you won't get any styling,
             # even if does_styling is True. This happens on win32 platforms
             # with http://www.lfd.uci.edu/~gohlke/pythonlibs/#curses installed
@@ -420,7 +420,7 @@ def resolve_color(term: 'Terminal', color: str) -> Union[NullCallableString, For
         # bright colors at 8-15:
         offset = 8 if 'bright_' in color else 0
         base_color = color.rsplit('_', 1)[-1]
-        fmt_attr = vga_color_cap(getattr(curses, f'COLOR_{base_color.upper()}') + offset)
+        fmt_attr = vga_color_cap(getattr(jinxed, f'COLOR_{base_color.upper()}') + offset)
         return FormattingString(fmt_attr, term.normal)
 
     assert base_color in X11_COLORNAMES_TO_RGB, (

@@ -10,13 +10,12 @@ from unittest import mock
 
 # 3rd party
 import pytest
+import jinxed
 
 # local
 from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, as_subprocess
 
-# isort: off
-import jinxed as curses
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
@@ -215,7 +214,7 @@ def test_a_keystroke():
 
 
 def test_get_keyboard_codes():
-    """Test all values returned by get_keyboard_codes are from curses."""
+    """Test all values returned by get_keyboard_codes are from curses(jinxed)."""
     import blessed.keyboard
     exemptions = dict(blessed.keyboard.CURSES_KEYCODE_OVERRIDE_MIXIN)
     # Add PUA overrides to exemptions since they intentionally override curses keys
@@ -256,12 +255,12 @@ def test_get_keyboard_codes():
             assert value == exemptions[keycode]
             continue
         if keycode[4:] in homemade_keycodes:
-            assert not hasattr(curses, keycode)
+            assert not hasattr(jinxed, keycode)
             assert hasattr(blessed.keyboard, keycode)
             assert getattr(blessed.keyboard, keycode) == value
         else:
-            assert hasattr(curses, keycode)
-            assert getattr(curses, keycode) == value
+            assert hasattr(jinxed, keycode)
+            assert getattr(jinxed, keycode) == value
 
 
 def test_alternative_left_right():
@@ -277,8 +276,8 @@ def test_alternative_left_right():
     term._cuf1 = 'seq-right'
     term._cub1 = 'seq-left'
     assert (_alternative_left_right(term) == {
-        'seq-right': curses.KEY_RIGHT,
-        'seq-left': curses.KEY_LEFT})
+        'seq-right': jinxed.KEY_RIGHT,
+        'seq-left': jinxed.KEY_LEFT})
 
 
 def test_cuf1_and_cub1_as_RIGHT_LEFT(any_term):
@@ -328,11 +327,11 @@ def test_get_keyboard_sequence(monkeypatch):
         b'seq-alt-cuf1',
         b'seq-alt-cub1_')
 
-    # patch curses functions
+    # patch jinxed functions
     def tigetstr_func(cap):
         return {CAP_SMALL: SEQ_SMALL, CAP_LARGE: SEQ_LARGE}[cap]
 
-    monkeypatch.setattr(curses, 'tigetstr', tigetstr_func)
+    monkeypatch.setattr(jinxed, 'tigetstr', tigetstr_func)
 
     monkeypatch.setattr(blessed.keyboard, 'capability_names',
                         dict(((KEY_SMALL, CAP_SMALL,),
@@ -355,8 +354,8 @@ def test_get_keyboard_sequence(monkeypatch):
 
     assert list(keymap.items()) == [
         (SEQ_LARGE.decode('latin1'), KEY_LARGE),
-        (SEQ_ALT_CUB1.decode('latin1'), curses.KEY_LEFT),
-        (SEQ_ALT_CUF1.decode('latin1'), curses.KEY_RIGHT),
+        (SEQ_ALT_CUB1.decode('latin1'), jinxed.KEY_LEFT),
+        (SEQ_ALT_CUF1.decode('latin1'), jinxed.KEY_RIGHT),
         (SEQ_SMALL.decode('latin1'), KEY_SMALL),
         (SEQ_MIXIN.decode('latin1'), KEY_MIXIN)]
 
@@ -626,25 +625,25 @@ def test_kp_begin_center_key():
         term.ungetch('\x1b[E')
         ks = term.inkey(timeout=0)
         assert ks and str(ks) == '\x1b[E'
-        assert ks.code == curses.KEY_B2
+        assert ks.code == jinxed.KEY_B2
         assert ks.name == 'KEY_CENTER'
 
         term.ungetch('\x1b[1;5E')
         ks = term.inkey(timeout=0)
         assert ks and str(ks) == '\x1b[1;5E'
-        assert ks.code == curses.KEY_B2
+        assert ks.code == jinxed.KEY_B2
         assert ks.name == 'KEY_CTRL_CENTER'
 
         term.ungetch('\x1b[1;3E')
         ks = term.inkey(timeout=0)
         assert ks and str(ks) == '\x1b[1;3E'
-        assert ks.code == curses.KEY_B2
+        assert ks.code == jinxed.KEY_B2
         assert ks.name == 'KEY_ALT_CENTER'
 
         term.ungetch('\x1b[1;7E')
         ks = term.inkey(timeout=0)
         assert ks and str(ks) == '\x1b[1;7E'
-        assert ks.code == curses.KEY_B2
+        assert ks.code == jinxed.KEY_B2
         assert ks.name == 'KEY_CTRL_ALT_CENTER'
 
     child('xterm')

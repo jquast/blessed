@@ -15,17 +15,14 @@ from typing import Dict
 # local
 from blessed import Terminal
 from blessed.dec_modes import DecModeResponse
-# local
 from .conftest import IS_WINDOWS
 
-if IS_WINDOWS:
-    # 3rd party
-    import jinxed as curses
-else:
+# 3rd party
+import jinxed
+if not IS_WINDOWS:
     # std imports
     import pty
     import termios
-    import jinxed as curses
 
 MAX_SUBPROC_TIME_SECONDS = 2  # no test should ever take over 2 seconds
 # extra time given for timeout-related tests for CI/slow machines, by percent
@@ -265,8 +262,8 @@ def unicode_cap(cap, term=None):
         val = term._jinxed_term.tigetstr(cap)
     else:
         try:
-            val = curses.tigetstr(cap)
-        except curses.error:
+            val = jinxed.tigetstr(cap)
+        except jinxed.error:
             val = None
 
     return val.decode('latin1') if val else ''
@@ -278,13 +275,13 @@ def unicode_parm(cap, *parms, term=None):
         cap = term._jinxed_term.tigetstr(cap)
     else:
         try:
-            cap = curses.tigetstr(cap)
-        except curses.error:
+            cap = jinxed.tigetstr(cap)
+        except jinxed.error:
             cap = None
     if cap:
         try:
-            val = curses.tparm(cap, *parms)
-        except curses.error:
+            val = jinxed.tparm(cap, *parms)
+        except jinxed.error:
             val = None
         if val:
             return val.decode('latin1')
@@ -429,13 +426,13 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
 
 class MockTigetstr():
     """
-    Wraps curses.tigetstr() to override specific capnames
+    Wraps jinxed.tigetstr() to override specific capnames
 
     Capnames and return values are provided as keyword arguments
     """
 
     def __init__(self, **kwargs):
-        self.callable = curses.tigetstr
+        self.callable = jinxed.tigetstr
         self.kwargs = kwargs
 
     def __call__(self, capname):

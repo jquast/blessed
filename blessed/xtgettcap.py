@@ -19,8 +19,31 @@ from typing import Dict
 # local
 from ._capabilities import XTGETTCAP_CAPABILITIES, TermcapResponse
 
-# CPR response as raw bytes (used as fence during reads)
+# CPR response regex (bytes for raw I/O via os.read).
 _RE_CPR_BYTES = re.compile(rb'\x1b\[([0-9]+);([0-9]+)R')
+
+
+def _read_response(fd: int, timeout: float) -> str:
+    """Read bytes from fd until CPR arrives or timeout; decode once at end."""
+    stime = time.time()
+    data = b''
+    while True:
+        remaining = timeout - (time.time() - stime)
+        if remaining <= 0:
+            break
+        ready, _, _ = select.select([fd], [], [], remaining)
+        if not ready:
+            break
+        try:
+            chunk = os.read(fd, 4096)
+        except OSError:
+            break
+        if not chunk:
+            break
+        data += chunk
+        if _RE_CPR_BYTES.search(data):
+            break
+    return data.decode('latin-1', errors='replace')
 
 
 def query_xtgettcap(stream_fd: int, timeout: float = 1.0) -> TermcapResponse:
@@ -70,26 +93,3 @@ def query_xtgettcap(stream_fd: int, timeout: float = 1.0) -> TermcapResponse:
     os.write(stream_fd, b'\r\x1b[K')
 
     return TermcapResponse(supported=True, capabilities=capabilities)
-
-
-def _read_response(fd: int, timeout: float) -> str:
-    """Read bytes from fd until CPR arrives or timeout; decode once at end."""
-    stime = time.time()
-    data = b''
-    while True:
-        remaining = timeout - (time.time() - stime)
-        if remaining <= 0:
-            break
-        ready, _, _ = select.select([fd], [], [], remaining)
-        if not ready:
-            break
-        try:
-            chunk = os.read(fd, 4096)
-        except OSError:
-            break
-        if not chunk:
-            break
-        data += chunk
-        if _RE_CPR_BYTES.search(data):
-            break
-    return data.decode('latin-1', errors='replace')

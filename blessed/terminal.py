@@ -16,7 +16,7 @@ import platform
 import warnings
 import contextlib
 import collections
-from typing import IO, Set, Dict, List, Match, Tuple, Union, Optional, Generator, SupportsIndex
+from typing import IO, Dict, List, Match, Tuple, Union, Optional, Generator, SupportsIndex
 
 # 3rd party
 import jinxed
@@ -189,8 +189,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         Initialize the terminal.
 
-        :arg str kind: A terminal string used by :func:`curses.setupterm`.
-            Defaults to the value of the ``TERM`` environment variable.
+        :arg str kind: A terminal string used for capability database, defaults to the value of the
+            ``TERM`` environment variable when undefined. If the terminal supports XTGETTCAP
+            extension, the 'TN' capability name reported has precedence over 'kind'.
 
         :arg file stream: A file-like object representing the Terminal output.
             Defaults to the original value of :obj:`sys.__stdout__`, like
@@ -228,17 +229,13 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         .. _jinxed: https://github.com/rockhopper-Technologies/jinxed
         """
         self.errors = [
-            f'parameters: kind={kind!r}, stream={stream!r}, force_styling={force_styling!r} '
+            f'parameters: kind={kind!r}, stream={stream!r}, force_styling={force_styling!r}'
         ]
         self._normal = None
 
         # we assume our input stream to be line-buffered until either the
         # cbreak of raw context manager methods are entered with an attached tty.
         self._line_buffered = True
-        self._kind_fallback = kind_fallback
-
-        # Timeout for init-time XTGETTCAP probe
-        self._init_xtgettcap_timeout: float = 1.0
 
         self._stream = stream
         self._keyboard_fd = None
@@ -255,17 +252,16 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         self.__init_set_styling(force_styling)
         if self.does_styling:
-            # Step 1: *Always* try for negotiated terminal capabilities using XTGETTCAP.  To provide
-            # easy testing, keyword argument '_xtgettcap_data' may be injected. Skip if
-            # cache was pre-populated or if _xtgettcap_data injected.
+            # Step 1: *Always* try for negotiated terminal capabilities using XTGETTCAP.
             if '_xtgettcap_cache' not in self.__dict__:
                 self._xtgettcap_cache: Optional[TermcapResponse] = None
                 self._xtgettcap_first_query_failed = False
+
                 # Set kwarg '_xtgettcap_data' to skip timeout or pty-automation/testing
                 if _xtgettcap_data is None and self.is_a_tty and self._init_descriptor is not None:
                     try:
-                        _xtgettcap_data = query_xtgettcap(stream_fd=self._init_descriptor,
-                                                          timeout=self._init_xtgettcap_timeout)
+                        _xtgettcap_data = query_xtgettcap(
+                            stream_fd=self._init_descriptor, timeout=1)
                     except OSError:
                         self.errors.append('XTGETTCAP probe failed (OSError)')
                         self._xtgettcap_first_query_failed = True
@@ -276,36 +272,24 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                     if not _xtgettcap_data.supported:
                         self.errors.append('XTGETTCAP probe: terminal does not support XTGETTCAP')
                     self._xtgettcap_cache = _xtgettcap_data
-                    # Use XTGETTCAP TN capability as terminal kind if available
-                    tn_kind = _xtgettcap_data.terminal_name
-                    if tn_kind:
-                        self._kind = tn_kind
 
-            # Step 2: Initialize jinxed virtual terminfo database.
-            # Try the requested kind first; if not in the virtual DB,
-            # fall back to kind_fallback.
+                    # override 'kind' when XTGETTCAP TN capability reported
+                    if _xtgettcap_data.terminal_name:
+                        self._kind = _xtgettcap_data.terminal_name
+
+            # Step 2: Initialize using jinxed and its limited-sized terminfo(5) database.
             try:
-                self._jinxed_term = jinxed.Terminal(
-                    self._kind, self._init_descriptor)
+                self._jinxed_term = jinxed.Terminal(self._kind, self._init_descriptor)
             except jinxed.error:
                 self.errors.append(
-                    f'jinxed Terminal(kind={self._kind!r}) failed, '
-                    f'trying fallback kind={self._kind_fallback!r}')
-                try:
-                    self._jinxed_term = jinxed.Terminal(
-                        self._kind_fallback, self._init_descriptor)
-                except jinxed.error as err:
-                    msg = (
-                        f'Failed to setupterm(kind={self._kind!r}'
-                        f' or {self._kind_fallback!r}): {err}')
-                    warnings.warn(msg)
-                    self.errors.append(msg)
-                    self._kind = None
-                    self._does_styling = False
+                    f'jinxed.Terminal({self._kind!r}, {self._init_descriptor}) '
+                    f'will try again using kind_fallback={kind_fallback!r}')
+                self._jinxed_term = jinxed.Terminal(kind_fallback, self._init_descriptor)
 
             # Step 3: Inject XTGETTCAP overrides into jinxed
             if self._xtgettcap_cache is not None and self._does_styling:
-                self._inject_xtgettcap_response(self._xtgettcap_cache)
+                self._jinxed_term.inject_xtgettcap(
+                    **self._xtgettcap_cache.make_jinxed_capabilities())
 
         # Step 4: Initialize keyboard infrastructure
         self.__init__keycodes()
@@ -1601,110 +1585,49 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         response = self.get_dec_mode(_DecPrivateMode.FOCUS_IN_OUT_EVENTS, timeout=timeout)
         return response.supported
 
-    def _inject_xtgettcap_response(self, tc: TermcapResponse) -> None:
-        """Inject XTGETTCAP results into jinxed."""
-        str_caps: Dict[str, str] = {}
-        num_caps: Dict[str, int] = {}
-        bool_caps: Set[str] = set()
-
-        for capname, value in tc.capabilities.items():
-            if not value:
-                if capname in jinxed.terminfo.BOOL_CAPS:
-                    bool_caps.add(capname)
-                continue
-            if capname in jinxed.terminfo.NUM_CAPS:
-                try:
-                    num_caps[capname] = int(value)
-                except ValueError:
-                    pass
-                continue
-            str_caps[capname] = value
-
-        self._jinxed_term.inject_xtgettcap(
-            str_caps=str_caps,
-            num_caps=num_caps,
-            bool_caps=bool_caps)
-
     def get_xtgettcap(self, timeout: Optional[float] = 1,  # pylint: disable=too-complex
                       force: bool = False) -> Optional[TermcapResponse]:
         """
         Query terminal capabilities via XTGETTCAP (DCS +q).
 
-        Sends XTGETTCAP queries to discover the terminal's built-in
-        terminfo capabilities, bypassing the local terminfo database.
-        Supported by xterm, foot, kitty, WezTerm, ghostty, and others.
-
-        Uses a probe-first strategy: sends a single capability query
-        first, then queries remaining capabilities only if the probe
-        succeeds.  This avoids visible garbage on terminals that do
-        not support XTGETTCAP.
+        Uses a probe-first CPR-fenced strategy to avoid visible garbage on
+        unsupported terminals and to stop reading as soon as all responses
+        arrive.  Keyboard input arriving during the query is preserved via
+        ``flushinp`` / ``ungetch``.
 
         When :attr:`is_a_tty` is False, returns ``None``.
-
         Responses are cached unless *force* is True.
-
-        :arg float timeout: Timeout in seconds per query round.
-        :arg bool force: Bypass cache and re-query the terminal.
-        :rtype: TermcapResponse or None
         """
         if not self.is_a_tty:
             return None
-
         if self._xtgettcap_cache is not None and not force:
             return self._xtgettcap_cache
-
         if self._xtgettcap_first_query_failed and not force:
             return None
 
-        # Phase 1: Probe with single capability via _query_with_boundary,
-        # which safely preserves any concurrent keyboard input and uses
-        # CPR boundary guard for fast negative detection.
+        # Phase 1: Probe with single capability to check support.
         probe_cap = XTGETTCAP_CAPABILITIES[0][0]
         probe_query = f'\x1bP+q{TermcapResponse.hex_encode(probe_cap)}\x1b\\'
         match = self._query_with_boundary(
             probe_query, TermcapResponse._RE_XTGETTCAP_RESPONSE, timeout)
-
         if match is None:
             self._xtgettcap_first_query_failed = True
-            # Erase any visible garbage from unsupported terminals.
-            # Before setupterm, capabilities are unavailable; use a
-            # hardcoded escape sequence.
-            try:
-                clear_eol: str = self.clear_eol
-            except jinxed.error:
-                clear_eol = '\x1b[K'
-            self.stream.write(f'\r{clear_eol}')
-            self.stream.flush()
             return None
 
         capabilities: Dict[str, str] = {}
         name, value = TermcapResponse.from_match(match)
         capabilities[name] = value
 
-        # Phase 2: Batch-query remaining capabilities.  We use
-        # flushinp() here because multiple DCS responses arrive, then
-        # re-buffer any non-DCS keyboard data via ungetch().
-        ctx = None
-        try:
-            if self._line_buffered:
-                ctx = self.cbreak()
-                ctx.__enter__()
-
-            for capname, _desc in XTGETTCAP_CAPABILITIES[1:]:
-                self.stream.write(f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\')
-            self.stream.flush()
-
-            raw = self.flushinp(timeout=timeout)
-            if raw:
-                capabilities.update(TermcapResponse.parse_capabilities(raw))
-                # Re-buffer any keyboard input that arrived alongside
-                remaining = TermcapResponse._RE_XTGETTCAP_RESPONSE.sub('', raw)
-                if remaining:
-                    self.ungetch(remaining)
-
-        finally:
-            if ctx is not None:
-                ctx.__exit__(None, None, None)
+        # Phase 2: Spray remaining capabilities, drain responses, preserve keyboard input.
+        for capname, _desc in XTGETTCAP_CAPABILITIES[1:]:
+            self.stream.write(f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\')
+        self.stream.flush()
+        raw = self.flushinp(timeout=timeout)
+        if raw:
+            capabilities.update(TermcapResponse.parse_capabilities(raw))
+            remaining = TermcapResponse._RE_XTGETTCAP_RESPONSE.sub('', raw)
+            if remaining:
+                self.ungetch(remaining)
 
         result = TermcapResponse(supported=True, capabilities=capabilities)
         self._xtgettcap_cache = result

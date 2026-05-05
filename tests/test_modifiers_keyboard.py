@@ -9,7 +9,7 @@ from .accessories import (TestTerminal, as_subprocess, assert_modifiers,
 from blessed.keyboard import Keystroke, LegacyCSIKeyEvent, ModifyOtherKeysEvent, resolve_sequence
 
 
-import jinxed as curses
+import jinxed
 
 
 def assert_ctrl_alt_modifiers(ks):
@@ -89,10 +89,10 @@ def test_keystroke_value_comprehensive(sequence, expected_value, needs_terminal)
 
 
 @pytest.mark.parametrize('code,expected_value', [
-    (curses.KEY_ENTER, '\n'),
-    (curses.KEY_UP, ''),
-    (curses.KEY_DOWN, ''),
-    (curses.KEY_F1, ''),
+    (jinxed.KEY_ENTER, '\n'),
+    (jinxed.KEY_UP, ''),
+    (jinxed.KEY_DOWN, ''),
+    (jinxed.KEY_F1, ''),
 ])
 def test_keystroke_value_by_keycode(code, expected_value):
     """Test keystroke.value property for keystrokes created with keycodes."""
@@ -405,7 +405,7 @@ def test_terminal_inkey_legacy_csi_modifiers():
     assert ks._alt is True
     assert ks._ctrl is False
     assert ks._shift is False
-    assert ks._code == curses.KEY_UP
+    assert ks._code == jinxed.KEY_UP
 
 
 @pytest.mark.parametrize('sequence,expected_key,expected_modifiers', [
@@ -617,7 +617,7 @@ def test_legacy_csi_modifiers_with_event_type_letter_form():
     assert event.key_id == 'Q'
     assert event.modifiers == 2
     assert event.event_type == 3
-    assert ks.code == curses.KEY_F2
+    assert ks.code == jinxed.KEY_F2
 
     term.ungetch('\x1b[1;5Q')
     ks = term.inkey(timeout=0)
@@ -641,7 +641,7 @@ def test_legacy_csi_modifiers_with_event_type_tilde_form():
     assert event.key_id == 24
     assert event.modifiers == 1
     assert event.event_type == 3
-    assert ks.code == curses.KEY_F12
+    assert ks.code == jinxed.KEY_F12
 
     term.ungetch('\x1b[24;2~')
     ks = term.inkey(timeout=0)
@@ -660,7 +660,7 @@ def test_terminal_inkey_legacy_csi_with_event_type():
     assert ks == letter_sequence
     assert ks._mode == -3
     assert ks._match.event_type == 3
-    assert ks.code == curses.KEY_F2
+    assert ks.code == jinxed.KEY_F2
 
     tilde_sequence = '\x1b[24;1:3~'
     term.ungetch(tilde_sequence)
@@ -668,7 +668,7 @@ def test_terminal_inkey_legacy_csi_with_event_type():
     assert ks == tilde_sequence
     assert ks._mode == -3
     assert ks._match.event_type == 3
-    assert ks.code == curses.KEY_F12
+    assert ks.code == jinxed.KEY_F12
 
 
 def test_legacy_csi_modifiers_event_type_edge_cases():
@@ -773,10 +773,10 @@ def test_match_ss3_fkey_invalid_final():
 
 
 @pytest.mark.parametrize('sequence,expected_code,expected_mod', [
-    ('\x1bO2P', curses.KEY_F1, 2),
-    ('\x1bO5Q', curses.KEY_F2, 5),
-    ('\x1bO3R', curses.KEY_F3, 3),
-    ('\x1bO6S', curses.KEY_F4, 6),
+    ('\x1bO2P', jinxed.KEY_F1, 2),
+    ('\x1bO5Q', jinxed.KEY_F2, 5),
+    ('\x1bO3R', jinxed.KEY_F3, 3),
+    ('\x1bO6S', jinxed.KEY_F4, 6),
 ])
 def test_match_ss3_fkey_valid(sequence, expected_code, expected_mod):
     """Test SS3 F-key sequences with modifiers parse correctly."""
@@ -796,7 +796,7 @@ def test_legacy_csi_e_center_key():
     term.ungetch('\x1b[1;5E')
     ks = term.inkey(timeout=0)
     assert ks is not None
-    assert ks.code == curses.KEY_B2
+    assert ks.code == jinxed.KEY_B2
     assert ks.modifiers == 5
 
 
@@ -866,7 +866,7 @@ def test_ss3_fkey_branches():
 
     ks = resolve('\x1bO2P')
     assert ks is not None
-    assert ks.code == curses.KEY_F1
+    assert ks.code == jinxed.KEY_F1
 
     ks = resolve('\x1bO2A')
     assert ks == '\x1bO'
@@ -1088,7 +1088,7 @@ def test_legacy_csi_modifiers_no_modifiers_integration():
     assert ks is not None
     assert ks._mode == -3
     assert ks.modifiers == 1
-    assert ks.code == curses.KEY_F1
+    assert ks.code == jinxed.KEY_F1
     result = ks._get_modified_keycode_name()
     assert result == 'KEY_F1'
     assert ks._ctrl is False
@@ -1168,7 +1168,7 @@ def test_build_appkeys_predicate_modifier_validation():
     term = TestTerminal(force_styling=True)
     term.ungetch('\x1b[1;2A')
     ks = term.inkey(timeout=0)
-    assert ks.code == curses.KEY_UP
+    assert ks.code == jinxed.KEY_UP
     assert ks._shift is True
     assert ks.is_shift_up() is True
     assert ks.is_ctrl_up() is False

@@ -2,8 +2,11 @@
 # std imports
 import re
 import typing
-from typing import Dict, Optional
+from typing import Dict, Set, Optional
 from collections import OrderedDict
+
+# 3rd party
+import jinxed.terminfo
 
 __all__ = (
     'CAPABILITY_DATABASE',
@@ -419,6 +422,34 @@ class TermcapResponse:
                 name, value = cls.from_match(match)
                 capabilities[name] = value
         return capabilities
+
+    def make_jinxed_capabilities(self) -> 'JinxedCapabilities':
+        """Classify discovered capabilities for injection into a jinxed Terminal."""
+        str_caps: Dict[str, str] = {}
+        num_caps: Dict[str, int] = {}
+        bool_caps: Set[str] = set()
+
+        for capname, value in self.capabilities.items():
+            if not value:
+                if capname in jinxed.terminfo.BOOL_CAPS:
+                    bool_caps.add(capname)
+                continue
+            if capname in jinxed.terminfo.NUM_CAPS:
+                try:
+                    num_caps[capname] = int(value)
+                except ValueError:
+                    pass
+                continue
+            str_caps[capname] = value
+
+        return JinxedCapabilities(str_caps=str_caps, num_caps=num_caps, bool_caps=bool_caps)
+
+
+class JinxedCapabilities(typing.NamedTuple):
+    """Classified terminfo capabilities ready for jinxed injection."""
+    str_caps: Dict[str, str] = {}
+    num_caps: Dict[str, int] = {}
+    bool_caps: Set[str] = set()
 
 
 class ITerm2Capabilities:

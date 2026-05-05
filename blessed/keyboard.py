@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Set, Dict, Match, Tuple, TypeVar, Optional
 from collections import OrderedDict, namedtuple
 
 # 3rd party
-import jinxed as curses
+import jinxed
 from jinxed.has_key import _capability_names as capability_names
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -206,7 +206,7 @@ class Keystroke(str):
         """Class constructor."""
         new = str.__new__(cls, ucs)
         new._name = name
-        new._code = code  # curses keycode is exposed for legacy API
+        new._code = code  # curses/jinxed keycode is exposed for legacy API
         new._mode = mode  # Internal mode indicator for different protocols
         new._match = match  # regex match object for protocol-specific data
         new._modifiers = cls._infer_modifiers(ucs, mode, match)
@@ -1021,10 +1021,10 @@ class Keystroke(str):
     def _get_ascii_value(self) -> Optional[str]:
         """Get value for keys matched by curses-imitated keycodes."""
         return {
-            curses.KEY_ENTER: '\n',
+            jinxed.KEY_ENTER: '\n',
             KEY_TAB: '\t',
-            curses.KEY_BACKSPACE: '\x08',
-            curses.KEY_EXIT: '\x1b',
+            jinxed.KEY_BACKSPACE: '\x08',
+            jinxed.KEY_EXIT: '\x1b',
         }.get(self._code)
 
     @property
@@ -1239,21 +1239,21 @@ def get_curses_keycodes() -> Dict[str, int]:
         values and their mnemonic name. Such as code ``260``, with the value of
         its key-name identity, ``'KEY_LEFT'``.
     """
-    _keynames = [attr for attr in dir(curses)
+    _keynames = [attr for attr in dir(jinxed)
                  if attr.startswith('KEY_')]
-    return {keyname: getattr(curses, keyname) for keyname in _keynames}
+    return {keyname: getattr(jinxed, keyname) for keyname in _keynames}
 
 
 def get_keyboard_codes() -> Dict[int, str]:
     """
-    Return mapping of keycode integer values paired by their curses key- name.
+    Return mapping of keycode integer values paired by their curses key name.
 
     :rtype: dict
     :returns: Dictionary of (code, name) pairs for curses keyboard constant
         values and their mnemonic name. Such as key ``260``, with the value of
         its identity, ``'KEY_LEFT'``.
 
-    These keys are derived from the attributes by the same of the curses module,
+    These keys are derived from the attributes by the same of the curses(jinxed) module,
     with the following exceptions:
 
     * ``KEY_DELETE`` in place of ``KEY_DC``
@@ -1309,9 +1309,9 @@ def _alternative_left_right(term: 'Terminal') -> typing.Dict[str, int]:
     # pylint: disable=protected-access
     keymap: typing.Dict[str, int] = {}
     if term._cuf1 and term._cuf1 != ' ':
-        keymap[term._cuf1] = curses.KEY_RIGHT
+        keymap[term._cuf1] = jinxed.KEY_RIGHT
     if term._cub1 and term._cub1 != '\b':
-        keymap[term._cub1] = curses.KEY_LEFT
+        keymap[term._cub1] = jinxed.KEY_LEFT
     return keymap
 
 
@@ -1456,7 +1456,7 @@ def resolve_sequence(text: str,
         and len(text) >= 2
         and (final or text[:2] not in prefixes)
         # pylint:disable=protected-access
-        and (ks is None or (ks.code == curses.KEY_EXIT and ks._mode is None))
+        and (ks is None or (ks.code == jinxed.KEY_EXIT and ks._mode is None))
     )
     if is_meta_escape:
         ks = Keystroke(ucs=text[:2])
@@ -1780,9 +1780,9 @@ def _match_legacy_ss3_fkey_form(text: str) -> Optional[Keystroke]:
 
 
 # We invent a few to fixup for missing keys in curses, these aren't especially required or useful
-# except to survive as API compatibility for the earliest versions of this software, before
-# "synthesized names" were created. They must be these values in this order, used as constants for
-# equality checks to Keystroke.code.
+# except to survive as API compatibility for the earliest version of this software before
+# "synthesized names" were created. They must be these specific ordinal values, as enum-like
+# constants for equality checks to Keystroke.code.
 KEY_TAB = 512
 KEY_KP_MULTIPLY = 513
 KEY_KP_ADD = 514
@@ -1807,10 +1807,10 @@ KEY_MENU = 530
 # Maps common control character unicode values to their curses keycodes
 # so they get proper names when received via Kitty protocol
 _KITTY_CONTROL_CHAR_TO_KEYCODE = {
-    27: curses.KEY_EXIT,        # Escape
+    27: jinxed.KEY_EXIT,        # Escape
     9: KEY_TAB,                 # Tab
-    13: curses.KEY_ENTER,       # Enter/Return
-    127: curses.KEY_BACKSPACE,  # Backspace/Delete
+    13: jinxed.KEY_ENTER,       # Enter/Return
+    127: jinxed.KEY_BACKSPACE,  # Backspace/Delete
 }
 
 # Kitty keyboard protocol PUA (Private Use Area) key codes
@@ -1934,57 +1934,57 @@ def _is_kitty_functional_key(unicode_key: int) -> bool:
 #: Maps CSI final characters to curses keycodes for sequences
 #: like ESC [ 1 ; mod [ABCDEFHPQRS]
 CSI_FINAL_CHAR_TO_KEYCODE = {
-    'A': curses.KEY_UP,
-    'B': curses.KEY_DOWN,
-    'C': curses.KEY_RIGHT,
-    'D': curses.KEY_LEFT,
-    'E': curses.KEY_B2,      # Center/Begin
-    'F': curses.KEY_END,
-    'H': curses.KEY_HOME,
-    'P': curses.KEY_F1,
-    'Q': curses.KEY_F2,
-    'R': curses.KEY_F3,
-    'S': curses.KEY_F4,
+    'A': jinxed.KEY_UP,
+    'B': jinxed.KEY_DOWN,
+    'C': jinxed.KEY_RIGHT,
+    'D': jinxed.KEY_LEFT,
+    'E': jinxed.KEY_B2,      # Center/Begin
+    'F': jinxed.KEY_END,
+    'H': jinxed.KEY_HOME,
+    'P': jinxed.KEY_F1,
+    'Q': jinxed.KEY_F2,
+    'R': jinxed.KEY_F3,
+    'S': jinxed.KEY_F4,
 }
 
 #: Maps CSI tilde numbers to curses keycodes for sequences
 #: like ESC [ num ; mod ~
 CSI_TILDE_NUM_TO_KEYCODE = {
-    2: curses.KEY_IC,        # Insert
-    3: curses.KEY_DC,        # Delete
-    5: curses.KEY_PPAGE,     # Page Up
-    6: curses.KEY_NPAGE,     # Page Down
-    7: curses.KEY_HOME,      # Home
-    8: curses.KEY_END,       # End
-    11: curses.KEY_F1,       # F1
-    12: curses.KEY_F2,       # F2
-    13: curses.KEY_F3,       # F3
-    14: curses.KEY_F4,       # F4
-    15: curses.KEY_F5,       # F5
-    17: curses.KEY_F6,       # F6
-    18: curses.KEY_F7,       # F7
-    19: curses.KEY_F8,       # F8
-    20: curses.KEY_F9,       # F9
-    21: curses.KEY_F10,      # F10
-    23: curses.KEY_F11,      # F11
-    24: curses.KEY_F12,      # F12
-    25: curses.KEY_F13,      # F13
-    26: curses.KEY_F14,      # F14
-    28: curses.KEY_F15,      # F15
+    2: jinxed.KEY_IC,        # Insert
+    3: jinxed.KEY_DC,        # Delete
+    5: jinxed.KEY_PPAGE,     # Page Up
+    6: jinxed.KEY_NPAGE,     # Page Down
+    7: jinxed.KEY_HOME,      # Home
+    8: jinxed.KEY_END,       # End
+    11: jinxed.KEY_F1,       # F1
+    12: jinxed.KEY_F2,       # F2
+    13: jinxed.KEY_F3,       # F3
+    14: jinxed.KEY_F4,       # F4
+    15: jinxed.KEY_F5,       # F5
+    17: jinxed.KEY_F6,       # F6
+    18: jinxed.KEY_F7,       # F7
+    19: jinxed.KEY_F8,       # F8
+    20: jinxed.KEY_F9,       # F9
+    21: jinxed.KEY_F10,      # F10
+    23: jinxed.KEY_F11,      # F11
+    24: jinxed.KEY_F12,      # F12
+    25: jinxed.KEY_F13,      # F13
+    26: jinxed.KEY_F14,      # F14
+    28: jinxed.KEY_F15,      # F15
     29: KEY_MENU,            # Menu
-    31: curses.KEY_F17,      # F17
-    32: curses.KEY_F18,      # F18
-    33: curses.KEY_F19,      # F19
-    34: curses.KEY_F20,      # F20
+    31: jinxed.KEY_F17,      # F17
+    32: jinxed.KEY_F18,      # F18
+    33: jinxed.KEY_F19,      # F19
+    34: jinxed.KEY_F20,      # F20
 }
 
 #: Maps SS3 final characters to curses keycodes for sequences
 #: like ESC O mod [PQRS]
 SS3_FKEY_TO_KEYCODE = {
-    'P': curses.KEY_F1,      # F1
-    'Q': curses.KEY_F2,      # F2
-    'R': curses.KEY_F3,      # F3
-    'S': curses.KEY_F4,      # F4
+    'P': jinxed.KEY_F1,      # F1
+    'Q': jinxed.KEY_F2,      # F2
+    'R': jinxed.KEY_F3,      # F3
+    'S': jinxed.KEY_F4,      # F4
 }
 
 #: In a perfect world, terminal emulators would always send exactly what
@@ -2005,35 +2005,35 @@ SS3_FKEY_TO_KEYCODE = {
 DEFAULT_SEQUENCE_MIXIN = (
     # these common control characters (and 127, ctrl+'?') mapped to
     # an application key definition.
-    (chr(10), curses.KEY_ENTER),
-    (chr(13), curses.KEY_ENTER),
-    (chr(8), curses.KEY_BACKSPACE),
+    (chr(10), jinxed.KEY_ENTER),
+    (chr(13), jinxed.KEY_ENTER),
+    (chr(8), jinxed.KEY_BACKSPACE),
     (chr(9), KEY_TAB),  # noqa
-    (chr(27), curses.KEY_EXIT),
-    (chr(127), curses.KEY_BACKSPACE),
+    (chr(27), jinxed.KEY_EXIT),
+    (chr(127), jinxed.KEY_BACKSPACE),
 
-    ("\x1b[A", curses.KEY_UP),
-    ("\x1b[B", curses.KEY_DOWN),
-    ("\x1b[C", curses.KEY_RIGHT),
-    ("\x1b[D", curses.KEY_LEFT),
-    ("\x1b[E", curses.KEY_B2),  # Center/Begin key
-    ("\x1b[1;2A", curses.KEY_SR),
-    ("\x1b[1;2B", curses.KEY_SF),
-    ("\x1b[1;2C", curses.KEY_SRIGHT),
-    ("\x1b[1;2D", curses.KEY_SLEFT),
-    ("\x1b[F", curses.KEY_END),
-    ("\x1b[H", curses.KEY_HOME),
+    ("\x1b[A", jinxed.KEY_UP),
+    ("\x1b[B", jinxed.KEY_DOWN),
+    ("\x1b[C", jinxed.KEY_RIGHT),
+    ("\x1b[D", jinxed.KEY_LEFT),
+    ("\x1b[E", jinxed.KEY_B2),  # Center/Begin key
+    ("\x1b[1;2A", jinxed.KEY_SR),
+    ("\x1b[1;2B", jinxed.KEY_SF),
+    ("\x1b[1;2C", jinxed.KEY_SRIGHT),
+    ("\x1b[1;2D", jinxed.KEY_SLEFT),
+    ("\x1b[F", jinxed.KEY_END),
+    ("\x1b[H", jinxed.KEY_HOME),
     # not sure where these are from .. please report
-    ("\x1b[K", curses.KEY_END),
-    ("\x1b[U", curses.KEY_NPAGE),
-    ("\x1b[V", curses.KEY_PPAGE),
+    ("\x1b[K", jinxed.KEY_END),
+    ("\x1b[U", jinxed.KEY_NPAGE),
+    ("\x1b[V", jinxed.KEY_PPAGE),
 
     # keys sent after term.smkx (keypad_xmit) is emitted, source:
     # http://www.xfree86.org/current/ctlseqs.html#PC-Style%20Function%20Keys
     # http://fossies.org/linux/rxvt/doc/rxvtRef.html#KeyCodes
     #
     # keypad, numlock on
-    ("\x1bOM", curses.KEY_ENTER),
+    ("\x1bOM", jinxed.KEY_ENTER),
     ("\x1bOj", KEY_KP_MULTIPLY),
     ("\x1bOk", KEY_KP_ADD),
     ("\x1bOl", KEY_KP_SEPARATOR),
@@ -2053,53 +2053,53 @@ DEFAULT_SEQUENCE_MIXIN = (
     ("\x1bOy", KEY_KP_9),
 
     # keypad, numlock off
-    ("\x1b[1~", curses.KEY_HOME),         # home
-    ("\x1b[2~", curses.KEY_IC),           # insert (0)
-    ("\x1b[3~", curses.KEY_DC),           # delete (.), "Execute"
-    ("\x1b[4~", curses.KEY_END),          # end
-    ("\x1b[5~", curses.KEY_PPAGE),        # pgup   (9)
-    ("\x1b[6~", curses.KEY_NPAGE),        # pgdown (3)
-    ("\x1b[7~", curses.KEY_HOME),         # home
-    ("\x1b[8~", curses.KEY_END),          # end
-    ("\x1b[OA", curses.KEY_UP),           # up     (8)
-    ("\x1b[OB", curses.KEY_DOWN),         # down   (2)
-    ("\x1b[OC", curses.KEY_RIGHT),        # right  (6)
-    ("\x1b[OD", curses.KEY_LEFT),         # left   (4)
-    ("\x1b[OF", curses.KEY_END),          # end    (1)
-    ("\x1b[OH", curses.KEY_HOME),         # home   (7)
+    ("\x1b[1~", jinxed.KEY_HOME),         # home
+    ("\x1b[2~", jinxed.KEY_IC),           # insert (0)
+    ("\x1b[3~", jinxed.KEY_DC),           # delete (.), "Execute"
+    ("\x1b[4~", jinxed.KEY_END),          # end
+    ("\x1b[5~", jinxed.KEY_PPAGE),        # pgup   (9)
+    ("\x1b[6~", jinxed.KEY_NPAGE),        # pgdown (3)
+    ("\x1b[7~", jinxed.KEY_HOME),         # home
+    ("\x1b[8~", jinxed.KEY_END),          # end
+    ("\x1b[OA", jinxed.KEY_UP),           # up     (8)
+    ("\x1b[OB", jinxed.KEY_DOWN),         # down   (2)
+    ("\x1b[OC", jinxed.KEY_RIGHT),        # right  (6)
+    ("\x1b[OD", jinxed.KEY_LEFT),         # left   (4)
+    ("\x1b[OF", jinxed.KEY_END),          # end    (1)
+    ("\x1b[OH", jinxed.KEY_HOME),         # home   (7)
 
     # The vt220 placed F1-F4 above the keypad, in place of actual
     # F1-F4 were local functions (hold screen, print screen,
     # set up, data/talk, break).
-    ("\x1bOP", curses.KEY_F1),
-    ("\x1bOQ", curses.KEY_F2),
-    ("\x1bOR", curses.KEY_F3),
-    ("\x1bOS", curses.KEY_F4),
+    ("\x1bOP", jinxed.KEY_F1),
+    ("\x1bOQ", jinxed.KEY_F2),
+    ("\x1bOR", jinxed.KEY_F3),
+    ("\x1bOS", jinxed.KEY_F4),
 
     # Kitty disambiguate mode F-keys (CSI form instead of SS3)
-    ("\x1b[P", curses.KEY_F1),
-    ("\x1b[Q", curses.KEY_F2),
-    ("\x1b[13~", curses.KEY_F3),
-    ("\x1b[S", curses.KEY_F4),
+    ("\x1b[P", jinxed.KEY_F1),
+    ("\x1b[Q", jinxed.KEY_F2),
+    ("\x1b[13~", jinxed.KEY_F3),
+    ("\x1b[S", jinxed.KEY_F4),
 )
 
 #: Override mixins for a few curses constants with easier
 #: mnemonics: there may only be a 1:1 mapping when only a
 #: keycode (int) is given, where these phrases are preferred.
 CURSES_KEYCODE_OVERRIDE_MIXIN = (
-    ('KEY_DELETE', curses.KEY_DC),
-    ('KEY_INSERT', curses.KEY_IC),
-    ('KEY_PGUP', curses.KEY_PPAGE),
-    ('KEY_PGDOWN', curses.KEY_NPAGE),
-    ('KEY_ESCAPE', curses.KEY_EXIT),
-    ('KEY_SUP', curses.KEY_SR),
-    ('KEY_SDOWN', curses.KEY_SF),
-    ('KEY_UP_LEFT', curses.KEY_A1),
-    ('KEY_UP_RIGHT', curses.KEY_A3),
-    ('KEY_CENTER', curses.KEY_B2),
-    ('KEY_BEGIN', curses.KEY_BEG),
-    ('KEY_DOWN_LEFT', curses.KEY_C1),
-    ('KEY_DOWN_RIGHT', curses.KEY_C3),
+    ('KEY_DELETE', jinxed.KEY_DC),
+    ('KEY_INSERT', jinxed.KEY_IC),
+    ('KEY_PGUP', jinxed.KEY_PPAGE),
+    ('KEY_PGDOWN', jinxed.KEY_NPAGE),
+    ('KEY_ESCAPE', jinxed.KEY_EXIT),
+    ('KEY_SUP', jinxed.KEY_SR),
+    ('KEY_SDOWN', jinxed.KEY_SF),
+    ('KEY_UP_LEFT', jinxed.KEY_A1),
+    ('KEY_UP_RIGHT', jinxed.KEY_A3),
+    ('KEY_CENTER', jinxed.KEY_B2),
+    ('KEY_BEGIN', jinxed.KEY_BEG),
+    ('KEY_DOWN_LEFT', jinxed.KEY_C1),
+    ('KEY_DOWN_RIGHT', jinxed.KEY_C3),
 )
 
 #: PUA keycode overrides to remove _PUA suffix from user-facing names.

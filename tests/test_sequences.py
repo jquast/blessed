@@ -5,6 +5,7 @@ import platform
 from io import StringIO
 
 # 3rd party
+import jinxed
 import pytest
 
 # local
@@ -168,7 +169,7 @@ def test_inject_move_x():
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         COL = 5
-        with mock.patch('curses.tigetstr', side_effect=MockTigetstr(hpa=None)):
+        with mock.patch('jinxed.tigetstr', side_effect=MockTigetstr(hpa=None)):
             with t.location(x=COL):
                 pass
         expected_output = ''.join((
@@ -190,7 +191,7 @@ def test_inject_move_y():
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         ROW = 5
-        with mock.patch('curses.tigetstr', side_effect=MockTigetstr(vpa=None)):
+        with mock.patch('jinxed.tigetstr', side_effect=MockTigetstr(vpa=None)):
             with t.location(y=ROW):
                 pass
         expected_output = ''.join((

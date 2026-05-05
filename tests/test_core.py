@@ -13,6 +13,7 @@ from io import StringIO
 from unittest import mock
 
 # 3rd party
+import jinxed
 import pytest
 
 # local
@@ -243,19 +244,12 @@ def test_setupterm_invalid_issue39():
 
 
 def test_setupterm_invalid_has_no_styling():
-    """An unknown TERM with bad fallback disables styling."""
-    def child():
-        warnings.filterwarnings("ignore", category=UserWarning)
-
-        term = TestTerminal(
+    """An unknown TERM with bad fallback raises jinxed.error."""
+    with pytest.raises(jinxed.error, match='xxXbadXxx'):
+        TestTerminal(
             kind='xxXunknownXxx', force_styling=True,
             kind_fallback='xxXbadXxx')
-        assert term.kind is None
-        assert not term.does_styling
-        assert term.number_of_colors == 0
-        warnings.resetwarnings()
-
-    child()
+    warnings.resetwarnings()
 
 
 def test_IOUnsupportedOperation():
