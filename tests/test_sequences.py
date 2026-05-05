@@ -24,7 +24,7 @@ except ImportError:
 def test_capability():
     """Check that capability lookup works."""
     # Also test that Terminal grabs a reasonable default stream.
-    t = TestTerminal()
+    t = TestTerminal(force_styling=True)
     sc = unicode_cap('sc', term=t)
     assert t.save == sc
     assert t.save == sc  # Make sure caching doesn't screw it up.

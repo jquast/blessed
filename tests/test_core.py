@@ -360,7 +360,7 @@ def test_no_preferredencoding_fallback():
     def child():
         with mock.patch('locale.getpreferredencoding') as get_enc:
             get_enc.return_value = ''
-            t = TestTerminal()
+            t = TestTerminal(force_styling=True)
             assert t._encoding == 'UTF-8'
 
     child()
@@ -370,12 +370,13 @@ def test_no_preferredencoding_fallback():
 def test_unknown_preferredencoding_warned_and_fallback():
     """Ensure a locale without a codec emits a warning."""
     def child():
-        with mock.patch('locale.getpreferredencoding') as get_enc:
+        with mock.patch('locale.getpreferredencoding') as get_enc, \
+             mock.patch('os.isatty', return_value=True):
             get_enc.return_value = '---unknown--encoding---'
             with pytest.warns(UserWarning, match=(
                     'LookupError: unknown encoding: ---unknown--encoding---, '
                     'defaulting to UTF-8 for keyboard.')):
-                t = TestTerminal()
+                t = TestTerminal(force_styling=True)
                 assert t._encoding == 'UTF-8'
 
     child()

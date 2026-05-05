@@ -123,11 +123,14 @@ def test_raw_input_no_kb():
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_raw_input_with_kb():
     """raw should call tty.setraw() when with keyboard."""
-    term = TestTerminal()
-    assert term._keyboard_fd is not None
-    with mock.patch("tty.setraw") as mock_setraw:
-        with term.raw():
-            assert mock_setraw.called
+    @as_subprocess
+    def child():
+        term = TestTerminal()
+        assert term._keyboard_fd is not None
+        with mock.patch("tty.setraw") as mock_setraw:
+            with term.raw():
+                assert mock_setraw.called
+    child()
 
 
 def test_stdout_notty_kb_is_None():
