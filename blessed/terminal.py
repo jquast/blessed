@@ -256,9 +256,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             # Step 1: Try XTGETTCAP first via lightweight query that does
             # not require curses or jinxed initialization.  Skip if cache
             # was pre-populated or if _xtgettcap_data was injected.
+            xtgettcap_data = _xtgettcap_data
             if '_xtgettcap_cache' not in self.__dict__:
                 self._xtgettcap_cache: Optional[TermcapResponse] = None
-                xtgettcap_data = _xtgettcap_data
                 if xtgettcap_data is None and self.is_a_tty:
                     xtgettcap_data = self._try_xtgettcap()
                     if xtgettcap_data is None:
@@ -303,7 +303,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         # Step 4: Initialize keyboard infrastructure
         self.__init__keycodes()
-        self.__init__dec_private_modes()
 
         # Step 5: Finalize capabilities using best available data
         self.__init__color_capabilities()
@@ -317,6 +316,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         # Device Attributes (DA1) cache and sticky failure tracking
         self._dec_mode_cache: Dict[int, int] = {}
+        self._dec_first_query_failed = False
+        self._dec_any_query_succeeded = False
         self._device_attributes_cache: Optional[DeviceAttribute] = None
         self._device_attributes_first_query_failed = False
 
@@ -341,7 +342,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         # XTGETTCAP cache and sticky failure tracking
         if '_xtgettcap_cache' not in self.__dict__:
-            self._xtgettcap_cache: Optional[TermcapResponse] = None
+            self._xtgettcap_cache: Optional[TermcapResponse] = None  # type: ignore[no-redef]
         self._xtgettcap_first_query_failed = False
 
         # Kitty Graphics protocol detection cache

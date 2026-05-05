@@ -270,8 +270,8 @@ XTGETTCAP_CAPABILITIES = (
     # String capabilities -- user-defined (xterm convention)
     ("u6", "CPR response format"),
     ("u7", "CPR request"),
-    ("u8", "DA request"),
-    ("u9", "DA response"),
+    ("u8", "DA response format"),
+    ("u9", "DA request"),
     # Extended capabilities -- modern terminal features
     ("Ms", "Clipboard via OSC 52"),
     ("Smulx", "Styled underlines"),
