@@ -35,7 +35,7 @@ def test_null_location(all_terms):
         with t.location():
             pass
         expected_output = ''.join(
-            (unicode_cap('sc'), unicode_cap('rc')))
+            (unicode_cap('sc', term=t), unicode_cap('rc', term=t)))
         assert t.stream.getvalue() == expected_output
 
     child(all_terms)

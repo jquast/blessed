@@ -255,22 +255,28 @@ def echo_off(fd):
         yield
 
 
-def unicode_cap(cap):
+def unicode_cap(cap, term=None):
     """Return the result of ``tigetstr`` except as Unicode."""
-    try:
-        val = curses.tigetstr(cap)
-    except curses.error:
-        val = None
+    if term is not None:
+        val = term._jinxed_term.tigetstr(cap)
+    else:
+        try:
+            val = curses.tigetstr(cap)
+        except curses.error:
+            val = None
 
     return val.decode('latin1') if val else ''
 
 
-def unicode_parm(cap, *parms):
+def unicode_parm(cap, *parms, term=None):
     """Return the result of ``tparm(tigetstr())`` except as Unicode."""
-    try:
-        cap = curses.tigetstr(cap)
-    except curses.error:
-        cap = None
+    if term is not None:
+        cap = term._jinxed_term.tigetstr(cap)
+    else:
+        try:
+            cap = curses.tigetstr(cap)
+        except curses.error:
+            cap = None
     if cap:
         try:
             val = curses.tparm(cap, *parms)

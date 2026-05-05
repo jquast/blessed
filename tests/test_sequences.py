@@ -27,7 +27,7 @@ def test_capability():
     def child():
         # Also test that Terminal grabs a reasonable default stream.
         t = TestTerminal()
-        sc = unicode_cap('sc')
+        sc = unicode_cap('sc', term=t)
         assert t.save == sc
         assert t.save == sc  # Make sure caching doesn't screw it up.
 
@@ -50,7 +50,7 @@ def test_capability_with_forced_tty():
     @as_subprocess
     def child():
         t = TestTerminal(stream=StringIO(), force_styling=True)
-        assert t.save == unicode_cap('sc')
+        assert t.save == unicode_cap('sc', term=t)
 
     child()
 
@@ -99,7 +99,7 @@ def test_parametrization():
     @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
-        assert term.cup(3, 4) == unicode_parm('cup', 3, 4)
+        assert term.cup(3, 4) == unicode_parm('cup', 3, 4, term=term)
 
     child()
 
@@ -132,10 +132,10 @@ def test_location_with_styling(all_terms):
         with t.location(3, 4):
             t.stream.write('hi')
         expected_output = ''.join(
-            (unicode_cap('sc') or '\x1b[s',
-             unicode_parm('cup', 4, 3),
+            (unicode_cap('sc', term=t) or '\x1b[s',
+             unicode_parm('cup', 4, 3, term=t),
              'hi',
-             unicode_cap('rc') or '\x1b[u'))
+             unicode_cap('rc', term=t) or '\x1b[u'))
         assert t.stream.getvalue() == expected_output
 
     child_with_styling(all_terms)
@@ -163,14 +163,14 @@ def test_horizontal_location(all_terms):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location(x=5):
             pass
-        _hpa = unicode_parm('hpa', 5)
+        _hpa = unicode_parm('hpa', 5, term=t)
         if not _hpa and (kind.startswith('screen') or
                          kind.startswith('ansi')):
             _hpa = '\x1b[6G'
         expected_output = ''.join(
-            (unicode_cap('sc') or '\x1b[s',
+            (unicode_cap('sc', term=t) or '\x1b[s',
              _hpa,
-             unicode_cap('rc') or '\x1b[u'))
+             unicode_cap('rc', term=t) or '\x1b[u'))
         assert (t.stream.getvalue() == expected_output), (
             repr(t.stream.getvalue()), repr(expected_output))
 
@@ -184,15 +184,15 @@ def test_vertical_location(all_terms):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location(y=5):
             pass
-        _vpa = unicode_parm('vpa', 5)
+        _vpa = unicode_parm('vpa', 5, term=t)
         if not _vpa and (kind.startswith('screen') or
                          kind.startswith('ansi')):
             _vpa = '\x1b[6d'
 
         expected_output = ''.join(
-            (unicode_cap('sc') or '\x1b[s',
+            (unicode_cap('sc', term=t) or '\x1b[s',
              _vpa,
-             unicode_cap('rc') or '\x1b[u'))
+             unicode_cap('rc', term=t) or '\x1b[u'))
         assert t.stream.getvalue() == expected_output
 
     child(all_terms)
@@ -209,7 +209,7 @@ def test_inject_move_x():
             with t.location(x=COL):
                 pass
         expected_output = ''.join(
-            (unicode_cap('sc') or '\x1b[s', f'\x1b[{COL + 1}G', unicode_cap('rc') or '\x1b[u'),
+            (unicode_cap('sc', term=t) or '\x1b[s', f'\x1b[{COL + 1}G', unicode_cap('rc', term=t) or '\x1b[u'),
         )
         assert t.stream.getvalue() == expected_output
         assert t.move_x(COL) == f'\x1b[{COL + 1}G'
@@ -230,7 +230,7 @@ def test_inject_move_y():
             with t.location(y=ROW):
                 pass
         expected_output = ''.join(
-            (unicode_cap('sc') or '\x1b[s', f'\x1b[{ROW + 1}d', unicode_cap('rc') or '\x1b[u')
+            (unicode_cap('sc', term=t) or '\x1b[s', f'\x1b[{ROW + 1}d', unicode_cap('rc', term=t) or '\x1b[u')
         )
         assert t.stream.getvalue() == expected_output
         assert t.move_y(ROW) == f'\x1b[{ROW + 1}d'
@@ -276,9 +276,9 @@ def test_zero_location(all_terms):
         with t.location(0, 0):
             pass
         expected_output = ''.join(
-            (unicode_cap('sc') or '\x1b[s',
-             unicode_parm('cup', 0, 0),
-             unicode_cap('rc') or '\x1b[u'))
+            (unicode_cap('sc', term=t) or '\x1b[s',
+             unicode_parm('cup', 0, 0, term=t),
+             unicode_cap('rc', term=t) or '\x1b[u'))
         assert t.stream.getvalue() == expected_output
 
     child(all_terms)
@@ -290,10 +290,10 @@ def test_mnemonic_colors(all_terms):
     @as_subprocess
     def child(kind):
         def color(t, num):
-            return t.number_of_colors and unicode_parm('setaf', num) or ''
+            return t.number_of_colors and unicode_parm('setaf', num, term=t) or ''
 
         def on_color(t, num):
-            return t.number_of_colors and unicode_parm('setab', num) or ''
+            return t.number_of_colors and unicode_parm('setab', num, term=t) or ''
 
         # Avoid testing red, blue, yellow, and cyan, since they might someday
         # change depending on terminal type.
