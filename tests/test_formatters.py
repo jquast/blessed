@@ -209,6 +209,9 @@ def test_resolve_capability(monkeypatch):
     monkeypatch.setattr(curses, 'tigetstr', tigetstr)
     term = mock.Mock()
     term._sugar = {'mnemonic': 'xyz'}
+    jinxed_mock = mock.Mock()
+    jinxed_mock.tigetstr = tigetstr
+    term._jinxed_term = jinxed_mock
 
     # exercise
     assert resolve_capability(term, 'mnemonic') == 'seq-xyz'
@@ -218,7 +221,7 @@ def test_resolve_capability(monkeypatch):
     def tigetstr_none(attr):
         return None
 
-    monkeypatch.setattr(curses, 'tigetstr', tigetstr_none)
+    jinxed_mock.tigetstr = tigetstr_none
 
     # exercise,
     assert resolve_capability(term, 'natural') == ''

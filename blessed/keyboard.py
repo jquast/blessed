@@ -1349,7 +1349,7 @@ def get_keyboard_sequences(term: 'Terminal') -> typing.OrderedDict[str, int]:
     #
     sequence_map = {
         seq.decode('latin1'): val for seq, val in (
-            (curses.tigetstr(cap), val) for (val, cap) in capability_names.items()
+            (term._jinxed_term.tigetstr(cap), val) for (val, cap) in capability_names.items()
         ) if seq
     } if term.does_styling else {}
 

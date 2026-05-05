@@ -288,10 +288,11 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             # Try the requested kind first; if not in the virtual DB,
             # fall back to kind_fallback.
             try:
-                curses.setupterm(self._kind, self._init_descriptor)
+                self._jinxed_term = curses.Terminal(
+                    self._kind, self._init_descriptor)
             except curses.error:
                 try:
-                    curses.setupterm(
+                    self._jinxed_term = curses.Terminal(
                         self._kind_fallback, self._init_descriptor)
                 except curses.error as err:
                     msg = (
@@ -301,12 +302,10 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                     self.errors.append(msg)
                     self._kind = None
                     self._does_styling = False
-                else:
-                    if _CUR_TERM is None:
-                        _CUR_TERM = self._kind_fallback
-            else:
-                if _CUR_TERM is None:
-                    _CUR_TERM = self._kind
+
+            # Track kind for use_curses singleton detection
+            if self._use_curses and _CUR_TERM is None:
+                _CUR_TERM = self._kind if self._kind else self._kind_fallback
 
             # Step 3: Inject XTGETTCAP overrides into jinxed
             if xtgettcap_data is not None:
@@ -455,7 +454,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         elif IS_WINDOWS or os.environ.get('COLORTERM') in {'truecolor', '24bit'}:
             self.number_of_colors = 1 << 24
         else:
-            self.number_of_colors = max(0, curses.tigetnum('colors') or -1)
+            self.number_of_colors = max(0, self._jinxed_term.tigetnum('colors') or -1)
 
     def __clear_color_capabilities(self) -> None:
         for cached_color_cap in set(dir(self)) & COLORS:
@@ -1613,8 +1612,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         response = self.get_dec_mode(_DecPrivateMode.FOCUS_IN_OUT_EVENTS, timeout=timeout)
         return response.supported
 
-    @staticmethod
-    def _inject_termcap_response(tc: TermcapResponse) -> None:
+    def _inject_termcap_response(self, tc: TermcapResponse) -> None:
         """Convert a TermcapResponse into jinxed XTGETTCAP injection."""
         from jinxed.terminfo import BOOL_CAPS, NUM_CAPS
 
@@ -1637,7 +1635,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             # Otherwise treat as string capability
             str_caps[capname] = value
 
-        curses.inject_xtgettcap(
+        self._jinxed_term.inject_xtgettcap(
             str_caps=str_caps,
             num_caps=num_caps,
             bool_caps=bool_caps)
@@ -1656,8 +1654,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         except Exception:
             return None
 
-    @staticmethod
-    def _inject_xtgettcap_response(tc: 'XtgettcapResponse') -> None:
+    def _inject_xtgettcap_response(self, tc: 'XtgettcapResponse') -> None:
         """Inject lightweight XTGETTCAP results into jinxed."""
         from jinxed.terminfo import BOOL_CAPS, NUM_CAPS
 
@@ -1678,7 +1675,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 continue
             str_caps[capname] = value
 
-        curses.inject_xtgettcap(
+        self._jinxed_term.inject_xtgettcap(
             str_caps=str_caps,
             num_caps=num_caps,
             bool_caps=bool_caps)

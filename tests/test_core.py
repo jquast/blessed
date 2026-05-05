@@ -592,3 +592,57 @@ def test_get_fgcolor_bgcolor_invalid_bits():
         term.get_fgcolor(bits=24)
     with pytest.raises(ValueError, match=r"bits must be 8 or 16, got 32"):
         term.get_bgcolor(bits=32)
+
+
+def test_multiple_terminal_kinds():
+    """Multiple Terminal instances with different kinds retain correct capabilities."""
+    term_a = TestTerminal(kind='xterm-256color', force_styling=True)
+    colors_a = term_a.number_of_colors
+    assert colors_a == 256
+
+    term_b = TestTerminal(kind='vt220', force_styling=True)
+    colors_b = term_b.number_of_colors
+    assert colors_b == 0
+
+    assert term_a.number_of_colors == 256
+    assert term_b.number_of_colors == 0
+
+
+def test_multiple_terminal_kinds_bool_caps():
+    """String capability presence survives terminal kind switching."""
+    term_a = TestTerminal(kind='xterm-256color', force_styling=True)
+    assert term_a.dim != ''
+
+    term_b = TestTerminal(kind='vt220', force_styling=True)
+    assert term_b.dim == ''
+
+    assert term_a.dim != ''
+    assert term_b.dim == ''
+
+
+def test_multiple_terminal_kinds_alt_screen():
+    """Alternate screen capability survives terminal kind switching."""
+    term_a = TestTerminal(kind='xterm-256color', force_styling=True)
+    smcup_a = term_a.enter_fullscreen
+    assert smcup_a != ''
+
+    term_b = TestTerminal(kind='vt220', force_styling=True)
+    smcup_b = term_b.enter_fullscreen
+    assert smcup_b == ''
+
+    assert term_a.enter_fullscreen != ''
+    assert term_b.enter_fullscreen == ''
+
+
+def test_multiple_terminal_kinds_key_codes():
+    """Key codes survive terminal kind switching."""
+    term_a = TestTerminal(kind='xterm-256color', force_styling=True)
+    home_a = term_a.khome
+    assert home_a == '\x1bOH'
+
+    term_b = TestTerminal(kind='screen', force_styling=True)
+    home_b = term_b.khome
+    assert home_b == '\x1b[1~'
+
+    assert term_a.khome == '\x1bOH'
+    assert term_b.khome == '\x1b[1~'

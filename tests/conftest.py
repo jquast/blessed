@@ -97,29 +97,22 @@ def detect_curses_contamination(request):
     initializes curses in the parent process.
     """
     if IS_WINDOWS:
-        # Windows doesn't have the curses singleton limitation
         yield
         return
 
     if TEST_BENCHMARK:
-        # Benchmark tests intentionally instantiate Terminal in parent process
         yield
         return
 
-    # Import here to avoid issues if module not yet imported
     import blessed.terminal  # pylint: disable=import-outside-toplevel
 
-    # Record the state before the test
     before = blessed.terminal._CUR_TERM
 
-    # Run the test
     yield
 
-    # Check if curses was initialized during the test
     after = blessed.terminal._CUR_TERM
 
     if before is None and after is not None:
-        # Curses was initialized during this test in the parent process
         test_name = request.node.nodeid
         pytest.fail(
             f"\n{'=' * 70}\n"

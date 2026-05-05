@@ -364,9 +364,10 @@ def test_get_keyboard_sequence(monkeypatch):
         b'seq-alt-cub1_')
 
     # patch curses functions
-    monkeypatch.setattr(curses, 'tigetstr',
-                        lambda cap: {CAP_SMALL: SEQ_SMALL,
-                                     CAP_LARGE: SEQ_LARGE}[cap])
+    tigetstr_func = lambda cap: {CAP_SMALL: SEQ_SMALL,
+                                 CAP_LARGE: SEQ_LARGE}[cap]
+
+    monkeypatch.setattr(curses, 'tigetstr', tigetstr_func)
 
     monkeypatch.setattr(blessed.keyboard, 'capability_names',
                         dict(((KEY_SMALL, CAP_SMALL,),
@@ -379,8 +380,12 @@ def test_get_keyboard_sequence(monkeypatch):
 
     # patch for _alternative_left_right
     term = mock.Mock()
+    term.does_styling = True
     term._cuf1 = SEQ_ALT_CUF1.decode('latin1')
     term._cub1 = SEQ_ALT_CUB1.decode('latin1')
+    jinxed_mock = mock.Mock()
+    jinxed_mock.tigetstr = tigetstr_func
+    term._jinxed_term = jinxed_mock
     keymap = blessed.keyboard.get_keyboard_sequences(term)
 
     assert list(keymap.items()) == [
