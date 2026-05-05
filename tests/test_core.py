@@ -240,7 +240,6 @@ def test_setupterm_singleton_issue_33():
 
         # instantiate first terminal, of type xterm-256color
         term = TestTerminal(force_styling=True)
-        first_kind = term.kind
         next_kind = 'xterm'
 
         # a second instantiation with a different kind no longer

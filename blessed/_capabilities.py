@@ -177,13 +177,32 @@ CAPABILITIES_CAUSE_MOVEMENT: typing.Tuple[str, ...] = tuple(CAPABILITIES_HORIZON
     'scroll_forward',
 )
 
-# NOTE: Keep synchronized with XTGETTCAP_CAPABILITIES in _xtgettcap_lite.py.
 XTGETTCAP_CAPABILITIES = (
-    # xterm extensions
+    # Terminal identification
     ("TN", "Terminal name"),
-    ("Co", "Number of colors"),
     # Numeric capabilities
-    ("colors", "Max colors"),
+    ("Co", "Number of colors"),
+    ("colors", "Max colors on screen"),
+    ("cols", "Columns"),
+    ("lines", "Lines"),
+    ("it", "Init tabs"),
+    ("pairs", "Max color pairs"),
+    # Boolean capabilities
+    ("am", "Auto right margin"),
+    ("bce", "Background color erase"),
+    ("bw", "Auto left margin"),
+    ("ccc", "Can redefine colors"),
+    ("da", "Memory above"),
+    ("db", "Memory below"),
+    ("eslok", "Status line escape OK"),
+    ("hs", "Has status line"),
+    ("km", "Has meta key"),
+    ("mir", "Move in insert mode"),
+    ("msgr", "Move in standout mode"),
+    ("npc", "No pad character"),
+    ("ul", "Transparent underline"),
+    ("xenl", "Newline glitch"),
+    ("xt", "Destructive tabs"),
     # String capabilities -- attributes
     ("bold", "Enter bold mode"),
     ("dim", "Enter dim mode"),
@@ -240,6 +259,8 @@ XTGETTCAP_CAPABILITIES = (
     ("csr", "Change scroll region"),
     ("smam", "Enable line wrap"),
     ("rmam", "Disable line wrap"),
+    ("smacs", "Enter alt charset"),
+    ("rmacs", "Exit alt charset"),
     ("flash", "Flash screen"),
     ("bel", "Bell"),
     ("cr", "Carriage return"),
@@ -249,12 +270,12 @@ XTGETTCAP_CAPABILITIES = (
     # String capabilities -- user-defined (xterm convention)
     ("u6", "CPR response format"),
     ("u7", "CPR request"),
-    ("u8", "DA response format"),
-    ("u9", "DA request"),
+    ("u8", "DA request"),
+    ("u9", "DA response"),
     # Extended capabilities -- modern terminal features
     ("Ms", "Clipboard via OSC 52"),
-    ("Smulx", "Set extended underline style"),
-    ("Setulc", "Set underline color"),
+    ("Smulx", "Styled underlines"),
+    ("Setulc", "Underline color"),
 )
 
 

@@ -364,8 +364,8 @@ def test_get_keyboard_sequence(monkeypatch):
         b'seq-alt-cub1_')
 
     # patch curses functions
-    tigetstr_func = lambda cap: {CAP_SMALL: SEQ_SMALL,
-                                 CAP_LARGE: SEQ_LARGE}[cap]
+    def tigetstr_func(cap):
+        return {CAP_SMALL: SEQ_SMALL, CAP_LARGE: SEQ_LARGE}[cap]
 
     monkeypatch.setattr(curses, 'tigetstr', tigetstr_func)
 

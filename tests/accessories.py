@@ -9,6 +9,8 @@ import contextlib
 import time
 import signal
 import warnings
+from importlib import import_module
+from typing import Dict
 
 # local
 from blessed import Terminal
@@ -37,12 +39,31 @@ def TestTerminal(is_a_tty=None, **kwargs):  # type: (...) -> Terminal
     Create a Terminal instance with optional is_a_tty override.
 
     'is_a_tty' is useful to pass "is a tty" tests without pty_test.
-    XTGETTCAP is disabled by default in tests since no real terminal
-    emulator is available to answer queries.
+    A fake successful XTGETTCAP response is injected by default, built
+    from jinxed's xterm-256color terminfo database, so no real XTGETTCAP
+    I/O occurs during Terminal.__init__.
+    Pass _xtgettcap_data to override the injected response, or
+    _xtgettcap_data=None to force a real probe attempt.
     """
-    kwargs.setdefault('use_xtgettcap', False)
     if 'kind' not in kwargs:
         kwargs['kind'] = test_kind
+    if '_xtgettcap_data' not in kwargs:
+        from blessed._capabilities import TermcapResponse
+        kind = kwargs['kind']
+        mod_name = f'jinxed.terminfo.{kind.replace("-", "_")}'
+        try:
+            mod = import_module(mod_name)
+        except ImportError:
+            mod = import_module('jinxed.terminfo.xterm_256color')
+        capabilities: Dict[str, str] = {'TN': kind}
+        for cap in mod.BOOL_CAPS:
+            capabilities[cap] = ''
+        for cap, val in mod.NUM_CAPS.items():
+            capabilities[cap] = str(val)
+        for cap, val in mod.STR_CAPS.items():
+            capabilities[cap] = val.decode('latin-1')
+        kwargs['_xtgettcap_data'] = TermcapResponse(
+            supported=True, capabilities=capabilities)
     term = Terminal(**kwargs)
     if is_a_tty is not None:
         term._is_a_tty = is_a_tty

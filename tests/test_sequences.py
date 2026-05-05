@@ -208,9 +208,11 @@ def test_inject_move_x():
         with mock.patch('curses.tigetstr', side_effect=MockTigetstr(hpa=None)):
             with t.location(x=COL):
                 pass
-        expected_output = ''.join(
-            (unicode_cap('sc', term=t) or '\x1b[s', f'\x1b[{COL + 1}G', unicode_cap('rc', term=t) or '\x1b[u'),
-        )
+        expected_output = ''.join((
+            unicode_cap('sc', term=t) or '\x1b[s',
+            f'\x1b[{COL + 1}G',
+            unicode_cap('rc', term=t) or '\x1b[u',
+        ))
         assert t.stream.getvalue() == expected_output
         assert t.move_x(COL) == f'\x1b[{COL + 1}G'
 
@@ -229,9 +231,11 @@ def test_inject_move_y():
         with mock.patch('curses.tigetstr', side_effect=MockTigetstr(vpa=None)):
             with t.location(y=ROW):
                 pass
-        expected_output = ''.join(
-            (unicode_cap('sc', term=t) or '\x1b[s', f'\x1b[{ROW + 1}d', unicode_cap('rc', term=t) or '\x1b[u')
-        )
+        expected_output = ''.join((
+            unicode_cap('sc', term=t) or '\x1b[s',
+            f'\x1b[{ROW + 1}d',
+            unicode_cap('rc', term=t) or '\x1b[u',
+        ))
         assert t.stream.getvalue() == expected_output
         assert t.move_y(ROW) == f'\x1b[{ROW + 1}d'
 

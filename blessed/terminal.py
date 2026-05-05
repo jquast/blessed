@@ -19,6 +19,8 @@ import collections
 from typing import IO, Set, Dict, List, Match, Tuple, Union, Optional, Generator, SupportsIndex
 
 # 3rd party
+import jinxed as curses
+import jinxed.terminfo
 from wcwidth import TextSizing, TextSizingParams
 from wcwidth import wrap as wcwidth_wrap
 from wcwidth import ljust as wcwidth_ljust
@@ -43,6 +45,7 @@ from .keyboard import (DEFAULT_ESCDELAY,
 from .dec_modes import DecPrivateMode as _DecPrivateMode
 from .dec_modes import DecModeResponse
 from .sequences import Termcap, Sequence
+from .xtgettcap import _RE_XTGETTCAP_RESPONSE, _parse_match, query_xtgettcap, _parse_responses
 from .colorspace import RGB_256TABLE, hex_to_rgb, rgb_to_hex, xparse_color
 from .formatters import (COLORS,
                          COMPOUNDABLES,
@@ -64,30 +67,28 @@ from ._capabilities import (CAPABILITY_DATABASE,
                             TextSizingResult,
                             ITerm2Capabilities)
 
-# isort: off
-
 HAS_TTY = True  # pylint: disable=invalid-name
 IS_WINDOWS = platform.system() == 'Windows'
-import jinxed as curses
 if IS_WINDOWS:
+    # 3rd party
     from jinxed.win32 import get_console_input_encoding
 else:
     try:
+        # std imports
+        import tty
         import fcntl
         import termios
-        import tty
     except ImportError:
         _TTY_METHODS = ('setraw', 'cbreak', 'kbhit', 'height', 'width')
         _MSG_NOSUPPORT = (
             "One or more of the modules: 'termios', 'fcntl', and 'tty' "
-            f"are not found on your platform '{platform.system()}'. "
+            f"are not found on your platform, '{platform.system()}'. "
             "The following methods of Terminal are dummy/no-op "
             f"unless a deriving class overrides them: {', '.join(_TTY_METHODS)}."
         )
         warnings.warn(_MSG_NOSUPPORT)
         HAS_TTY = False  # pylint: disable=invalid-name
 
-_CUR_TERM = None  # See comments at end of file
 RE_GET_FGCOLOR_RESPONSE = re.compile(
     '\x1b]10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)(?:\x07|\x1b\\\\)')
 RE_GET_BGCOLOR_RESPONSE = re.compile(
@@ -102,8 +103,6 @@ _RE_XTWINOPS_14_RESPONSE = re.compile(r'\x1b\[4;(\d+);(\d+)t')
 _RE_XTWINOPS_16_RESPONSE = re.compile(r'\x1b\[6;(\d+);(\d+)t')
 _RE_GET_DEVICE_ATTR_RESPONSE = re.compile('\x1b\\[\\?([0-9]+)((?:;[0-9]+)*)c')
 _RE_GET_SOFTWARE_VERSION_RESPONSE = re.compile('\x1bP>\\|(.+?)\x1b\\\\')
-_RE_XTGETTCAP_RESPONSE = re.compile(
-    r'\x1bP([01])\+r([0-9a-fA-F]+)(?:=([0-9a-fA-F]*))?\x1b\\')
 _RE_KITTY_GRAPHICS_RESPONSE = re.compile(r'\x1b_Gi=31;(.+?)\x1b\\')
 _RE_ITERM2_CAPABILITIES_RESPONSE = re.compile(
     r'\x1b\]1337;Capabilities=([^\x07\x1b]+)(?:\x07|\x1b\\)')
@@ -184,17 +183,13 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                  kind: Optional[str] = None,
                  stream: Optional[IO[str]] = None,
                  force_styling: Union[bool, None] = False,
-                 use_xtgettcap: bool = True,
-                 use_curses: bool = False,
-                 kind_fallback: str = 'xterm-256color') -> None:
+                 kind_fallback: str = 'xterm-256color',
+                 _xtgettcap_data: Optional[TermcapResponse] = None) -> None:
         """
         Initialize the terminal.
 
         :arg str kind: A terminal string as taken by :func:`curses.setupterm`.
             Defaults to the value of the ``TERM`` environment variable.
-
-            .. note:: Terminals within a single process must share a common
-                ``kind``. See :obj:`_CUR_TERM`.
 
         :arg file stream: A file-like object representing the Terminal output.
             Defaults to the original value of :obj:`sys.__stdout__`, like
@@ -226,38 +221,23 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             .. _CLICOLOR_FORCE: https://bixense.com/clicolors/
             .. _NO_COLOR: https://no-color.org/
 
-        :arg bool use_xtgettcap: Whether to query terminal capabilities via
-            XTGETTCAP (DCS +q) at initialization.  When True (default),
-            blessed sprays all capabilities it needs and uses the terminal's
-            built-in terminfo responses, bypassing the local database.  Set
-            to False to skip XTGETTCAP queries entirely.
-
-        :arg bool use_curses: Whether to fall back to the system curses
-            library if XTGETTCAP and the built-in virtual terminfo database
-            both fail.  Default ``False``; blessed operates without importing
-            the curses module unless this is explicitly set to ``True``.
-
-        :arg str kind_fallback: Terminal kind to use as fallback when the
-            requested ``kind`` is not found in the virtual terminfo database.
-            Default ``'xterm-256color'``.  Used only when ``use_curses`` is
-            ``False`` or the curses fallback also fails.
+        :arg str kind_fallback: Terminal kind to use as fallback when the requested ``kind`` is not
+            found in the virtual terminfo database.  Defaults to ``'xterm-256color'``.  Used only
+            when curses is not available, or terminfo(5) capability database is missing, and the
+            terminal failed to negotiate capabilities using XTGETTCAP.
         """
-        # pylint: disable=global-statement
-        global _CUR_TERM
         self.errors = [
-            f'parameters: kind={kind!r}, stream={stream!r}, force_styling={force_styling!r}, '
-            f'use_xtgettcap={use_xtgettcap!r}, use_curses={use_curses!r}',
+            f'parameters: kind={kind!r}, stream={stream!r}, force_styling={force_styling!r} '
         ]
-        self._normal = None  # cache normal attr, preventing recursive lookups
+        self._normal = None
+
         # we assume our input stream to be line-buffered until either the
         # cbreak of raw context manager methods are entered with an attached tty.
         self._line_buffered = True
-        self._use_xtgettcap = use_xtgettcap
-        self._use_curses = use_curses
         self._kind_fallback = kind_fallback
 
-        # Shorter timeout for init-time XTGETTCAP probe
-        self._init_xtgettcap_timeout: float = 0.75
+        # Timeout for init-time XTGETTCAP probe
+        self._init_xtgettcap_timeout: float = 1.0
 
         self._stream = stream
         self._keyboard_fd = None
@@ -274,11 +254,22 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self.__init_set_styling(force_styling)
         if self.does_styling:
             # Step 1: Try XTGETTCAP first via lightweight query that does
-            # not require curses or jinxed initialization.
-            xtgettcap_data = None
-            if self._use_xtgettcap and self.is_a_tty:
-                xtgettcap_data = self._try_lightweight_xtgettcap()
+            # not require curses or jinxed initialization.  Skip if cache
+            # was pre-populated or if _xtgettcap_data was injected.
+            if '_xtgettcap_cache' not in self.__dict__:
+                self._xtgettcap_cache: Optional[TermcapResponse] = None
+                xtgettcap_data = _xtgettcap_data
+                if xtgettcap_data is None and self.is_a_tty:
+                    xtgettcap_data = self._try_xtgettcap()
+                    if xtgettcap_data is None:
+                        self.errors.append('XTGETTCAP probe failed (no response)')
                 if xtgettcap_data is not None:
+                    if not xtgettcap_data.supported:
+                        self.errors.append('XTGETTCAP probe: terminal does not support XTGETTCAP')
+                    # Populate cache so get_xtgettcap() doesn't re-query
+                    self._xtgettcap_cache = TermcapResponse(
+                        supported=xtgettcap_data.supported,
+                        capabilities=xtgettcap_data.capabilities)
                     # Use XTGETTCAP TN capability as terminal kind if available
                     tn_kind = xtgettcap_data.terminal_name
                     if tn_kind:
@@ -291,6 +282,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 self._jinxed_term = curses.Terminal(
                     self._kind, self._init_descriptor)
             except curses.error:
+                self.errors.append(
+                    f'jinxed Terminal(kind={self._kind!r}) failed, '
+                    f'trying fallback kind={self._kind_fallback!r}')
                 try:
                     self._jinxed_term = curses.Terminal(
                         self._kind_fallback, self._init_descriptor)
@@ -302,10 +296,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                     self.errors.append(msg)
                     self._kind = None
                     self._does_styling = False
-
-            # Track kind for use_curses singleton detection
-            if self._use_curses and _CUR_TERM is None:
-                _CUR_TERM = self._kind if self._kind else self._kind_fallback
 
             # Step 3: Inject XTGETTCAP overrides into jinxed
             if xtgettcap_data is not None:
@@ -326,6 +316,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._kitty_kb_first_query_failed = False
 
         # Device Attributes (DA1) cache and sticky failure tracking
+        self._dec_mode_cache: Dict[int, int] = {}
         self._device_attributes_cache: Optional[DeviceAttribute] = None
         self._device_attributes_first_query_failed = False
 
@@ -349,7 +340,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._preferred_size_cache: Optional["WINSZ"] = None
 
         # XTGETTCAP cache and sticky failure tracking
-        self._xtgettcap_cache: Optional[TermcapResponse] = None
+        if '_xtgettcap_cache' not in self.__dict__:
+            self._xtgettcap_cache: Optional[TermcapResponse] = None
         self._xtgettcap_first_query_failed = False
 
         # Kitty Graphics protocol detection cache
@@ -560,14 +552,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 warnings.warn(f'LookupError: {err}, defaulting to UTF-8 for keyboard.')
                 self._encoding = 'UTF-8'
                 self._keyboard_decoder = codecs.getincrementaldecoder(self._encoding)()
-
-    def __init__dec_private_modes(self) -> None:
-        """Initialize DEC Private Mode caching and state tracking."""
-        # Cache for queried DEC private modes to avoid repeated queries
-        self._dec_mode_cache: Dict[int, int] = {}
-        # Global timeout tracking state
-        self._dec_any_query_succeeded = False
-        self._dec_first_query_failed = False
 
     def __getattr__(self,
                     attr: str) -> Union[NullCallableString,
@@ -1612,62 +1596,28 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         response = self.get_dec_mode(_DecPrivateMode.FOCUS_IN_OUT_EVENTS, timeout=timeout)
         return response.supported
 
-    def _inject_termcap_response(self, tc: TermcapResponse) -> None:
-        """Convert a TermcapResponse into jinxed XTGETTCAP injection."""
-        from jinxed.terminfo import BOOL_CAPS, NUM_CAPS
-
-        str_caps: Dict[str, str] = {}
-        num_caps: Dict[str, int] = {}
-        bool_caps: Set[str] = set()
-
-        for capname, value in tc.capabilities.items():
-            if not value:
-                # Empty value: boolean capability (present = true)
-                if capname in BOOL_CAPS:
-                    bool_caps.add(capname)
-                continue
-            if capname in NUM_CAPS:
-                try:
-                    num_caps[capname] = int(value)
-                except ValueError:
-                    pass
-                continue
-            # Otherwise treat as string capability
-            str_caps[capname] = value
-
-        self._jinxed_term.inject_xtgettcap(
-            str_caps=str_caps,
-            num_caps=num_caps,
-            bool_caps=bool_caps)
-
-    def _try_lightweight_xtgettcap(self) -> Optional['XtgettcapResponse']:
-        """Query terminal via lightweight XTGETTCAP (no curses required)."""
+    def _try_xtgettcap(self) -> Optional[TermcapResponse]:
+        """Query terminal via raw XTGETTCAP (no jinxed required)."""
         try:
-            from blessed._xtgettcap_lite import (
-                query_xtgettcap,
-                XtgettcapResponse,
-            )
             fd = self._init_descriptor
             if fd is None:
                 return None
             return query_xtgettcap(fd, timeout=self._init_xtgettcap_timeout)
-        except Exception:
+        except OSError:
             return None
 
-    def _inject_xtgettcap_response(self, tc: 'XtgettcapResponse') -> None:
-        """Inject lightweight XTGETTCAP results into jinxed."""
-        from jinxed.terminfo import BOOL_CAPS, NUM_CAPS
-
+    def _inject_xtgettcap_response(self, tc: TermcapResponse) -> None:
+        """Inject XTGETTCAP results into jinxed."""
         str_caps: Dict[str, str] = {}
         num_caps: Dict[str, int] = {}
         bool_caps: Set[str] = set()
 
         for capname, value in tc.capabilities.items():
             if not value:
-                if capname in BOOL_CAPS:
+                if capname in jinxed.terminfo.BOOL_CAPS:
                     bool_caps.add(capname)
                 continue
-            if capname in NUM_CAPS:
+            if capname in jinxed.terminfo.NUM_CAPS:
                 try:
                     num_caps[capname] = int(value)
                 except ValueError:
@@ -1725,7 +1675,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             # Before setupterm, capabilities are unavailable; use a
             # hardcoded escape sequence.
             try:
-                clear_eol = self.clear_eol
+                clear_eol: str = self.clear_eol
             except curses.error:
                 clear_eol = '\x1b[K'
             self.stream.write(f'\r{clear_eol}')
@@ -1733,7 +1683,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return None
 
         capabilities: Dict[str, str] = {}
-        self._parse_single_xtgettcap(match, capabilities)
+        _parse_match(match, capabilities)
 
         # Phase 2: Batch-query remaining capabilities.  We use
         # flushinp() here because multiple DCS responses arrive, then
@@ -1745,13 +1695,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 ctx.__enter__()
 
             for capname, _desc in XTGETTCAP_CAPABILITIES[1:]:
-                self.stream.write(
-                    f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\')
+                self.stream.write(f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\')
             self.stream.flush()
 
             raw = self.flushinp(timeout=timeout)
             if raw:
-                self._parse_xtgettcap_responses(raw, capabilities)
+                _parse_responses(raw, capabilities)
                 # Re-buffer any keyboard input that arrived alongside
                 remaining = _RE_XTGETTCAP_RESPONSE.sub('', raw)
                 if remaining:
@@ -1764,22 +1713,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         result = TermcapResponse(supported=True, capabilities=capabilities)
         self._xtgettcap_cache = result
         return result
-
-    @staticmethod
-    def _parse_single_xtgettcap(match: Match[str], capabilities: Dict[str, str]) -> None:
-        """Parse a single XTGETTCAP DCS +r regex match into *capabilities*."""
-        success = match.group(1) == '1'
-        if success:
-            cap_name = TermcapResponse.hex_decode(match.group(2))
-            val_hex = match.group(3)
-            capabilities[cap_name] = (
-                TermcapResponse.hex_decode(val_hex) if val_hex is not None else '')
-
-    @staticmethod
-    def _parse_xtgettcap_responses(raw: str, capabilities: Dict[str, str]) -> None:
-        """Parse DCS +r responses from XTGETTCAP into *capabilities* dict."""
-        for match in _RE_XTGETTCAP_RESPONSE.finditer(raw):
-            Terminal._parse_single_xtgettcap(match, capabilities)
 
     def does_xtgettcap(self, timeout: Optional[float] = 1,
                        force: bool = False) -> bool:
@@ -1995,7 +1928,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return True
 
         # Strategy 2: XTGETTCAP Ms capability
-        tcap = self.get_xtgettcap(timeout=timeout)
+        tcap = self.get_xtgettcap(timeout=timeout, force=force)
         if tcap is not None and 'Ms' in tcap.capabilities:
             self._osc52_clipboard_supported = True
             return True
@@ -4184,25 +4117,3 @@ class WINSZ(collections.namedtuple('WINSZ', (
     _FMT = 'hhhh'
     #: buffer of termios structure appropriate for ioctl argument
     _BUF = '\x00' * struct.calcsize(_FMT)
-
-
-#: _CUR_TERM = None
-#: From libcurses/doc/ncurses-intro.html (ESR, Thomas Dickey, et. al)::
-#:
-#:   "After the call to setupterm(), the global variable cur_term is set to
-#:    point to the current structure of terminal capabilities. By calling
-#:    setupterm() for each terminal, and saving and restoring cur_term, it
-#:    is possible for a program to use two or more terminals at once."
-#:
-#: However, if you study Python's ``./Modules/_cursesmodule.c``, you'll find::
-#:
-#:   if (!initialised_setupterm && setupterm(termstr,fd,&err) == ERR) {
-#:
-#: Python - perhaps wrongly - will not allow for re-initialisation of new
-#: terminals through :func:`curses.setupterm`, so the value of cur_term cannot
-#: be changed once set: subsequent calls to :func:`curses.setupterm` have no
-#: effect.
-#:
-#: Therefore, the :attr:`Terminal.kind` of each :class:`Terminal` is
-#: essentially a singleton. This global variable reflects that, and a warning
-#: is emitted if somebody expects otherwise.

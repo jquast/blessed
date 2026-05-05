@@ -9,6 +9,10 @@ import functools
 from typing import TYPE_CHECKING, Set, Dict, Match, Tuple, TypeVar, Optional
 from collections import OrderedDict, namedtuple
 
+# 3rd party
+import jinxed as curses
+from jinxed.has_key import _capability_names as capability_names
+
 if TYPE_CHECKING:  # pragma: no cover
     # local
     from blessed.terminal import Terminal
@@ -22,12 +26,6 @@ from blessed.mouse import (RE_PATTERN_MOUSE_SGR,
 from blessed.dec_modes import DecPrivateMode
 
 _T = TypeVar('_T', bound='Keystroke')
-
-
-# isort: off
-# curses
-import jinxed as curses
-from jinxed.has_key import _capability_names as capability_names
 
 
 # DEC event namedtuples
@@ -1564,6 +1562,7 @@ def _match_dec_event(text: str,
     :rtype: Keystroke or None
     :returns: :class:`Keystroke` with DEC event data if matched, ``None`` otherwise
     """
+    # local
     from blessed.dec_modes import DecModeResponse  # pylint: disable=import-outside-toplevel
 
     if dec_mode_cache is None:
