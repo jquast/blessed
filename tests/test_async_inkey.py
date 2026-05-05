@@ -156,10 +156,7 @@ def test_async_read_byte_oserror_propagates():
 
     loop = asyncio.new_event_loop()
     try:
-        original_add_reader = loop.add_reader
-
         def mock_add_reader(fd, callback):
-            original_add_reader(fd, callback)
             loop.call_soon(callback)
 
         with mock.patch.object(loop, 'add_reader', side_effect=mock_add_reader):

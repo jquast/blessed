@@ -301,9 +301,21 @@ def test_winsize_IOError_returns_environ():
 
         term = TestTerminal()
         term._winsize = side_effect
-        os.environ['COLUMNS'] = '1984'
-        os.environ['LINES'] = '1888'
-        assert term._height_and_width() == (1888, 1984, None, None)
+        save_cols = os.environ.get('COLUMNS')
+        save_lines = os.environ.get('LINES')
+        try:
+            os.environ['COLUMNS'] = '1984'
+            os.environ['LINES'] = '1888'
+            assert term._height_and_width() == (1888, 1984, None, None)
+        finally:
+            if save_cols is not None:
+                os.environ['COLUMNS'] = save_cols
+            else:
+                del os.environ['COLUMNS']
+            if save_lines is not None:
+                os.environ['LINES'] = save_lines
+            else:
+                del os.environ['LINES']
 
     child()
 

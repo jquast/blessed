@@ -316,6 +316,8 @@ def test_sequence_length(all_terms):
 def test_env_winsize():
     """Test height and width is appropriately queried in a pty."""
     # set the pty's virtual window size
+    save_cols = os.environ.get('COLUMNS')
+    save_lines = os.environ.get('LINES')
     os.environ['COLUMNS'] = '99'
     os.environ['LINES'] = '11'
     term = TestTerminal(stream=StringIO())
@@ -330,6 +332,14 @@ def test_env_winsize():
     finally:
         term._init_descriptor = save_init
         sys.__stdout__ = save_stdout
+        if save_cols is not None:
+            os.environ['COLUMNS'] = save_cols
+        else:
+            del os.environ['COLUMNS']
+        if save_lines is not None:
+            os.environ['LINES'] = save_lines
+        else:
+            del os.environ['LINES']
     assert winsize.ws_col == width == 99
     assert winsize.ws_row == height == 11
 

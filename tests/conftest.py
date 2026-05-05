@@ -89,6 +89,41 @@ def all_terms(request):
     return request.param
 
 
+# Full list of terminal types available in jinxed's virtual database.
+# Each test gets a single randomly rotated terminal kind for coverage
+# across the full suite, rather than parametrizing every test over all types.
+_JINXED_TERMINALS = [
+    'xterm', 'xterm_256color', 'xterm_16color',
+    'screen', 'screen_256color',
+    'tmux', 'tmux_256color',
+    'rxvt', 'rxvt_256color', 'rxvt_unicode', 'rxvt_unicode_256color',
+    'putty', 'putty_256color',
+    'st', 'st_256color',
+    'ansi', 'ansi_bbs', 'ansicon',
+    'linux', 'linux_16color',
+    'vt220', 'vtwin10',
+    'cons25', 'syncterm',
+]
+
+import random  # pylint: disable=wrong-import-position
+_random_terms = list(_JINXED_TERMINALS)
+random.shuffle(_random_terms)
+_random_term_iter = iter(_random_terms)
+
+
+@pytest.fixture
+def any_term():
+    """A single randomly rotated terminal kind, covering all jinxed types."""
+    global _random_term_iter
+    try:
+        return next(_random_term_iter)
+    except StopIteration:
+        _random_terms[:] = list(_JINXED_TERMINALS)
+        random.shuffle(_random_terms)
+        _random_term_iter = iter(_random_terms)
+        return next(_random_term_iter)
+
+
 @pytest.fixture(params=many_lines_params)
 def many_lines(request):
     """Various number of lines for screen height."""
