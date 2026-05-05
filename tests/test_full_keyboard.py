@@ -14,7 +14,7 @@ from unittest import mock
 import pytest
 
 # local
-from .conftest import TEST_RAW, IS_WINDOWS, TEST_QUICK, TEST_KEYBOARD
+from .conftest import IS_WINDOWS, TEST_KEYBOARD, TEST_RAW
 from .accessories import (SEMAPHORE,
                           RECV_SEMAPHORE,
                           SEND_SEMAPHORE,

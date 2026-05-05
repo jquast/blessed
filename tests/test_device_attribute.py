@@ -42,7 +42,6 @@ from .conftest import TEST_KEYBOARD, IS_WINDOWS
 from .accessories import (
     TestTerminal,
     pty_test,
-    as_subprocess,
 )
 from blessed.keyboard import DeviceAttribute
 

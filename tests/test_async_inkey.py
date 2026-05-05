@@ -12,7 +12,7 @@ import pytest
 
 # local
 from .conftest import IS_WINDOWS
-from .accessories import SEMAPHORE, TestTerminal, pty_test, as_subprocess, read_until_semaphore
+from .accessories import SEMAPHORE, TestTerminal, pty_test, read_until_semaphore
 
 pytestmark = pytest.mark.skipif(IS_WINDOWS, reason="no pty on Windows")
 

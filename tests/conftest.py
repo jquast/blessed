@@ -1,9 +1,9 @@
 """Configure test fixtures"""
 
 # std imports
+import itertools
 import os
 import platform
-import random
 
 # 3rd party
 import pytest
@@ -66,7 +66,6 @@ if TEST_QUICK:
 
 
 # Full list of terminal types available in jinxed's virtual database.
-
 _JINXED_TERMINALS = [
     'xterm', 'xterm_256color', 'xterm_16color',
     'screen', 'screen_256color',
@@ -80,22 +79,13 @@ _JINXED_TERMINALS = [
     'cons25', 'syncterm',
 ]
 
-_random_terms = list(_JINXED_TERMINALS)
-random.shuffle(_random_terms)
-_random_term_iter = iter(_random_terms)
+_term_cycle = itertools.cycle(_JINXED_TERMINALS)
 
 
 @pytest.fixture
-def all_terms():
-    """A single randomly rotated terminal kind from jinxed's database."""
-    global _random_term_iter
-    try:
-        return next(_random_term_iter)
-    except StopIteration:
-        _random_terms[:] = list(_JINXED_TERMINALS)
-        random.shuffle(_random_terms)
-        _random_term_iter = iter(_random_terms)
-        return next(_random_term_iter)
+def any_term():
+    """A single deterministically rotated terminal kind from jinxed's database."""
+    return next(_term_cycle)
 
 
 # -- Keep old parametrized versions for backward compatibility --

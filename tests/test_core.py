@@ -27,7 +27,7 @@ def test_export_only_Terminal():
     assert blessed.__all__ == ('Terminal', 'LineEditor', 'LineHistory')
 
 
-def test_null_location(all_terms):
+def test_null_location(any_term):
     """Make sure ``location()`` with no args just does position restoration."""
     def child(kind):
         t = TestTerminal(stream=StringIO(), force_styling=True)
@@ -37,10 +37,10 @@ def test_null_location(all_terms):
             (unicode_cap('sc', term=t), unicode_cap('rc', term=t)))
         assert t.stream.getvalue() == expected_output
 
-    child(all_terms)
+    child(any_term)
 
 
-def test_location_to_move_xy(all_terms):
+def test_location_to_move_xy(any_term):
     """``location()`` and ``move_xy()`` receive complimentary arguments."""
     def child(kind):
         buf = StringIO()
@@ -51,7 +51,7 @@ def test_location_to_move_xy(all_terms):
             xy_val_from_location = buf.getvalue()[len(t.sc):]
             assert xy_val_from_move_xy == xy_val_from_location
 
-    child(all_terms)
+    child(any_term)
 
 
 def test_yield_keypad():
@@ -142,7 +142,7 @@ def test_number_of_colors_with_tty():
     child_256()
 
 
-def test_init_descriptor_always_initted(all_terms):
+def test_init_descriptor_always_initted(any_term):
     """Test height and width with non-tty Terminals."""
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO())
@@ -152,19 +152,19 @@ def test_init_descriptor_always_initted(all_terms):
         assert t.height == t._height_and_width()[0]
         assert t.width == t._height_and_width()[1]
 
-    child(all_terms)
+    child(any_term)
 
 
-def test_force_styling_none(all_terms):
+def test_force_styling_none(any_term):
     """If ``force_styling=None`` is used, don't ever do styling."""
     def child(kind):
         t = TestTerminal(force_styling=None)
         assert not t.does_styling
 
-    child(all_terms)
+    child(any_term)
 
 
-def test_force_styling_none_but_FORCE_COLOR(all_terms):
+def test_force_styling_none_but_FORCE_COLOR(any_term):
     """``force_styling=None``, but FORCE_COLOR or CLICOLOR_FORCE is non-empty, does styling."""
     def child(envkey):
         os.environ[envkey] = '1'
@@ -176,7 +176,7 @@ def test_force_styling_none_but_FORCE_COLOR(all_terms):
     child('CLICOLOR_FORCE')
 
 
-def test_force_styling_none_and_unset_FORCE_COLOR(all_terms):
+def test_force_styling_none_and_unset_FORCE_COLOR(any_term):
     """
     ``force_styling=None``, but FORCE_COLOR/CLICOLOR_FORCE is set, but empty, do not style.
     """
@@ -320,7 +320,7 @@ def test_winsize_IOError_returns_environ():
     child()
 
 
-def test_yield_fullscreen(all_terms):
+def test_yield_fullscreen(any_term):
     """Ensure ``fullscreen()`` writes enter_fullscreen and exit_fullscreen."""
     def child(kind):
         t = TestTerminal(stream=StringIO(), force_styling=True)
@@ -331,10 +331,10 @@ def test_yield_fullscreen(all_terms):
         expected_output = ''.join((t.enter_fullscreen, t.exit_fullscreen))
         assert t.stream.getvalue() == expected_output
 
-    child(all_terms)
+    child(any_term)
 
 
-def test_yield_hidden_cursor(all_terms):
+def test_yield_hidden_cursor(any_term):
     """Ensure ``hidden_cursor()`` writes hide_cursor and normal_cursor."""
     def child(kind):
         t = TestTerminal(stream=StringIO(), force_styling=True)
@@ -345,7 +345,7 @@ def test_yield_hidden_cursor(all_terms):
         expected_output = ''.join((t.hide_cursor, t.normal_cursor))
         assert t.stream.getvalue() == expected_output
 
-    child(all_terms)
+    child(any_term)
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="windows lacks disable_line_wrap capability")

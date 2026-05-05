@@ -9,7 +9,7 @@ import pytest
 
 # local
 from .conftest import TEST_QUICK
-from .accessories import TestTerminal, as_subprocess
+from .accessories import TestTerminal
 
 TEXTWRAP_KEYWORD_COMBINATIONS = [
     {'break_long_words': False, 'drop_whitespace': False, 'subsequent_indent': ''},

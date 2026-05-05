@@ -63,7 +63,7 @@ def test_length_ansiart():
     child(kind)
 
 
-def test_sequence_length(all_terms):
+def test_sequence_length(any_term):
     """Ensure T.length(string containing sequence) is correct."""
     # pylint: disable=too-complex,too-many-statements
     def child(kind):
@@ -310,7 +310,7 @@ def test_sequence_length(all_terms):
             *zip(plain_text, itertools.cycle(['\b_']))))
         assert term.length(text_wseqs) == len(plain_text)
 
-    child(all_terms)
+    child(any_term)
 
 
 def test_env_winsize():
@@ -367,7 +367,7 @@ def test_winsize(many_lines, many_columns):
     child(lines=many_lines, cols=many_columns)
 
 
-def test_Sequence_alignment_fixed_width(all_terms):
+def test_Sequence_alignment_fixed_width(any_term):
     """Test alignment methods with width provided"""
     def child(kind):
         term = TestTerminal(kind=kind)
@@ -387,11 +387,11 @@ def test_Sequence_alignment_fixed_width(all_terms):
         assert term.length(radjusted.strip()) == pony_len
         assert term.length(radjusted) == len(pony_msg.rjust(88))
 
-    child(kind=all_terms)
+    child(kind=any_term)
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="requires fcntl")
-def test_Sequence_alignment(all_terms):
+def test_Sequence_alignment(any_term):
     """Tests methods related to Sequence class, namely ljust, rjust, center."""
     @as_subprocess
     def child(kind, lines=25, cols=80):
@@ -417,7 +417,7 @@ def test_Sequence_alignment(all_terms):
         assert term.length(radjusted.strip()) == pony_len
         assert term.length(radjusted) == len(pony_msg.rjust(term.width))
 
-    child(kind=all_terms)
+    child(kind=any_term)
 
 
 def test_hyperlink_nostyling():
@@ -533,7 +533,7 @@ def test_window_title_context_manager_nostyling():
     assert output == ''
 
 
-def test_sequence_is_movement_false(all_terms):
+def test_sequence_is_movement_false(any_term):
     """Test parser about sequences that do not move the cursor."""
     def child(kind):
         # local
@@ -566,10 +566,10 @@ def test_sequence_is_movement_false(all_terms):
         assert (len(term.standout) == measure_length(term.standout, term)
                 ), (term.standout, term._wont_move)
 
-    child(all_terms)
+    child(any_term)
 
 
-def test_termcap_will_move_false(all_terms):  # pylint: disable=too-complex
+def test_termcap_will_move_false(any_term):  # pylint: disable=too-complex
     """Test parser about sequences that do not move the cursor."""
     def child(kind):  # pylint: disable=too-many-branches
         # local
@@ -604,10 +604,10 @@ def test_termcap_will_move_false(all_terms):  # pylint: disable=too-complex
         if term.standout:
             assert not next(iter_parse(term, term.standout))[1].will_move
 
-    child(all_terms)
+    child(any_term)
 
 
-def test_sequence_is_movement_true(all_terms):
+def test_sequence_is_movement_true(any_term):
     """Test parsers about sequences that move the cursor."""
     def child(kind):
         # local
@@ -637,10 +637,10 @@ def test_sequence_is_movement_true(all_terms):
         assert not term.clear or (len(term.clear) ==
                                   measure_length(term.clear, term))
 
-    child(all_terms)
+    child(any_term)
 
 
-def test_termcap_will_move_true(all_terms):
+def test_termcap_will_move_true(any_term):
     """Test parser about sequences that move the cursor."""
     def child(kind):
         # local
@@ -661,7 +661,7 @@ def test_termcap_will_move_true(all_terms):
         assert next(iter_parse(term, term.home))[1].will_move
         assert next(iter_parse(term, term.restore))[1].will_move
         assert next(iter_parse(term, term.clear))[1].will_move
-    child(all_terms)
+    child(any_term)
 
 
 def test_foreign_sequences():

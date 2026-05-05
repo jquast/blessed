@@ -281,7 +281,7 @@ def test_alternative_left_right():
         'seq-left': curses.KEY_LEFT})
 
 
-def test_cuf1_and_cub1_as_RIGHT_LEFT(all_terms):
+def test_cuf1_and_cub1_as_RIGHT_LEFT(any_term):
     """Test that cuf1 and cub1 are assigned KEY_RIGHT and KEY_LEFT."""
     from blessed.keyboard import get_keyboard_sequences
 
@@ -298,7 +298,7 @@ def test_cuf1_and_cub1_as_RIGHT_LEFT(all_terms):
             else:
                 assert keymap[term._cub1] == term.KEY_LEFT
 
-    child(all_terms)
+    child(any_term)
 
 
 def test_get_keyboard_sequences_sort_order():
