@@ -196,24 +196,20 @@ class TestGetXtgettcap:
 
     def test_parse_xtgettcap_responses(self):
         """Parse multiple DCS +r responses."""
-        from blessed.xtgettcap import _parse_responses
         raw = (
             '\x1bP1+r544e=787465726d\x1b\\'
             '\x1bP1+r636f6c6f7273=323536\x1b\\'
             '\x1bP0+r626365\x1b\\'
         )
-        capabilities: dict = {}
-        _parse_responses(raw, capabilities)
+        capabilities = TermcapResponse.parse_capabilities(raw)
         assert capabilities['TN'] == 'xterm'
         assert capabilities['colors'] == '256'
         assert 'bce' not in capabilities
 
     def test_parse_xtgettcap_boolean_capability(self):
         """Parse DCS +r boolean capability (no value)."""
-        from blessed.xtgettcap import _parse_responses
         raw = '\x1bP1+r626365\x1b\\'
-        capabilities: dict = {}
-        _parse_responses(raw, capabilities)
+        capabilities = TermcapResponse.parse_capabilities(raw)
         assert capabilities['bce'] == ''
 
     def test_does_xtgettcap_with_cached(self):
@@ -904,37 +900,49 @@ def test_get_decrqss_invalid():
 
 
 class TestLightweightXtgettcap:
-    """Terminal._try_xtgettcap() raw XTGETTCAP query."""
+    """XTGETTCAP probe during Terminal.__init__ via query_xtgettcap mock."""
 
     @pytest.mark.parametrize('init_descriptor,query_side_effect,expected', [
-        (None, None, None),
+        (999, None, None),
         (999, OSError, None),
         (999, TermcapResponse(supported=True,
                               capabilities={'TN': 'xterm', 'colors': '256'}), 'supported'),
         (999, TermcapResponse(supported=False), 'unsupported'),
     ])
-    def test_try_xtgettcap(self, init_descriptor, query_side_effect, expected):
-        """Raw XTGETTCAP query returns appropriate response or None."""
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._is_a_tty = True
-        term._init_descriptor = init_descriptor
+    def test_init_xtgettcap_probe(self, init_descriptor, query_side_effect, expected):
+        """XTGETTCAP probe during init populates _xtgettcap_cache correctly."""
+        def mock_init_streams(term_self):
+            term_self._is_a_tty = True
+            term_self._init_descriptor = init_descriptor
+            term_self._keyboard_fd = None
+            term_self.errors = term_self.errors or []
+            term_self._encoding = 'UTF-8'
+
         if isinstance(query_side_effect, TermcapResponse):
             patcher = mock.patch('blessed.terminal.query_xtgettcap',
                                  return_value=query_side_effect)
+        elif query_side_effect is None:
+            patcher = mock.patch('blessed.terminal.query_xtgettcap',
+                                 return_value=None)
         else:
             patcher = mock.patch('blessed.terminal.query_xtgettcap',
                                  side_effect=query_side_effect)
-        with patcher:
-            result = term._try_xtgettcap()
+        with patcher, \
+             mock.patch.object(Terminal, '_Terminal__init__streams',
+                               mock_init_streams):
+            term = TestTerminal(
+                stream=io.StringIO(), force_styling=True,
+                _xtgettcap_data=None)
+        cache = term._xtgettcap_cache
         if expected is None:
-            assert result is None
+            assert cache is None
         elif expected == 'supported':
-            assert result is not None
-            assert result.supported is True
-            assert result.capabilities['TN'] == 'xterm'
+            assert cache is not None
+            assert cache.supported is True
+            assert cache.capabilities['TN'] == 'xterm'
         elif expected == 'unsupported':
-            assert result is not None
-            assert result.supported is False
+            assert cache is not None
+            assert cache.supported is False
 
 
 class TestInitLightweightCache:

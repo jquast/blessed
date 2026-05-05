@@ -398,6 +398,28 @@ class TermcapResponse:
         except ValueError:
             return ''
 
+    # XTGETTCAP DCS response: DCS <success>+r<hex-name>=<hex-value> ST
+    _RE_XTGETTCAP_RESPONSE: typing.ClassVar[typing.Pattern[str]] = re.compile(
+        r'\x1bP([01])\+r([0-9a-fA-F]+)(?:=([0-9a-fA-F]*))?\x1b\\')
+
+    @classmethod
+    def from_match(cls, match: 're.Match[str]') -> 'tuple[str, str]':
+        """Parse a single XTGETTCAP DCS +r regex match into (name, value)."""
+        cap_name = cls.hex_decode(match.group(2))
+        val_hex = match.group(3)
+        value = cls.hex_decode(val_hex) if val_hex is not None else ''
+        return cap_name, value
+
+    @classmethod
+    def parse_capabilities(cls, raw: str) -> 'Dict[str, str]':
+        """Parse all successful DCS +r responses from raw text."""
+        capabilities: Dict[str, str] = {}
+        for match in cls._RE_XTGETTCAP_RESPONSE.finditer(raw):
+            if match.group(1) == '1':
+                name, value = cls.from_match(match)
+                capabilities[name] = value
+        return capabilities
+
 
 class ITerm2Capabilities:
     """

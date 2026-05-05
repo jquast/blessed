@@ -1,9 +1,10 @@
 """
 XTGETTCAP query and response parser.
 
-Used during Terminal.__init__ before jinxed is initialized, so capabilities gathered from the
-terminal override the virtual terminfo database.  This module has zero dependencies on jinxed,
-curses, or blessed's keyboard infrastructure.
+Used in blessed.Terminal.__init__, before jinxed is initialized, to gather capabilities
+for terminal override of jinxed's virtual terminfo database.  This module has *no* dependencies on
+jinxed, curses, or our keyboard.py or terminal.py's Terminal, so that it may be used so early in
+class initialization.
 """
 
 from __future__ import annotations
@@ -17,10 +18,6 @@ from typing import Dict
 
 # local
 from ._capabilities import XTGETTCAP_CAPABILITIES, TermcapResponse
-
-# XTGETTCAP DCS response: DCS <success>+r<hex-name>=<hex-value> ST
-_RE_XTGETTCAP_RESPONSE = re.compile(
-    r'\x1bP([01])\+r([0-9a-fA-F]+)(?:=([0-9a-fA-F]*))?\x1b\\')
 
 # CPR response as raw bytes (used as fence during reads)
 _RE_CPR_BYTES = re.compile(rb'\x1b\[([0-9]+);([0-9]+)R')
@@ -50,13 +47,14 @@ def query_xtgettcap(stream_fd: int, timeout: float = 1.0) -> TermcapResponse:
         return TermcapResponse(supported=False)
 
     # Check if probe got a valid XTGETTCAP response
-    probe_match = _RE_XTGETTCAP_RESPONSE.search(raw)
+    probe_match = TermcapResponse._RE_XTGETTCAP_RESPONSE.search(raw)
     if probe_match is None or probe_match.group(1) != '1':
         # Not supported; clean up any garbage on the terminal
         os.write(stream_fd, b'\r\x1b[K')
         return TermcapResponse(supported=False)
 
-    _parse_match(probe_match, capabilities)
+    name, value = TermcapResponse.from_match(probe_match)
+    capabilities[name] = value
 
     # Phase 2: Spray remaining capabilities.
     for capname, _desc in XTGETTCAP_CAPABILITIES[1:]:
@@ -66,7 +64,7 @@ def query_xtgettcap(stream_fd: int, timeout: float = 1.0) -> TermcapResponse:
     raw = _read_response(stream_fd, timeout)
 
     if raw:
-        _parse_responses(raw, capabilities)
+        capabilities.update(TermcapResponse.parse_capabilities(raw))
 
     # Erase any visible DCS garbage on unsupported terminals
     os.write(stream_fd, b'\r\x1b[K')
@@ -95,18 +93,3 @@ def _read_response(fd: int, timeout: float) -> str:
         if _RE_CPR_BYTES.search(data):
             break
     return data.decode('latin-1', errors='replace')
-
-
-def _parse_match(match: re.Match[str], capabilities: Dict[str, str]) -> None:
-    """Parse a single XTGETTCAP DCS +r regex match."""
-    cap_name = TermcapResponse.hex_decode(match.group(2))
-    val_hex = match.group(3)
-    capabilities[cap_name] = (
-        TermcapResponse.hex_decode(val_hex) if val_hex is not None else '')
-
-
-def _parse_responses(raw: str, capabilities: Dict[str, str]) -> None:
-    """Parse all DCS +r responses from raw text."""
-    for match in _RE_XTGETTCAP_RESPONSE.finditer(raw):
-        if match.group(1) == '1':
-            _parse_match(match, capabilities)
