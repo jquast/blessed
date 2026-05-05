@@ -106,7 +106,7 @@ def test_async_inkey_mouse_x10():
             loop = asyncio.new_event_loop()
             try:
                 ks = loop.run_until_complete(
-                    term.async_inkey(timeout=2.0))
+                    term.async_inkey(timeout=0.5))
             finally:
                 loop.close()
             assert ks.is_mouse
@@ -132,7 +132,7 @@ def test_async_inkey_resize_event():
             loop = asyncio.new_event_loop()
             try:
                 ks = loop.run_until_complete(
-                    term.async_inkey(timeout=2.0))
+                    term.async_inkey(timeout=0.5))
             finally:
                 loop.close()
             assert ks.name == 'RESIZE_EVENT'
@@ -222,7 +222,7 @@ def test_async_inkey_arrow_key():
             loop = asyncio.new_event_loop()
             try:
                 ks = loop.run_until_complete(
-                    term.async_inkey(timeout=2.0))
+                    term.async_inkey(timeout=0.5))
             finally:
                 loop.close()
             assert ks.name == 'KEY_UP'
@@ -245,7 +245,7 @@ def test_async_inkey_buffered_multi_byte():
             loop = asyncio.new_event_loop()
             try:
                 ks = loop.run_until_complete(
-                    term.async_inkey(timeout=2.0))
+                    term.async_inkey(timeout=0.5))
                 assert str(ks) == 'x'
                 ks2 = loop.run_until_complete(
                     term.async_inkey(timeout=0.5))

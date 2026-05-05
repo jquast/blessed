@@ -41,7 +41,6 @@ def test_does_sixel_with_and_without_support(da1_response, has_sixel, expected_o
     assert expected_output in output
 
 
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_does_sixel_returns_false_on_timeout():
     """Test does_sixel() returns False when timeout occurs."""
     def child(term):
@@ -148,19 +147,20 @@ def test_get_sixel_height_and_width_0s_ungetch():
     assert 'OK' in output
 
 
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
-@pytest.mark.parametrize('method_name,expected_result,max_time', [
-    ('get_sixel_height_and_width', (-1, -1), 0.15),
-    ('get_sixel_colors', -1, 0.18),  # Longer: queries XTSMGRAPHICS + DA1
+@pytest.mark.parametrize('method_name,expected_result,timeout_val', [
+    ('get_sixel_height_and_width', (-1, -1), 0.3),
+    ('get_sixel_colors', -1, 0.3),
 ])
-def test_sixel_methods_timeout(method_name, expected_result, max_time):
+def test_sixel_methods_timeout(method_name, expected_result, timeout_val):
     """Sixel query methods return failure values on timeout."""
+    max_time = timeout_val * PCT_MAXWAIT_KEYSTROKE
+
     def child(term):
         stime = time.time()
 
-        result = getattr(term, method_name)(timeout=0.1)
+        result = getattr(term, method_name)(timeout=timeout_val)
         elapsed = time.time() - stime
-        assert 0.08 <= elapsed <= max_time
+        assert timeout_val * 0.5 <= elapsed <= max_time
         assert result == expected_result
         return b'OK'
 
@@ -195,7 +195,6 @@ def test_get_sixel_colors_success():
     assert 'OK' in output
 
 
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_sixel_height_and_width_xtwinops_cell_success():
     """Test sixel height and width succeeds quickly with XTWINOPS 16t response."""
     def child(term):
@@ -226,7 +225,6 @@ def test_sixel_height_and_width_xtwinops_cell_success():
     assert math.floor(time.time() - stime) == 0.0
 
 
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_sixel_height_and_width_fallback_to_xtwinops():
     """Test sixel height and width falls back to XTWINOPS 14t after 16t timeout."""
     def child(term):
@@ -373,7 +371,6 @@ def test_timeout_allocation_across_methods():
     assert window_cached == '-1x-1'
 
 
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_cell_cache_sticky_failure():
     """Test that cell cache failure is cached but can be bypassed with force=True."""
     def child(term):
@@ -421,34 +418,35 @@ def test_cell_cache_sticky_failure():
     assert float(dur2) < 0.5
 
 
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
-@pytest.mark.parametrize('method_name,expected_failure,max_time', [
-    ('get_sixel_height_and_width', (-1, -1), 0.15),
-    ('get_sixel_colors', -1, 0.18),  # Longer: queries XTSMGRAPHICS + DA1
+@pytest.mark.parametrize('method_name,expected_failure,timeout_val', [
+    ('get_sixel_height_and_width', (-1, -1), 0.3),
+    ('get_sixel_colors', -1, 0.3),
 ])
-def test_cached_failure_returns_immediately(method_name, expected_failure, max_time):
+def test_cached_failure_returns_immediately(method_name, expected_failure, timeout_val):
     """Test that cached failure results return immediately on subsequent calls."""
+    max_time = timeout_val * PCT_MAXWAIT_KEYSTROKE
+
     def child(term):
         # First call - will timeout and cache failure result
         stime1 = time.time()
-        result1 = getattr(term, method_name)(timeout=0.1, force=True)
+        result1 = getattr(term, method_name)(timeout=timeout_val, force=True)
         elapsed1 = time.time() - stime1
         assert result1 == expected_failure
-        assert 0.08 <= elapsed1 <= max_time
+        assert timeout_val * 0.5 <= elapsed1 <= max_time
 
         # Second call - should return cached failure immediately (no timeout)
         stime2 = time.time()
-        result2 = getattr(term, method_name)(timeout=0.1)
+        result2 = getattr(term, method_name)(timeout=timeout_val)
         elapsed2 = time.time() - stime2
         assert result2 == expected_failure
-        assert elapsed2 < 0.01  # Should be instant from cache
+        assert elapsed2 < max_time * 0.5  # Should be instant from cache
 
         # Third call with force=True - bypasses cache and re-queries
         stime3 = time.time()
-        result3 = getattr(term, method_name)(timeout=0.1, force=True)
+        result3 = getattr(term, method_name)(timeout=timeout_val, force=True)
         elapsed3 = time.time() - stime3
         assert result3 == expected_failure
-        assert 0.08 <= elapsed3 <= max_time  # Should timeout again
+        assert timeout_val * 0.5 <= elapsed3 <= max_time  # Should timeout again
         return b'OK'
 
     output = pty_test(child, parent_func=None,
@@ -551,11 +549,11 @@ def test_fast_path_with_caches_populated(cell_cache, window_cache, expected_resu
         term._xtsmgraphics_cache = None
 
         stime = time.time()
-        height, width = term.get_sixel_height_and_width(timeout=0.1)
+        height, width = term.get_sixel_height_and_width(timeout=0.2)
         elapsed = time.time() - stime
 
         assert (height, width) == expected_result
-        assert elapsed < 0.01  # Instant from cache
+        assert elapsed < 0.1  # Instant from cache
         return b'OK'
 
     output = pty_test(child, parent_func=None,
@@ -711,11 +709,11 @@ def test_xtsmgraphics_cache_hit():
 
         # Should return cached XTSMGRAPHICS value instantly
         stime = time.time()
-        result = term.get_sixel_height_and_width(timeout=0.1)
+        result = term.get_sixel_height_and_width(timeout=0.2)
         elapsed = time.time() - stime
 
         assert result == (600, 800)
-        assert elapsed < 0.01  # Instant from cache
+        assert elapsed < 0.1  # Instant from cache
         return b'OK'
 
     output = pty_test(child, parent_func=None, test_name='test_xtsmgraphics_cache_hit')

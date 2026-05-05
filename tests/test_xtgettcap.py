@@ -426,7 +426,7 @@ def test_get_xtgettcap_full_success():
         cpr = '\x1b[10;20R'
         batch_resp = '\x1bP1+r436f=323536\x1b\\'
         term.ungetch(probe_resp + cpr + batch_resp)
-        result = term.get_xtgettcap(timeout=1, force=True)
+        result = term.get_xtgettcap(timeout=0.1, force=True)
         assert result is not None
         assert result.supported is True
         assert result['TN'] == 'xterm'
@@ -445,7 +445,7 @@ def test_get_xtgettcap_probe_failure():
     def child(term):
         # Only CPR, no DCS response -- probe fails
         term.ungetch('\x1b[10;20R')
-        result = term.get_xtgettcap(timeout=1, force=True)
+        result = term.get_xtgettcap(timeout=0.1, force=True)
         assert result is None
         assert term._xtgettcap_first_query_failed is True
         return b'OK'
@@ -464,7 +464,7 @@ def test_get_xtgettcap_batch_with_remaining_input():
         batch_resp = '\x1bP1+r436f=323536\x1b\\'
         keyboard_data = 'x'
         term.ungetch(probe_resp + cpr + batch_resp + keyboard_data)
-        result = term.get_xtgettcap(timeout=1, force=True)
+        result = term.get_xtgettcap(timeout=0.1, force=True)
         assert result is not None
         assert result['TN'] == 'xterm'
         assert result['Co'] == '256'
@@ -505,7 +505,7 @@ def test_does_osc52_clipboard_via_da1():
         da1_resp = '\x1b[?64;1;4;52c'
         cpr = '\x1b[10;20R'
         term.ungetch(da1_resp + cpr)
-        result = term.does_osc52_clipboard(timeout=1)
+        result = term.does_osc52_clipboard(timeout=0.1)
         assert result is True
         assert term._osc52_clipboard_supported is True
         return b'OK'
@@ -530,7 +530,7 @@ def test_does_osc52_clipboard_via_xtgettcap():
         tcap_cpr = '\x1b[11;21R'
         batch_resp = f'\x1bP1+r{hex_ms}={ms_val}\x1b\\'
         term.ungetch(da1_resp + da1_cpr + probe_resp + tcap_cpr + batch_resp)
-        result = term.does_osc52_clipboard(timeout=1, force=True)
+        result = term.does_osc52_clipboard(timeout=0.1, force=True)
         assert result is True
         assert term._osc52_clipboard_supported is True
         return b'OK'
@@ -550,7 +550,7 @@ def test_does_osc52_clipboard_unsupported():
         # XTGETTCAP probe fails (no DCS response)
         tcap_cpr = '\x1b[11;21R'
         term.ungetch(da1_resp + da1_cpr + tcap_cpr)
-        result = term.does_osc52_clipboard(timeout=1)
+        result = term.does_osc52_clipboard(timeout=0.1)
         assert result is False
         assert term._osc52_clipboard_supported is False
         return b'OK'
@@ -604,7 +604,7 @@ def test_clipboard_paste_success(terminator):
     def child(term):
         osc52_resp = '\x1b]52;c;SGVsbG8=' + terminator
         term.ungetch(osc52_resp)
-        result = term.clipboard_paste(timeout=1)
+        result = term.clipboard_paste(timeout=0.1)
         assert result == 'Hello'
         return b'OK'
 
@@ -620,7 +620,7 @@ def test_clipboard_paste_empty(terminator):
     def child(term):
         osc52_resp = '\x1b]52;c;' + terminator
         term.ungetch(osc52_resp)
-        result = term.clipboard_paste(timeout=1)
+        result = term.clipboard_paste(timeout=0.1)
         assert result == ''
         return b'OK'
 
@@ -649,7 +649,7 @@ def test_clipboard_paste_invalid_base64(terminator):
     def child(term):
         osc52_resp = '\x1b]52;c;!!!not-base64!!!' + terminator
         term.ungetch(osc52_resp)
-        result = term.clipboard_paste(timeout=1)
+        result = term.clipboard_paste(timeout=0.1)
         assert result is None
         return b'OK'
 
@@ -665,7 +665,7 @@ def test_get_color_scheme_dark():
         resp = '\x1b[?997;1n'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.get_color_scheme(timeout=1)
+        result = term.get_color_scheme(timeout=0.1)
         assert result == 'dark'
         assert term._color_scheme_supported is True
         return b'OK'
@@ -682,7 +682,7 @@ def test_get_color_scheme_light():
         resp = '\x1b[?997;2n'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.get_color_scheme(timeout=1)
+        result = term.get_color_scheme(timeout=0.1)
         assert result == 'light'
         assert term._color_scheme_supported is True
         return b'OK'
@@ -698,7 +698,7 @@ def test_get_color_scheme_unsupported():
     def child(term):
         cpr = '\x1b[10;20R'
         term.ungetch(cpr)
-        result = term.get_color_scheme(timeout=1)
+        result = term.get_color_scheme(timeout=0.1)
         assert result is None
         return b'OK'
 
@@ -717,7 +717,7 @@ def test_does_kitty_query_supported():
         resp = f'\x1bP1+r{hex_cap}={hex_val}\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.does_kitty_query(timeout=1)
+        result = term.does_kitty_query(timeout=0.1)
         assert result is True
         assert term._kitty_query_supported is True
         return b'OK'
@@ -733,7 +733,7 @@ def test_does_kitty_query_unsupported():
     def child(term):
         cpr = '\x1b[10;20R'
         term.ungetch(cpr)
-        result = term.does_kitty_query(timeout=1)
+        result = term.does_kitty_query(timeout=0.1)
         assert result is False
         return b'OK'
 
@@ -751,7 +751,7 @@ def test_does_kitty_query_rejected():
         resp = f'\x1bP0+r{hex_cap}\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.does_kitty_query(timeout=1)
+        result = term.does_kitty_query(timeout=0.1)
         assert result is False
         return b'OK'
 
@@ -767,7 +767,7 @@ def test_does_decrqss_supported():
         resp = '\x1bP1$r0m\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.does_decrqss(timeout=1)
+        result = term.does_decrqss(timeout=0.1)
         assert result is True
         assert term._decrqss_supported is True
         return b'OK'
@@ -783,7 +783,7 @@ def test_does_decrqss_unsupported():
     def child(term):
         cpr = '\x1b[10;20R'
         term.ungetch(cpr)
-        result = term.does_decrqss(timeout=1)
+        result = term.does_decrqss(timeout=0.1)
         assert result is False
         return b'OK'
 
@@ -799,7 +799,7 @@ def test_does_decrqss_invalid():
         resp = '\x1bP0$r\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.does_decrqss(timeout=1)
+        result = term.does_decrqss(timeout=0.1)
         assert result is False
         return b'OK'
 
@@ -815,7 +815,7 @@ def test_get_decrqss_sgr():
         resp = '\x1bP1$r0m\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.get_decrqss(Decrqss.SGR, timeout=1)
+        result = term.get_decrqss(Decrqss.SGR, timeout=0.1)
         assert result == '0'
         return b'OK'
 
@@ -831,7 +831,7 @@ def test_get_decrqss_sgr_with_attrs():
         resp = '\x1bP1$r1;4;38;5;12m\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.get_decrqss(Decrqss.SGR, timeout=1)
+        result = term.get_decrqss(Decrqss.SGR, timeout=0.1)
         assert result == '1;4;38;5;12'
         return b'OK'
 
@@ -847,7 +847,7 @@ def test_get_decrqss_cursor_style():
         resp = '\x1bP1$r2 q\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.get_decrqss(Decrqss.DECSCUSR, timeout=1)
+        result = term.get_decrqss(Decrqss.DECSCUSR, timeout=0.1)
         assert result == '2'
         return b'OK'
 
@@ -863,7 +863,7 @@ def test_get_decrqss_scroll_region():
         resp = '\x1bP1$r1;24r\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.get_decrqss(Decrqss.DECSTBM, timeout=1)
+        result = term.get_decrqss(Decrqss.DECSTBM, timeout=0.1)
         assert result == '1;24'
         return b'OK'
 
@@ -878,7 +878,7 @@ def test_get_decrqss_unsupported():
     def child(term):
         cpr = '\x1b[10;20R'
         term.ungetch(cpr)
-        result = term.get_decrqss(Decrqss.SGR, timeout=1)
+        result = term.get_decrqss(Decrqss.SGR, timeout=0.1)
         assert result is None
         return b'OK'
 
@@ -894,7 +894,7 @@ def test_get_decrqss_invalid():
         resp = '\x1bP0$r\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.get_decrqss(Decrqss.SGR, timeout=1)
+        result = term.get_decrqss(Decrqss.SGR, timeout=0.1)
         assert result is None
         return b'OK'
 

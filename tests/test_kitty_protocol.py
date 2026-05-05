@@ -269,7 +269,7 @@ def test_enable_kitty_keyboard_pty_success():
             report_events=True,
             report_all_keys=True,
             report_text=True,
-            timeout=1.0,
+            timeout=0.1,
             force=True
         ):
             # Write marker to show we're inside the context

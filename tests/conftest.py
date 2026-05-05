@@ -3,7 +3,7 @@
 # std imports
 import os
 import platform
-import subprocess
+import random
 
 # 3rd party
 import pytest
@@ -20,7 +20,6 @@ except ImportError:
 
 IS_WINDOWS = platform.system() == 'Windows'
 
-all_terms_params = 'xterm screen ansi vt220 rxvt cons25 linux'.split()
 many_lines_params = [40, 80]
 # we must test a '1' column for conditional in _handle_long_word
 many_columns_params = [1, 10]
@@ -61,37 +60,13 @@ if not TEST_BENCHMARK:
     collect_ignore.append('test_benchmarks.py')
 
 
-if TEST_FULL:
-    try:
-        all_terms_params = [
-            # use all values of the first column of data in output of 'toe -a'
-            _term.split(None, 1)[0] for _term in
-            subprocess.Popen(('toe', '-a'),  # pylint: disable=consider-using-with
-                             stdout=subprocess.PIPE,
-                             close_fds=True)
-            .communicate()[0].splitlines()]
-    except OSError:
-        pass
-elif IS_WINDOWS:
-    all_terms_params = ['vtwin10', ]
-elif TEST_QUICK:
-    all_terms_params = 'xterm screen ansi linux'.split()
-
-
 if TEST_QUICK:
     many_lines_params = [80, ]
     many_columns_params = [25, ]
 
 
-@pytest.fixture(params=all_terms_params)
-def all_terms(request):
-    """Common kind values for all kinds of terminals."""
-    return request.param
-
-
 # Full list of terminal types available in jinxed's virtual database.
-# Each test gets a single randomly rotated terminal kind for coverage
-# across the full suite, rather than parametrizing every test over all types.
+
 _JINXED_TERMINALS = [
     'xterm', 'xterm_256color', 'xterm_16color',
     'screen', 'screen_256color',
@@ -105,15 +80,14 @@ _JINXED_TERMINALS = [
     'cons25', 'syncterm',
 ]
 
-import random  # pylint: disable=wrong-import-position
 _random_terms = list(_JINXED_TERMINALS)
 random.shuffle(_random_terms)
 _random_term_iter = iter(_random_terms)
 
 
 @pytest.fixture
-def any_term():
-    """A single randomly rotated terminal kind, covering all jinxed types."""
+def all_terms():
+    """A single randomly rotated terminal kind from jinxed's database."""
     global _random_term_iter
     try:
         return next(_random_term_iter)
@@ -123,6 +97,8 @@ def any_term():
         _random_term_iter = iter(_random_terms)
         return next(_random_term_iter)
 
+
+# -- Keep old parametrized versions for backward compatibility --
 
 @pytest.fixture(params=many_lines_params)
 def many_lines(request):

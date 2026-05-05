@@ -3656,8 +3656,11 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         if self._keyboard_eof:
             return False
 
+        if self._keyboard_fd is None:
+            return False
+
         ready_r = [None, ]
-        check_r = [self._keyboard_fd] if self._keyboard_fd is not None else []
+        check_r = [self._keyboard_fd]
 
         if HAS_TTY:
             ready_r, _, _ = select.select(check_r, [], [], timeout)

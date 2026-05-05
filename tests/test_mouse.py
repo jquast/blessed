@@ -582,7 +582,7 @@ def test_mouse_legacy_encoding_systematic():
         results = []
         with term.cbreak():
             for _ in test_cases:
-                ks = term.inkey(timeout=1.0)
+                ks = term.inkey(timeout=0.1)
                 if ks and ks._mode_values:
                     evt = ks._mode_values
                     results.append(f'{evt.button_value},{evt.x},{evt.y},'
@@ -605,7 +605,7 @@ def test_mouse_legacy_encoding_systematic():
                     ctrl,
                     released,
                     is_motion))
-            time.sleep(0.05)
+            time.sleep(0.03)
 
     output = pty_test(child, parent)
     results = output.split(';')

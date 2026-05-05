@@ -40,7 +40,6 @@ def assert_elapsed_range_ms(start_time, min_ms, max_ms):
     assert min_ms <= int(elapsed_ms) <= max_ms
 
 
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_kbhit_interrupted():
     """kbhit() survives signal handler."""
     # this is a test for a legacy version of python, doesn't hurt to keep around
@@ -61,7 +60,7 @@ def test_kbhit_interrupted():
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.raw():
-            assert term.inkey(timeout=0.2) == ''
+            assert term.inkey(timeout=0.1) == ''
         os.write(sys.__stdout__.fileno(), b'complete')
         assert got_sigwinch
         if cov is not None:
@@ -73,17 +72,16 @@ def test_kbhit_interrupted():
         os.write(master_fd, SEND_SEMAPHORE)
         read_until_semaphore(master_fd)
         stime = time.time()
-        time.sleep(0.05)
+        time.sleep(0.01)
         os.kill(pid, signal.SIGWINCH)
         output = read_until_eof(master_fd)
 
     pid, status = os.waitpid(pid, 0)
     assert output == 'complete'
     assert os.WEXITSTATUS(status) == 0
-    assert_elapsed_range_ms(stime, 15, 80)
+    assert_elapsed_range_ms(stime, 8, 40)
 
 
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_kbhit_interrupted_nonetype():
     """kbhit() should also allow interruption with timeout of None."""
     # pylint: disable=global-statement
@@ -140,7 +138,7 @@ def test_kbhit_no_kb():
     stime = time.time()
     assert term._keyboard_fd is None
     assert not term.kbhit(timeout=0.3)
-    assert_elapsed_range_ms(stime, 25, 80)
+    assert_elapsed_range_ms(stime, 0, 5)
 
 
 def test_kbhit_no_tty():
@@ -156,10 +154,8 @@ def test_kbhit_no_tty():
     'use_stream,timeout,expected_cs_range', [
         (False, 0, (0, 5)),
         (True, 0, (0, 5)),
-        pytest.param(False, 0.3, (25, 80), marks=pytest.mark.skipif(
-            TEST_QUICK, reason="TEST_QUICK specified")),
-        pytest.param(True, 0.3, (25, 80), marks=pytest.mark.skipif(
-            TEST_QUICK, reason="TEST_QUICK specified")),
+        (False, 0.1, (0, 5)),
+        (True, 0.1, (0, 5)),
     ])
 def test_keystroke_cbreak_noinput(use_stream, timeout, expected_cs_range):
     """Test keystroke without input with various timeout/stream combinations."""
@@ -211,11 +207,11 @@ def test_keystroke_cbreak_with_input_slowly():
     def parent(master_fd):
         os.write(master_fd, SEND_SEMAPHORE)
         os.write(master_fd, b'a')
-        time.sleep(0.1)
+        time.sleep(0.05)
         os.write(master_fd, b'b')
         time.sleep(0.1)
         os.write(master_fd, b'cdefgh')
-        time.sleep(0.1)
+        time.sleep(0.05)
         os.write(master_fd, b'X')
         read_until_semaphore(master_fd)
 
@@ -302,7 +298,6 @@ def test_keystroke_0s_cbreak_sequence():
     assert math.floor(time.time() - stime) == 0.0
 
 
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_keystroke_20ms_cbreak_with_input():
     """1-second keystroke w/multibyte sequence; should return after ~1 second."""
     def child(term):
@@ -313,23 +308,22 @@ def test_keystroke_20ms_cbreak_with_input():
 
     def parent(master_fd):
         read_until_semaphore(master_fd)
-        time.sleep(0.2)
+        time.sleep(0.015)
         os.write(master_fd, '\x1b[C'.encode('ascii'))
 
     stime = time.time()
     output = pty_test(child, parent, 'test_keystroke_20ms_cbreak_with_input')
     assert output == 'KEY_RIGHT'
-    assert_elapsed_range_ms(stime, 19, 40)
+    assert_elapsed_range_ms(stime, 5, 25)
 
 
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_esc_delay_cbreak_15ms():
-    r"""esc_delay=0.15 will cause a single ESC ('\x1b') to delay for 15ms"""
+    r""r"""esc_delay=0.10 will cause a single ESC ('\x1b') to delay for 10ms"""
     def child(term):
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            inp = term.inkey(timeout=1, esc_delay=0.15)
+            inp = term.inkey(timeout=1, esc_delay=0.10)
             measured_time = (time.time() - stime) * 100
             return f'{inp.name} {measured_time:.0f}'.encode('ascii')
 
@@ -341,7 +335,7 @@ def test_esc_delay_cbreak_15ms():
     key_name, duration_ms = output.split()
 
     assert key_name == 'KEY_ESCAPE'
-    assert 14 <= int(duration_ms) <= 20, int(duration_ms)
+    assert 9 <= int(duration_ms) <= 15, int(duration_ms)
 
 
 def test_esc_delay_cbreak_timout_0():
@@ -350,7 +344,7 @@ def test_esc_delay_cbreak_timout_0():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            inp = term.inkey(timeout=0, esc_delay=0.15)
+            inp = term.inkey(timeout=0, esc_delay=0.10)
             measured_time = (time.time() - stime) * 100
             return f'{inp.name} {measured_time:.0f}'.encode('ascii')
 
@@ -364,7 +358,7 @@ def test_esc_delay_cbreak_timout_0():
 
     assert key_name == 'KEY_ESCAPE'
     assert math.floor(time.time() - stime) == 0.0
-    assert 14 <= int(duration_ms) <= 25, int(duration_ms)
+    assert 9 <= int(duration_ms) <= 15, int(duration_ms)
 
 
 def test_esc_delay_cbreak_nonprefix_sequence():
@@ -390,7 +384,6 @@ def test_esc_delay_cbreak_nonprefix_sequence():
     assert 0 <= int(duration_ms) <= 10, duration_ms
 
 
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_flushinp_timeout_with_continuous_input():
     """flushinp() respects timeout even when keystrokes arrive continuously."""
     def child(term):
@@ -850,7 +843,9 @@ def test_read_until_max_buffer_size():
     term._line_buffered = False
     term._keyboard_fd = 0
 
-    chars = iter('x' * 70000)
+    # 9x7000 + 2536 = 65536 (not over max), then 1 more 'x' triggers overflow
+    chunks = (['x' * 7000] * 9) + ['x' * 2536, 'x']
+    chars = iter(chunks)
 
     def mock_inkey(timeout=None, esc_delay=None):
         try:
@@ -870,7 +865,7 @@ def test_esc_delay_while_loop_with_continued_input():
     def child(term):
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
-            ks = term.inkey(timeout=1.0, esc_delay=0.2)
+            ks = term.inkey(timeout=1.0, esc_delay=0.1)
             return ks.name.encode('ascii')
 
     def parent(master_fd):
@@ -889,7 +884,6 @@ def test_esc_delay_while_loop_with_continued_input():
     assert output == 'KEY_LEFT'
 
 
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_esc_delay_long_sequence_prefix_slow_complete():
     """Long sequence sent slowly byte-by-byte should complete before esc_delay.
 
@@ -908,9 +902,9 @@ def test_esc_delay_long_sequence_prefix_slow_complete():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            keystroke = term.inkey(timeout=6.0, esc_delay=esc_delay)
+            keystroke = term.inkey(timeout=1.0, esc_delay=esc_delay)
             duration_ms = (time.time() - stime) * 100
-            remaining = term.flushinp(timeout=0.15)
+            remaining = term.flushinp(timeout=0.05)
             result = f'{keystroke.name}|{keystroke.code}|{remaining!r}|{duration_ms:.0f}'
             return result.encode('ascii')
 
@@ -936,7 +930,6 @@ def test_esc_delay_long_sequence_prefix_slow_complete():
             int(100 * esc_delay * PCT_MAXWAIT_KEYSTROKE))
 
 
-@pytest.mark.skipif(TEST_QUICK, reason="TEST_QUICK specified")
 def test_esc_delay_incomplete_known_sequence():
     """Incomplete known sequence should timeout and be flushed.
 
@@ -950,9 +943,9 @@ def test_esc_delay_incomplete_known_sequence():
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
             stime = time.time()
-            keystroke = term.inkey(timeout=5.0, esc_delay=esc_delay)
+            keystroke = term.inkey(timeout=1.0, esc_delay=esc_delay)
             duration_ms = (time.time() - stime) * 100
-            remaining = term.flushinp(0.15)
+            remaining = term.flushinp(0.05)
             result = f'{keystroke.name}|{remaining!r}|{duration_ms:.0f}'
             return result.encode('ascii')
 
