@@ -31,13 +31,10 @@ pytestmark = pytest.mark.skipif(
 ])
 def test_detection_not_a_tty(method_name, expected):
     """Detection methods return falsy default when not a TTY."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True,
-                            is_a_tty=False)
-        result = getattr(term, method_name)(timeout=0.01)
-        assert result == expected
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                        is_a_tty=False)
+    result = getattr(term, method_name)(timeout=0.01)
+    assert result == expected
 
 
 @pytest.mark.parametrize('method_name,expected', [
@@ -50,12 +47,9 @@ def test_detection_not_a_tty(method_name, expected):
 ])
 def test_detection_no_styling(method_name, expected):
     """Detection methods return falsy default when does_styling is False."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=False)
-        result = getattr(term, method_name)(timeout=0.01)
-        assert result == expected
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=False)
+    result = getattr(term, method_name)(timeout=0.01)
+    assert result == expected
 
 
 @pytest.mark.parametrize('method_name,cache_attr,cached_value,expected', [
@@ -68,52 +62,40 @@ def test_detection_no_styling(method_name, expected):
 ])
 def test_detection_cached_bool(method_name, cache_attr, cached_value, expected):
     """Boolean detection methods return cached value."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        setattr(term, cache_attr, cached_value)
-        assert getattr(term, method_name)() is expected
-    child()
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    setattr(term, cache_attr, cached_value)
+    assert getattr(term, method_name)() is expected
 
 
 def test_get_iterm2_capabilities_cached():
     """get_iterm2_capabilities returns cached result."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        cached = ITerm2Capabilities(supported=True, features={'truecolor': 2})
-        term._iterm2_capabilities_cache = cached
-        result = term.get_iterm2_capabilities()
-        assert result is cached
-    child()
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    cached = ITerm2Capabilities(supported=True, features={'truecolor': 2})
+    term._iterm2_capabilities_cache = cached
+    result = term.get_iterm2_capabilities()
+    assert result is cached
 
 
 def test_does_kitty_pointer_shapes_cached_supported():
     """does_kitty_pointer_shapes returns cached shape string."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        term._kitty_pointer_shapes_result = (True, 'beam')
-        assert term.does_kitty_pointer_shapes() == 'beam'
-    child()
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    term._kitty_pointer_shapes_result = (True, 'beam')
+    assert term.does_kitty_pointer_shapes() == 'beam'
 
 
 def test_does_kitty_pointer_shapes_cached_unsupported():
     """does_kitty_pointer_shapes returns None when cached unsupported."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        term._kitty_pointer_shapes_result = (False, '')
-        assert term.does_kitty_pointer_shapes() is None
-    child()
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    term._kitty_pointer_shapes_result = (False, '')
+    assert term.does_kitty_pointer_shapes() is None
 
 
 @pytest.mark.parametrize('method_name,cache_attr,cached_value', [
@@ -151,15 +133,12 @@ def test_get_iterm2_capabilities_force_bypass():
 
 def test_does_text_sizing_cached():
     """does_text_sizing returns cached result."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        cached = TextSizingResult(width=True, scale=True)
-        term._text_sizing_cache = cached
-        assert term.does_text_sizing() is cached
-    child()
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    cached = TextSizingResult(width=True, scale=True)
+    term._text_sizing_cache = cached
+    assert term.does_text_sizing() is cached
 
 
 def test_does_text_sizing_force_bypass():
@@ -288,15 +267,12 @@ def test_does_kitty_notifications_supported(terminator):
 ])
 def test_does_iterm2_delegates_cached(method_name, cached_supported):
     """does_iterm2 and does_iterm2_graphics return cached result."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        term._iterm2_capabilities_cache = ITerm2Capabilities(
-            supported=cached_supported)
-        assert getattr(term, method_name)() is cached_supported
-    child()
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    term._iterm2_capabilities_cache = ITerm2Capabilities(
+        supported=cached_supported)
+    assert getattr(term, method_name)() is cached_supported
 
 
 @pytest.mark.parametrize('ps,expected', [
@@ -501,40 +477,32 @@ def test_does_text_sizing_scale_location_timeout():
 
 def test_does_text_sizing_cleanup_side_effect():
     """does_text_sizing writes cleanup (backspace+space+backspace) to erase probes."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        with mock.patch.object(term, 'get_location', side_effect=[
-            (5, 10),  # initial: col0=10
-            (5, 12),  # after width probe: col1=12
-            (5, 14),  # after scale probe: col2=14
-        ]):
-            result = term.does_text_sizing(timeout=0.1)
-        assert result == TextSizingResult(width=True, scale=True)
-        output = stream.getvalue()
-        # cleanup: _movement=4 backspaces, 4 spaces, 4 backspaces
-        assert '\b' * 4 + ' ' * 4 + '\b' * 4 in output
-
-    child()
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    with mock.patch.object(term, 'get_location', side_effect=[
+        (5, 10),  # initial: col0=10
+        (5, 12),  # after width probe: col1=12
+        (5, 14),  # after scale probe: col2=14
+    ]):
+        result = term.does_text_sizing(timeout=0.1)
+    assert result == TextSizingResult(width=True, scale=True)
+    output = stream.getvalue()
+    # cleanup: _movement=4 backspaces, 4 spaces, 4 backspaces
+    assert '\b' * 4 + ' ' * 4 + '\b' * 4 in output
 
 
 def test_does_text_sizing_no_cleanup_when_cached():
     """does_text_sizing does not write probes/cleanup when cached result exists."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        term._text_sizing_cache = TextSizingResult(width=True, scale=True)
-        stream.truncate(0)
-        stream.seek(0)
-        result = term.does_text_sizing()
-        assert result == TextSizingResult(width=True, scale=True)
-        assert stream.getvalue() == ''
-
-    child()
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    term._text_sizing_cache = TextSizingResult(width=True, scale=True)
+    stream.truncate(0)
+    stream.seek(0)
+    result = term.does_text_sizing()
+    assert result == TextSizingResult(width=True, scale=True)
+    assert stream.getvalue() == ''
 
 
 def _sizing_term(supported):
@@ -562,22 +530,15 @@ def _sizing_term(supported):
 ])
 def test_text_sized(supported, kwargs, expected, measured):
     """text_sized returns OSC 66-wrapped text when supported, as-is otherwise."""
-    @as_subprocess
-    def child():
-        from wcwidth import width as wcwidth_width
-        term = _sizing_term(supported)
-        result = term.text_sized('abc', **kwargs)
-        assert result == expected
-        assert wcwidth_width(result) == measured
-    child()
+    from wcwidth import width as wcwidth_width
+    term = _sizing_term(supported)
+    result = term.text_sized('abc', **kwargs)
+    assert result == expected
+    assert wcwidth_width(result) == measured
 
 
 def test_text_sized_ValueError():
     """text_sized raises ValueError for text exceeding 4096 length limit."""
-    @as_subprocess
-    def child():
-        term = _sizing_term(True)
-        with pytest.raises(ValueError):
-            term.text_sized('X' * 4097, scale=2)
-
-    child()
+    term = _sizing_term(True)
+    with pytest.raises(ValueError):
+        term.text_sized('X' * 4097, scale=2)

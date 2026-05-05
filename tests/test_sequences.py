@@ -23,105 +23,73 @@ except ImportError:
 @pytest.mark.skipif(IS_WINDOWS, reason="requires real tty")
 def test_capability():
     """Check that capability lookup works."""
-    @as_subprocess
-    def child():
-        # Also test that Terminal grabs a reasonable default stream.
-        t = TestTerminal()
-        sc = unicode_cap('sc', term=t)
-        assert t.save == sc
-        assert t.save == sc  # Make sure caching doesn't screw it up.
-
-    child()
+    # Also test that Terminal grabs a reasonable default stream.
+    t = TestTerminal()
+    sc = unicode_cap('sc', term=t)
+    assert t.save == sc
+    assert t.save == sc  # Make sure caching doesn't screw it up.
 
 
 def test_capability_without_tty():
     """Assert capability templates are '' when stream is not a tty."""
-    @as_subprocess
-    def child():
-        t = TestTerminal(stream=StringIO())
-        assert t.save == ''
-        assert t.red == ''
-
-    child()
+    t = TestTerminal(stream=StringIO())
+    assert t.save == ''
+    assert t.red == ''
 
 
 def test_capability_with_forced_tty():
     """force styling should return sequences even for non-ttys."""
-    @as_subprocess
-    def child():
-        t = TestTerminal(stream=StringIO(), force_styling=True)
-        assert t.save == unicode_cap('sc', term=t)
-
-    child()
+    t = TestTerminal(stream=StringIO(), force_styling=True)
+    assert t.save == unicode_cap('sc', term=t)
 
 
 def test_basic_url():
     """force styling should return sequences even for non-ttys."""
-    @as_subprocess
-    def child():
-        # given
-        t = TestTerminal(stream=StringIO(), force_styling=True)
-        given_url = 'https://blessed.readthedocs.org'
-        given_text = 'documentation'
-        expected_output = f'\x1b]8;;{given_url}\x1b\\{given_text}\x1b]8;;\x1b\\'
+    # given
+    t = TestTerminal(stream=StringIO(), force_styling=True)
+    given_url = 'https://blessed.readthedocs.org'
+    given_text = 'documentation'
+    expected_output = f'\x1b]8;;{given_url}\x1b\\{given_text}\x1b]8;;\x1b\\'
 
-        # exercise
-        result = t.link(given_url, 'documentation')
+    # exercise
+    result = t.link(given_url, 'documentation')
 
-        # verify
-        assert repr(result) == repr(expected_output)
-
-    child()
+    # verify
+    assert repr(result) == repr(expected_output)
 
 
 def test_url_with_id():
     """force styling should return sequences even for non-ttys."""
-    @as_subprocess
-    def child():
-        # given
-        t = TestTerminal(stream=StringIO(), force_styling=True)
-        given_url = 'https://blessed.readthedocs.org'
-        given_text = 'documentation'
-        given_url_id = '123'
-        expected_output = f'\x1b]8;id={given_url_id};{given_url}\x1b\\{given_text}\x1b]8;;\x1b\\'
+    # given
+    t = TestTerminal(stream=StringIO(), force_styling=True)
+    given_url = 'https://blessed.readthedocs.org'
+    given_text = 'documentation'
+    given_url_id = '123'
+    expected_output = f'\x1b]8;id={given_url_id};{given_url}\x1b\\{given_text}\x1b]8;;\x1b\\'
 
-        # exercise
-        result = t.link(given_url, 'documentation', given_url_id)
+    # exercise
+    result = t.link(given_url, 'documentation', given_url_id)
 
-        # verify
-        assert repr(result) == repr(expected_output)
-
-    child()
+    # verify
+    assert repr(result) == repr(expected_output)
 
 
 def test_parametrization():
     """Test parameterizing a capability."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        assert term.cup(3, 4) == unicode_parm('cup', 3, 4, term=term)
-
-    child()
+    term = TestTerminal(force_styling=True)
+    assert term.cup(3, 4) == unicode_parm('cup', 3, 4, term=term)
 
 
 def test_height_and_width():
     """Assert that ``height_and_width()`` returns full integers."""
-    @as_subprocess
-    def child():
-        t = TestTerminal()  # kind shouldn't matter.
-        assert isinstance(t.height, int)
-        assert isinstance(t.width, int)
-
-    child()
+    t = TestTerminal()  # kind shouldn't matter.
+    assert isinstance(t.height, int)
+    assert isinstance(t.width, int)
 
 
 def test_stream_attr():
     """Make sure Terminal ``stream`` is stdout by default."""
-    @as_subprocess
-    def child():
-        assert TestTerminal().stream == sys.__stdout__
-
-    child()
+    assert TestTerminal().stream == sys.__stdout__
 
 
 def test_location_with_styling(all_terms):
@@ -645,25 +613,21 @@ def test_termcap_match_optional():
     # local
     from blessed.sequences import Termcap
 
-    @as_subprocess
-    def child():
-        t = TestTerminal(force_styling=True)
-        cap = Termcap.build('move_right', t.cuf, 'cuf', nparams=1,
-                            match_grouped=True, match_optional=True)
+    t = TestTerminal(force_styling=True)
+    cap = Termcap.build('move_right', t.cuf, 'cuf', nparams=1,
+                        match_grouped=True, match_optional=True)
 
-        # Digits absent
-        assert cap.re_compiled.match(t.cuf1).group(1) is None
+    # Digits absent
+    assert cap.re_compiled.match(t.cuf1).group(1) is None
 
-        # Digits present
-        assert cap.re_compiled.match(t.cuf()).group(1) == '0'
-        assert cap.re_compiled.match(t.cuf(1)).group(1) == '1'
-        assert cap.re_compiled.match(t.cuf(22)).group(1) == '22'
+    # Digits present
+    assert cap.re_compiled.match(t.cuf()).group(1) == '0'
+    assert cap.re_compiled.match(t.cuf(1)).group(1) == '1'
+    assert cap.re_compiled.match(t.cuf(22)).group(1) == '22'
 
-        # Make sure match is not too generalized
-        assert cap.re_compiled.match(t.cub(2)) is None
-        assert cap.re_compiled.match(t.cub1) is None
-
-    child()
+    # Make sure match is not too generalized
+    assert cap.re_compiled.match(t.cub(2)) is None
+    assert cap.re_compiled.match(t.cub1) is None
 
 
 def test_truncate(all_terms):

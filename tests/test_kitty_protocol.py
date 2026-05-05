@@ -104,40 +104,37 @@ def test_kitty_sequence_properties():
 
 def test_terminal_inkey_kitty_protocol():
     """Test Terminal.inkey() with Kitty protocol sequences."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        term.ungetch('\x1b[97;5u')
-        ks = term.inkey(timeout=0)
-        assert ks == '\x1b[97;5u'
-        assert ks._mode == -1
-        assert isinstance(ks._match, KittyKeyEvent)
-        assert ks._match.unicode_key == 97
-        assert ks._match.modifiers == 5
+    term.ungetch('\x1b[97;5u')
+    ks = term.inkey(timeout=0)
+    assert ks == '\x1b[97;5u'
+    assert ks._mode == -1
+    assert isinstance(ks._match, KittyKeyEvent)
+    assert ks._match.unicode_key == 97
+    assert ks._match.modifiers == 5
 
-        term.ungetch('\x1b[65u')
-        ks = term.inkey(timeout=0)
-        assert ks._mode == -1
-        assert ks._match.unicode_key == 65
+    term.ungetch('\x1b[65u')
+    ks = term.inkey(timeout=0)
+    assert ks._mode == -1
+    assert ks._match.unicode_key == 65
 
-        term.ungetch('\x1b[97;5uextra')
-        ks = term.inkey(timeout=0)
-        assert ks == '\x1b[97;5u'
-        assert ks._mode == -1
-        remaining = term.flushinp()
-        assert remaining == 'extra'
+    term.ungetch('\x1b[97;5uextra')
+    ks = term.inkey(timeout=0)
+    assert ks == '\x1b[97;5u'
+    assert ks._mode == -1
+    remaining = term.flushinp()
+    assert remaining == 'extra'
 
-        term.ungetch('\x1b[97;8u')
-        ks = term.inkey(timeout=0)
-        assert ks._mode == -1
-        assert isinstance(ks._match, KittyKeyEvent)
-        assert ks._match.unicode_key == 97
-        assert ks._match.modifiers == 8
+    term.ungetch('\x1b[97;8u')
+    ks = term.inkey(timeout=0)
+    assert ks._mode == -1
+    assert isinstance(ks._match, KittyKeyEvent)
+    assert ks._match.unicode_key == 97
+    assert ks._match.modifiers == 8
 
-        assert stream.getvalue() == ''
-    child()
+    assert stream.getvalue() == ''
 
 
 def test_kitty_protocol_modifier_properties():
@@ -296,102 +293,90 @@ def test_enable_kitty_keyboard_pty_success():
 
 def test_kitty_state_0s_reply_via_ungetch():
     """0-second get_kitty_keyboard_state call with response via ungetch."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._is_a_tty = True  # Force TTY behavior for testing
-        stime = time.time()
-        # Simulate Kitty keyboard state response - flags value 9 (disambiguate + report_all_keys)
-        # Need both Kitty and DA response for boundary approach on first call
-        term.ungetch('\x1b[?9u\x1b[?64c')
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._is_a_tty = True  # Force TTY behavior for testing
+    stime = time.time()
+    # Simulate Kitty keyboard state response - flags value 9 (disambiguate + report_all_keys)
+    # Need both Kitty and DA response for boundary approach on first call
+    term.ungetch('\x1b[?9u\x1b[?64c')
 
-        flags = term.get_kitty_keyboard_state(timeout=0.01)
-        assert math.floor(time.time() - stime) == 0.0
-        assert flags is not None
-        assert flags.value == 9
-        assert flags.disambiguate is True
-        assert flags.report_all_keys is True
-        assert flags.report_events is False
-    child()
+    flags = term.get_kitty_keyboard_state(timeout=0.01)
+    assert math.floor(time.time() - stime) == 0.0
+    assert flags is not None
+    assert flags.value == 9
+    assert flags.disambiguate is True
+    assert flags.report_all_keys is True
+    assert flags.report_events is False
 
 
 def test_kitty_state_styling_indifferent():
     """Test get_kitty_keyboard_state with styling enabled and disabled."""
-    @as_subprocess
-    def child():
-        # Test with styling enabled
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._is_a_tty = True  # Force TTY behavior for testing
-        # Need both Kitty and DA response for boundary approach on first call
-        term.ungetch('\x1b[?15u\x1b[?64c')  # flags value 15 (multiple flags)
-        flags = term.get_kitty_keyboard_state(timeout=0.01)
-        assert flags is not None
-        assert flags.value == 15
-        assert flags.disambiguate is True
-        assert flags.report_events is True
-        assert flags.report_alternates is True
-        assert flags.report_all_keys is True  # bit 3 (8) is set in value 15
-        assert flags.report_text is False
+    # Test with styling enabled
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._is_a_tty = True  # Force TTY behavior for testing
+    # Need both Kitty and DA response for boundary approach on first call
+    term.ungetch('\x1b[?15u\x1b[?64c')  # flags value 15 (multiple flags)
+    flags = term.get_kitty_keyboard_state(timeout=0.01)
+    assert flags is not None
+    assert flags.value == 15
+    assert flags.disambiguate is True
+    assert flags.report_events is True
+    assert flags.report_alternates is True
+    assert flags.report_all_keys is True  # bit 3 (8) is set in value 15
+    assert flags.report_text is False
 
-        # Test with styling disabled, still works when is_a_tty is True
-        term = TestTerminal(stream=io.StringIO(), force_styling=False)
-        term._is_a_tty = True
-        term.ungetch('\x1b[?15u\x1b[?64c')
-        flags = term.get_kitty_keyboard_state(timeout=0.01)
-        assert flags is not None
-        assert flags.value == 15
-        assert flags.disambiguate is True
-        assert flags.report_events is True
-        assert flags.report_alternates is True
-        assert flags.report_all_keys is True
-        assert flags.report_text is False
-    child()
+    # Test with styling disabled, still works when is_a_tty is True
+    term = TestTerminal(stream=io.StringIO(), force_styling=False)
+    term._is_a_tty = True
+    term.ungetch('\x1b[?15u\x1b[?64c')
+    flags = term.get_kitty_keyboard_state(timeout=0.01)
+    assert flags is not None
+    assert flags.value == 15
+    assert flags.disambiguate is True
+    assert flags.report_events is True
+    assert flags.report_alternates is True
+    assert flags.report_all_keys is True
+    assert flags.report_text is False
 
 
 def test_kitty_state_timeout_handling():
     """Test get_kitty_keyboard_state timeout and sticky failure behavior."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._is_a_tty = True  # Force TTY behavior for testing
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._is_a_tty = True  # Force TTY behavior for testing
 
-        # Should have clean state initially
-        assert term._kitty_kb_first_query_failed is False
+    # Should have clean state initially
+    assert term._kitty_kb_first_query_failed is False
 
-        # First timeout should set sticky failure flag
-        flags1 = term.get_kitty_keyboard_state(timeout=0.001)
-        assert flags1 is None
-        assert term._kitty_kb_first_query_failed is True
+    # First timeout should set sticky failure flag
+    flags1 = term.get_kitty_keyboard_state(timeout=0.001)
+    assert flags1 is None
+    assert term._kitty_kb_first_query_failed is True
 
-        # Subsequent calls should return None immediately (sticky failure)
-        flags2 = term.get_kitty_keyboard_state(timeout=1.0)
-        assert flags2 is None
+    # Subsequent calls should return None immediately (sticky failure)
+    flags2 = term.get_kitty_keyboard_state(timeout=1.0)
+    assert flags2 is None
 
-        # Force should override sticky failure and attempt query again
-        flags3 = term.get_kitty_keyboard_state(timeout=0.001, force=True)
-        assert flags3 is None  # Still timeout, but sticky behavior was bypassed
-    child()
+    # Force should override sticky failure and attempt query again
+    flags3 = term.get_kitty_keyboard_state(timeout=0.001, force=True)
+    assert flags3 is None  # Still timeout, but sticky behavior was bypassed
 
 
 def test_kitty_state_excludes_response_from_buffer():
     """Test get_kitty_keyboard_state buffer management."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._is_a_tty = True  # Force TTY behavior for testing
-        # Buffer unrelated data before and after the kitty state response
-        term.ungetch('abc' + '\x1b[?13u' + 'xyz')
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._is_a_tty = True  # Force TTY behavior for testing
+    # Buffer unrelated data before and after the kitty state response
+    term.ungetch('abc' + '\x1b[?13u' + 'xyz')
 
-        # get_kitty_keyboard_state should parse and consume only the response
-        # Use force=True to bypass boundary approach for this buffer management test
-        flags = term.get_kitty_keyboard_state(timeout=0.01, force=True)
-        assert flags is not None
-        assert flags.value == 13
+    # get_kitty_keyboard_state should parse and consume only the response
+    # Use force=True to bypass boundary approach for this buffer management test
+    flags = term.get_kitty_keyboard_state(timeout=0.01, force=True)
+    assert flags is not None
+    assert flags.value == 13
 
-        # Remaining data should still be available for subsequent input
-        remaining = term.flushinp()
-        assert remaining == 'abcxyz'
-    child()
+    # Remaining data should still be available for subsequent input
+    remaining = term.flushinp()
+    assert remaining == 'abcxyz'
 
 
 @pytest.mark.parametrize("force_styling,expected_sticky_flag", [
@@ -400,25 +385,22 @@ def test_kitty_state_excludes_response_from_buffer():
 ])
 def test_get_kitty_keyboard_state_no_tty_or_disabled(force_styling, expected_sticky_flag):
     """Test get_kitty_keyboard_state returns None when unsupported."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=force_styling)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=force_styling)
 
-        # Should return None immediately without attempting query
-        result = term.get_kitty_keyboard_state(timeout=0.01)
-        assert result is None
-        assert term._kitty_kb_first_query_failed == expected_sticky_flag
+    # Should return None immediately without attempting query
+    result = term.get_kitty_keyboard_state(timeout=0.01)
+    assert result is None
+    assert term._kitty_kb_first_query_failed == expected_sticky_flag
 
-        # All subsequent calls should return None
-        result2 = term.get_kitty_keyboard_state(timeout=None)
-        assert result2 is None
+    # All subsequent calls should return None
+    result2 = term.get_kitty_keyboard_state(timeout=None)
+    assert result2 is None
 
-        # Force should also return None when not supported/not a TTY
-        result3 = term.get_kitty_keyboard_state(timeout=0.01, force=True)
-        assert result3 is None
-        assert stream.getvalue() == ''
-    child()
+    # Force should also return None when not supported/not a TTY
+    result3 = term.get_kitty_keyboard_state(timeout=0.01, force=True)
+    assert result3 is None
+    assert stream.getvalue() == ''
 
 
 @pytest.mark.parametrize("force_styling,force,flags,mode,expected_output", [
@@ -439,91 +421,76 @@ def test_get_kitty_keyboard_state_no_tty_or_disabled(force_styling, expected_sti
 ])
 def test_enable_kitty_keyboard(force_styling, force, flags, mode, expected_output):
     """Test enable_kitty_keyboard with various flag combinations and conditions."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=force_styling)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=force_styling)
 
-        with term.enable_kitty_keyboard(**flags, mode=mode, force=force, timeout=0.01):
-            pass
-        assert stream.getvalue() == expected_output
-    child()
+    with term.enable_kitty_keyboard(**flags, mode=mode, force=force, timeout=0.01):
+        pass
+    assert stream.getvalue() == expected_output
 
 
 def test_enable_kitty_keyboard_all_flag_operations():
     """Test all flag bit operations in enable_kitty_keyboard."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        given_flags_response = '\x1b[?0u'  # flags 0 (no flags currently set)
-        expected_enable_seq = '\x1b[=31;1u'  # flags 31 (1+2+4+8+16: all 5 flags), mode 1 (push)
-        term.ungetch(given_flags_response)
-        with term.enable_kitty_keyboard(
-            disambiguate=True,
-            report_events=True,
-            report_alternates=True,
-            report_all_keys=True,
-            report_text=True,
-            timeout=0.01,
-            force=True
-        ):
-            pass
-        output = stream.getvalue()
-        assert expected_enable_seq in output
-    child()
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    given_flags_response = '\x1b[?0u'  # flags 0 (no flags currently set)
+    expected_enable_seq = '\x1b[=31;1u'  # flags 31 (1+2+4+8+16: all 5 flags), mode 1 (push)
+    term.ungetch(given_flags_response)
+    with term.enable_kitty_keyboard(
+        disambiguate=True,
+        report_events=True,
+        report_alternates=True,
+        report_all_keys=True,
+        report_text=True,
+        timeout=0.01,
+        force=True
+    ):
+        pass
+    output = stream.getvalue()
+    assert expected_enable_seq in output
 
 
 def test_enable_kitty_keyboard_sequence_emission():
     """Test sequence emission and flush in enable_kitty_keyboard."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        given_flags_response = '\x1b[?5u'  # flags 5 (1+4: disambiguate+report_alternates)
-        expected_enable_seq = '\x1b[=1;1u'  # flags 1 (disambiguate), mode 1 (push)
-        expected_restore_seq = '\x1b[=5;1u'  # flags 5 (restore previous), mode 1
-        term.ungetch(given_flags_response)
-        with term.enable_kitty_keyboard(disambiguate=True, timeout=0.01, force=True):
-            output_during = stream.getvalue()
-            assert expected_enable_seq in output_during
-        output_after = stream.getvalue()
-        assert expected_restore_seq in output_after
-    child()
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    given_flags_response = '\x1b[?5u'  # flags 5 (1+4: disambiguate+report_alternates)
+    expected_enable_seq = '\x1b[=1;1u'  # flags 1 (disambiguate), mode 1 (push)
+    expected_restore_seq = '\x1b[=5;1u'  # flags 5 (restore previous), mode 1
+    term.ungetch(given_flags_response)
+    with term.enable_kitty_keyboard(disambiguate=True, timeout=0.01, force=True):
+        output_during = stream.getvalue()
+        assert expected_enable_seq in output_during
+    output_after = stream.getvalue()
+    assert expected_restore_seq in output_after
 
 
 def test_enable_kitty_keyboard_restoration_with_previous_flags():
     """Test restoration logic when previous flags exist."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        given_flags_response = '\x1b[?9u'  # flags 9 (1+8: disambiguate+report_all_keys)
-        expected_restore_seq = '\x1b[=9;1u'  # flags 9 (restore previous), mode 1
-        term.ungetch(given_flags_response)
-        with term.enable_kitty_keyboard(disambiguate=True, report_all_keys=True,
-                                        timeout=0.01, force=True):
-            pass
-        output = stream.getvalue()
-        assert expected_restore_seq in output
-    child()
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    given_flags_response = '\x1b[?9u'  # flags 9 (1+8: disambiguate+report_all_keys)
+    expected_restore_seq = '\x1b[=9;1u'  # flags 9 (restore previous), mode 1
+    term.ungetch(given_flags_response)
+    with term.enable_kitty_keyboard(disambiguate=True, report_all_keys=True,
+                                    timeout=0.01, force=True):
+        pass
+    output = stream.getvalue()
+    assert expected_restore_seq in output
 
 
 def test_enable_kitty_keyboard_sticky_failure():
     """Test enable_kitty_keyboard skips when first query failed."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        term._kitty_kb_first_query_failed = True
-        with term.enable_kitty_keyboard(disambiguate=True, timeout=0.01):
-            pass
-        assert stream.getvalue() == ''
-    child()
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    term._kitty_kb_first_query_failed = True
+    with term.enable_kitty_keyboard(disambiguate=True, timeout=0.01):
+        pass
+    assert stream.getvalue() == ''
 
 
 @pytest.mark.parametrize("flags,expected_value", [
@@ -551,75 +518,69 @@ def test_kitty_keyboard_protocol_setters(flags, expected_value):
 
 def test_get_kitty_state_boundary_no_response():
     """Test CPR boundary approach when no response found."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        expected_kitty_query = '\x1b[?u'
-        expected_cpr_query = '\x1b[6n'
-        flags = term.get_kitty_keyboard_state(timeout=0.01)
-        assert flags is None
-        assert term._kitty_kb_first_query_failed is True
-        output = stream.getvalue()
-        assert expected_kitty_query in output
-        assert expected_cpr_query in output
-    child()
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    expected_kitty_query = '\x1b[?u'
+    expected_cpr_query = '\x1b[6n'
+    flags = term.get_kitty_keyboard_state(timeout=0.01)
+    assert flags is None
+    assert term._kitty_kb_first_query_failed is True
+    output = stream.getvalue()
+    assert expected_kitty_query in output
+    assert expected_cpr_query in output
 
 
 def test_get_kitty_keyboard_state_boundary_approach():
     """Test CPR boundary approach for detecting Kitty keyboard support."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
+    stream = io.StringIO()
 
-        # Test 1: Kitty response found via CPR boundary
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        term.ungetch('\x1b[?9u\x1b[10;20R')
-        flags = term.get_kitty_keyboard_state(timeout=0.01)
-        assert flags is not None
-        assert flags.value == 9
-        assert term._kitty_kb_first_query_failed is False
+    # Test 1: Kitty response found via CPR boundary
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    term.ungetch('\x1b[?9u\x1b[10;20R')
+    flags = term.get_kitty_keyboard_state(timeout=0.01)
+    assert flags is not None
+    assert flags.value == 9
+    assert term._kitty_kb_first_query_failed is False
 
-        # Test 2: Timeout with no response sets sticky failure
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        flags = term.get_kitty_keyboard_state(timeout=0.001)
-        assert flags is None
-        assert term._kitty_kb_first_query_failed is True
-        flags2 = term.get_kitty_keyboard_state(timeout=1.0)
-        assert flags2 is None
+    # Test 2: Timeout with no response sets sticky failure
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    flags = term.get_kitty_keyboard_state(timeout=0.001)
+    assert flags is None
+    assert term._kitty_kb_first_query_failed is True
+    flags2 = term.get_kitty_keyboard_state(timeout=1.0)
+    assert flags2 is None
 
-        # Test 3: CPR boundary fast negative (only CPR responds)
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        term.ungetch('\x1b[10;20R')
-        flags = term.get_kitty_keyboard_state(timeout=0.5)
-        assert flags is None
-        assert term._kitty_kb_first_query_failed is True
+    # Test 3: CPR boundary fast negative (only CPR responds)
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    term.ungetch('\x1b[10;20R')
+    flags = term.get_kitty_keyboard_state(timeout=0.5)
+    assert flags is None
+    assert term._kitty_kb_first_query_failed is True
 
-        # Test 4: Subsequent call after success
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        term.ungetch('\x1b[?15u\x1b[10;20R')
-        flags1 = term.get_kitty_keyboard_state(timeout=0.01)
-        assert flags1 is not None
-        assert flags1.value == 15
-        term.ungetch('\x1b[?7u\x1b[10;20R')
-        flags2 = term.get_kitty_keyboard_state(timeout=0.01)
-        assert flags2 is not None
-        assert flags2.value == 7
+    # Test 4: Subsequent call after success
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    term.ungetch('\x1b[?15u\x1b[10;20R')
+    flags1 = term.get_kitty_keyboard_state(timeout=0.01)
+    assert flags1 is not None
+    assert flags1.value == 15
+    term.ungetch('\x1b[?7u\x1b[10;20R')
+    flags2 = term.get_kitty_keyboard_state(timeout=0.01)
+    assert flags2 is not None
+    assert flags2.value == 7
 
-        # Test 5: force=True bypasses sticky failure
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        term.ungetch('\x1b[?13u\x1b[10;20R')
-        flags = term.get_kitty_keyboard_state(timeout=0.01, force=True)
-        assert flags is not None
-        assert flags.value == 13
-        assert term._kitty_kb_first_query_failed is False
-    child()
+    # Test 5: force=True bypasses sticky failure
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    term.ungetch('\x1b[?13u\x1b[10;20R')
+    flags = term.get_kitty_keyboard_state(timeout=0.01, force=True)
+    assert flags is not None
+    assert flags.value == 13
+    assert term._kitty_kb_first_query_failed is False
 
 
 @pytest.mark.parametrize("sequence,expected_name,expected_value", [
@@ -732,14 +693,11 @@ def test_kitty_name_synthesis_custom_name():
 ])
 def test_kitty_letter_name_synthesis_integration(sequence, expected_name):
     """Test letter name synthesis with Terminal.inkey()."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        term.ungetch(sequence)
-        ks = term.inkey(timeout=0)
-        assert ks == sequence
-        assert ks.name == expected_name
-    child()
+    term = TestTerminal(force_styling=True)
+    term.ungetch(sequence)
+    ks = term.inkey(timeout=0)
+    assert ks == sequence
+    assert ks.name == expected_name
 
 
 @pytest.mark.parametrize("sequence,expected_name", [
@@ -750,19 +708,15 @@ def test_kitty_letter_name_synthesis_integration(sequence, expected_name):
 ])
 def test_disambiguate_f1_f4_csi_sequences(sequence, expected_name):
     """Test F1-F4 recognition in disambiguate mode."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        mapper = term._keymap
-        codes = term._keycodes
-        prefixes = set()
+    term = TestTerminal(force_styling=True)
+    mapper = term._keymap
+    codes = term._keycodes
+    prefixes = set()
 
-        ks = resolve_sequence(sequence, mapper, codes, prefixes, final=True)
-        assert ks is not None
-        assert ks.name == expected_name
-        assert str(ks) == sequence
-
-    child()
+    ks = resolve_sequence(sequence, mapper, codes, prefixes, final=True)
+    assert ks is not None
+    assert ks.name == expected_name
+    assert str(ks) == sequence
 
 
 @pytest.mark.parametrize("sequence,expected_name", [
@@ -773,37 +727,29 @@ def test_disambiguate_f1_f4_csi_sequences(sequence, expected_name):
 ])
 def test_disambiguate_f1_f4_via_inkey(sequence, expected_name):
     """Test F1-F4 disambiguate sequences with Terminal.inkey()."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term.ungetch(sequence)
-        ks = term.inkey(timeout=0)
-        assert ks == sequence
-        assert ks.name == expected_name
-
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term.ungetch(sequence)
+    ks = term.inkey(timeout=0)
+    assert ks == sequence
+    assert ks.name == expected_name
 
 
 def test_disambiguate_f1_f4_not_confused_with_alt():
     """Test F1-F4 not confused with ALT+[ sequences."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
 
-        # F1 should be \x1b[P, not confused with ALT+[ followed by P
-        term.ungetch('\x1b[P')
-        ks = term.inkey(timeout=0)
+    # F1 should be \x1b[P, not confused with ALT+[ followed by P
+    term.ungetch('\x1b[P')
+    ks = term.inkey(timeout=0)
 
-        # Should be recognized as F1, not as two separate keys
-        assert ks.name == 'KEY_F1'
-        assert str(ks) == '\x1b[P'
-        assert len(ks) == 3
+    # Should be recognized as F1, not as two separate keys
+    assert ks.name == 'KEY_F1'
+    assert str(ks) == '\x1b[P'
+    assert len(ks) == 3
 
-        # Verify no leftover input
-        remaining = term.inkey(timeout=0)
-        assert remaining == ''
-
-    child()
+    # Verify no leftover input
+    remaining = term.inkey(timeout=0)
+    assert remaining == ''
 
 
 @pytest.mark.parametrize("sequence,expected_name", [
@@ -1092,20 +1038,17 @@ def test_kitty_keypad_inkey_integration(
         # pylint: disable=too-many-positional-arguments
         sequence, expected_code, expected_name, ctrl, alt, released, repeated):
     """Test keypad integration with Terminal.inkey()."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term.ungetch(sequence)
-        ks = term.inkey(timeout=0)
-        if not released and not repeated:
-            assert ks == sequence
-            assert ks.code == expected_code
-        assert ks.name == expected_name
-        assert ks._ctrl == ctrl
-        assert ks._alt == alt
-        assert ks.released == released
-        assert ks.repeated == repeated
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term.ungetch(sequence)
+    ks = term.inkey(timeout=0)
+    if not released and not repeated:
+        assert ks == sequence
+        assert ks.code == expected_code
+    assert ks.name == expected_name
+    assert ks._ctrl == ctrl
+    assert ks._alt == alt
+    assert ks.released == released
+    assert ks.repeated == repeated
 
 
 @pytest.mark.parametrize("digit", range(10))
@@ -1374,23 +1317,20 @@ def test_kitty_escape_key_integration(
         # pylint: disable=too-many-positional-arguments
         sequence, expected_name, expected_code, ctrl, alt, released, repeated):
     """Test ESC key sequences via Terminal.inkey() integration."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term.ungetch(sequence)
-        ks = term.inkey(timeout=0)
-        assert ks == sequence
-        assert ks.name == expected_name
-        assert ks.code == expected_code
-        assert ks._ctrl == ctrl
-        assert ks._alt == alt
-        assert ks.released == released
-        assert ks.repeated == repeated
-        if released:
-            assert ks.value == ''
-        else:
-            assert ks.value == '\x1b'
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term.ungetch(sequence)
+    ks = term.inkey(timeout=0)
+    assert ks == sequence
+    assert ks.name == expected_name
+    assert ks.code == expected_code
+    assert ks._ctrl == ctrl
+    assert ks._alt == alt
+    assert ks.released == released
+    assert ks.repeated == repeated
+    if released:
+        assert ks.value == ''
+    else:
+        assert ks.value == '\x1b'
 
 
 @pytest.mark.parametrize("sequence,expected_name,expected_code,expected_value,alt", [
@@ -1401,65 +1341,54 @@ def test_kitty_escape_key_integration(
 ])
 def test_kitty_control_key_integration(sequence, expected_name, expected_code, expected_value, alt):
     """Test control key integration with Terminal.inkey()."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term.ungetch(sequence)
-        ks = term.inkey(timeout=0)
-        assert ks.name == expected_name
-        assert ks.code == expected_code
-        assert ks.value == expected_value
-        assert ks._alt == alt
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term.ungetch(sequence)
+    ks = term.inkey(timeout=0)
+    assert ks.name == expected_name
+    assert ks.code == expected_code
+    assert ks.value == expected_value
+    assert ks._alt == alt
 
 
 @pytest.mark.skipif(not TEST_KEYBOARD, reason="TEST_KEYBOARD not specified")
 def test_kitty_negotiation_timing_cached_failure():
     """Test timing of cached failure returns immediately."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._is_a_tty = True
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._is_a_tty = True
 
-        stime = time.time()
-        flags1 = term.get_kitty_keyboard_state(timeout=0.025)
-        assert flags1 is None
-        assert term._kitty_kb_first_query_failed is True
-        elapsed_ms = (time.time() - stime) * 1000
-        assert 24 <= elapsed_ms <= 35
+    stime = time.time()
+    flags1 = term.get_kitty_keyboard_state(timeout=0.025)
+    assert flags1 is None
+    assert term._kitty_kb_first_query_failed is True
+    elapsed_ms = (time.time() - stime) * 1000
+    assert 24 <= elapsed_ms <= 35
 
-        # any subsequent calls return immediately (as failed)
-        stime = time.time()
-        flags2 = term.get_kitty_keyboard_state(timeout=1.0)
-        elapsed_ms = (time.time() - stime) * 1000
-        assert flags2 is None
-        assert elapsed_ms < 5
-
-    child()
+    # any subsequent calls return immediately (as failed)
+    stime = time.time()
+    flags2 = term.get_kitty_keyboard_state(timeout=1.0)
+    elapsed_ms = (time.time() - stime) * 1000
+    assert flags2 is None
+    assert elapsed_ms < 5
 
 
 @pytest.mark.skipif(not TEST_KEYBOARD, reason="TEST_KEYBOARD not specified")
 def test_kitty_negotiation_force_True_incurs_second_timeout():
     """Test timing of force=True incurs timeout again."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._is_a_tty = True
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._is_a_tty = True
 
-        flags1 = term.get_kitty_keyboard_state(timeout=0.025)
-        assert flags1 is None
-        assert term._kitty_kb_first_query_failed is True
+    flags1 = term.get_kitty_keyboard_state(timeout=0.025)
+    assert flags1 is None
+    assert term._kitty_kb_first_query_failed is True
 
-        # demonstrate that the 'force=True' argument works as designed by its
-        # side-effect of exceeding our timeout (again).
-        stime = time.time()
-        flags2 = term.get_kitty_keyboard_state(timeout=0.025, force=True)
-        elapsed_ms = (time.time() - stime) * 1000
+    # demonstrate that the 'force=True' argument works as designed by its
+    # side-effect of exceeding our timeout (again).
+    stime = time.time()
+    flags2 = term.get_kitty_keyboard_state(timeout=0.025, force=True)
+    elapsed_ms = (time.time() - stime) * 1000
 
-        assert flags2 is None
-        assert 20 <= elapsed_ms <= 35
-
-    child()
+    assert flags2 is None
+    assert 20 <= elapsed_ms <= 35
 
 
 def test_kitty_keyboard_protocol_report_all_keys_setter_false():
@@ -1538,16 +1467,13 @@ def test_kitty_keyboard_protocol_equality_with_other_types():
 ])
 def test_kitty_state_boundary_kitty_only_response(response, expected_flags):
     """Test boundary approach with kitty-only response (no DA1)."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._is_a_tty = True
-        term.ungetch(response)
-        flags = term.get_kitty_keyboard_state(timeout=0.01)
-        assert flags is not None
-        assert flags.value == expected_flags
-        assert term._kitty_kb_first_query_failed is False
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._is_a_tty = True
+    term.ungetch(response)
+    flags = term.get_kitty_keyboard_state(timeout=0.01)
+    assert flags is not None
+    assert flags.value == expected_flags
+    assert term._kitty_kb_first_query_failed is False
 
 
 @pytest.mark.parametrize("sequence,expected_key_name,expected_key_value", [

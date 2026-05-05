@@ -639,27 +639,24 @@ def test_mouse_legacy_encoding_systematic():
 ])
 def test_mouse_enabled_mode_selection(clicks, drag, motion, pixels, expected_modes):
     """Test mouse_enabled selects correct modes based on parameters."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        mock_response = mock.Mock()
-        mock_response.supported = True
-        mock_response.enabled = False
+    mock_response = mock.Mock()
+    mock_response.supported = True
+    mock_response.enabled = False
 
-        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
-                mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
-                mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
+    with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
+            mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
+            mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
 
-            with term.mouse_enabled(clicks=clicks, report_drag=drag,
-                                    report_motion=motion, report_pixels=pixels):
-                args = mock_set_enabled.call_args[0]
-                mode_values = [m.value if hasattr(m, 'value') else m for m in args]
-                assert mode_values == expected_modes
+        with term.mouse_enabled(clicks=clicks, report_drag=drag,
+                                report_motion=motion, report_pixels=pixels):
+            args = mock_set_enabled.call_args[0]
+            mode_values = [m.value if hasattr(m, 'value') else m for m in args]
+            assert mode_values == expected_modes
 
-            mock_set_disabled.assert_called_once()
-    child()
+        mock_set_disabled.assert_called_once()
 
 
 def test_mouse_enabled_no_styling():
@@ -685,47 +682,41 @@ def test_mouse_enabled_no_styling():
 @pytest.mark.skipif(IS_WINDOWS, reason="Windows uses native console mouse API")
 def test_does_mouse_supported(clicks, drag, motion, pixels, expected_modes):
     """Test does_mouse returns True when all required modes are supported."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        mock_response = mock.Mock()
-        mock_response.supported = True
+    mock_response = mock.Mock()
+    mock_response.supported = True
 
-        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response) as mock_get:
-            result = term.does_mouse(clicks=clicks, report_drag=drag,
-                                     report_motion=motion, report_pixels=pixels)
+    with mock.patch.object(term, 'get_dec_mode', return_value=mock_response) as mock_get:
+        result = term.does_mouse(clicks=clicks, report_drag=drag,
+                                 report_motion=motion, report_pixels=pixels)
 
-            assert result is True
-            assert mock_get.call_count == len(expected_modes)
-            for mode_value in expected_modes:
-                assert any(call[0][0] == mode_value for call in mock_get.call_args_list)
-        assert stream.getvalue() == ''
-    child()
+        assert result is True
+        assert mock_get.call_count == len(expected_modes)
+        for mode_value in expected_modes:
+            assert any(call[0][0] == mode_value for call in mock_get.call_args_list)
+    assert stream.getvalue() == ''
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="Windows uses native console mouse API")
 def test_does_mouse_unsupported():
     """Test does_mouse returns False when any mode is unsupported."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        def get_mode_response(mode, timeout=None):
-            mock_response = mock.Mock()
-            if mode == Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR:
-                mock_response.supported = True
-            else:
-                mock_response.supported = False
-            return mock_response
+    def get_mode_response(mode, timeout=None):
+        mock_response = mock.Mock()
+        if mode == Terminal.DecPrivateMode.MOUSE_EXTENDED_SGR:
+            mock_response.supported = True
+        else:
+            mock_response.supported = False
+        return mock_response
 
-        with mock.patch.object(term, 'get_dec_mode', side_effect=get_mode_response):
-            result = term.does_mouse()
-            assert result is False
-        assert stream.getvalue() == ''
-    child()
+    with mock.patch.object(term, 'get_dec_mode', side_effect=get_mode_response):
+        result = term.does_mouse()
+        assert result is False
+    assert stream.getvalue() == ''
 
 
 def test_does_mouse_no_styling():
@@ -741,42 +732,36 @@ def test_does_mouse_no_styling():
 @pytest.mark.skipif(IS_WINDOWS, reason="Windows uses native console mouse API")
 def test_does_mouse_default_parameters():
     """Test does_mouse with default parameters checks click tracking."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        mock_response = mock.Mock()
-        mock_response.supported = True
+    mock_response = mock.Mock()
+    mock_response.supported = True
 
-        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response) as mock_get:
-            result = term.does_mouse()
+    with mock.patch.object(term, 'get_dec_mode', return_value=mock_response) as mock_get:
+        result = term.does_mouse()
 
-            assert result is True
-            assert mock_get.call_count == 2
-        assert stream.getvalue() == ''
-    child()
+        assert result is True
+        assert mock_get.call_count == 2
+    assert stream.getvalue() == ''
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="Windows uses native console mouse API")
 def test_does_mouse_custom_timeout():
     """Test does_mouse respects custom timeout parameter."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        mock_response = mock.Mock()
-        mock_response.supported = True
+    mock_response = mock.Mock()
+    mock_response.supported = True
 
-        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response) as mock_get:
-            result = term.does_mouse(timeout=2.5)
+    with mock.patch.object(term, 'get_dec_mode', return_value=mock_response) as mock_get:
+        result = term.does_mouse(timeout=2.5)
 
-            assert result is True
-            for call in mock_get.call_args_list:
-                assert call[1].get('timeout') == 2.5 or call[0][1] == 2.5
-        assert stream.getvalue() == ''
-    child()
+        assert result is True
+        for call in mock_get.call_args_list:
+            assert call[1].get('timeout') == 2.5 or call[0][1] == 2.5
+    assert stream.getvalue() == ''
 
 
 def test_mouse_extended_button_motion():
@@ -911,99 +896,87 @@ def test_mouse_sgr_pixels_precedence():
 ])
 def test_mouse_enabled_variations(kwargs, expected_modes):
     """Test mouse_enabled with various parameter combinations and precedence."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        modes_str = ';'.join(expected_modes)
-        # Expected: DECSET (h=enable) on enter, DECRST (l=disable) on exit
-        expected_output = f'\x1b[?{modes_str}h\x1b[?{modes_str}l'
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    modes_str = ';'.join(expected_modes)
+    # Expected: DECSET (h=enable) on enter, DECRST (l=disable) on exit
+    expected_output = f'\x1b[?{modes_str}h\x1b[?{modes_str}l'
 
-        term.get_dec_mode = (
-            lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.RESET)
-        )
+    term.get_dec_mode = (
+        lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.RESET)
+    )
 
-        with term.mouse_enabled(**kwargs):
-            pass
+    with term.mouse_enabled(**kwargs):
+        pass
 
-        assert stream.getvalue() == expected_output
-    child()
+    assert stream.getvalue() == expected_output
 
 
 def test_does_mouse_default():
     """Test does_mouse with default parameters."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
 
-        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.SET)
+    term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(mode_num, DecModeResponse.SET)
 
-        result = term.does_mouse()
-        assert result is True
-        assert stream.getvalue() == ''
-    child()
+    result = term.does_mouse()
+    assert result is True
+    assert stream.getvalue() == ''
 
 
 def test_flushinp_with_unicode_followed_by_legacy_mouse():
     """Test flushinp() decodes legacy mouse sequences with high bytes after unicode text."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO())
-        term._dec_mode_cache = make_enabled_dec_cache()
+    term = TestTerminal(stream=io.StringIO())
+    term._dec_mode_cache = make_enabled_dec_cache()
 
-        # Emoji followed by legacy mouse at coordinates (200, 190)
-        # cb=0 (button 0), x=200+1+32=233, y=190+1+32=223 (both >127, need latin1)
-        emoji_and_mouse = '😀\x1b[M' + chr(32) + chr(233) + chr(223)
+    # Emoji followed by legacy mouse at coordinates (200, 190)
+    # cb=0 (button 0), x=200+1+32=233, y=190+1+32=223 (both >127, need latin1)
+    emoji_and_mouse = '😀\x1b[M' + chr(32) + chr(233) + chr(223)
+    term.ungetch(emoji_and_mouse)
+
+    with term.cbreak():
+        flushed = term.flushinp(timeout=0)
+        # Should get emoji + mouse sequence as one string
+        assert '😀' in flushed
+        assert '\x1b[M' in flushed
+
+        # Now decode and check the mouse event was properly parsed
         term.ungetch(emoji_and_mouse)
+        # Read the emoji first
+        emoji_ks = term.inkey(timeout=0.1)
+        assert emoji_ks == '😀'
 
-        with term.cbreak():
-            flushed = term.flushinp(timeout=0)
-            # Should get emoji + mouse sequence as one string
-            assert '😀' in flushed
-            assert '\x1b[M' in flushed
-
-            # Now decode and check the mouse event was properly parsed
-            term.ungetch(emoji_and_mouse)
-            # Read the emoji first
-            emoji_ks = term.inkey(timeout=0.1)
-            assert emoji_ks == '😀'
-
-            # Then read the mouse event
-            mouse_ks = term.inkey(timeout=0.1)
-            assert mouse_ks._mode_values is not None
-            evt = mouse_ks._mode_values
-            assert evt.button_value == 0
-            assert evt.x == 200
-            assert evt.y == 190
-    child()
+        # Then read the mouse event
+        mouse_ks = term.inkey(timeout=0.1)
+        assert mouse_ks._mode_values is not None
+        evt = mouse_ks._mode_values
+        assert evt.button_value == 0
+        assert evt.x == 200
+        assert evt.y == 190
 
 
 def test_inkey_with_cjk_followed_by_legacy_mouse():
     """Test inkey() decodes legacy mouse sequences with high bytes after CJK characters."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO())
-        term._dec_mode_cache = make_enabled_dec_cache()
+    term = TestTerminal(stream=io.StringIO())
+    term._dec_mode_cache = make_enabled_dec_cache()
 
-        # CJK character '你' followed by legacy mouse at coordinates (150, 145)
-        # cb=0 (button 0), x=150+1+32=183, y=145+1+32=178 (both >127, need latin1)
-        cjk_and_mouse = '你\x1b[M' + chr(32) + chr(183) + chr(178)
-        term.ungetch(cjk_and_mouse)
+    # CJK character '你' followed by legacy mouse at coordinates (150, 145)
+    # cb=0 (button 0), x=150+1+32=183, y=145+1+32=178 (both >127, need latin1)
+    cjk_and_mouse = '你\x1b[M' + chr(32) + chr(183) + chr(178)
+    term.ungetch(cjk_and_mouse)
 
-        with term.cbreak():
-            # Read the CJK character first
-            cjk_ks = term.inkey(timeout=0.1)
-            assert cjk_ks == '你'
+    with term.cbreak():
+        # Read the CJK character first
+        cjk_ks = term.inkey(timeout=0.1)
+        assert cjk_ks == '你'
 
-            # Then read the mouse event - this is where the bug manifests
-            # Without the fix, the high bytes won't be decoded as latin1
-            mouse_ks = term.inkey(timeout=0.1)
-            assert mouse_ks._mode_values is not None
-            evt = mouse_ks._mode_values
-            assert evt.button_value == 0
-            assert evt.x == 150
-            assert evt.y == 145
-    child()
+        # Then read the mouse event - this is where the bug manifests
+        # Without the fix, the high bytes won't be decoded as latin1
+        mouse_ks = term.inkey(timeout=0.1)
+        assert mouse_ks._mode_values is not None
+        evt = mouse_ks._mode_values
+        assert evt.button_value == 0
+        assert evt.x == 150
+        assert evt.y == 145

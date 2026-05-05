@@ -152,201 +152,162 @@ def test_does_returns_false_without_styling(method):
 @pytest.mark.parametrize("method", ['does_mouse', 'does_inband_resize'])
 def test_does_returns_false_without_tty(method):
     """Test does_mouse/does_inband_resize return False without tty."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True,
-                            is_a_tty=False)
-        assert getattr(term, method)() is False
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                        is_a_tty=False)
+    assert getattr(term, method)() is False
 
 
 @pytest.mark.parametrize("method", ['does_mouse', 'does_inband_resize'])
 def test_does_returns_true_with_tty_and_styling(method):
     """Test does_mouse/does_inband_resize return True with tty and styling."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._is_a_tty = True
-        assert getattr(term, method)() is True
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._is_a_tty = True
+    assert getattr(term, method)() is True
 
 
 def test_getch_drains_event_buf():
     """Test getch returns buffered event characters first."""
-    @as_subprocess
-    def child():
-        seq = '\x1b[<0;1;1M'
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._event_buf.extend(seq)
-        assert ''.join(term.getch() for _ in range(len(seq))) == seq
-    child()
+    seq = '\x1b[<0;1;1M'
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._event_buf.extend(seq)
+    assert ''.join(term.getch() for _ in range(len(seq))) == seq
 
 
 def test_kbhit_returns_true_when_buf_has_data():
     """Test kbhit returns True when event buffer is populated."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._keyboard_fd = 0
-        term._event_buf.extend('x')
-        assert term.kbhit(timeout=0) is True
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._keyboard_fd = 0
+    term._event_buf.extend('x')
+    assert term.kbhit(timeout=0) is True
 
 
 def test_kbhit_returns_false_with_no_keyboard_fd():
     """Test kbhit returns False when keyboard fd is None."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._keyboard_fd = None
-        assert term.kbhit(timeout=0) is False
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._keyboard_fd = None
+    assert term.kbhit(timeout=0) is False
 
 
 def test_kbhit_timeout_zero_returns_false_on_empty():
     """Test kbhit returns False on empty buffer with zero timeout."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        with mock.patch.object(win32, 'ConsoleInput') as mock_ci:
-            console = mock.MagicMock()
-            console.peek.return_value = None
-            console.wait.return_value = False
-            mock_ci.return_value = console
-            assert term.kbhit(timeout=0) is False
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    with mock.patch.object(win32, 'ConsoleInput') as mock_ci:
+        console = mock.MagicMock()
+        console.peek.return_value = None
+        console.wait.return_value = False
+        mock_ci.return_value = console
+        assert term.kbhit(timeout=0) is False
 
 
 def test_drain_mouse_event_buffered():
     """Test drain converts mouse events to SGR sequences."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._native_mouse = True
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._native_mouse = True
 
-        console = mock.MagicMock()
-        console.peek.side_effect = [
-            _mock_mouse_event(x=5, y=10, button_state=0x0001), None]
+    console = mock.MagicMock()
+    console.peek.side_effect = [
+        _mock_mouse_event(x=5, y=10, button_state=0x0001), None]
 
-        term._drain_native_events(console)
-        assert ''.join(term._event_buf) == '\x1b[<0;6;11M'
-        console.read.assert_called_once()
-    child()
+    term._drain_native_events(console)
+    assert ''.join(term._event_buf) == '\x1b[<0;6;11M'
+    console.read.assert_called_once()
 
 
 def test_drain_resize_event_buffered():
     """Test drain converts resize events to DEC mode 2048 sequences."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._native_resize = True
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._native_resize = True
 
-        console = mock.MagicMock()
-        console.peek.side_effect = [_mock_resize_event(), None]
+    console = mock.MagicMock()
+    console.peek.side_effect = [_mock_resize_event(), None]
 
-        with mock.patch('blessed.win_terminal.win32.get_terminal_size') as m:
-            m.return_value = mock.MagicMock(lines=24, columns=80)
-            term._drain_native_events(console)
+    with mock.patch('blessed.win_terminal.win32.get_terminal_size') as m:
+        m.return_value = mock.MagicMock(lines=24, columns=80)
+        term._drain_native_events(console)
 
-        assert ''.join(term._event_buf) == '\x1b[48;24;80;0;0t'
-    child()
+    assert ''.join(term._event_buf) == '\x1b[48;24;80;0;0t'
 
 
 def test_drain_stops_at_key_down():
     """Test drain stops processing at key-down events."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._native_mouse = True
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._native_mouse = True
 
-        console = mock.MagicMock()
-        console.peek.return_value = _mock_key_event(key_down=True)
+    console = mock.MagicMock()
+    console.peek.return_value = _mock_key_event(key_down=True)
 
-        term._drain_native_events(console)
-        assert len(term._event_buf) == 0
-        console.read.assert_not_called()
-    child()
+    term._drain_native_events(console)
+    assert len(term._event_buf) == 0
+    console.read.assert_not_called()
 
 
 def test_drain_consumes_non_key_down_events():
     """Test drain silently consumes key-up, focus, and menu events."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._native_mouse = True
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._native_mouse = True
 
-        console = mock.MagicMock()
-        console.peek.side_effect = [
-            _mock_key_event(key_down=False),
-            mock.MagicMock(EventType=0x0010),
-            None]
+    console = mock.MagicMock()
+    console.peek.side_effect = [
+        _mock_key_event(key_down=False),
+        mock.MagicMock(EventType=0x0010),
+        None]
 
-        term._drain_native_events(console)
-        assert len(term._event_buf) == 0
-        assert console.read.call_count == 2
-    child()
+    term._drain_native_events(console)
+    assert len(term._event_buf) == 0
+    assert console.read.call_count == 2
 
 
 def test_drain_multiple_mouse_events():
     """Test drain processes all pending mouse events eagerly."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._native_mouse = True
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._native_mouse = True
 
-        console = mock.MagicMock()
-        console.peek.side_effect = [
-            _mock_mouse_event(x=1, y=0, button_state=0x0001),
-            _mock_mouse_event(x=2, y=0, button_state=0x0001,
-                              event_flags=0x0001),
-            None]
+    console = mock.MagicMock()
+    console.peek.side_effect = [
+        _mock_mouse_event(x=1, y=0, button_state=0x0001),
+        _mock_mouse_event(x=2, y=0, button_state=0x0001,
+                          event_flags=0x0001),
+        None]
 
-        term._drain_native_events(console)
-        buf = ''.join(term._event_buf)
-        assert '\x1b[<0;2;1M' in buf
-        assert '\x1b[<32;3;1M' in buf
-        assert console.read.call_count == 2
-    child()
+    term._drain_native_events(console)
+    buf = ''.join(term._event_buf)
+    assert '\x1b[<0;2;1M' in buf
+    assert '\x1b[<32;3;1M' in buf
+    assert console.read.call_count == 2
 
 
 @pytest.mark.parametrize("flag", ['_native_mouse', '_native_resize'])
 def test_drain_ignores_events_when_flag_disabled(flag):
     """Test drain consumes but does not convert events when flag is off."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        setattr(term, flag, False)
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    setattr(term, flag, False)
 
-        console = mock.MagicMock()
-        evt = (_mock_mouse_event(button_state=0x0001)
-               if flag == '_native_mouse' else _mock_resize_event())
-        console.peek.side_effect = [evt, None]
+    console = mock.MagicMock()
+    evt = (_mock_mouse_event(button_state=0x0001)
+           if flag == '_native_mouse' else _mock_resize_event())
+    console.peek.side_effect = [evt, None]
 
-        term._drain_native_events(console)
-        assert len(term._event_buf) == 0
-        console.read.assert_called_once()
-    child()
+    term._drain_native_events(console)
+    assert len(term._event_buf) == 0
+    console.read.assert_called_once()
 
 
 def test_drain_tracks_button_state():
     """Test drain updates prev_button_state across consecutive events."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._native_mouse = True
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._native_mouse = True
 
-        console = mock.MagicMock()
-        console.peek.side_effect = [
-            _mock_mouse_event(button_state=0x0001),
-            _mock_mouse_event(button_state=0),
-            None]
+    console = mock.MagicMock()
+    console.peek.side_effect = [
+        _mock_mouse_event(button_state=0x0001),
+        _mock_mouse_event(button_state=0),
+        None]
 
-        term._drain_native_events(console)
-        buf = ''.join(term._event_buf)
-        assert '\x1b[<0;1;1M' in buf
-        assert '\x1b[<0;1;1m' in buf
-        assert term._prev_button_state == 0
-    child()
+    term._drain_native_events(console)
+    buf = ''.join(term._event_buf)
+    assert '\x1b[<0;1;1M' in buf
+    assert '\x1b[<0;1;1m' in buf
+    assert term._prev_button_state == 0
 
 
 _NATIVE_CTX_PARAMS = pytest.mark.parametrize(
@@ -364,59 +325,50 @@ _NATIVE_CTX_PARAMS = pytest.mark.parametrize(
 def test_native_fallback_sets_and_clears(
         ctx_method, probe_method, flag, dec_mode, enable_bit):
     """Test native fallback enables console mode and cleans up on exit."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._keyboard_fd = 0
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._keyboard_fd = 0
 
-        with mock.patch.object(type(term), probe_method,
-                               return_value=False, create=True), \
-                mock.patch('blessed.win_terminal.msvcrt.get_osfhandle',
-                           return_value=42), \
-                mock.patch.object(
-                win32, 'get_console_mode',
-                return_value=0x0201), \
-                mock.patch.object(win32, 'set_console_mode') as mock_set:
-            cache_key = int(dec_mode)
-            with getattr(term, ctx_method)():
-                assert getattr(term, flag) is True
-                assert cache_key in term._dec_mode_cache
-                mock_set.assert_called_with(42, 0x0201 | enable_bit)
+    with mock.patch.object(type(term), probe_method,
+                           return_value=False, create=True), \
+            mock.patch('blessed.win_terminal.msvcrt.get_osfhandle',
+                       return_value=42), \
+            mock.patch.object(
+            win32, 'get_console_mode',
+            return_value=0x0201), \
+            mock.patch.object(win32, 'set_console_mode') as mock_set:
+        cache_key = int(dec_mode)
+        with getattr(term, ctx_method)():
+            assert getattr(term, flag) is True
+            assert cache_key in term._dec_mode_cache
+            mock_set.assert_called_with(42, 0x0201 | enable_bit)
 
-            assert getattr(term, flag) is False
-            assert len(term._event_buf) == 0
-            assert cache_key not in term._dec_mode_cache
-            assert mock_set.call_args_list[-1] == mock.call(42, 0x0201)
-    child()
+        assert getattr(term, flag) is False
+        assert len(term._event_buf) == 0
+        assert cache_key not in term._dec_mode_cache
+        assert mock_set.call_args_list[-1] == mock.call(42, 0x0201)
 
 
 @_NATIVE_CTX_PARAMS
 def test_native_fallback_no_keyboard_fd(
         ctx_method, probe_method, flag, dec_mode, enable_bit):
     """Test native fallback yields without action when keyboard fd is None."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._keyboard_fd = None
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._keyboard_fd = None
 
-        with mock.patch.object(type(term), probe_method,
-                               return_value=False, create=True):
-            with getattr(term, ctx_method)():
-                assert getattr(term, flag) is False
-    child()
+    with mock.patch.object(type(term), probe_method,
+                           return_value=False, create=True):
+        with getattr(term, ctx_method)():
+            assert getattr(term, flag) is False
 
 
 def test_init_attributes():
     """Test Terminal.__init__ initializes native event attributes."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        assert isinstance(term._event_buf, collections.deque)
-        assert len(term._event_buf) == 0
-        assert term._native_mouse is False
-        assert term._native_resize is False
-        assert term._prev_button_state == 0
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    assert isinstance(term._event_buf, collections.deque)
+    assert len(term._event_buf) == 0
+    assert term._native_mouse is False
+    assert term._native_resize is False
+    assert term._prev_button_state == 0
 
 
 def test_poll_kbhit_period():

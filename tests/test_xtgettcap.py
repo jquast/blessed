@@ -146,68 +146,53 @@ class TestGetXtgettcap:
 
     def test_not_a_tty_returns_none(self):
         """Returns None when not a TTY."""
-        @as_subprocess
-        def child():
-            term = TestTerminal(stream=io.StringIO(), force_styling=True,
-                                is_a_tty=False)
-            assert term.get_xtgettcap(timeout=0.01) is None
-        child()
+        term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                            is_a_tty=False)
+        assert term.get_xtgettcap(timeout=0.01) is None
 
     def test_does_xtgettcap_not_a_tty(self):
         """does_xtgettcap returns False when not a TTY."""
-        @as_subprocess
-        def child():
-            term = TestTerminal(stream=io.StringIO(), force_styling=True,
-                                is_a_tty=False)
-            assert term.does_xtgettcap(timeout=0.01) is False
-        child()
+        term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                            is_a_tty=False)
+        assert term.does_xtgettcap(timeout=0.01) is False
 
     def test_cached_result(self):
         """Returns cached result without re-querying."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
 
-            cached = TermcapResponse(supported=True,
-                                     capabilities={'TN': 'test'})
-            term._xtgettcap_cache = cached
+        cached = TermcapResponse(supported=True,
+                                 capabilities={'TN': 'test'})
+        term._xtgettcap_cache = cached
 
-            result = term.get_xtgettcap()
-            assert result is cached
-        child()
+        result = term.get_xtgettcap()
+        assert result is cached
 
     def test_sticky_failure(self):
         """Returns None after first query failure."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
-            term._xtgettcap_cache = None
-            term._xtgettcap_first_query_failed = True
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._xtgettcap_cache = None
+        term._xtgettcap_first_query_failed = True
 
-            result = term.get_xtgettcap()
-            assert result is None
-        child()
+        result = term.get_xtgettcap()
+        assert result is None
 
     def test_force_bypasses_cache(self):
         """force=True bypasses both cache and sticky failure."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
 
-            cached = TermcapResponse(supported=True,
-                                     capabilities={'TN': 'old'})
-            term._xtgettcap_cache = cached
-            term._xtgettcap_first_query_failed = True
+        cached = TermcapResponse(supported=True,
+                                 capabilities={'TN': 'old'})
+        term._xtgettcap_cache = cached
+        term._xtgettcap_first_query_failed = True
 
-            result = term.get_xtgettcap(timeout=0.01, force=True)
-            assert result is None
-        child()
+        result = term.get_xtgettcap(timeout=0.01, force=True)
+        assert result is None
 
     def test_parse_xtgettcap_responses(self):
         """Parse multiple DCS +r responses."""
@@ -233,29 +218,23 @@ class TestGetXtgettcap:
 
     def test_does_xtgettcap_with_cached(self):
         """does_xtgettcap returns True with cached supported result."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
-            term._xtgettcap_cache = TermcapResponse(
-                supported=True, capabilities={'TN': 'test'})
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._xtgettcap_cache = TermcapResponse(
+            supported=True, capabilities={'TN': 'test'})
 
-            assert term.does_xtgettcap() is True
-        child()
+        assert term.does_xtgettcap() is True
 
     def test_does_xtgettcap_unsupported(self):
         """does_xtgettcap returns False after probe failure."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
-            term._xtgettcap_cache = None
-            term._xtgettcap_first_query_failed = True
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._xtgettcap_cache = None
+        term._xtgettcap_first_query_failed = True
 
-            assert term.does_xtgettcap() is False
-        child()
+        assert term.does_xtgettcap() is False
 
 
 class TestStyledUnderlines:
@@ -263,64 +242,49 @@ class TestStyledUnderlines:
 
     def test_styled_underlines_supported(self):
         """Returns True when Smulx is in XTGETTCAP capabilities."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
-            term._xtgettcap_cache = TermcapResponse(
-                supported=True,
-                capabilities={'TN': 'xterm', 'Smulx': '\x1b[4:%p1%dm'})
-            assert term.does_styled_underlines() is True
-        child()
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._xtgettcap_cache = TermcapResponse(
+            supported=True,
+            capabilities={'TN': 'xterm', 'Smulx': '\x1b[4:%p1%dm'})
+        assert term.does_styled_underlines() is True
 
     def test_styled_underlines_unsupported(self):
         """Returns False when Smulx is not in capabilities."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
-            term._xtgettcap_cache = TermcapResponse(
-                supported=True, capabilities={'TN': 'xterm'})
-            assert term.does_styled_underlines() is False
-        child()
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._xtgettcap_cache = TermcapResponse(
+            supported=True, capabilities={'TN': 'xterm'})
+        assert term.does_styled_underlines() is False
 
     def test_styled_underlines_no_xtgettcap(self):
         """Returns False when XTGETTCAP is not supported."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
-            term._xtgettcap_first_query_failed = True
-            assert term.does_styled_underlines() is False
-        child()
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._xtgettcap_first_query_failed = True
+        assert term.does_styled_underlines() is False
 
     def test_colored_underlines_supported(self):
         """Returns True when Setulc is in XTGETTCAP capabilities."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
-            term._xtgettcap_cache = TermcapResponse(
-                supported=True,
-                capabilities={'Setulc': '\x1b[58;2;%p1%d;%p2%d;%p3%dm'})
-            assert term.does_colored_underlines() is True
-        child()
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._xtgettcap_cache = TermcapResponse(
+            supported=True,
+            capabilities={'Setulc': '\x1b[58;2;%p1%d;%p2%d;%p3%dm'})
+        assert term.does_colored_underlines() is True
 
     def test_colored_underlines_unsupported(self):
         """Returns False when Setulc is not in capabilities."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
-            term._xtgettcap_cache = TermcapResponse(
-                supported=True, capabilities={'TN': 'xterm'})
-            assert term.does_colored_underlines() is False
-        child()
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._xtgettcap_cache = TermcapResponse(
+            supported=True, capabilities={'TN': 'xterm'})
+        assert term.does_colored_underlines() is False
 
 
 class TestOsc52Clipboard:
@@ -328,35 +292,26 @@ class TestOsc52Clipboard:
 
     def test_not_a_tty(self):
         """Returns False when not a TTY."""
-        @as_subprocess
-        def child():
-            term = TestTerminal(stream=io.StringIO(), force_styling=True,
-                                is_a_tty=False)
-            assert term.does_osc52_clipboard(timeout=0.01) is False
-        child()
+        term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                            is_a_tty=False)
+        assert term.does_osc52_clipboard(timeout=0.01) is False
 
     def test_cached_result(self):
         """Returns cached result without re-querying."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
-            term._osc52_clipboard_supported = True
-            assert term.does_osc52_clipboard() is True
-        child()
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._osc52_clipboard_supported = True
+        assert term.does_osc52_clipboard() is True
 
     def test_force_bypasses_cache(self):
         """force=True bypasses cached result."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
-            term._osc52_clipboard_supported = True
-            result = term.does_osc52_clipboard(timeout=0.01, force=True)
-            assert result is False
-        child()
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._osc52_clipboard_supported = True
+        result = term.does_osc52_clipboard(timeout=0.01, force=True)
+        assert result is False
 
 
 class TestColorScheme:
@@ -364,35 +319,26 @@ class TestColorScheme:
 
     def test_not_a_tty(self):
         """Returns None when not a TTY."""
-        @as_subprocess
-        def child():
-            term = TestTerminal(stream=io.StringIO(), force_styling=True,
-                                is_a_tty=False)
-            assert term.get_color_scheme(timeout=0.01) is None
-        child()
+        term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                            is_a_tty=False)
+        assert term.get_color_scheme(timeout=0.01) is None
 
     def test_negative_cache(self):
         """Returns None immediately when previously unsupported."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
-            term._color_scheme_supported = False
-            assert term.get_color_scheme() is None
-        child()
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._color_scheme_supported = False
+        assert term.get_color_scheme() is None
 
     def test_force_bypasses_negative_cache(self):
         """force=True bypasses negative cache."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
-            term._color_scheme_supported = False
-            result = term.get_color_scheme(timeout=0.01, force=True)
-            assert result is None
-        child()
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._color_scheme_supported = False
+        result = term.get_color_scheme(timeout=0.01, force=True)
+        assert result is None
 
 
 class TestKittyQuery:
@@ -400,35 +346,26 @@ class TestKittyQuery:
 
     def test_not_a_tty(self):
         """Returns False when not a TTY."""
-        @as_subprocess
-        def child():
-            term = TestTerminal(stream=io.StringIO(), force_styling=True,
-                                is_a_tty=False)
-            assert term.does_kitty_query(timeout=0.01) is False
-        child()
+        term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                            is_a_tty=False)
+        assert term.does_kitty_query(timeout=0.01) is False
 
     def test_cached_result(self):
         """Returns cached result without re-querying."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
-            term._kitty_query_supported = True
-            assert term.does_kitty_query() is True
-        child()
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._kitty_query_supported = True
+        assert term.does_kitty_query() is True
 
     def test_force_bypasses_cache(self):
         """force=True bypasses cached result."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
-            term._kitty_query_supported = True
-            result = term.does_kitty_query(timeout=0.01, force=True)
-            assert result is False
-        child()
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._kitty_query_supported = True
+        result = term.does_kitty_query(timeout=0.01, force=True)
+        assert result is False
 
 
 class TestDecrqss:
@@ -436,35 +373,26 @@ class TestDecrqss:
 
     def test_not_a_tty(self):
         """Returns False when not a TTY."""
-        @as_subprocess
-        def child():
-            term = TestTerminal(stream=io.StringIO(), force_styling=True,
-                                is_a_tty=False)
-            assert term.does_decrqss(timeout=0.01) is False
-        child()
+        term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                            is_a_tty=False)
+        assert term.does_decrqss(timeout=0.01) is False
 
     def test_cached_result(self):
         """Returns cached result without re-querying."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
-            term._decrqss_supported = True
-            assert term.does_decrqss() is True
-        child()
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._decrqss_supported = True
+        assert term.does_decrqss() is True
 
     def test_force_bypasses_cache(self):
         """force=True bypasses cached result."""
-        @as_subprocess
-        def child():
-            stream = io.StringIO()
-            term = TestTerminal(stream=stream, force_styling=True)
-            term._is_a_tty = True
-            term._decrqss_supported = True
-            result = term.does_decrqss(timeout=0.01, force=True)
-            assert result is False
-        child()
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._decrqss_supported = True
+        result = term.does_decrqss(timeout=0.01, force=True)
+        assert result is False
 
 
 class TestGetDecrqss:
@@ -472,22 +400,16 @@ class TestGetDecrqss:
 
     def test_not_a_tty(self):
         """Returns None when not a TTY."""
-        @as_subprocess
-        def child():
-            term = TestTerminal(stream=io.StringIO(), force_styling=True,
-                                is_a_tty=False)
-            assert term.get_decrqss(timeout=0.01) is None
-        child()
+        term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                            is_a_tty=False)
+        assert term.get_decrqss(timeout=0.01) is None
 
     def test_default_setting_is_sgr(self):
         """Default setting_id is SGR ('m')."""
-        @as_subprocess
-        def child():
-            term = TestTerminal(stream=io.StringIO(), force_styling=True,
-                                is_a_tty=False)
-            assert Decrqss.SGR == 'm'
-            assert term.get_decrqss() is None
-        child()
+        term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                            is_a_tty=False)
+        assert Decrqss.SGR == 'm'
+        assert term.get_decrqss() is None
 
 
 pytestmark_pty = pytest.mark.skipif(
@@ -993,29 +915,26 @@ class TestLightweightXtgettcap:
     ])
     def test_try_xtgettcap(self, init_descriptor, query_side_effect, expected):
         """Raw XTGETTCAP query returns appropriate response or None."""
-        @as_subprocess
-        def child():
-            term = TestTerminal(stream=io.StringIO(), force_styling=True)
-            term._is_a_tty = True
-            term._init_descriptor = init_descriptor
-            if isinstance(query_side_effect, TermcapResponse):
-                patcher = mock.patch('blessed.terminal.query_xtgettcap',
-                                     return_value=query_side_effect)
-            else:
-                patcher = mock.patch('blessed.terminal.query_xtgettcap',
-                                     side_effect=query_side_effect)
-            with patcher:
-                result = term._try_xtgettcap()
-            if expected is None:
-                assert result is None
-            elif expected == 'supported':
-                assert result is not None
-                assert result.supported is True
-                assert result.capabilities['TN'] == 'xterm'
-            elif expected == 'unsupported':
-                assert result is not None
-                assert result.supported is False
-        child()
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        term._is_a_tty = True
+        term._init_descriptor = init_descriptor
+        if isinstance(query_side_effect, TermcapResponse):
+            patcher = mock.patch('blessed.terminal.query_xtgettcap',
+                                 return_value=query_side_effect)
+        else:
+            patcher = mock.patch('blessed.terminal.query_xtgettcap',
+                                 side_effect=query_side_effect)
+        with patcher:
+            result = term._try_xtgettcap()
+        if expected is None:
+            assert result is None
+        elif expected == 'supported':
+            assert result is not None
+            assert result.supported is True
+            assert result.capabilities['TN'] == 'xterm'
+        elif expected == 'unsupported':
+            assert result is not None
+            assert result.supported is False
 
 
 class TestInitLightweightCache:
@@ -1037,32 +956,29 @@ class TestInitLightweightCache:
     ])
     def test_init_cache_population(self, xtgettcap_data, assertions):
         """__init__ cache integration with injected or probed XTGETTCAP results."""
-        @as_subprocess
-        def child():
-            kwargs: dict = {}
-            if xtgettcap_data is not None:
-                kwargs['_xtgettcap_data'] = xtgettcap_data
-            else:
-                # None means: skip injection, force a real probe (which fails)
-                kwargs['_xtgettcap_data'] = None
-                kwargs['is_a_tty'] = True
-            term = TestTerminal(stream=io.StringIO(), force_styling=True, **kwargs)
-            for attr, expected_val in assertions:
-                if attr == 'cache':
-                    if expected_val == 'not_none':
-                        assert term._xtgettcap_cache is not None
-                    elif expected_val == 'is_none':
-                        assert term._xtgettcap_cache is None
-                elif attr == 'term.kind':
-                    assert term.kind == expected_val
-                elif attr.startswith('_xtgettcap_cache.'):
-                    _, rest = attr.split('.', 1)
-                    if rest == 'supported':
-                        assert term._xtgettcap_cache.supported == expected_val
-                    elif rest.startswith('capabilities['):
-                        cap_name = rest.split('"')[1]
-                        assert term._xtgettcap_cache.capabilities[cap_name] == expected_val
-        child()
+        kwargs: dict = {}
+        if xtgettcap_data is not None:
+            kwargs['_xtgettcap_data'] = xtgettcap_data
+        else:
+            # None means: skip injection, force a real probe (which fails)
+            kwargs['_xtgettcap_data'] = None
+            kwargs['is_a_tty'] = True
+        term = TestTerminal(stream=io.StringIO(), force_styling=True, **kwargs)
+        for attr, expected_val in assertions:
+            if attr == 'cache':
+                if expected_val == 'not_none':
+                    assert term._xtgettcap_cache is not None
+                elif expected_val == 'is_none':
+                    assert term._xtgettcap_cache is None
+            elif attr == 'term.kind':
+                assert term.kind == expected_val
+            elif attr.startswith('_xtgettcap_cache.'):
+                _, rest = attr.split('.', 1)
+                if rest == 'supported':
+                    assert term._xtgettcap_cache.supported == expected_val
+                elif rest.startswith('capabilities['):
+                    cap_name = rest.split('"')[1]
+                    assert term._xtgettcap_cache.capabilities[cap_name] == expected_val
 
 
 class TestDoesForceRequery:
@@ -1075,12 +991,9 @@ class TestDoesForceRequery:
     ])
     def test_force_bypasses_cache(self, method, capabilities):
         """force=True causes re-query even with populated cache, returns False."""
-        @as_subprocess
-        def child():
-            term = TestTerminal(stream=io.StringIO(), force_styling=True)
-            term._is_a_tty = True
-            term._xtgettcap_cache = TermcapResponse(
-                supported=True, capabilities=capabilities)
-            result = getattr(term, method)(timeout=0.01, force=True)
-            assert result is False
-        child()
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        term._is_a_tty = True
+        term._xtgettcap_cache = TermcapResponse(
+            supported=True, capabilities=capabilities)
+        result = getattr(term, method)(timeout=0.01, force=True)
+        assert result is False

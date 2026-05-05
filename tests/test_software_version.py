@@ -204,18 +204,15 @@ def test_get_software_version_raw_stored():
 
 def test_get_software_version_not_a_tty():
     """Test get_software_version() returns None when not a TTY and no env vars."""
-    @as_subprocess
-    def child():
-        import io
-        import os
-        os.environ.pop('TERM_PROGRAM', None)
-        os.environ.pop('TERM_PROGRAM_VERSION', None)
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._is_a_tty = False
+    import io
+    import os
+    os.environ.pop('TERM_PROGRAM', None)
+    os.environ.pop('TERM_PROGRAM_VERSION', None)
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._is_a_tty = False
 
-        sv = term.get_software_version(timeout=0.01)
-        assert sv is None
-    child()
+    sv = term.get_software_version(timeout=0.01)
+    assert sv is None
 
 
 def test_get_software_version_env_fallback():

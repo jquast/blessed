@@ -22,203 +22,167 @@ import jinxed as curses
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_getch_raises_eoferror_on_eof():
     """getch() raises EOFError when keyboard fd is at EOF."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        read_fd, write_fd = os.pipe()
-        os.close(write_fd)
-        term._keyboard_fd = read_fd
-        try:
-            with pytest.raises(EOFError):
-                term.getch()
-        finally:
-            os.close(read_fd)
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    read_fd, write_fd = os.pipe()
+    os.close(write_fd)
+    term._keyboard_fd = read_fd
+    try:
+        with pytest.raises(EOFError):
+            term.getch()
+    finally:
+        os.close(read_fd)
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_flushinp_handles_eof():
     """flushinp() returns buffered data when keyboard fd reaches EOF."""
-    @as_subprocess
-    def child():
-        import codecs
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        read_fd, write_fd = os.pipe()
-        os.write(write_fd, b'xy')
-        os.close(write_fd)
-        term._keyboard_fd = read_fd
-        term._keyboard_decoder = codecs.getincrementaldecoder('utf-8')()
-        try:
-            result = term.flushinp(timeout=1)
-            assert 'x' in result
-            assert 'y' in result
-        finally:
-            os.close(read_fd)
-    child()
+    import codecs
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    read_fd, write_fd = os.pipe()
+    os.write(write_fd, b'xy')
+    os.close(write_fd)
+    term._keyboard_fd = read_fd
+    term._keyboard_decoder = codecs.getincrementaldecoder('utf-8')()
+    try:
+        result = term.flushinp(timeout=1)
+        assert 'x' in result
+        assert 'y' in result
+    finally:
+        os.close(read_fd)
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_getch_sets_eof_flag():
     """getch() sets _keyboard_eof flag on EOF."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        read_fd, write_fd = os.pipe()
-        os.close(write_fd)
-        term._keyboard_fd = read_fd
-        try:
-            assert term._keyboard_eof is False
-            with pytest.raises(EOFError):
-                term.getch()
-            assert term._keyboard_eof is True
-        finally:
-            os.close(read_fd)
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    read_fd, write_fd = os.pipe()
+    os.close(write_fd)
+    term._keyboard_fd = read_fd
+    try:
+        assert term._keyboard_eof is False
+        with pytest.raises(EOFError):
+            term.getch()
+        assert term._keyboard_eof is True
+    finally:
+        os.close(read_fd)
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_kbhit_returns_false_after_eof():
     """kbhit() returns False once _keyboard_eof is set."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        read_fd, write_fd = os.pipe()
-        os.close(write_fd)
-        term._keyboard_fd = read_fd
-        try:
-            term._keyboard_eof = True
-            assert term.kbhit(timeout=0) is False
-        finally:
-            os.close(read_fd)
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    read_fd, write_fd = os.pipe()
+    os.close(write_fd)
+    term._keyboard_fd = read_fd
+    try:
+        term._keyboard_eof = True
+        assert term.kbhit(timeout=0) is False
+    finally:
+        os.close(read_fd)
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_inkey_raises_EOF():
     """inkey() returns empty Keystroke when keyboard fd is at EOF."""
-    @as_subprocess
-    def child():
-        import codecs
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        read_fd, write_fd = os.pipe()
-        os.close(write_fd)
-        term._keyboard_fd = read_fd
-        term._keyboard_decoder = codecs.getincrementaldecoder('utf-8')()
-        try:
-            with pytest.raises(EOFError):
-                term.inkey(timeout=0)
-            assert term._keyboard_eof is True
-        finally:
-            os.close(read_fd)
-    child()
+    import codecs
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    read_fd, write_fd = os.pipe()
+    os.close(write_fd)
+    term._keyboard_fd = read_fd
+    term._keyboard_decoder = codecs.getincrementaldecoder('utf-8')()
+    try:
+        with pytest.raises(EOFError):
+            term.inkey(timeout=0)
+        assert term._keyboard_eof is True
+    finally:
+        os.close(read_fd)
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_break_input_no_kb():
     """cbreak() should not call tty.setcbreak() without keyboard."""
-    @as_subprocess
-    def child():
-        with tempfile.NamedTemporaryFile() as stream:
-            term = TestTerminal(stream=stream)
-            with mock.patch("tty.setcbreak") as mock_setcbreak:
-                with term.cbreak():
-                    assert not mock_setcbreak.called
-                assert term._keyboard_fd is None
-    child()
+    with tempfile.NamedTemporaryFile() as stream:
+        term = TestTerminal(stream=stream)
+        with mock.patch("tty.setcbreak") as mock_setcbreak:
+            with term.cbreak():
+                assert not mock_setcbreak.called
+            assert term._keyboard_fd is None
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_raw_input_no_kb():
     """raw should not call tty.setraw() without keyboard."""
-    @as_subprocess
-    def child():
-        with tempfile.NamedTemporaryFile() as stream:
-            term = TestTerminal(stream=stream)
-            with mock.patch("tty.setraw") as mock_setraw:
-                with term.raw():
-                    assert not mock_setraw.called
-            assert term._keyboard_fd is None
-    child()
+    with tempfile.NamedTemporaryFile() as stream:
+        term = TestTerminal(stream=stream)
+        with mock.patch("tty.setraw") as mock_setraw:
+            with term.raw():
+                assert not mock_setraw.called
+        assert term._keyboard_fd is None
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_raw_input_with_kb():
     """raw should call tty.setraw() when with keyboard."""
-    @as_subprocess
-    def child():
-        term = TestTerminal()
-        assert term._keyboard_fd is not None
-        with mock.patch("tty.setraw") as mock_setraw:
-            with term.raw():
-                assert mock_setraw.called
-    child()
+    term = TestTerminal()
+    assert term._keyboard_fd is not None
+    with mock.patch("tty.setraw") as mock_setraw:
+        with term.raw():
+            assert mock_setraw.called
 
 
 def test_stdout_notty_kb_is_None():
     """term._keyboard_fd should be None when os.isatty returns False for output."""
     # In this scenario, stream is sys.__stdout__, but os.isatty(1) is False
     # such as when piping output to less(1)
-    @as_subprocess
-    def child():
-        isatty = os.isatty
-        with mock.patch('os.isatty') as mock_isatty:
-            mock_isatty.side_effect = (
-                lambda fd: False if fd == sys.__stdout__.fileno() else isatty(fd))
-            term = TestTerminal()
-            assert term._keyboard_fd is None
-            # pylint: disable=use-a-generator
-            assert any(['stream not a TTY' in err
-                        for err in term.errors]), term.errors
-    child()
+    isatty = os.isatty
+    with mock.patch('os.isatty') as mock_isatty:
+        mock_isatty.side_effect = (
+            lambda fd: False if fd == sys.__stdout__.fileno() else isatty(fd))
+        term = TestTerminal()
+        assert term._keyboard_fd is None
+        # pylint: disable=use-a-generator
+        assert any(['stream not a TTY' in err
+                    for err in term.errors]), term.errors
 
 
 def test_stdin_fileno_is_None():
     """term._keyboard_fd should be None when stdin.fileno() raises an exception."""
-    @as_subprocess
-    def child():
-        with mock.patch.object(sys.__stdin__, 'fileno') as mock_fileno:
-            mock_fileno.side_effect = ValueError('fileno is not implemented on this stream')
-            term = TestTerminal()
-            assert term._keyboard_fd is None
-            # pylint: disable=use-a-generator
-            assert any(['fileno is not implemented on this stream' in err
-                        for err in term.errors])
-    child()
+    with mock.patch.object(sys.__stdin__, 'fileno') as mock_fileno:
+        mock_fileno.side_effect = ValueError('fileno is not implemented on this stream')
+        term = TestTerminal()
+        assert term._keyboard_fd is None
+        # pylint: disable=use-a-generator
+        assert any(['fileno is not implemented on this stream' in err
+                    for err in term.errors])
 
 
 def test_stdin_as_bytesio_is_None():
     """term._keyboard_fd should be None when sys.__stdin__.fileno() raises exception."""
     # In this scenario, stream is sys.__stdout__, but sys.__stdin__ is BytesIO
     # This may happen in a test scenario or when the program is wrapped in another interface
-    @as_subprocess
-    def child():
-        with mock.patch('sys.__stdin__', new=io.BytesIO()):
-            term = TestTerminal()
-            assert term._keyboard_fd is None
-            # pylint: disable=use-a-generator
-            assert any([err.startswith('Unable to determine input stream file descriptor')
-                        for err in term.errors])
-    child()
+    with mock.patch('sys.__stdin__', new=io.BytesIO()):
+        term = TestTerminal()
+        assert term._keyboard_fd is None
+        # pylint: disable=use-a-generator
+        assert any([err.startswith('Unable to determine input stream file descriptor')
+                    for err in term.errors])
 
 
 def test_stdin_notty_kb_is_None():
     """term._keyboard_fd should be None when os.isatty returns False for input."""
     # In this scenario, stream is sys.__stdout__, but os.isatty(0) is False,
     # such as when piping from another program
-    @as_subprocess
-    def child():
-        isatty = os.isatty
-        with mock.patch('os.isatty') as mock_isatty:
-            mock_isatty.side_effect = (
-                lambda fd:
-                    True if fd == sys.__stdout__.fileno()
-                    else False if fd == sys.__stdin__.fileno()
-                    else isatty(fd)
-            )
-            term = TestTerminal()
-            assert term._keyboard_fd is None
-            assert 'Input stream is not a TTY' in term.errors
-    child()
+    isatty = os.isatty
+    with mock.patch('os.isatty') as mock_isatty:
+        mock_isatty.side_effect = (
+            lambda fd:
+                True if fd == sys.__stdout__.fileno()
+                else False if fd == sys.__stdin__.fileno()
+                else isatty(fd)
+        )
+        term = TestTerminal()
+        assert term._keyboard_fd is None
+        assert 'Input stream is not a TTY' in term.errors
 
 
 def test_keystroke_default_args():
@@ -732,28 +696,24 @@ def test_unsupported_high_byte_metasendsescape():
 
 def test_is_incomplete_keystroke():
     """Test _is_incomplete_keystroke private method."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
+    term = TestTerminal(force_styling=True)
 
-        # Case 1: Exact match - text is a known prefix
-        assert term._is_incomplete_keystroke('\x1b[')
-        assert term._is_incomplete_keystroke('\x1b[1')
-        assert term._is_incomplete_keystroke('\x1b[15')
+    # Case 1: Exact match - text is a known prefix
+    assert term._is_incomplete_keystroke('\x1b[')
+    assert term._is_incomplete_keystroke('\x1b[1')
+    assert term._is_incomplete_keystroke('\x1b[15')
 
-        # Case 2: Building toward - text is a partial match for a longer prefix
-        # '\x1b' is building toward '\x1b[', '\x1b[1', '\x1b[15', etc.
-        assert term._is_incomplete_keystroke('\x1b')
+    # Case 2: Building toward - text is a partial match for a longer prefix
+    # '\x1b' is building toward '\x1b[', '\x1b[1', '\x1b[15', etc.
+    assert term._is_incomplete_keystroke('\x1b')
 
-        # Case 3: Extending beyond - text starts with a known prefix but continues
-        # '\x1b[15~' completes to F5, but '\x1b[15~x' extends beyond the prefix '\x1b[15'
-        # this is for 'bracketed paste' and really really long sequences
-        assert term._is_incomplete_keystroke('\x1b[15~xxx')
-        assert term._is_incomplete_keystroke('\x1b[200~data')
+    # Case 3: Extending beyond - text starts with a known prefix but continues
+    # '\x1b[15~' completes to F5, but '\x1b[15~x' extends beyond the prefix '\x1b[15'
+    # this is for 'bracketed paste' and really really long sequences
+    assert term._is_incomplete_keystroke('\x1b[15~xxx')
+    assert term._is_incomplete_keystroke('\x1b[200~data')
 
-        # Case 4: No match - text doesn't relate to any known prefix
-        assert not term._is_incomplete_keystroke('')
-        assert not term._is_incomplete_keystroke('x')
-        assert not term._is_incomplete_keystroke('xyz')
-
-    child()
+    # Case 4: No match - text doesn't relate to any known prefix
+    assert not term._is_incomplete_keystroke('')
+    assert not term._is_incomplete_keystroke('x')
+    assert not term._is_incomplete_keystroke('xyz')

@@ -151,28 +151,24 @@ def test_async_inkey_resize_event():
 
 def test_async_read_byte_oserror_propagates():
     """OSError from os.read propagates through the future."""
-    @as_subprocess
-    def child():
-        term = TestTerminal()
-        term._keyboard_fd = 0
+    term = TestTerminal()
+    term._keyboard_fd = 0
 
-        loop = asyncio.new_event_loop()
-        try:
-            original_add_reader = loop.add_reader
+    loop = asyncio.new_event_loop()
+    try:
+        original_add_reader = loop.add_reader
 
-            def mock_add_reader(fd, callback):
-                original_add_reader(fd, callback)
-                loop.call_soon(callback)
+        def mock_add_reader(fd, callback):
+            original_add_reader(fd, callback)
+            loop.call_soon(callback)
 
-            with mock.patch.object(loop, 'add_reader', side_effect=mock_add_reader):
-                with mock.patch('os.read', side_effect=OSError("mock read error")):
-                    with pytest.raises(OSError, match="mock read error"):
-                        loop.run_until_complete(
-                            term._async_read_byte(loop, timeout=1.0))
-        finally:
-            loop.close()
-
-    child()
+        with mock.patch.object(loop, 'add_reader', side_effect=mock_add_reader):
+            with mock.patch('os.read', side_effect=OSError("mock read error")):
+                with pytest.raises(OSError, match="mock read error"):
+                    loop.run_until_complete(
+                        term._async_read_byte(loop, timeout=1.0))
+    finally:
+        loop.close()
 
 
 def test_async_read_byte_no_timeout():
@@ -322,16 +318,12 @@ def test_async_inkey_escape_then_arrow():
 
 def test_async_inkey_no_keyboard_fd():
     """_async_read_byte raises RuntimeError without keyboard fd."""
-    @as_subprocess
-    def child():
-        term = TestTerminal()
-        term._keyboard_fd = None
-        loop = asyncio.new_event_loop()
-        try:
-            with pytest.raises(RuntimeError, match="keyboard file descriptor"):
-                loop.run_until_complete(
-                    term._async_read_byte(loop, timeout=1.0))
-        finally:
-            loop.close()
-
-    child()
+    term = TestTerminal()
+    term._keyboard_fd = None
+    loop = asyncio.new_event_loop()
+    try:
+        with pytest.raises(RuntimeError, match="keyboard file descriptor"):
+            loop.run_until_complete(
+                term._async_read_byte(loop, timeout=1.0))
+    finally:
+        loop.close()

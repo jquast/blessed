@@ -78,14 +78,11 @@ def test_legacy_ctrl_alt_exact_matching():
 def test_keystroke_value_comprehensive(sequence, expected_value, needs_terminal):
     """Test keystroke.value property returns correct character for various sequences."""
     if needs_terminal:
-        @as_subprocess
-        def child():
-            term = TestTerminal(force_styling=True)
-            term.ungetch(sequence)
-            ks = term.inkey(timeout=0)
-            assert ks is not None
-            assert ks.value == expected_value
-        child()
+        term = TestTerminal(force_styling=True)
+        term.ungetch(sequence)
+        ks = term.inkey(timeout=0)
+        assert ks is not None
+        assert ks.value == expected_value
     else:
         ks = Keystroke(sequence)
         assert ks.value == expected_value
@@ -199,23 +196,19 @@ def test_legacy_ctrl_alt_edge_cases(
 
 def test_terminal_inkey_legacy_ctrl_alt_integration():
     """Test terminal.inkey() correctly detects ctrl+alt modifier sequences."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
+    term = TestTerminal(force_styling=True)
 
-        ctrl_alt_f = '\x1b\x06'
-        term.ungetch(ctrl_alt_f)
-        ks = term.inkey(timeout=0)
-        assert ks == ctrl_alt_f
-        assert_ctrl_alt_modifiers(ks)
+    ctrl_alt_f = '\x1b\x06'
+    term.ungetch(ctrl_alt_f)
+    ks = term.inkey(timeout=0)
+    assert ks == ctrl_alt_f
+    assert_ctrl_alt_modifiers(ks)
 
-        ctrl_alt_z = '\x1b\x1a'
-        term.ungetch(ctrl_alt_z)
-        ks = term.inkey(timeout=0)
-        assert ks == ctrl_alt_z
-        assert_ctrl_alt_modifiers(ks)
-
-    child()
+    ctrl_alt_z = '\x1b\x1a'
+    term.ungetch(ctrl_alt_z)
+    ks = term.inkey(timeout=0)
+    assert ks == ctrl_alt_z
+    assert_ctrl_alt_modifiers(ks)
 
 
 def test_legacy_ctrl_alt_doesnt_affect_other_sequences():
@@ -309,24 +302,20 @@ def test_keystroke_legacy_ctrl_alt_name_generation():
 def test_match_legacy_csi_modifiers_letter_form(
         sequence, final_char, expected_mod, expected_key_name):
     """Test legacy CSI modifier sequences with letter-form final characters."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        term.ungetch(sequence)
-        ks = term.inkey(timeout=0)
-        assert ks is not None
-        assert ks._mode == -3
-        assert isinstance(ks._match, LegacyCSIKeyEvent)
+    term = TestTerminal(force_styling=True)
+    term.ungetch(sequence)
+    ks = term.inkey(timeout=0)
+    assert ks is not None
+    assert ks._mode == -3
+    assert isinstance(ks._match, LegacyCSIKeyEvent)
 
-        event = ks._match
-        assert event.kind == 'letter'
-        assert event.key_id == final_char
-        assert event.modifiers == expected_mod
-        assert ks.modifiers == expected_mod
-        assert ks._code is not None
-        assert ks.name == expected_key_name
-
-    child()
+    event = ks._match
+    assert event.kind == 'letter'
+    assert event.key_id == final_char
+    assert event.modifiers == expected_mod
+    assert ks.modifiers == expected_mod
+    assert ks._code is not None
+    assert ks.name == expected_key_name
 
 
 @pytest.mark.parametrize('sequence,key_num,expected_mod,expected_key_name', [
@@ -341,97 +330,82 @@ def test_match_legacy_csi_modifiers_letter_form(
 ])
 def test_match_legacy_csi_modifiers_tilde_form(sequence, key_num, expected_mod, expected_key_name):
     """Test legacy CSI modifier sequences with tilde-form final characters."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        term.ungetch(sequence)
-        ks = term.inkey(timeout=0)
-        assert ks is not None
-        assert ks._mode == -3
-        assert isinstance(ks._match, LegacyCSIKeyEvent)
+    term = TestTerminal(force_styling=True)
+    term.ungetch(sequence)
+    ks = term.inkey(timeout=0)
+    assert ks is not None
+    assert ks._mode == -3
+    assert isinstance(ks._match, LegacyCSIKeyEvent)
 
-        event = ks._match
-        assert event.kind == 'tilde'
-        assert event.key_id == key_num
-        assert event.modifiers == expected_mod
-        assert ks.modifiers == expected_mod
-        assert ks._code is not None
-        assert ks.name == expected_key_name
-
-    child()
+    event = ks._match
+    assert event.kind == 'tilde'
+    assert event.key_id == key_num
+    assert event.modifiers == expected_mod
+    assert ks.modifiers == expected_mod
+    assert ks._code is not None
+    assert ks.name == expected_key_name
 
 
 def test_match_legacy_csi_modifiers_non_matching():
     """Test legacy CSI modifier sequences that don't match."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        resolve = functools.partial(resolve_sequence,
-                                    mapper=term._keymap,
-                                    codes=term._keycodes,
-                                    prefixes=term._keymap_prefixes,
-                                    final=True)
+    term = TestTerminal(force_styling=True)
+    resolve = functools.partial(resolve_sequence,
+                                mapper=term._keymap,
+                                codes=term._keycodes,
+                                prefixes=term._keymap_prefixes,
+                                final=True)
 
-        assert resolve('a') == 'a'
-        assert resolve('\x1b[A').name == 'KEY_UP'
-        assert resolve('\x1b[2~').name == 'KEY_INSERT'
+    assert resolve('a') == 'a'
+    assert resolve('\x1b[A').name == 'KEY_UP'
+    assert resolve('\x1b[2~').name == 'KEY_INSERT'
 
-        ks = resolve('\x1b[1;3')
-        assert ks == '\x1b[' and ks.name == 'CSI'
+    ks = resolve('\x1b[1;3')
+    assert ks == '\x1b[' and ks.name == 'CSI'
 
-        assert resolve('\x1b[1;3Z') == '\x1b['
-        assert resolve('\x1b[99;5~') == '\x1b['
-
-    child()
+    assert resolve('\x1b[1;3Z') == '\x1b['
+    assert resolve('\x1b[99;5~') == '\x1b['
 
 
 def test_legacy_csi_modifier_properties():
     """Test modifier properties set correctly for legacy CSI sequences."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
+    term = TestTerminal(force_styling=True)
 
-        term.ungetch('\x1b[1;7C')
-        ks = term.inkey(timeout=0)
-        assert ks._ctrl is True
-        assert ks._alt is True
-        assert ks._shift is False
-        assert ks._super is False
+    term.ungetch('\x1b[1;7C')
+    ks = term.inkey(timeout=0)
+    assert ks._ctrl is True
+    assert ks._alt is True
+    assert ks._shift is False
+    assert ks._super is False
 
-        term.ungetch('\x1b[5;2~')
-        ks = term.inkey(timeout=0)
-        assert ks._shift is True
-        assert ks._ctrl is False
-        assert ks._alt is False
-
-    child()
+    term.ungetch('\x1b[5;2~')
+    ks = term.inkey(timeout=0)
+    assert ks._shift is True
+    assert ks._ctrl is False
+    assert ks._alt is False
 
 
 def test_terminal_inkey_legacy_csi_modifiers():
     """Test terminal.inkey() correctly handles legacy CSI modifier sequences."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
+    term = TestTerminal(force_styling=True)
 
-        legacy_sequence = '\x1b[1;3A'
-        term.ungetch(legacy_sequence)
+    legacy_sequence = '\x1b[1;3A'
+    term.ungetch(legacy_sequence)
 
-        ks = term.inkey(timeout=0)
+    ks = term.inkey(timeout=0)
 
-        assert ks is not None
-        assert ks == legacy_sequence
-        assert ks._mode == -3
-        assert isinstance(ks._match, LegacyCSIKeyEvent)
+    assert ks is not None
+    assert ks == legacy_sequence
+    assert ks._mode == -3
+    assert isinstance(ks._match, LegacyCSIKeyEvent)
 
-        event = ks._match
-        assert event.kind == 'letter'
-        assert event.key_id == 'A'
-        assert event.modifiers == 3
-        assert ks._alt is True
-        assert ks._ctrl is False
-        assert ks._shift is False
-        assert ks._code == curses.KEY_UP
-    child()
+    event = ks._match
+    assert event.kind == 'letter'
+    assert event.key_id == 'A'
+    assert event.modifiers == 3
+    assert ks._alt is True
+    assert ks._ctrl is False
+    assert ks._shift is False
+    assert ks._code == curses.KEY_UP
 
 
 @pytest.mark.parametrize('sequence,expected_key,expected_modifiers', [
@@ -442,65 +416,54 @@ def test_terminal_inkey_legacy_csi_modifiers():
 ])
 def test_match_modify_other_keys(sequence, expected_key, expected_modifiers):
     """Test ModifyOtherKeys protocol sequences are parsed correctly."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        term.ungetch(sequence)
-        ks = term.inkey(timeout=0)
-        assert ks is not None
-        assert ks._mode == -2
-        assert isinstance(ks._match, ModifyOtherKeysEvent)
+    term = TestTerminal(force_styling=True)
+    term.ungetch(sequence)
+    ks = term.inkey(timeout=0)
+    assert ks is not None
+    assert ks._mode == -2
+    assert isinstance(ks._match, ModifyOtherKeysEvent)
 
-        event = ks._match
-        assert event.key == expected_key
-        assert event.modifiers == expected_modifiers
-
-    child()
+    event = ks._match
+    assert event.key == expected_key
+    assert event.modifiers == expected_modifiers
 
 
 def test_match_modify_other_keys_non_matching():
     """Test Modify OtherKeys sequences that don't match."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        resolve = functools.partial(resolve_sequence,
-                                    mapper=term._keymap,
-                                    codes=term._keycodes,
-                                    prefixes=term._keymap_prefixes,
-                                    final=True)
+    term = TestTerminal(force_styling=True)
+    resolve = functools.partial(resolve_sequence,
+                                mapper=term._keymap,
+                                codes=term._keycodes,
+                                prefixes=term._keymap_prefixes,
+                                final=True)
 
-        assert resolve('a') == 'a'
-        assert resolve('\x1b[A').name == 'KEY_UP'
+    assert resolve('a') == 'a'
+    assert resolve('\x1b[A').name == 'KEY_UP'
 
-        ks = resolve('\x1b[27;5')
-        assert ks == '\x1b[' and ks.name == 'CSI'
+    ks = resolve('\x1b[27;5')
+    assert ks == '\x1b[' and ks.name == 'CSI'
 
-        assert resolve('\x1b[28;5;44~') == '\x1b['
-        assert resolve('\x1b]27;5;44~') == '\x1b]'
-
-    child()
+    assert resolve('\x1b[28;5;44~') == '\x1b['
+    assert resolve('\x1b]27;5;44~') == '\x1b]'
 
 
 def test_terminal_inkey_modify_other_keys():
     """Test terminal.inkey() correctly handles ModifyOtherKeys sequences."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
+    term = TestTerminal(force_styling=True)
 
-        modify_sequence = '\x1b[27;5;44~'
-        term.ungetch(modify_sequence)
+    modify_sequence = '\x1b[27;5;44~'
+    term.ungetch(modify_sequence)
 
-        ks = term.inkey(timeout=0)
+    ks = term.inkey(timeout=0)
 
-        assert ks is not None
-        assert ks == modify_sequence
-        assert ks._mode == -2
-        assert isinstance(ks._match, ModifyOtherKeysEvent)
+    assert ks is not None
+    assert ks == modify_sequence
+    assert ks._mode == -2
+    assert isinstance(ks._match, ModifyOtherKeysEvent)
 
-        event = ks._match
-        assert event.key == 44
-        assert event.modifiers == 5
-    child()
+    event = ks._match
+    assert event.key == 44
+    assert event.modifiers == 5
 
 
 @pytest.mark.parametrize('sequence,char,expected', [
@@ -586,19 +549,15 @@ def test_keystroke_properties_comprehensive(sequence, property_name, expected_va
 
 def test_keystroke_repr_with_name():
     """Test repr() shows name for sequences, string representation for text."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        term.ungetch('\x1b[A')
-        ks = term.inkey(timeout=0)
-        assert ks.name == 'KEY_UP'
-        assert repr(ks) == 'KEY_UP'
+    term = TestTerminal(force_styling=True)
+    term.ungetch('\x1b[A')
+    ks = term.inkey(timeout=0)
+    assert ks.name == 'KEY_UP'
+    assert repr(ks) == 'KEY_UP'
 
-        ks_plain = Keystroke('a')
-        assert ks_plain.name is None
-        assert repr(ks_plain) == "'a'"
-
-    child()
+    ks_plain = Keystroke('a')
+    assert ks_plain.name is None
+    assert repr(ks_plain) == "'a'"
 
 
 def test_alt_uppercase_sets_shift_modifier_and_name():
@@ -645,212 +604,172 @@ def test_alt_uppercase_sets_shift_modifier_and_name():
 
 def test_legacy_csi_modifiers_with_event_type_letter_form():
     """Test legacy CSI letter-form sequences with event type field."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
+    term = TestTerminal(force_styling=True)
 
-        term.ungetch('\x1b[1;2:3Q')
-        ks = term.inkey(timeout=0)
-        assert ks is not None
-        assert ks._mode == -3
-        assert isinstance(ks._match, LegacyCSIKeyEvent)
+    term.ungetch('\x1b[1;2:3Q')
+    ks = term.inkey(timeout=0)
+    assert ks is not None
+    assert ks._mode == -3
+    assert isinstance(ks._match, LegacyCSIKeyEvent)
 
-        event = ks._match
-        assert event.kind == 'letter'
-        assert event.key_id == 'Q'
-        assert event.modifiers == 2
-        assert event.event_type == 3
-        assert ks.code == curses.KEY_F2
+    event = ks._match
+    assert event.kind == 'letter'
+    assert event.key_id == 'Q'
+    assert event.modifiers == 2
+    assert event.event_type == 3
+    assert ks.code == curses.KEY_F2
 
-        term.ungetch('\x1b[1;5Q')
-        ks = term.inkey(timeout=0)
-        assert ks is not None
-        event = ks._match
-        assert event.event_type == 1
-
-    child()
+    term.ungetch('\x1b[1;5Q')
+    ks = term.inkey(timeout=0)
+    assert ks is not None
+    event = ks._match
+    assert event.event_type == 1
 
 
 def test_legacy_csi_modifiers_with_event_type_tilde_form():
     """Test legacy CSI tilde-form sequences with event type field."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
+    term = TestTerminal(force_styling=True)
 
-        term.ungetch('\x1b[24;1:3~')
-        ks = term.inkey(timeout=0)
-        assert ks is not None
-        assert ks._mode == -3
-        assert isinstance(ks._match, LegacyCSIKeyEvent)
+    term.ungetch('\x1b[24;1:3~')
+    ks = term.inkey(timeout=0)
+    assert ks is not None
+    assert ks._mode == -3
+    assert isinstance(ks._match, LegacyCSIKeyEvent)
 
-        event = ks._match
-        assert event.kind == 'tilde'
-        assert event.key_id == 24
-        assert event.modifiers == 1
-        assert event.event_type == 3
-        assert ks.code == curses.KEY_F12
+    event = ks._match
+    assert event.kind == 'tilde'
+    assert event.key_id == 24
+    assert event.modifiers == 1
+    assert event.event_type == 3
+    assert ks.code == curses.KEY_F12
 
-        term.ungetch('\x1b[24;2~')
-        ks = term.inkey(timeout=0)
-        assert ks is not None
-        event = ks._match
-        assert event.event_type == 1
-
-    child()
+    term.ungetch('\x1b[24;2~')
+    ks = term.inkey(timeout=0)
+    assert ks is not None
+    event = ks._match
+    assert event.event_type == 1
 
 
 def test_terminal_inkey_legacy_csi_with_event_type():
     """Test terminal.inkey() parses event type from legacy CSI sequences."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
+    term = TestTerminal(force_styling=True)
 
-        letter_sequence = '\x1b[1;2:3Q'
-        term.ungetch(letter_sequence)
-        ks = term.inkey(timeout=0)
-        assert ks == letter_sequence
-        assert ks._mode == -3
-        assert ks._match.event_type == 3
-        assert ks.code == curses.KEY_F2
+    letter_sequence = '\x1b[1;2:3Q'
+    term.ungetch(letter_sequence)
+    ks = term.inkey(timeout=0)
+    assert ks == letter_sequence
+    assert ks._mode == -3
+    assert ks._match.event_type == 3
+    assert ks.code == curses.KEY_F2
 
-        tilde_sequence = '\x1b[24;1:3~'
-        term.ungetch(tilde_sequence)
-        ks = term.inkey(timeout=0)
-        assert ks == tilde_sequence
-        assert ks._mode == -3
-        assert ks._match.event_type == 3
-        assert ks.code == curses.KEY_F12
-
-    child()
+    tilde_sequence = '\x1b[24;1:3~'
+    term.ungetch(tilde_sequence)
+    ks = term.inkey(timeout=0)
+    assert ks == tilde_sequence
+    assert ks._mode == -3
+    assert ks._match.event_type == 3
+    assert ks.code == curses.KEY_F12
 
 
 def test_legacy_csi_modifiers_event_type_edge_cases():
     """Test legacy CSI sequences with various event type values and invalid patterns."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
+    term = TestTerminal(force_styling=True)
 
-        event_type_cases = [
-            ('\x1b[1;2:1Q', 1),
-            ('\x1b[1;2:2Q', 2),
-            ('\x1b[1;2:3Q', 3),
-        ]
+    event_type_cases = [
+        ('\x1b[1;2:1Q', 1),
+        ('\x1b[1;2:2Q', 2),
+        ('\x1b[1;2:3Q', 3),
+    ]
 
-        for sequence, expected_type in event_type_cases:
-            term.ungetch(sequence)
-            ks = term.inkey(timeout=0)
-            assert ks is not None
-            assert ks._match.event_type == expected_type
+    for sequence, expected_type in event_type_cases:
+        term.ungetch(sequence)
+        ks = term.inkey(timeout=0)
+        assert ks is not None
+        assert ks._match.event_type == expected_type
 
-        invalid_cases = [
-            '\x1b[1;2:Q',
-            '\x1b[1;2:abc~',
-            '\x1b[24;2:~',
-        ]
+    invalid_cases = [
+        '\x1b[1;2:Q',
+        '\x1b[1;2:abc~',
+        '\x1b[24;2:~',
+    ]
 
-        for invalid_seq in invalid_cases:
-            term.ungetch(invalid_seq)
-            ks = term.inkey(timeout=0)
-            assert ks in {'\x1b', '\x1b['} or ks.name is None
-
-    child()
+    for invalid_seq in invalid_cases:
+        term.ungetch(invalid_seq)
+        ks = term.inkey(timeout=0)
+        assert ks in {'\x1b', '\x1b['} or ks.name is None
 
 
 def test_build_appkeys_predicate_with_char():
     """Test application key predicates with character argument."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        term.ungetch('\x1b[1;2A')
-        ks = term.inkey(timeout=0)
+    term = TestTerminal(force_styling=True)
+    term.ungetch('\x1b[1;2A')
+    ks = term.inkey(timeout=0)
 
-        assert ks.is_shift_up('x') is False
-        assert ks.is_shift_up('') is True
-
-    child()
+    assert ks.is_shift_up('x') is False
+    assert ks.is_shift_up('') is True
 
 
 def test_build_appkeys_predicate_keycode_loop():
     """Test application key predicates with invalid key names raise AttributeError."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        term.ungetch('\x1b[1;2A')
-        ks = term.inkey(timeout=0)
+    term = TestTerminal(force_styling=True)
+    term.ungetch('\x1b[1;2A')
+    ks = term.inkey(timeout=0)
 
-        assert ks.is_shift_up() is True
+    assert ks.is_shift_up() is True
 
-        try:
-            ks.is_shift_foobar()
-            assert False
-        except AttributeError as e:
-            assert 'foobar' in str(e)
-
-    child()
+    try:
+        ks.is_shift_foobar()
+        assert False
+    except AttributeError as e:
+        assert 'foobar' in str(e)
 
 
 def test_match_legacy_csi_invalid_letter_final():
     """Test legacy CSI sequences with invalid letter final characters."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        resolve = functools.partial(resolve_sequence,
-                                    mapper=term._keymap,
-                                    codes=term._keycodes,
-                                    prefixes=term._keymap_prefixes,
-                                    final=True)
-        ks = resolve('\x1b[1;5Z')
-        assert ks == '\x1b['
-
-    child()
+    term = TestTerminal(force_styling=True)
+    resolve = functools.partial(resolve_sequence,
+                                mapper=term._keymap,
+                                codes=term._keycodes,
+                                prefixes=term._keymap_prefixes,
+                                final=True)
+    ks = resolve('\x1b[1;5Z')
+    assert ks == '\x1b['
 
 
 def test_match_legacy_csi_invalid_tilde_number():
     """Test legacy CSI sequences with invalid tilde key numbers."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        resolve = functools.partial(resolve_sequence,
-                                    mapper=term._keymap,
-                                    codes=term._keycodes,
-                                    prefixes=term._keymap_prefixes,
-                                    final=True)
-        ks = resolve('\x1b[99;5~')
-        assert ks == '\x1b['
-
-    child()
+    term = TestTerminal(force_styling=True)
+    resolve = functools.partial(resolve_sequence,
+                                mapper=term._keymap,
+                                codes=term._keycodes,
+                                prefixes=term._keymap_prefixes,
+                                final=True)
+    ks = resolve('\x1b[99;5~')
+    assert ks == '\x1b['
 
 
 def test_match_ss3_fkey_modifier_zero():
     """Test SS3 F-key sequences with modifier zero are invalid."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        resolve = functools.partial(resolve_sequence,
-                                    mapper=term._keymap,
-                                    codes=term._keycodes,
-                                    prefixes=term._keymap_prefixes,
-                                    final=True)
-        ks = resolve('\x1bO0P')
-        assert ks == '\x1bO'
-
-    child()
+    term = TestTerminal(force_styling=True)
+    resolve = functools.partial(resolve_sequence,
+                                mapper=term._keymap,
+                                codes=term._keycodes,
+                                prefixes=term._keymap_prefixes,
+                                final=True)
+    ks = resolve('\x1bO0P')
+    assert ks == '\x1bO'
 
 
 def test_match_ss3_fkey_invalid_final():
     """Test SS3 F-key sequences with invalid final characters."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        resolve = functools.partial(resolve_sequence,
-                                    mapper=term._keymap,
-                                    codes=term._keycodes,
-                                    prefixes=term._keymap_prefixes,
-                                    final=True)
-        ks = resolve('\x1bO2X')
-        assert ks == '\x1bO'
-
-    child()
+    term = TestTerminal(force_styling=True)
+    resolve = functools.partial(resolve_sequence,
+                                mapper=term._keymap,
+                                codes=term._keycodes,
+                                prefixes=term._keymap_prefixes,
+                                final=True)
+    ks = resolve('\x1bO2X')
+    assert ks == '\x1bO'
 
 
 @pytest.mark.parametrize('sequence,expected_code,expected_mod', [
@@ -861,32 +780,24 @@ def test_match_ss3_fkey_invalid_final():
 ])
 def test_match_ss3_fkey_valid(sequence, expected_code, expected_mod):
     """Test SS3 F-key sequences with modifiers parse correctly."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        term.ungetch(sequence)
-        ks = term.inkey(timeout=0)
-        assert ks is not None
-        assert ks.code == expected_code
-        assert ks.modifiers == expected_mod
-        assert ks._match.kind == 'ss3-fkey'
-        assert ks._match.event_type == 1
-
-    child()
+    term = TestTerminal(force_styling=True)
+    term.ungetch(sequence)
+    ks = term.inkey(timeout=0)
+    assert ks is not None
+    assert ks.code == expected_code
+    assert ks.modifiers == expected_mod
+    assert ks._match.kind == 'ss3-fkey'
+    assert ks._match.event_type == 1
 
 
 def test_legacy_csi_e_center_key():
     """Test legacy CSI E (center/begin key) sequence with modifiers."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        term.ungetch('\x1b[1;5E')
-        ks = term.inkey(timeout=0)
-        assert ks is not None
-        assert ks.code == curses.KEY_B2
-        assert ks.modifiers == 5
-
-    child()
+    term = TestTerminal(force_styling=True)
+    term.ungetch('\x1b[1;5E')
+    ks = term.inkey(timeout=0)
+    assert ks is not None
+    assert ks.code == curses.KEY_B2
+    assert ks.modifiers == 5
 
 
 @pytest.mark.parametrize('sequence,expected_name', [
@@ -906,75 +817,59 @@ def test_ctrl_code_symbols_all(sequence, expected_name):
 
 def test_match_legacy_csi_letter_keycode_none():
     """Test legacy CSI letter-form sequences that don't map to keycodes."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        resolve = functools.partial(resolve_sequence,
-                                    mapper=term._keymap,
-                                    codes=term._keycodes,
-                                    prefixes=term._keymap_prefixes,
-                                    final=True)
-        ks = resolve('\x1b[1;5X')
-        assert ks == '\x1b['
-
-    child()
+    term = TestTerminal(force_styling=True)
+    resolve = functools.partial(resolve_sequence,
+                                mapper=term._keymap,
+                                codes=term._keycodes,
+                                prefixes=term._keymap_prefixes,
+                                final=True)
+    ks = resolve('\x1b[1;5X')
+    assert ks == '\x1b['
 
 
 def test_match_ss3_keycode_none():
     """Test SS3 sequences that don't map to keycodes."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        resolve = functools.partial(resolve_sequence,
-                                    mapper=term._keymap,
-                                    codes=term._keycodes,
-                                    prefixes=term._keymap_prefixes,
-                                    final=True)
-        ks = resolve('\x1bO2Z')
-        assert ks == '\x1bO'
-
-    child()
+    term = TestTerminal(force_styling=True)
+    resolve = functools.partial(resolve_sequence,
+                                mapper=term._keymap,
+                                codes=term._keycodes,
+                                prefixes=term._keymap_prefixes,
+                                final=True)
+    ks = resolve('\x1bO2Z')
+    assert ks == '\x1bO'
 
 
 def test_legacy_csi_modifiers_keycode_none_both_forms():
     """Test legacy CSI sequences in both forms that don't map to keycodes."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        resolve = functools.partial(resolve_sequence,
-                                    mapper=term._keymap,
-                                    codes=term._keycodes,
-                                    prefixes=term._keymap_prefixes,
-                                    final=True)
+    term = TestTerminal(force_styling=True)
+    resolve = functools.partial(resolve_sequence,
+                                mapper=term._keymap,
+                                codes=term._keycodes,
+                                prefixes=term._keymap_prefixes,
+                                final=True)
 
-        ks = resolve('\x1b[1;5W')
-        assert ks == '\x1b['
+    ks = resolve('\x1b[1;5W')
+    assert ks == '\x1b['
 
-        ks = resolve('\x1b[100;5~')
-        assert ks == '\x1b['
-
-    child()
+    ks = resolve('\x1b[100;5~')
+    assert ks == '\x1b['
 
 
 def test_ss3_fkey_branches():
     """Test SS3 F-key sequence matching logic."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        resolve = functools.partial(resolve_sequence,
-                                    mapper=term._keymap,
-                                    codes=term._keycodes,
-                                    prefixes=term._keymap_prefixes,
-                                    final=True)
+    term = TestTerminal(force_styling=True)
+    resolve = functools.partial(resolve_sequence,
+                                mapper=term._keymap,
+                                codes=term._keycodes,
+                                prefixes=term._keymap_prefixes,
+                                final=True)
 
-        ks = resolve('\x1bO2P')
-        assert ks is not None
-        assert ks.code == curses.KEY_F1
+    ks = resolve('\x1bO2P')
+    assert ks is not None
+    assert ks.code == curses.KEY_F1
 
-        ks = resolve('\x1bO2A')
-        assert ks == '\x1bO'
-
-    child()
+    ks = resolve('\x1bO2A')
+    assert ks == '\x1bO'
 
 
 def test_alphanum_predicate_no_char_non_printable_return():
@@ -985,25 +880,21 @@ def test_alphanum_predicate_no_char_non_printable_return():
 
 def test_alphanum_predicate_no_char_application_key():
     """Test alphanumeric predicate without char argument for application keys."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
+    term = TestTerminal(force_styling=True)
 
-        # Ctrl+Up arrow: is_ctrl() without char should return False
-        # Use is_ctrl_up() for application keys instead
-        term.ungetch('\x1b[1;5A')
-        ks = term.inkey(timeout=0)
-        assert ks.is_ctrl() is False
-        assert ks.is_ctrl_up() is True
+    # Ctrl+Up arrow: is_ctrl() without char should return False
+    # Use is_ctrl_up() for application keys instead
+    term.ungetch('\x1b[1;5A')
+    ks = term.inkey(timeout=0)
+    assert ks.is_ctrl() is False
+    assert ks.is_ctrl_up() is True
 
-        # Alt+Down arrow: is_alt() without char should return False
-        # Use is_alt_down() for application keys instead
-        term.ungetch('\x1b[1;3B')
-        ks = term.inkey(timeout=0)
-        assert ks.is_alt() is False
-        assert ks.is_alt_down() is True
-
-    child()
+    # Alt+Down arrow: is_alt() without char should return False
+    # Use is_alt_down() for application keys instead
+    term.ungetch('\x1b[1;3B')
+    ks = term.inkey(timeout=0)
+    assert ks.is_alt() is False
+    assert ks.is_alt_down() is True
 
 
 def test_repr_with_name():
@@ -1061,26 +952,22 @@ def test_pressed_property_default_return():
 
 def test_pressed_property_with_event_types():
     """Test pressed property returns correct value based on event_type."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
+    term = TestTerminal(force_styling=True)
 
-        # event_type=1 (press) should return True
-        term.ungetch('\x1b[1;2:1Q')
-        ks = term.inkey(timeout=0)
-        assert ks.pressed is True
+    # event_type=1 (press) should return True
+    term.ungetch('\x1b[1;2:1Q')
+    ks = term.inkey(timeout=0)
+    assert ks.pressed is True
 
-        # event_type=2 (repeat) should return False
-        term.ungetch('\x1b[1;2:2Q')
-        ks = term.inkey(timeout=0)
-        assert ks.pressed is False
+    # event_type=2 (repeat) should return False
+    term.ungetch('\x1b[1;2:2Q')
+    ks = term.inkey(timeout=0)
+    assert ks.pressed is False
 
-        # event_type=3 (release) should return False
-        term.ungetch('\x1b[1;2:3Q')
-        ks = term.inkey(timeout=0)
-        assert ks.pressed is False
-
-    child()
+    # event_type=3 (release) should return False
+    term.ungetch('\x1b[1;2:3Q')
+    ks = term.inkey(timeout=0)
+    assert ks.pressed is False
 
 
 def test_getattr_property_getter():
@@ -1093,18 +980,14 @@ def test_getattr_property_getter():
 
 def test_get_modified_keycode_name_no_modifiers():
     """Test modified keycode name resolves for unmodified press events."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        term.ungetch('\x1b[1;1A')
-        ks = term.inkey(timeout=0)
-        assert ks is not None
-        assert ks._mode == -3
-        assert ks.modifiers == 1
-        result = ks._get_modified_keycode_name()
-        assert result == 'KEY_UP'
-
-    child()
+    term = TestTerminal(force_styling=True)
+    term.ungetch('\x1b[1;1A')
+    ks = term.inkey(timeout=0)
+    assert ks is not None
+    assert ks._mode == -3
+    assert ks.modifiers == 1
+    result = ks._get_modified_keycode_name()
+    assert result == 'KEY_UP'
 
 
 def test_get_control_symbol_unknown_char_code():
@@ -1142,28 +1025,20 @@ def test_get_meta_escape_name_not_printable_edge_case():
 
 def test_build_appkeys_predicate_expected_code_none():
     """Test application key predicate when expected_code lookup fails."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        term.ungetch('\x1b[1;2A')
-        ks = term.inkey(timeout=0)
-        predicate = ks._build_appkeys_predicate([], 'nonexistent_key')
-        assert predicate() is False
-
-    child()
+    term = TestTerminal(force_styling=True)
+    term.ungetch('\x1b[1;2A')
+    ks = term.inkey(timeout=0)
+    predicate = ks._build_appkeys_predicate([], 'nonexistent_key')
+    assert predicate() is False
 
 
 def test_build_appkeys_predicate_code_mismatch():
     """Test application key predicate when keystroke code doesn't match expected."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        term.ungetch('\x1b[1;2A')
-        ks = term.inkey(timeout=0)
-        predicate = ks._build_appkeys_predicate([], 'down')
-        assert predicate() is False
-
-    child()
+    term = TestTerminal(force_styling=True)
+    term.ungetch('\x1b[1;2A')
+    ks = term.inkey(timeout=0)
+    predicate = ks._build_appkeys_predicate([], 'down')
+    assert predicate() is False
 
 
 def test_alphanum_predicate_exact_matching_non_alpha():
@@ -1175,15 +1050,11 @@ def test_alphanum_predicate_exact_matching_non_alpha():
 
 def test_alphanum_predicate_value_empty():
     """Test alphanumeric predicate when keystroke value is empty."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        term.ungetch('\x1b[A')
-        ks = term.inkey(timeout=0)
-        assert ks.value == ''
-        assert ks.is_alt('x') is False
-
-    child()
+    term = TestTerminal(force_styling=True)
+    term.ungetch('\x1b[A')
+    ks = term.inkey(timeout=0)
+    assert ks.value == ''
+    assert ks.is_alt('x') is False
 
 
 def test_alphanum_predicate_value_multi_char():
@@ -1194,43 +1065,35 @@ def test_alphanum_predicate_value_multi_char():
 
 def test_terminal_inkey_csi_sequence():
     """Test term.inkey() returns single CSI keystroke for unmatched sequences."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
+    term = TestTerminal(force_styling=True)
 
-        # When an unsupported CSI sequence arrives, inkey should detect it as CSI
-        term.ungetch('\x1b[')
-        ks = term.inkey(timeout=0)
-        assert ks == '\x1b['
-        assert ks.name == 'CSI'
-        assert len(ks) == 2
-        assert ks.modifiers == 3
+    # When an unsupported CSI sequence arrives, inkey should detect it as CSI
+    term.ungetch('\x1b[')
+    ks = term.inkey(timeout=0)
+    assert ks == '\x1b['
+    assert ks.name == 'CSI'
+    assert len(ks) == 2
+    assert ks.modifiers == 3
 
-        # Verify no second keystroke was created
-        ks2 = term.inkey(timeout=0)
-        assert ks2 == ''
-
-    child()
+    # Verify no second keystroke was created
+    ks2 = term.inkey(timeout=0)
+    assert ks2 == ''
 
 
 def test_legacy_csi_modifiers_no_modifiers_integration():
     """Test legacy CSI sequence with modifier=1 (no actual modifiers)."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        term.ungetch('\x1b[1;1P')
-        ks = term.inkey(timeout=0)
-        assert ks is not None
-        assert ks._mode == -3
-        assert ks.modifiers == 1
-        assert ks.code == curses.KEY_F1
-        result = ks._get_modified_keycode_name()
-        assert result == 'KEY_F1'
-        assert ks._ctrl is False
-        assert ks._alt is False
-        assert ks._shift is False
-
-    child()
+    term = TestTerminal(force_styling=True)
+    term.ungetch('\x1b[1;1P')
+    ks = term.inkey(timeout=0)
+    assert ks is not None
+    assert ks._mode == -3
+    assert ks.modifiers == 1
+    assert ks.code == curses.KEY_F1
+    result = ks._get_modified_keycode_name()
+    assert result == 'KEY_F1'
+    assert ks._ctrl is False
+    assert ks._alt is False
+    assert ks._shift is False
 
 
 def test_getattr_non_is_attribute():
@@ -1302,16 +1165,13 @@ def test_get_meta_escape_name_branch_coverage():
 
 def test_build_appkeys_predicate_modifier_validation():
     """Test application key predicate when modifiers don't match."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        term.ungetch('\x1b[1;2A')
-        ks = term.inkey(timeout=0)
-        assert ks.code == curses.KEY_UP
-        assert ks._shift is True
-        assert ks.is_shift_up() is True
-        assert ks.is_ctrl_up() is False
-    child()
+    term = TestTerminal(force_styling=True)
+    term.ungetch('\x1b[1;2A')
+    ks = term.inkey(timeout=0)
+    assert ks.code == curses.KEY_UP
+    assert ks._shift is True
+    assert ks.is_shift_up() is True
+    assert ks.is_ctrl_up() is False
 
 
 def test_event_type_suffix_without_application_key():

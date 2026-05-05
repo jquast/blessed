@@ -23,31 +23,24 @@ if platform.system() != 'Windows':
 
 def test_length_cjk():
     """Test length of East Asian characters"""
-    @as_subprocess
-    def child():
-        term = TestTerminal()
+    term = TestTerminal()
 
-        # given,
-        given = term.bold_red('コンニチハ, セカイ!')
-        expected = sum((2, 2, 2, 2, 2, 1, 1, 2, 2, 2, 1,))
+    # given,
+    given = term.bold_red('コンニチハ, セカイ!')
+    expected = sum((2, 2, 2, 2, 2, 1, 1, 2, 2, 2, 1,))
 
-        # exercise,
-        assert term.length(given) == expected
-
-    child()
+    # exercise,
+    assert term.length(given) == expected
 
 
 def test_length_with_zwj():
     """Test that ZWJ sequences are measured correctly like wcswidth()."""
-    @as_subprocess
-    def child():
-        term = TestTerminal()
-        # RGI_Emoji_ZWJ_Sequence  ; family: woman, woman, girl, boy
-        given = term.bold_red('\U0001F469\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466')
-        expected = 2
+    term = TestTerminal()
+    # RGI_Emoji_ZWJ_Sequence  ; family: woman, woman, girl, boy
+    given = term.bold_red('\U0001F469\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466')
+    expected = 2
 
-        assert term.length(given) == expected
-    child()
+    assert term.length(given) == expected
 
 
 def test_length_ansiart():
@@ -324,27 +317,23 @@ def test_sequence_length(all_terms):
 
 def test_env_winsize():
     """Test height and width is appropriately queried in a pty."""
-    @as_subprocess
-    def child():
-        # set the pty's virtual window size
-        os.environ['COLUMNS'] = '99'
-        os.environ['LINES'] = '11'
-        term = TestTerminal(stream=StringIO())
-        save_init = term._init_descriptor
-        save_stdout = sys.__stdout__
-        try:
-            term._init_descriptor = None
-            sys.__stdout__ = None
-            winsize = term._height_and_width()
-            width = term.width
-            height = term.height
-        finally:
-            term._init_descriptor = save_init
-            sys.__stdout__ = save_stdout
-        assert winsize.ws_col == width == 99
-        assert winsize.ws_row == height == 11
-
-    child()
+    # set the pty's virtual window size
+    os.environ['COLUMNS'] = '99'
+    os.environ['LINES'] = '11'
+    term = TestTerminal(stream=StringIO())
+    save_init = term._init_descriptor
+    save_stdout = sys.__stdout__
+    try:
+        term._init_descriptor = None
+        sys.__stdout__ = None
+        winsize = term._height_and_width()
+        width = term.width
+        height = term.height
+    finally:
+        term._init_descriptor = save_init
+        sys.__stdout__ = save_stdout
+    assert winsize.ws_col == width == 99
+    assert winsize.ws_row == height == 11
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="requires fcntl")
@@ -426,83 +415,63 @@ def test_Sequence_alignment(all_terms):
 
 def test_hyperlink_nostyling():
     """Test length our of hyperlink URL's."""
-    @as_subprocess
-    def child():
-        # given,
-        term = TestTerminal(force_styling=None)
-        given_basic_url = term.link(
-            'https://blessed.readthedocs.org', 'blessed')
-        assert given_basic_url == 'blessed'
-
-    child()
+    # given,
+    term = TestTerminal(force_styling=None)
+    given_basic_url = term.link(
+        'https://blessed.readthedocs.org', 'blessed')
+    assert given_basic_url == 'blessed'
 
 
 def test_basic_hyperlinks():
     """Test length our of hyperlink URL's."""
-    @as_subprocess
-    def child():
-        # given,
-        term = TestTerminal()
-        given_basic_url = term.link(
-            'https://blessed.readthedocs.org', 'blessed')
-        # exercise,
-        split_parts = term.split_seqs(given_basic_url)
-        # verify
-        if term.does_styling:
-            assert split_parts[0] == '\x1b]8;;https://blessed.readthedocs.org\x1b\\'
-            assert term.length(split_parts[0]) == 0
-            assert ''.join(split_parts[1:8]) == 'blessed'
-            assert split_parts[8] == '\x1b]8;;\x1b\\'
-            assert len(split_parts) == 9
-        else:
-            assert ''.join(split_parts) == 'blessed'
-
-    child()
+    # given,
+    term = TestTerminal()
+    given_basic_url = term.link(
+        'https://blessed.readthedocs.org', 'blessed')
+    # exercise,
+    split_parts = term.split_seqs(given_basic_url)
+    # verify
+    if term.does_styling:
+        assert split_parts[0] == '\x1b]8;;https://blessed.readthedocs.org\x1b\\'
+        assert term.length(split_parts[0]) == 0
+        assert ''.join(split_parts[1:8]) == 'blessed'
+        assert split_parts[8] == '\x1b]8;;\x1b\\'
+        assert len(split_parts) == 9
+    else:
+        assert ''.join(split_parts) == 'blessed'
 
 
 def test_hyperlink_with_id():
     """Test length our of hyperlink URL's with ID."""
-    @as_subprocess
-    def child():
-        # given,
-        term = TestTerminal()
-        given_advanced_urltext = term.link(
-            'https://blessed.readthedocs.org', 'blessed', '123')
-        # exercise,
-        split_parts = term.split_seqs(given_advanced_urltext)
-        # verify,
-        if term.does_styling:
-            assert split_parts[0] == '\x1b]8;id=123;https://blessed.readthedocs.org\x1b\\'
-            assert term.length(split_parts[0]) == 0
-            assert ''.join(split_parts[1:8]) == 'blessed'
-            assert split_parts[8] == '\x1b]8;;\x1b\\'
-            assert len(split_parts) == 9
-        else:
-            assert ''.join(split_parts) == 'blessed'
-
-    child()
+    # given,
+    term = TestTerminal()
+    given_advanced_urltext = term.link(
+        'https://blessed.readthedocs.org', 'blessed', '123')
+    # exercise,
+    split_parts = term.split_seqs(given_advanced_urltext)
+    # verify,
+    if term.does_styling:
+        assert split_parts[0] == '\x1b]8;id=123;https://blessed.readthedocs.org\x1b\\'
+        assert term.length(split_parts[0]) == 0
+        assert ''.join(split_parts[1:8]) == 'blessed'
+        assert split_parts[8] == '\x1b]8;;\x1b\\'
+        assert len(split_parts) == 9
+    else:
+        assert ''.join(split_parts) == 'blessed'
 
 
 def test_set_window_title_nostyling():
     """Test set_window_title returns empty when styling is disabled."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=None)
-        result = term.set_window_title('hello')
-        assert result == ''
-
-    child()
+    term = TestTerminal(force_styling=None)
+    result = term.set_window_title('hello')
+    assert result == ''
 
 
 def test_set_window_title_default():
     """Test set_window_title returns OSC 0 sequence."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        result = term.set_window_title('My Title')
-        assert result == '\x1b]0;My Title\x07'
-
-    child()
+    term = TestTerminal(force_styling=True)
+    result = term.set_window_title('My Title')
+    assert result == '\x1b]0;My Title\x07'
 
 
 @pytest.mark.parametrize("mode,expected_prefix", [
@@ -523,55 +492,39 @@ def test_set_window_title_modes(mode, expected_prefix):
 
 def test_set_window_title_sanitizes():
     """Test set_window_title strips ESC and BEL from title text."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        result = term.set_window_title('bad\x1b[31mtitle\x07end')
-        assert result == '\x1b]0;bad[31mtitleend\x07'
-
-    child()
+    term = TestTerminal(force_styling=True)
+    result = term.set_window_title('bad\x1b[31mtitle\x07end')
+    assert result == '\x1b]0;bad[31mtitleend\x07'
 
 
 def test_set_window_title_invalid_mode():
     """Test set_window_title rejects invalid mode values."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        try:
-            term.set_window_title('test', mode=3)
-            assert False
-        except AssertionError:
-            pass
-
-    child()
+    term = TestTerminal(force_styling=True)
+    try:
+        term.set_window_title('test', mode=3)
+        assert False
+    except AssertionError:
+        pass
 
 
 def test_window_title_context_manager():
     """Test title context manager writes push/pop sequences."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True, stream=StringIO())
-        with term.window_title('My App'):
-            pass
-        output = term.stream.getvalue()
-        assert '\x1b[22;0t' in output
-        assert '\x1b]0;My App\x07' in output
-        assert '\x1b[23;0t' in output
-
-    child()
+    term = TestTerminal(force_styling=True, stream=StringIO())
+    with term.window_title('My App'):
+        pass
+    output = term.stream.getvalue()
+    assert '\x1b[22;0t' in output
+    assert '\x1b]0;My App\x07' in output
+    assert '\x1b[23;0t' in output
 
 
 def test_window_title_context_manager_nostyling():
     """Test title context manager is a no-op without styling."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=None, stream=StringIO())
-        with term.window_title('My App'):
-            pass
-        output = term.stream.getvalue()
-        assert output == ''
-
-    child()
+    term = TestTerminal(force_styling=None, stream=StringIO())
+    with term.window_title('My App'):
+        pass
+    output = term.stream.getvalue()
+    assert output == ''
 
 
 def test_sequence_is_movement_false(all_terms):

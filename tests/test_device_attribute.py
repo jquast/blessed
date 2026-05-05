@@ -255,51 +255,42 @@ def test_device_attribute_raw_stored():
 
 def test_get_kitty_keyboard_state_boundary_no_response():
     """Kitty keyboard query sets sticky failure when no response."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
 
-        flags = term.get_kitty_keyboard_state(timeout=0.01)
-        assert flags is None
-        assert term._kitty_kb_first_query_failed is True
+    flags = term.get_kitty_keyboard_state(timeout=0.01)
+    assert flags is None
+    assert term._kitty_kb_first_query_failed is True
 
-        flags2 = term.get_kitty_keyboard_state(timeout=1.0)
-        assert flags2 is None
-    child()
+    flags2 = term.get_kitty_keyboard_state(timeout=1.0)
+    assert flags2 is None
 
 
 def test_get_kitty_keyboard_state_cpr_fast_negative():
     """Kitty keyboard query returns None quickly via CPR boundary."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
 
-        term.ungetch('\x1b[10;20R')
-        flags = term.get_kitty_keyboard_state(timeout=0.5)
-        assert flags is None
-        assert term._kitty_kb_first_query_failed is True
-    child()
+    term.ungetch('\x1b[10;20R')
+    flags = term.get_kitty_keyboard_state(timeout=0.5)
+    assert flags is None
+    assert term._kitty_kb_first_query_failed is True
 
 
 def test_enable_kitty_keyboard_after_query_failed():
     """Test enable_kitty_keyboard yields without emitting sequences after query failed."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
 
-        term._kitty_kb_first_query_failed = True
+    term._kitty_kb_first_query_failed = True
 
-        with term.enable_kitty_keyboard(disambiguate=True, timeout=0.01, force=False):
-            pass
+    with term.enable_kitty_keyboard(disambiguate=True, timeout=0.01, force=False):
+        pass
 
-        assert stream.getvalue() == ''
-    child()
+    assert stream.getvalue() == ''
 
 
 def test_device_attribute_from_match_with_malformed_extensions():

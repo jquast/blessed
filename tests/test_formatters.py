@@ -392,64 +392,52 @@ def test_resolve_attribute_recursive_compoundables(monkeypatch):
 
 def test_formattingstring_picklability():
     """Test pickle-ability of a FormattingString."""
-    @as_subprocess
-    def child():
-        t = TestTerminal(force_styling=True)
-        # basic pickle
-        assert pickle.loads(pickle.dumps(t.red))('orange') == t.red('orange')
-        assert pickle.loads(pickle.dumps(t.normal)) == t.normal
+    t = TestTerminal(force_styling=True)
+    # basic pickle
+    assert pickle.loads(pickle.dumps(t.red))('orange') == t.red('orange')
+    assert pickle.loads(pickle.dumps(t.normal)) == t.normal
 
-        # and, pickle through multiprocessing
-        r, w = multiprocessing.Pipe()
-        w.send(t.normal)
-        assert r.recv() == t.normal
-
-    child()
+    # and, pickle through multiprocessing
+    r, w = multiprocessing.Pipe()
+    w.send(t.normal)
+    assert r.recv() == t.normal
 
 
 def test_formattingotherstring_picklability():
     """Test pickle-ability of a FormattingOtherString."""
-    @as_subprocess
-    def child():
-        t = TestTerminal(force_styling=True)
-        # basic pickle
-        assert pickle.loads(pickle.dumps(t.move_left)) == t.move_left
-        assert pickle.loads(pickle.dumps(t.move_left(3))) == t.move_left(3)
-        assert pickle.loads(pickle.dumps(t.move_left))(3) == t.move_left(3)
+    t = TestTerminal(force_styling=True)
+    # basic pickle
+    assert pickle.loads(pickle.dumps(t.move_left)) == t.move_left
+    assert pickle.loads(pickle.dumps(t.move_left(3))) == t.move_left(3)
+    assert pickle.loads(pickle.dumps(t.move_left))(3) == t.move_left(3)
 
-        # and, pickle through multiprocessing
-        r, w = multiprocessing.Pipe()
-        w.send(t.move_left)
-        assert r.recv()(3) == t.move_left(3)
-        w.send(t.move_left(3))
-        assert r.recv() == t.move_left(3)
-
-    child()
+    # and, pickle through multiprocessing
+    r, w = multiprocessing.Pipe()
+    w.send(t.move_left)
+    assert r.recv()(3) == t.move_left(3)
+    w.send(t.move_left(3))
+    assert r.recv() == t.move_left(3)
 
 
 def test_paramterizingstring_picklability():
     """Test pickle-ability of ParameterizingString."""
-    @as_subprocess
-    def child():
-        # local
-        from blessed.formatters import ParameterizingString
-        t = TestTerminal(force_styling=True)
+    # local
+    from blessed.formatters import ParameterizingString
+    t = TestTerminal(force_styling=True)
 
-        color = ParameterizingString(t.color, t.normal, 'color')
-        assert pickle.loads(pickle.dumps(color)) == color
-        assert pickle.loads(pickle.dumps(color(3))) == color(3)
-        assert pickle.loads(pickle.dumps(color))(3) == color(3)
+    color = ParameterizingString(t.color, t.normal, 'color')
+    assert pickle.loads(pickle.dumps(color)) == color
+    assert pickle.loads(pickle.dumps(color(3))) == color(3)
+    assert pickle.loads(pickle.dumps(color))(3) == color(3)
 
-        # and, pickle through multiprocessing
-        r, w = multiprocessing.Pipe()
-        w.send(color)
-        assert r.recv() == color
-        w.send(color(3))
-        assert r.recv() == color(3)
-        w.send(t.color)
-        assert r.recv()(3) == t.color(3)
-
-    child()
+    # and, pickle through multiprocessing
+    r, w = multiprocessing.Pipe()
+    w.send(color)
+    assert r.recv() == color
+    w.send(color(3))
+    assert r.recv() == color(3)
+    w.send(t.color)
+    assert r.recv()(3) == t.color(3)
 
 
 def test_pickled_parameterizing_string(monkeypatch):

@@ -8,39 +8,30 @@ from .accessories import TestTerminal, as_subprocess
 
 def test_progress_bar_normal():
     """Test progress_bar with state=1 returns OSC 9;4 set sequence."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        assert term.progress_bar(1, 42) == '\x1b]9;4;1;42\x07'
-        assert term.progress_bar('normal', 0) == '\x1b]9;4;1;0\x07'
-        assert term.progress_bar('normal', 100) == '\x1b]9;4;1;100\x07'
-    child()
+    term = TestTerminal(force_styling=True)
+    assert term.progress_bar(1, 42) == '\x1b]9;4;1;42\x07'
+    assert term.progress_bar('normal', 0) == '\x1b]9;4;1;0\x07'
+    assert term.progress_bar('normal', 100) == '\x1b]9;4;1;100\x07'
 
 
 def test_progress_bar_states_no_value():
     """Test progress_bar for non-normal states returns correct sequence."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=True)
-        assert term.progress_bar(0) == '\x1b]9;4;0;\x07'
-        assert term.progress_bar('clear') == '\x1b]9;4;0;\x07'
-        assert term.progress_bar(2) == '\x1b]9;4;2;\x07'
-        assert term.progress_bar('error') == '\x1b]9;4;2;\x07'
-        assert term.progress_bar(3) == '\x1b]9;4;3;\x07'
-        assert term.progress_bar('indeterminate') == '\x1b]9;4;3;\x07'
-        assert term.progress_bar(4) == '\x1b]9;4;4;\x07'
-        assert term.progress_bar('paused') == '\x1b]9;4;4;\x07'
-    child()
+    term = TestTerminal(force_styling=True)
+    assert term.progress_bar(0) == '\x1b]9;4;0;\x07'
+    assert term.progress_bar('clear') == '\x1b]9;4;0;\x07'
+    assert term.progress_bar(2) == '\x1b]9;4;2;\x07'
+    assert term.progress_bar('error') == '\x1b]9;4;2;\x07'
+    assert term.progress_bar(3) == '\x1b]9;4;3;\x07'
+    assert term.progress_bar('indeterminate') == '\x1b]9;4;3;\x07'
+    assert term.progress_bar(4) == '\x1b]9;4;4;\x07'
+    assert term.progress_bar('paused') == '\x1b]9;4;4;\x07'
 
 
 def test_progress_bar_nostyling():
     """Test progress_bar returns empty string when does_styling is False."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(force_styling=None)
-        assert term.progress_bar('normal', 50) == ''
-        assert term.progress_bar('clear') == ''
-    child()
+    term = TestTerminal(force_styling=None)
+    assert term.progress_bar('normal', 50) == ''
+    assert term.progress_bar('clear') == ''
 
 
 @pytest.mark.parametrize("state", [5, 'unknown', -1])

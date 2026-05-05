@@ -76,14 +76,11 @@ def test_does_sixel_uses_cache():
 
 def test_does_sixel_not_a_tty():
     """Test does_sixel() returns False when not a TTY."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._is_a_tty = False
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._is_a_tty = False
 
-        result = term.does_sixel(timeout=0.01)
-        assert result is False
-    child()
+    result = term.does_sixel(timeout=0.01)
+    assert result is False
 
 
 def test_get_cell_height_and_width_success():
@@ -634,20 +631,17 @@ def test_window_cache_return_when_cell_query_fails():
 
 def test_preferred_size_cache_path():
     """Test get_sixel_height_and_width falls back to preferred_size_cache as last resort."""
-    @as_subprocess
-    def child():
-        from blessed.terminal import WINSZ
-        term = TestTerminal()
+    from blessed.terminal import WINSZ
+    term = TestTerminal()
 
-        # Pre-cache failures for methods 1-3 so it falls through to method 4
-        term._xtwinops_cell_cache = (-1, -1)
-        term._xtwinops_cache = (-1, -1)
-        term._xtsmgraphics_cache = (-1, -1)
-        term._preferred_size_cache = WINSZ(ws_row=24, ws_col=80, ws_xpixel=1920, ws_ypixel=1080)
+    # Pre-cache failures for methods 1-3 so it falls through to method 4
+    term._xtwinops_cell_cache = (-1, -1)
+    term._xtwinops_cache = (-1, -1)
+    term._xtsmgraphics_cache = (-1, -1)
+    term._preferred_size_cache = WINSZ(ws_row=24, ws_col=80, ws_xpixel=1920, ws_ypixel=1080)
 
-        result = term.get_sixel_height_and_width(timeout=0.1)
-        assert result == (1080, 1920)
-    child()
+    result = term.get_sixel_height_and_width(timeout=0.1)
+    assert result == (1080, 1920)
 
 
 def test_preferred_size_cache_with_zero_pixels():
@@ -775,11 +769,8 @@ def test_tiocswinsz_invalid_dimensions():
 
 def test_get_sixel_height_and_width_not_a_tty():
     """Test get_sixel_height_and_width returns (-1, -1) when not a TTY."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._is_a_tty = False
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._is_a_tty = False
 
-        result = term.get_sixel_height_and_width(timeout=0.1)
-        assert result == (-1, -1)
-    child()
+    result = term.get_sixel_height_and_width(timeout=0.1)
+    assert result == (-1, -1)

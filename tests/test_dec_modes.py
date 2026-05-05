@@ -306,250 +306,214 @@ def test_dec_mode_response_description_fallback():
 
 def test_dec_mode_calls_with_no_styling():
     """Test _dec_mode_set_enabled does nothing when does_styling is False."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=False)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=False)
 
-        term._dec_mode_set_enabled(DecPrivateMode.DECTCEM)
-        term._dec_mode_set_enabled(DecPrivateMode.DECTCEM)
+    term._dec_mode_set_enabled(DecPrivateMode.DECTCEM)
+    term._dec_mode_set_enabled(DecPrivateMode.DECTCEM)
 
-        assert stream.getvalue() == ''
+    assert stream.getvalue() == ''
 
-        response = term.get_dec_mode(DecPrivateMode.DECTCEM)
+    response = term.get_dec_mode(DecPrivateMode.DECTCEM)
 
-        assert response.value == DecModeResponse.NOT_QUERIED
-        assert response.failed is True
-        assert not response.supported
-        assert stream.getvalue() == ''
-    child()
+    assert response.value == DecModeResponse.NOT_QUERIED
+    assert response.failed is True
+    assert not response.supported
+    assert stream.getvalue() == ''
 
 
 def test_get_dec_mode_invalid_mode_type():
     """Test get_dec_mode raises TypeError for invalid mode types."""
-    @as_subprocess
-    def child():
-        term = TestTerminal()
-        with pytest.raises(TypeError):
-            term.get_dec_mode("invalid")
-    child()
+    term = TestTerminal()
+    with pytest.raises(TypeError):
+        term.get_dec_mode("invalid")
 
 
 def test_get_dec_mode_successful_query():
     """Test successful DEC mode query with mocked response."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        mock_match = mock.Mock()
-        mock_match.group.return_value = '1'
+    mock_match = mock.Mock()
+    mock_match.group.return_value = '1'
 
-        with mock.patch.object(term, '_is_a_tty', True), \
-                mock.patch.object(
-                    term, '_query_with_boundary',
-                    return_value=mock_match
-        ) as mock_query:
-            response = term.get_dec_mode(
-                DecPrivateMode.DECTCEM, timeout=0.5
-            )
+    with mock.patch.object(term, '_is_a_tty', True), \
+            mock.patch.object(
+                term, '_query_with_boundary',
+                return_value=mock_match
+    ) as mock_query:
+        response = term.get_dec_mode(
+            DecPrivateMode.DECTCEM, timeout=0.5
+        )
 
-            mock_query.assert_called_once()
-            assert response.value == DecModeResponse.SET
-            assert response.supported is True
-            assert response.enabled is True
-            assert term._dec_mode_cache[_DPM.DECTCEM] == DecModeResponse.SET
-        assert stream.getvalue() == ''
-    child()
+        mock_query.assert_called_once()
+        assert response.value == DecModeResponse.SET
+        assert response.supported is True
+        assert response.enabled is True
+        assert term._dec_mode_cache[_DPM.DECTCEM] == DecModeResponse.SET
+    assert stream.getvalue() == ''
 
 
 def test_get_dec_mode_timeout():
     """Test DEC mode query timeout handling."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        with mock.patch.object(term, '_is_a_tty', True), \
-                mock.patch.object(
-                    term, '_query_with_boundary',
-                    return_value=None
-        ):
-            response = term.get_dec_mode(
-                DecPrivateMode.DECTCEM, timeout=0.1
-            )
+    with mock.patch.object(term, '_is_a_tty', True), \
+            mock.patch.object(
+                term, '_query_with_boundary',
+                return_value=None
+    ):
+        response = term.get_dec_mode(
+            DecPrivateMode.DECTCEM, timeout=0.1
+        )
 
-            assert response.value == DecModeResponse.NO_RESPONSE
-            assert response.failed is True
-            assert term._dec_first_query_failed is True
-        assert stream.getvalue() == ''
-    child()
+        assert response.value == DecModeResponse.NO_RESPONSE
+        assert response.failed is True
+        assert term._dec_first_query_failed is True
+    assert stream.getvalue() == ''
 
 
 def test_get_dec_mode_cached_response():
     """Test that cached responses are returned without re-querying."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        term._dec_mode_cache[_DPM.DECTCEM] = DecModeResponse.SET
+    term._dec_mode_cache[_DPM.DECTCEM] = DecModeResponse.SET
 
-        with mock.patch.object(term, '_is_a_tty', True), \
-                mock.patch.object(
-                    term, '_query_with_boundary'
-        ) as mock_query:
-            response = term.get_dec_mode(DecPrivateMode.DECTCEM)
+    with mock.patch.object(term, '_is_a_tty', True), \
+            mock.patch.object(
+                term, '_query_with_boundary'
+    ) as mock_query:
+        response = term.get_dec_mode(DecPrivateMode.DECTCEM)
 
-            mock_query.assert_not_called()
-            assert response.value == DecModeResponse.SET
-        assert stream.getvalue() == ''
-    child()
+        mock_query.assert_not_called()
+        assert response.value == DecModeResponse.SET
+    assert stream.getvalue() == ''
 
 
 def test_get_dec_mode_force_bypass_cache():
     """Test force=True bypasses cache and re-queries."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        term._dec_mode_cache[_DPM.DECTCEM] = DecModeResponse.SET
+    term._dec_mode_cache[_DPM.DECTCEM] = DecModeResponse.SET
 
-        mock_match = mock.Mock()
-        mock_match.group.return_value = '2'
+    mock_match = mock.Mock()
+    mock_match.group.return_value = '2'
 
-        with mock.patch.object(term, '_is_a_tty', True), \
-                mock.patch.object(
-                    term, '_query_with_boundary',
-                    return_value=mock_match
-        ) as mock_query:
-            response = term.get_dec_mode(
-                DecPrivateMode.DECTCEM, force=True
-            )
+    with mock.patch.object(term, '_is_a_tty', True), \
+            mock.patch.object(
+                term, '_query_with_boundary',
+                return_value=mock_match
+    ) as mock_query:
+        response = term.get_dec_mode(
+            DecPrivateMode.DECTCEM, force=True
+        )
 
-            mock_query.assert_called_once()
-            assert response.value == DecModeResponse.RESET
-        assert stream.getvalue() == ''
-    child()
+        mock_query.assert_called_once()
+        assert response.value == DecModeResponse.RESET
+    assert stream.getvalue() == ''
 
 
 def test_get_dec_mode_sticky_failure():
     """Test get_dec_mode returns NOT_QUERIED after first query fails."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        with mock.patch.object(term, '_is_a_tty', True), \
-                mock.patch.object(
-                    term, '_query_with_boundary',
-                    return_value=None
-        ):
+    with mock.patch.object(term, '_is_a_tty', True), \
+            mock.patch.object(
+                term, '_query_with_boundary',
+                return_value=None
+    ):
 
-            first_response = term.get_dec_mode(
-                DecPrivateMode.DECTCEM, timeout=0.1
-            )
-            assert first_response.value == DecModeResponse.NO_RESPONSE
-            assert term._dec_first_query_failed is True
+        first_response = term.get_dec_mode(
+            DecPrivateMode.DECTCEM, timeout=0.1
+        )
+        assert first_response.value == DecModeResponse.NO_RESPONSE
+        assert term._dec_first_query_failed is True
 
-            second_response = term.get_dec_mode(
-                DecPrivateMode.BRACKETED_PASTE
-            )
-            assert second_response.value == DecModeResponse.NOT_QUERIED
-            assert second_response.failed is True
+        second_response = term.get_dec_mode(
+            DecPrivateMode.BRACKETED_PASTE
+        )
+        assert second_response.value == DecModeResponse.NOT_QUERIED
+        assert second_response.failed is True
 
-        assert stream.getvalue() == ''
-    child()
+    assert stream.getvalue() == ''
 
 
 def test_get_dec_mode_no_response_after_success():
     """Test get_dec_mode returns NO_RESPONSE when query fails after previous success."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        mock_match_success = mock.Mock()
-        mock_match_success.group.return_value = '1'
+    mock_match_success = mock.Mock()
+    mock_match_success.group.return_value = '1'
 
-        with mock.patch.object(term, '_is_a_tty', True):
-            with mock.patch.object(
-                term, '_query_with_boundary',
-                return_value=mock_match_success
-            ):
-                first_response = term.get_dec_mode(
-                    DecPrivateMode.DECTCEM, timeout=0.1
-                )
-                assert first_response.value == DecModeResponse.SET
-                assert term._dec_any_query_succeeded is True
+    with mock.patch.object(term, '_is_a_tty', True):
+        with mock.patch.object(
+            term, '_query_with_boundary',
+            return_value=mock_match_success
+        ):
+            first_response = term.get_dec_mode(
+                DecPrivateMode.DECTCEM, timeout=0.1
+            )
+            assert first_response.value == DecModeResponse.SET
+            assert term._dec_any_query_succeeded is True
 
-            with mock.patch.object(
-                term, '_query_with_boundary',
-                return_value=None
-            ):
-                second_response = term.get_dec_mode(
-                    DecPrivateMode.BRACKETED_PASTE,
-                    timeout=0.1
-                )
-                assert second_response.value == DecModeResponse.NO_RESPONSE
-                assert second_response.failed is True
-                assert term._dec_any_query_succeeded is True
+        with mock.patch.object(
+            term, '_query_with_boundary',
+            return_value=None
+        ):
+            second_response = term.get_dec_mode(
+                DecPrivateMode.BRACKETED_PASTE,
+                timeout=0.1
+            )
+            assert second_response.value == DecModeResponse.NO_RESPONSE
+            assert second_response.failed is True
+            assert term._dec_any_query_succeeded is True
 
-        assert stream.getvalue() == ''
-    child()
+    assert stream.getvalue() == ''
 
 
 def test_dec_mode_set_enabled_with_styling():
     """Test _dec_mode_set_enabled writes correct sequence."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        term._dec_mode_set_enabled(DecPrivateMode.DECTCEM, DecPrivateMode.BRACKETED_PASTE)
-        assert stream.getvalue() == '\x1b[?25;2004h'
-        assert term._dec_mode_cache[_DPM.DECTCEM] == DecModeResponse.SET
-        assert term._dec_mode_cache[_DPM.BRACKETED_PASTE] == DecModeResponse.SET
-    child()
+    term._dec_mode_set_enabled(DecPrivateMode.DECTCEM, DecPrivateMode.BRACKETED_PASTE)
+    assert stream.getvalue() == '\x1b[?25;2004h'
+    assert term._dec_mode_cache[_DPM.DECTCEM] == DecModeResponse.SET
+    assert term._dec_mode_cache[_DPM.BRACKETED_PASTE] == DecModeResponse.SET
 
 
 def test_dec_mode_set_disabled_with_styling():
     """Test _dec_mode_set_disabled writes correct sequence."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        term._dec_mode_set_disabled(DecPrivateMode.DECTCEM, DecPrivateMode.BRACKETED_PASTE)
-        assert stream.getvalue() == '\x1b[?25;2004l'
-        assert term._dec_mode_cache[_DPM.DECTCEM] == DecModeResponse.RESET
-        assert term._dec_mode_cache[_DPM.BRACKETED_PASTE] == DecModeResponse.RESET
-    child()
+    term._dec_mode_set_disabled(DecPrivateMode.DECTCEM, DecPrivateMode.BRACKETED_PASTE)
+    assert stream.getvalue() == '\x1b[?25;2004l'
+    assert term._dec_mode_cache[_DPM.DECTCEM] == DecModeResponse.RESET
+    assert term._dec_mode_cache[_DPM.BRACKETED_PASTE] == DecModeResponse.RESET
 
 
 def test_dec_mode_set_enabled_invalid_mode_type():
     """Test _dec_mode_set_enabled raises TypeError for invalid mode types."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=False)
-        with pytest.raises(TypeError):
-            term._dec_mode_set_enabled("invalid")
-        assert stream.getvalue() == ''
-    child()
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=False)
+    with pytest.raises(TypeError):
+        term._dec_mode_set_enabled("invalid")
+    assert stream.getvalue() == ''
 
 
 def test_dec_mode_set_disabled_invalid_mode_type():
     """Test _dec_mode_set_disabled raises TypeError for invalid mode types."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=False)
-        with pytest.raises(TypeError):
-            term._dec_mode_set_disabled("invalid")
-        assert stream.getvalue() == ''
-    child()
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=False)
+    with pytest.raises(TypeError):
+        term._dec_mode_set_disabled("invalid")
+    assert stream.getvalue() == ''
 
 
 @pytest.mark.parametrize("method_name,suffix", [
@@ -558,17 +522,14 @@ def test_dec_mode_set_disabled_invalid_mode_type():
 ])
 def test_dec_mode_set_with_dec_private_mode_enum(method_name, suffix):
     """Test _dec_mode_set_enabled/disabled with DecPrivateMode instance values."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        method = getattr(term, method_name)
-        method(_DPM(2004), _DPM(1006))
+    method = getattr(term, method_name)
+    method(_DPM(2004), _DPM(1006))
 
-        output = stream.getvalue()
-        assert f'\x1b[?2004;1006{suffix}' in output
-    child()
+    output = stream.getvalue()
+    assert f'\x1b[?2004;1006{suffix}' in output
 
 
 def test_dec_modes_enabled_with_invalid_type():
@@ -609,116 +570,101 @@ def test_dec_modes_disabled_with_invalid_type():
 
 def test_dec_modes_enabled_context_manager():
     """Test dec_modes_enabled context manager behavior."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        mock_response = mock.Mock()
-        mock_response.supported = True
-        mock_response.enabled = False
+    mock_response = mock.Mock()
+    mock_response.supported = True
+    mock_response.enabled = False
 
-        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
-                mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
-                mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
+    with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
+            mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
+            mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
 
-            with term.dec_modes_enabled(DecPrivateMode.DECTCEM, timeout=0.5):
-                mock_set_enabled.assert_called_once_with(DecPrivateMode.DECTCEM)
-                mock_set_enabled.reset_mock()
+        with term.dec_modes_enabled(DecPrivateMode.DECTCEM, timeout=0.5):
+            mock_set_enabled.assert_called_once_with(DecPrivateMode.DECTCEM)
+            mock_set_enabled.reset_mock()
 
-            mock_set_disabled.assert_called_once_with(DecPrivateMode.DECTCEM)
-    child()
+        mock_set_disabled.assert_called_once_with(DecPrivateMode.DECTCEM)
 
 
 def test_dec_modes_enabled_already_enabled():
     """Test dec_modes_enabled skips already enabled modes."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        mock_response = mock.Mock()
-        mock_response.supported = True
-        mock_response.enabled = True
+    mock_response = mock.Mock()
+    mock_response.supported = True
+    mock_response.enabled = True
 
-        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
-                mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
-                mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
+    with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
+            mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
+            mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
 
-            with term.dec_modes_enabled(DecPrivateMode.DECTCEM, timeout=0.5):
-                mock_set_enabled.assert_called_once_with()
-                mock_set_enabled.reset_mock()
+        with term.dec_modes_enabled(DecPrivateMode.DECTCEM, timeout=0.5):
+            mock_set_enabled.assert_called_once_with()
+            mock_set_enabled.reset_mock()
 
-            mock_set_disabled.assert_called_once_with()
-    child()
+        mock_set_disabled.assert_called_once_with()
 
 
 def test_dec_modes_enabled_unsupported_mode():
     """Test dec_modes_enabled skips unsupported modes."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        mock_response = mock.Mock()
-        mock_response.supported = False
+    mock_response = mock.Mock()
+    mock_response.supported = False
 
-        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
-                mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
-                mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
+    with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
+            mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
+            mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
 
-            with term.dec_modes_enabled(DecPrivateMode.DECTCEM, timeout=0.5):
-                mock_set_enabled.assert_called_once_with()
-                mock_set_enabled.reset_mock()
+        with term.dec_modes_enabled(DecPrivateMode.DECTCEM, timeout=0.5):
+            mock_set_enabled.assert_called_once_with()
+            mock_set_enabled.reset_mock()
 
-            mock_set_disabled.assert_called_once_with()
-    child()
+        mock_set_disabled.assert_called_once_with()
 
 
 def test_dec_modes_disabled_context_manager():
     """Test dec_modes_disabled context manager behavior."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        mock_response = mock.Mock()
-        mock_response.supported = True
-        mock_response.enabled = True
+    mock_response = mock.Mock()
+    mock_response.supported = True
+    mock_response.enabled = True
 
-        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
-                mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
-                mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
+    with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
+            mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
+            mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
 
-            with term.dec_modes_disabled(DecPrivateMode.DECTCEM, timeout=0.5):
-                mock_set_disabled.assert_called_once_with(DecPrivateMode.DECTCEM)
-                mock_set_disabled.reset_mock()
+        with term.dec_modes_disabled(DecPrivateMode.DECTCEM, timeout=0.5):
+            mock_set_disabled.assert_called_once_with(DecPrivateMode.DECTCEM)
+            mock_set_disabled.reset_mock()
 
-            mock_set_enabled.assert_called_once_with(DecPrivateMode.DECTCEM)
-    child()
+        mock_set_enabled.assert_called_once_with(DecPrivateMode.DECTCEM)
 
 
 def test_dec_modes_disabled_already_disabled():
     """Test dec_modes_disabled skips already disabled modes."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        mock_response = mock.Mock()
-        mock_response.supported = True
-        mock_response.enabled = False
+    mock_response = mock.Mock()
+    mock_response.supported = True
+    mock_response.enabled = False
 
-        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
-                mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
-                mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
+    with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
+            mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
+            mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
 
-            with term.dec_modes_disabled(DecPrivateMode.DECTCEM, timeout=0.5):
-                mock_set_disabled.assert_called_once_with()
-                mock_set_disabled.reset_mock()
+        with term.dec_modes_disabled(DecPrivateMode.DECTCEM, timeout=0.5):
+            mock_set_disabled.assert_called_once_with()
+            mock_set_disabled.reset_mock()
 
-            mock_set_enabled.assert_called_once_with()
-    child()
+        mock_set_enabled.assert_called_once_with()
 
 
 def test_context_manager_no_styling_and_invalid_args():
@@ -744,53 +690,47 @@ def test_context_manager_no_styling_and_invalid_args():
 
 def test_context_manager_exception_handling():
     """Test context managers properly restore state on exception."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        mock_response = mock.Mock()
-        mock_response.supported = True
-        mock_response.enabled = False
+    mock_response = mock.Mock()
+    mock_response.supported = True
+    mock_response.enabled = False
 
-        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
-                mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
-                mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
+    with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
+            mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
+            mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
 
-            with pytest.raises(ValueError):
-                with term.dec_modes_enabled(DecPrivateMode.DECTCEM):
-                    mock_set_enabled.assert_called_once_with(DecPrivateMode.DECTCEM)
-                    raise ValueError("Test exception")
+        with pytest.raises(ValueError):
+            with term.dec_modes_enabled(DecPrivateMode.DECTCEM):
+                mock_set_enabled.assert_called_once_with(DecPrivateMode.DECTCEM)
+                raise ValueError("Test exception")
 
-            mock_set_disabled.assert_called_once_with(DecPrivateMode.DECTCEM)
-        assert stream.getvalue() == ''
-    child()
+        mock_set_disabled.assert_called_once_with(DecPrivateMode.DECTCEM)
+    assert stream.getvalue() == ''
 
 
 def test_multiple_modes_context_manager():
     """Test context managers work with multiple modes."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        mock_response = mock.Mock()
-        mock_response.supported = True
-        mock_response.enabled = False
+    mock_response = mock.Mock()
+    mock_response.supported = True
+    mock_response.enabled = False
 
-        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
-                mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
-                mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
+    with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
+            mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
+            mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
 
-            with term.dec_modes_enabled(DecPrivateMode.DECTCEM, DecPrivateMode.BRACKETED_PASTE):
-                mock_set_enabled.assert_called_once_with(
-                    DecPrivateMode.DECTCEM, DecPrivateMode.BRACKETED_PASTE)
-                mock_set_enabled.reset_mock()
-
-            mock_set_disabled.assert_called_once_with(
+        with term.dec_modes_enabled(DecPrivateMode.DECTCEM, DecPrivateMode.BRACKETED_PASTE):
+            mock_set_enabled.assert_called_once_with(
                 DecPrivateMode.DECTCEM, DecPrivateMode.BRACKETED_PASTE)
-        assert stream.getvalue() == ''
-    child()
+            mock_set_enabled.reset_mock()
+
+        mock_set_disabled.assert_called_once_with(
+            DecPrivateMode.DECTCEM, DecPrivateMode.BRACKETED_PASTE)
+    assert stream.getvalue() == ''
 
 
 @pytest.mark.parametrize("method_name,mock_response", [
@@ -799,23 +739,20 @@ def test_multiple_modes_context_manager():
 ])
 def test_dec_modes_context_with_dec_private_mode_enum(method_name, mock_response):
     """Test dec_modes_enabled/disabled with DecPrivateMode instance values."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
 
-        response_value = getattr(DecModeResponse, mock_response)
-        term.get_dec_mode = lambda mode_num, timeout=None, force=False: DecModeResponse(
-            mode_num, response_value)
+    response_value = getattr(DecModeResponse, mock_response)
+    term.get_dec_mode = lambda mode_num, timeout=None, force=False: DecModeResponse(
+        mode_num, response_value)
 
-        context_manager = getattr(term, method_name)
-        with context_manager(_DPM(2004), timeout=0.01):
-            pass
+    context_manager = getattr(term, method_name)
+    with context_manager(_DPM(2004), timeout=0.01):
+        pass
 
-        output = stream.getvalue()
-        assert '\x1b[?2004' in output
-    child()
+    output = stream.getvalue()
+    assert '\x1b[?2004' in output
 
 
 def test_int_mode_parameters():
@@ -838,26 +775,23 @@ def test_int_mode_parameters():
 ])
 def test_sugary_context_managers(method_name, expected_mode):
     """Test sugary context managers enable correct modes."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        mock_response = mock.Mock()
-        mock_response.supported = True
-        mock_response.enabled = False
+    mock_response = mock.Mock()
+    mock_response.supported = True
+    mock_response.enabled = False
 
-        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
-                mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
-                mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
+    with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
+            mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
+            mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
 
-            method = getattr(term, method_name)
-            with method():
-                mock_set_enabled.assert_called_once_with(expected_mode)
-                mock_set_enabled.reset_mock()
+        method = getattr(term, method_name)
+        with method():
+            mock_set_enabled.assert_called_once_with(expected_mode)
+            mock_set_enabled.reset_mock()
 
-            mock_set_disabled.assert_called_once_with(expected_mode)
-    child()
+        mock_set_disabled.assert_called_once_with(expected_mode)
 
 
 @pytest.mark.parametrize("method_name", [
@@ -867,17 +801,14 @@ def test_sugary_context_managers(method_name, expected_mode):
 ])
 def test_sugary_context_managers_no_styling(method_name):
     """Test sugary context managers do nothing when does_styling is False."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=False)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=False)
 
-        method = getattr(term, method_name)
-        with method():
-            pass
+    method = getattr(term, method_name)
+    with method():
+        pass
 
-        assert stream.getvalue() == ""
-    child()
+    assert stream.getvalue() == ""
 
 
 @pytest.mark.parametrize("sequence", [
@@ -1021,34 +952,31 @@ def test_mouse_event_name_with_non_mouse_mode():
 
 def test_query_response_with_line_buffered_mode():
     """Test _query_response with line buffering disabled."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
-        term._line_buffered = False
-        term._keyboard_fd = None
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    term._line_buffered = False
+    term._keyboard_fd = None
 
-        mock_match = mock.Mock()
-        mock_match.start.return_value = 0
-        mock_match.end.return_value = 999
+    mock_match = mock.Mock()
+    mock_match.start.return_value = 0
+    mock_match.end.return_value = 999
 
-        with mock.patch.object(term, 'ungetch') as mock_ungetch, \
-                mock.patch.object(terminal_module, '_read_until',
-                                  return_value=(mock_match, '')) as mock_read_until:
+    with mock.patch.object(term, 'ungetch') as mock_ungetch, \
+            mock.patch.object(terminal_module, '_read_until',
+                              return_value=(mock_match, '')) as mock_read_until:
 
-            match = term._query_response(
-                '\x1b[c', DeviceAttribute.RE_RESPONSE, timeout=0.01
-            )
+        match = term._query_response(
+            '\x1b[c', DeviceAttribute.RE_RESPONSE, timeout=0.01
+        )
 
-            mock_read_until.assert_called_once_with(
-                term=term, pattern=DeviceAttribute.RE_RESPONSE, timeout=0.01
-            )
-            mock_ungetch.assert_called_once_with('')
-            assert match is mock_match
+        mock_read_until.assert_called_once_with(
+            term=term, pattern=DeviceAttribute.RE_RESPONSE, timeout=0.01
+        )
+        mock_ungetch.assert_called_once_with('')
+        assert match is mock_match
 
-        assert stream.getvalue() == '\x1b[c'
-    child()
+    assert stream.getvalue() == '\x1b[c'
 
 
 @pytest.mark.parametrize("sequence,h_chars,w_chars,h_pix,w_pix", [
@@ -1075,109 +1003,94 @@ def test_resize_events(sequence, h_chars, w_chars, h_pix, w_pix):
 
 def test_notify_on_resize_context_manager():
     """Test notify_on_resize enables and disables mode correctly."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        mock_response = mock.Mock()
-        mock_response.supported = True
-        mock_response.enabled = False
+    mock_response = mock.Mock()
+    mock_response.supported = True
+    mock_response.enabled = False
 
-        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
-                mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
-                mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
+    with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
+            mock.patch.object(term, '_dec_mode_set_enabled') as mock_set_enabled, \
+            mock.patch.object(term, '_dec_mode_set_disabled') as mock_set_disabled:
 
-            with term.notify_on_resize():
-                mock_set_enabled.assert_called_once_with(DecPrivateMode.IN_BAND_WINDOW_RESIZE)
-                mock_set_enabled.reset_mock()
+        with term.notify_on_resize():
+            mock_set_enabled.assert_called_once_with(DecPrivateMode.IN_BAND_WINDOW_RESIZE)
+            mock_set_enabled.reset_mock()
 
-            mock_set_disabled.assert_called_once_with(DecPrivateMode.IN_BAND_WINDOW_RESIZE)
-    child()
+        mock_set_disabled.assert_called_once_with(DecPrivateMode.IN_BAND_WINDOW_RESIZE)
 
 
 def test_notify_on_resize_cache_cleared_on_exit():
     """Test preferred size cache is cleared when exiting context."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        mock_response = mock.Mock()
-        mock_response.supported = True
-        mock_response.enabled = False
+    mock_response = mock.Mock()
+    mock_response.supported = True
+    mock_response.enabled = False
 
-        with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
-                mock.patch.object(term, '_dec_mode_set_enabled'), \
-                mock.patch.object(term, '_dec_mode_set_disabled'):
+    with mock.patch.object(term, 'get_dec_mode', return_value=mock_response), \
+            mock.patch.object(term, '_dec_mode_set_enabled'), \
+            mock.patch.object(term, '_dec_mode_set_disabled'):
 
-            # Set cache inside context
-            with term.notify_on_resize():
-                from blessed.terminal import WINSZ
-                term._preferred_size_cache = WINSZ(ws_row=50, ws_col=100,
-                                                   ws_xpixel=500, ws_ypixel=1000)
-                assert term._preferred_size_cache is not None
+        # Set cache inside context
+        with term.notify_on_resize():
+            from blessed.terminal import WINSZ
+            term._preferred_size_cache = WINSZ(ws_row=50, ws_col=100,
+                                               ws_xpixel=500, ws_ypixel=1000)
+            assert term._preferred_size_cache is not None
 
-            # Cache should be cleared after exit
-            assert term._preferred_size_cache is None
-    child()
+        # Cache should be cleared after exit
+        assert term._preferred_size_cache is None
 
 
 def test_height_width_use_preferred_cache():
     """Test height and width properties use preferred cache."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        from blessed.terminal import WINSZ
-        term._preferred_size_cache = WINSZ(ws_row=42, ws_col=123,
-                                           ws_xpixel=2460, ws_ypixel=840)
+    from blessed.terminal import WINSZ
+    term._preferred_size_cache = WINSZ(ws_row=42, ws_col=123,
+                                       ws_xpixel=2460, ws_ypixel=840)
 
-        assert term.height == 42
-        assert term.width == 123
-        assert term.pixel_height == 840
-        assert term.pixel_width == 2460
-    child()
+    assert term.height == 42
+    assert term.width == 123
+    assert term.pixel_height == 840
+    assert term.pixel_width == 2460
 
 
 def test_sixel_uses_preferred_cache():
     """Test get_sixel_height_and_width uses pixel dimensions from cache."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        from blessed.terminal import WINSZ
-        term._preferred_size_cache = WINSZ(ws_row=40, ws_col=100,
-                                           ws_xpixel=2000, ws_ypixel=800)
+    from blessed.terminal import WINSZ
+    term._preferred_size_cache = WINSZ(ws_row=40, ws_col=100,
+                                       ws_xpixel=2000, ws_ypixel=800)
 
-        height, width = term.get_sixel_height_and_width()
-        assert height == 800
-        assert width == 2000
-    child()
+    height, width = term.get_sixel_height_and_width()
+    assert height == 800
+    assert width == 2000
 
 
 def test_sixel_ignores_zero_pixel_cache():
     """Test get_sixel_height_and_width falls back when pixel dimensions are zero."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
 
-        from blessed.terminal import WINSZ
-        term._preferred_size_cache = WINSZ(ws_row=40, ws_col=100,
-                                           ws_xpixel=0, ws_ypixel=0)
+    from blessed.terminal import WINSZ
+    term._preferred_size_cache = WINSZ(ws_row=40, ws_col=100,
+                                       ws_xpixel=0, ws_ypixel=0)
 
-        # Set XTSMGRAPHICS cache to verify fallback
-        term._xtsmgraphics_cache = (1000, 2500)
-        term._xtwinops_cache = (1000, 2500)
+    # Set XTSMGRAPHICS cache to verify fallback
+    term._xtsmgraphics_cache = (1000, 2500)
+    term._xtwinops_cache = (1000, 2500)
 
-        height, width = term.get_sixel_height_and_width()
-        # Should use xtsmgraphics cache instead of preferred cache with zeros
-        assert height == 1000
-        assert width == 2500
-    child()
+    height, width = term.get_sixel_height_and_width()
+    # Should use xtsmgraphics cache instead of preferred cache with zeros
+    assert height == 1000
+    assert width == 2500
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="Windows uses native console resize API")
@@ -1187,30 +1100,24 @@ def test_sixel_ignores_zero_pixel_cache():
 ])
 def test_does_inband_resize(response_value, expected):
     """Test does_inband_resize returns expected value based on mode support."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
 
-        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(
-            mode_num, response_value)
+    term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(
+        mode_num, response_value)
 
-        result = term.does_inband_resize()
-        assert result is expected
-        assert stream.getvalue() == ''
-    child()
+    result = term.does_inband_resize()
+    assert result is expected
+    assert stream.getvalue() == ''
 
 
 def test_does_inband_resize_not_a_tty():
     """Test does_inband_resize returns False when not a TTY."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True, is_a_tty=False)
+    term = TestTerminal(stream=io.StringIO(), force_styling=True, is_a_tty=False)
 
-        result = term.does_inband_resize(timeout=0.01)
-        assert result is False
-    child()
+    result = term.does_inband_resize(timeout=0.01)
+    assert result is False
 
 
 def test_inkey_updates_preferred_cache_on_resize_event():
@@ -1273,18 +1180,15 @@ def test_does_inband_resize_no_styling():
 ])
 def test_does_dec_mode_convenience(method_name, response_value, expected):
     """Boolean DEC mode convenience methods return correct values."""
-    @as_subprocess
-    def child():
-        stream = io.StringIO()
-        term = TestTerminal(stream=stream, force_styling=True)
-        term._is_a_tty = True
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
 
-        term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(
-            mode_num, response_value)
+    term.get_dec_mode = lambda mode_num, timeout: DecModeResponse(
+        mode_num, response_value)
 
-        result = getattr(term, method_name)()
-        assert result is expected
-    child()
+    result = getattr(term, method_name)()
+    assert result is expected
 
 
 @pytest.mark.parametrize("method_name", [
@@ -1295,9 +1199,6 @@ def test_does_dec_mode_convenience(method_name, response_value, expected):
 ])
 def test_does_dec_mode_convenience_not_a_tty(method_name):
     """Boolean DEC mode convenience methods return False when not a TTY."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True, is_a_tty=False)
-        result = getattr(term, method_name)(timeout=0.01)
-        assert result is False
-    child()
+    term = TestTerminal(stream=io.StringIO(), force_styling=True, is_a_tty=False)
+    result = getattr(term, method_name)(timeout=0.01)
+    assert result is False

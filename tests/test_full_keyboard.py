@@ -136,26 +136,20 @@ def test_kbhit_interrupted_nonetype():
 
 def test_kbhit_no_kb():
     """kbhit() always immediately returns False without a keyboard."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO())
-        stime = time.time()
-        assert term._keyboard_fd is None
-        assert not term.kbhit(timeout=0.3)
-        assert_elapsed_range_ms(stime, 25, 80)
-    child()
+    term = TestTerminal(stream=StringIO())
+    stime = time.time()
+    assert term._keyboard_fd is None
+    assert not term.kbhit(timeout=0.3)
+    assert_elapsed_range_ms(stime, 25, 80)
 
 
 def test_kbhit_no_tty():
     """kbhit() returns False immediately if HAS_TTY is False"""
-    @as_subprocess
-    def child():
-        with mock.patch('blessed.terminal.HAS_TTY', False):
-            term = TestTerminal(stream=StringIO())
-            stime = time.time()
-            assert term.kbhit(timeout=1.1) is False
-            assert math.floor(time.time() - stime) == 0
-    child()
+    with mock.patch('blessed.terminal.HAS_TTY', False):
+        term = TestTerminal(stream=StringIO())
+        stime = time.time()
+        assert term.kbhit(timeout=1.1) is False
+        assert math.floor(time.time() - stime) == 0
 
 
 @pytest.mark.parametrize(
@@ -425,14 +419,11 @@ def test_flushinp_timeout_with_continuous_input():
 
 def test_get_location_0s():
     """0-second get_location call without response."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO())
-        stime = time.time()
-        y, x = term.get_location(timeout=0)
-        assert math.floor(time.time() - stime) == 0.0
-        assert (y, x) == (-1, -1)
-    child()
+    term = TestTerminal(stream=StringIO())
+    stime = time.time()
+    y, x = term.get_location(timeout=0)
+    assert math.floor(time.time() - stime) == 0.0
+    assert (y, x) == (-1, -1)
 
 
 # jquast: having trouble with these tests intermittently locking up on Mac OS X 10.15.1,
@@ -495,17 +486,14 @@ def test_get_location_0s_reply_via_ungetch_under_raw():
 
 def test_get_location_0s_reply_via_ungetch():
     """0-second get_location call with response."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        stime = time.time()
-        # monkey patch in an invalid response !
-        term.ungetch('\x1b[10;10R')
+    term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
+    stime = time.time()
+    # monkey patch in an invalid response !
+    term.ungetch('\x1b[10;10R')
 
-        y, x = term.get_location(timeout=0.01)
-        assert math.floor(time.time() - stime) == 0.0
-        assert (y, x) == (9, 9)
-    child()
+    y, x = term.get_location(timeout=0.01)
+    assert math.floor(time.time() - stime) == 0.0
+    assert (y, x) == (9, 9)
 
 
 def test_get_location_0s_nonstandard_u6():
@@ -513,50 +501,41 @@ def test_get_location_0s_nonstandard_u6():
     # local
     from blessed.formatters import ParameterizingString
 
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        stime = time.time()
-        # monkey patch in an invalid response !
-        term.ungetch('\x1b[10;10R')
+    term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
+    stime = time.time()
+    # monkey patch in an invalid response !
+    term.ungetch('\x1b[10;10R')
 
-        with mock.patch.object(term, 'u6') as mock_u6:
-            mock_u6.return_value = ParameterizingString('\x1b[%d;%dR', term.normal, 'u6')
-            y, x = term.get_location(timeout=0.01)
-        assert math.floor(time.time() - stime) == 0.0
-        assert (y, x) == (10, 10)
-    child()
+    with mock.patch.object(term, 'u6') as mock_u6:
+        mock_u6.return_value = ParameterizingString('\x1b[%d;%dR', term.normal, 'u6')
+        y, x = term.get_location(timeout=0.01)
+    assert math.floor(time.time() - stime) == 0.0
+    assert (y, x) == (10, 10)
 
 
 def test_get_location_styling_indifferent():
     """Ensure get_location() behavior is the same regardless of styling"""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        term.ungetch('\x1b[10;10R')
-        y, x = term.get_location(timeout=0.01)
-        assert (y, x) == (9, 9)
+    term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
+    term.ungetch('\x1b[10;10R')
+    y, x = term.get_location(timeout=0.01)
+    assert (y, x) == (9, 9)
 
-        term = TestTerminal(stream=StringIO(), force_styling=False, is_a_tty=True)
-        term.ungetch('\x1b[10;10R')
-        y, x = term.get_location(timeout=0.01)
-        assert (y, x) == (9, 9)
-    child()
+    term = TestTerminal(stream=StringIO(), force_styling=False, is_a_tty=True)
+    term.ungetch('\x1b[10;10R')
+    y, x = term.get_location(timeout=0.01)
+    assert (y, x) == (9, 9)
 
 
 def test_get_location_timeout():
     """0-second get_location call with response."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO())
-        stime = time.time()
-        # monkey patch in an invalid response !
-        term.ungetch('\x1b[0n')
+    term = TestTerminal(stream=StringIO())
+    stime = time.time()
+    # monkey patch in an invalid response !
+    term.ungetch('\x1b[0n')
 
-        y, x = term.get_location(timeout=0.2)
-        assert math.floor(time.time() - stime) == 0.0
-        assert (y, x) == (-1, -1)
-    child()
+    y, x = term.get_location(timeout=0.2)
+    assert math.floor(time.time() - stime) == 0.0
+    assert (y, x) == (-1, -1)
 
 
 @pytest.mark.parametrize('cpr1,cpr2,expected', [
@@ -567,24 +546,18 @@ def test_get_location_timeout():
 ])
 def test_detect_ambiguous_width(cpr1, cpr2, expected):
     """Test detect_ambiguous_width with various CPR responses."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        term.ungetch(cpr1)
-        term.ungetch(cpr2)
-        result = term.detect_ambiguous_width(timeout=0.1, fallback=1)
-        assert result == expected
-    child()
+    term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
+    term.ungetch(cpr1)
+    term.ungetch(cpr2)
+    result = term.detect_ambiguous_width(timeout=0.1, fallback=1)
+    assert result == expected
 
 
 def test_detect_ambiguous_width_not_a_tty():
     """Test detect_ambiguous_width returns fallback when not a TTY."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True)
-        term._is_a_tty = False
-        assert term.detect_ambiguous_width(timeout=0.01, fallback=42) == 42
-    child()
+    term = TestTerminal(stream=StringIO(), force_styling=True)
+    term._is_a_tty = False
+    assert term.detect_ambiguous_width(timeout=0.01, fallback=42) == 42
 
 
 def test_detect_ambiguous_width_first_timeout():
@@ -619,112 +592,88 @@ def test_detect_ambiguous_width_second_timeout():
 
 def test_get_fgcolor_0s():
     """0-second get_fgcolor call without response."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO())
-        stime = time.time()
-        rgb = term.get_fgcolor(timeout=0)
-        assert math.floor(time.time() - stime) == 0.0
-        assert rgb == (-1, -1, -1)
-    child()
+    term = TestTerminal(stream=StringIO())
+    stime = time.time()
+    rgb = term.get_fgcolor(timeout=0)
+    assert math.floor(time.time() - stime) == 0.0
+    assert rgb == (-1, -1, -1)
 
 
 @pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
 def test_get_fgcolor_0s_reply_via_ungetch(terminator):
     """0-second get_fgcolor call with BEL or ST terminated response."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        stime = time.time()
-        term.ungetch('\x1b]10;rgb:a0/52/2d' + terminator)  # sienna
+    term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
+    stime = time.time()
+    term.ungetch('\x1b]10;rgb:a0/52/2d' + terminator)  # sienna
 
-        rgb = term.get_fgcolor(timeout=0.01, bits=8)
-        assert math.floor(time.time() - stime) == 0.0
-        assert rgb == (160, 82, 45)
-    child()
+    rgb = term.get_fgcolor(timeout=0.01, bits=8)
+    assert math.floor(time.time() - stime) == 0.0
+    assert rgb == (160, 82, 45)
 
 
 @pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
 def test_get_fgcolor_requires_styling(terminator):
     """get_fgcolor returns (-1, -1, -1) when does_styling is False."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        term.ungetch('\x1b]10;rgb:d2/b4/8c' + terminator)  # tan
-        rgb = term.get_fgcolor(timeout=0.01, bits=8)
-        assert rgb == (210, 180, 140)
+    term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
+    term.ungetch('\x1b]10;rgb:d2/b4/8c' + terminator)  # tan
+    rgb = term.get_fgcolor(timeout=0.01, bits=8)
+    assert rgb == (210, 180, 140)
 
-        term = TestTerminal(stream=StringIO(), force_styling=False, is_a_tty=True)
-        rgb = term.get_fgcolor(timeout=0.01, bits=8)
-        assert rgb == (-1, -1, -1)
-    child()
+    term = TestTerminal(stream=StringIO(), force_styling=False, is_a_tty=True)
+    rgb = term.get_fgcolor(timeout=0.01, bits=8)
+    assert rgb == (-1, -1, -1)
 
 
 @pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
 def test_get_fgcolor_16bit_reply_via_ungetch(terminator):
     """get_fgcolor call with default 16-bit response."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        term.ungetch('\x1b]10;rgb:a099/5277/2d44' + terminator)  # sienna-ish
-        rgb = term.get_fgcolor(timeout=0.01)
-        assert rgb == (0xa099, 0x5277, 0x2d44)
-    child()
+    term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
+    term.ungetch('\x1b]10;rgb:a099/5277/2d44' + terminator)  # sienna-ish
+    rgb = term.get_fgcolor(timeout=0.01)
+    assert rgb == (0xa099, 0x5277, 0x2d44)
 
 
 def test_get_bgcolor_0s():
     """0-second get_bgcolor call without response."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO())
-        stime = time.time()
-        rgb = term.get_bgcolor(timeout=0)
-        assert math.floor(time.time() - stime) == 0.0
-        assert rgb == (-1, -1, -1)
-    child()
+    term = TestTerminal(stream=StringIO())
+    stime = time.time()
+    rgb = term.get_bgcolor(timeout=0)
+    assert math.floor(time.time() - stime) == 0.0
+    assert rgb == (-1, -1, -1)
 
 
 @pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
 def test_get_bgcolor_0s_reply_via_ungetch(terminator):
     """0-second get_bgcolor call with BEL or ST terminated response."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        stime = time.time()
-        term.ungetch('\x1b]11;rgb:99/32/cc' + terminator)  # darkorchid
+    term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
+    stime = time.time()
+    term.ungetch('\x1b]11;rgb:99/32/cc' + terminator)  # darkorchid
 
-        rgb = term.get_bgcolor(timeout=0.01, bits=8)
-        assert math.floor(time.time() - stime) == 0.0
-        assert rgb == (153, 50, 204)
-    child()
+    rgb = term.get_bgcolor(timeout=0.01, bits=8)
+    assert math.floor(time.time() - stime) == 0.0
+    assert rgb == (153, 50, 204)
 
 
 @pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
 def test_get_bgcolor_requires_styling(terminator):
     """get_bgcolor returns (-1, -1, -1) when does_styling is False."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        term.ungetch('\x1b]11;rgb:ff/e4/c4' + terminator)  # bisque
-        rgb = term.get_bgcolor(timeout=0.01, bits=8)
-        assert rgb == (255, 228, 196)
+    term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
+    term.ungetch('\x1b]11;rgb:ff/e4/c4' + terminator)  # bisque
+    rgb = term.get_bgcolor(timeout=0.01, bits=8)
+    assert rgb == (255, 228, 196)
 
-        term = TestTerminal(stream=StringIO(), force_styling=False, is_a_tty=True)
-        rgb = term.get_bgcolor(timeout=0.01, bits=8)
-        assert rgb == (-1, -1, -1)
-    child()
+    term = TestTerminal(stream=StringIO(), force_styling=False, is_a_tty=True)
+    rgb = term.get_bgcolor(timeout=0.01, bits=8)
+    assert rgb == (-1, -1, -1)
 
 
 @pytest.mark.parametrize("terminator", ['\x07', '\x1b\\'])
 def test_get_bgcolor_16bit_reply_via_ungetch(terminator):
     """get_bgcolor call with default 16-bit response."""
-    @as_subprocess
-    def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        term.ungetch('\x1b]11;rgb:9988/3255/cc11' + terminator)  # darkorchid-ish
-        rgb = term.get_bgcolor(timeout=0.01)
-        assert rgb == (0x9988, 0x3255, 0xcc11)
-    child()
+    term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
+    term.ungetch('\x1b]11;rgb:9988/3255/cc11' + terminator)  # darkorchid-ish
+    rgb = term.get_bgcolor(timeout=0.01)
+    assert rgb == (0x9988, 0x3255, 0xcc11)
 
 
 def test_detached_stdout():
