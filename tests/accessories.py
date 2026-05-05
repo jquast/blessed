@@ -105,110 +105,14 @@ def init_subproc_coverage(run_note):
 
 
 class as_subprocess():
-    """This helper executes test cases in a child process, avoiding a python-internal bug of
-    _curses: setupterm() may not be called more than once per process."""
-    _CHILD_PID = 0
+    """Thin wrapper that calls the function directly — jinxed has no process-global state."""
     encoding = 'utf8'
 
     def __init__(self, func):
         self.func = func
 
     def __call__(self, *args, **kwargs):
-        # pylint: disable=too-many-locals,too-complex,too-many-branches,too-many-statements
-        if IS_WINDOWS:
-            self.func(*args, **kwargs)
-            return
-
-        pid_testrunner = os.getpid()
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=DeprecationWarning)
-            pid, master_fd = pty.fork()  # pylint: disable=possibly-used-before-assignment
-
-        if pid == self._CHILD_PID:
-            # child process executes function, raises exception
-            # if failed, causing a non-zero exit code, using the
-            # protected _exit() function of ``os``; to prevent the
-            # 'SystemExit' exception from being thrown.
-            cov = init_subproc_coverage(
-                f"@as_subprocess-{os.getpid()};{self.func}(*{args}, **{kwargs})"
-            )
-            try:
-                self.func(*args, **kwargs)
-            except Exception:  # pylint: disable=broad-except
-                e_type, e_value, e_tb = sys.exc_info()
-                o_err = [line.rstrip().encode('utf-8') for line in traceback.format_tb(e_tb)]
-                o_err.append(('-=' * 20).encode('ascii'))
-                o_err.extend([_exc.rstrip().encode('utf-8') for _exc in
-                              traceback.format_exception_only(
-                                  e_type, e_value)])
-                os.write(sys.__stdout__.fileno(), b'\n'.join(o_err))
-                os.close(sys.__stdout__.fileno())
-                os.close(sys.__stderr__.fileno())
-                os.close(sys.__stdin__.fileno())
-                if cov is not None:
-                    cov.stop()
-                    cov.save()
-                os._exit(1)
-            else:
-                if cov is not None:
-                    cov.stop()
-                    cov.save()
-                os._exit(0)
-
-        # detect rare fork in test runner, when bad bugs happen
-        if pid_testrunner != os.getpid():
-            print(f'TEST RUNNER HAS FORKED, {pid_testrunner}=>{os.getpid()}: EXIT', file=sys.stderr)
-            os._exit(1)
-
-        exc_output = ''
-        decoder = codecs.getincrementaldecoder(self.encoding)()
-        while True:
-            try:
-                _exc = os.read(master_fd, 65534)
-            except OSError:
-                # linux EOF
-                break
-            if not _exc:
-                # bsd EOF
-                break
-            exc_output += decoder.decode(_exc)
-
-        # parent process asserts exit code is 0, causing test
-        # to fail if child process raised an exception/assertion
-        # Use non-blocking wait with timeout to detect hung child processes
-        timeout = MAX_SUBPROC_TIME_SECONDS
-        start_time = time.time()
-        status = None
-        while True:
-            pid_result, status = os.waitpid(pid, os.WNOHANG)
-            if pid_result != 0:
-                # Child has exited
-                break
-            if time.time() - start_time > timeout:
-                # Child hasn't exited, it's hung - kill it and report what we know
-                try:
-                    os.kill(pid, signal.SIGKILL)
-                    os.waitpid(pid, 0)  # Clean up zombie
-                except OSError:
-                    pass
-                os.close(master_fd)
-                # Show the output we captured - this likely contains the root cause
-                exc_output_msg = (
-                    f'Child process hung and did not exit within {timeout}s.\n'
-                    f'Output captured from child:\n{"=" * 40}\n{exc_output}\n{"=" * 40}'
-                )
-                raise AssertionError(exc_output_msg)
-            time.sleep(0.05)  # Poll every 50ms
-
-        os.close(master_fd)
-
-        # Display any output written by child process
-        # (esp. any AssertionError exceptions written to stderr).
-        exc_output_msg = f'Output in child process:\n{"=" * 40}\n{exc_output}\n{"=" * 40}'
-        assert exc_output == '', exc_output_msg
-
-        # Also test exit status is non-zero
-        assert os.WEXITSTATUS(status) == 0
+        self.func(*args, **kwargs)
 
 
 def read_until_semaphore(fd, semaphore=RECV_SEMAPHORE, encoding='utf8'):
