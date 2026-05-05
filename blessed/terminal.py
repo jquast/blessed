@@ -16,7 +16,7 @@ import platform
 import warnings
 import contextlib
 import collections
-from typing import IO, Dict, List, Match, Set, Tuple, Union, Optional, Generator, SupportsIndex
+from typing import IO, Set, Dict, List, Match, Tuple, Union, Optional, Generator, SupportsIndex
 
 # 3rd party
 from wcwidth import TextSizing, TextSizingParams

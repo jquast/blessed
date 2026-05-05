@@ -1,18 +1,17 @@
 """
 Lightweight XTGETTCAP query and response parser.
 
-Used during Terminal.__init__ before curses/jinxed is initialized,
-so capabilities gathered from the terminal override the virtual
-terminfo database.  This module has zero dependencies on jinxed,
+Used during Terminal.__init__ before curses/jinxed is initialized, so capabilities gathered from the
+terminal override the virtual terminfo database.  This module has zero dependencies on jinxed,
 curses, or blessed's keyboard infrastructure.
 """
 
+# std imports
 import os
 import re
-import select
 import time
-from typing import Dict, Optional, Tuple
-
+import select
+from typing import Dict, Tuple, Optional
 
 # XTGETTCAP DCS response: DCS <success>+r<hex-name>=<hex-value> ST
 _RE_XTGETTCAP_RESPONSE = re.compile(
@@ -136,9 +135,8 @@ def query_xtgettcap(stream_fd: int, timeout: float = 1.0) -> XtgettcapResponse:
     """
     Spray XTGETTCAP queries and gather responses.
 
-    Writes all capabilities to *stream_fd* in rapid succession (spray),
-    then reads responses (gather).  Uses a trailing CPR query as a fence
-    to detect when all responses have arrived.
+    Writes all capabilities to *stream_fd* in rapid succession (spray), then reads responses
+    (gather).  Uses a trailing CPR query as a fence to detect when all responses have arrived.
 
     :arg int stream_fd: File descriptor for terminal output (and input).
     :arg float timeout: Per-read timeout in seconds.
