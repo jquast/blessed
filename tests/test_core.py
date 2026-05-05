@@ -125,17 +125,16 @@ def test_number_of_colors_without_tty():
 def test_number_of_colors_with_tty():
     """test ``number_of_colors`` 0, 8, and 256."""
     def child_256():
-        t = TestTerminal()
+        t = TestTerminal(force_styling=True)
         assert t.number_of_colors == 256
 
     def child_8():
-        # 'ansi' on freebsd returns 0 colors. We use 'cons25', compatible with its kernel tty.c
         kind = 'cons25' if platform.system().lower() == 'freebsd' else 'ansi'
-        t = TestTerminal(kind=kind)
+        t = TestTerminal(kind=kind, force_styling=True)
         assert t.number_of_colors == 8
 
     def child_0():
-        t = TestTerminal(kind='vt220')
+        t = TestTerminal(kind='vt220', force_styling=True)
         assert t.number_of_colors == 0
 
     child_0()
@@ -476,7 +475,7 @@ def test_termcap_repr():
     def child():
         # local
         import blessed
-        term = blessed.Terminal(given_ttype, use_xtgettcap=False)
+        term = TestTerminal(kind=given_ttype, force_styling=True)
         given = repr(term.caps[given_capname])
         assert given in expected
 
