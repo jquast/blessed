@@ -315,20 +315,13 @@ def get_proxy_string(term: 'Terminal', attr: str) -> Optional[ParameterizingProx
     :rtype: None or :class:`ParameterizingProxyString`.
     :returns: :class:`ParameterizingProxyString` for some attributes
         of some terminal types that support it, where the terminfo(5)
-        database would otherwise come up empty, such as ``move_x``
-        attribute for ``term.kind`` of ``screen``.  Otherwise, None.
+        database would otherwise come up empty, such as ``civis``
+        or ``sc``/``rc`` for ``term.kind`` of ``ansi``.  Otherwise, None.
     """
-    # normalize 'screen-256color', or 'ansi.sys' to its basic names
-    term_kind = next(iter(_kind for _kind in ('screen', 'ansi',)
+    # normalize 'ansi.sys' to its basic name 'ansi'
+    term_kind = next(iter(_kind for _kind in ('ansi',)
                           if term.kind.startswith(_kind)), term.kind)
     _proxy_table: Dict[str, Dict[str, object]] = {  # pragma: no cover
-        'screen': {
-            # proxy move_x/move_y for 'screen' terminal type, used by tmux(1).
-            'hpa': ParameterizingProxyString(
-                ('\x1b[{0}G', lambda *arg: (arg[0] + 1,)), term.normal, attr),
-            'vpa': ParameterizingProxyString(
-                ('\x1b[{0}d', lambda *arg: (arg[0] + 1,)), term.normal, attr),
-        },
         'ansi': {
             # proxy show/hide cursor for 'ansi' terminal type.  There is some
             # demand for a richly working ANSI terminal type for some reason.
@@ -336,10 +329,6 @@ def get_proxy_string(term: 'Terminal', attr: str) -> Optional[ParameterizingProx
                 ('\x1b[?25l', lambda *arg: ()), term.normal, attr),
             'cnorm': ParameterizingProxyString(
                 ('\x1b[?25h', lambda *arg: ()), term.normal, attr),
-            'hpa': ParameterizingProxyString(
-                ('\x1b[{0}G', lambda *arg: (arg[0] + 1,)), term.normal, attr),
-            'vpa': ParameterizingProxyString(
-                ('\x1b[{0}d', lambda *arg: (arg[0] + 1,)), term.normal, attr),
             'sc': '\x1b[s',
             'rc': '\x1b[u',
         }

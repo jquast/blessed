@@ -15,6 +15,7 @@ from typing import Dict
 # local
 from blessed import Terminal
 from blessed.dec_modes import DecModeResponse
+# local
 from .conftest import IS_WINDOWS
 
 # 3rd party
@@ -35,12 +36,7 @@ def TestTerminal(is_a_tty=None, **kwargs):  # type: (...) -> Terminal
     """
     Create a Terminal instance with optional is_a_tty override.
 
-    'is_a_tty' is useful to pass "is a tty" tests without pty_test.
-    A fake successful XTGETTCAP response is injected by default, built
-    from jinxed's xterm-256color terminfo database, so no real XTGETTCAP
-    I/O occurs during Terminal.__init__.
-    Pass _xtgettcap_data to override the injected response, or
-    _xtgettcap_data=None to force a real probe attempt.
+    'is_a_tty' is useful to pass "is a tty" tests without pty_test
     """
     if 'kind' not in kwargs:
         kwargs['kind'] = test_kind
@@ -103,11 +99,7 @@ def init_subproc_coverage(run_note):
 
 class as_subprocess():
     """This helper executes test cases in a child process, avoiding a python-internal bug of
-    _curses: setupterm() may not be called more than once per process.
-
-    With jinxed replacing curses, there is no longer a process-level setupterm() singleton.
-    This is kept as a PTY-based fork for tests that need real terminal I/O (ioctl, etc.).
-    """
+    _curses: setupterm() may not be called more than once per process."""
     _CHILD_PID = 0
     encoding = 'utf8'
 
@@ -123,20 +115,25 @@ class as_subprocess():
         pid_testrunner = os.getpid()
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
-            pid, master_fd = pty.fork()
+            pid, master_fd = pty.fork()  # pylint: disable=possibly-used-before-assignment
 
         if pid == self._CHILD_PID:
+            # child process executes function, raises exception
+            # if failed, causing a non-zero exit code, using the
+            # protected _exit() function of ``os``; to prevent the
+            # 'SystemExit' exception from being thrown.
             cov = init_subproc_coverage(
                 f"@as_subprocess-{os.getpid()};{self.func}(*{args}, **{kwargs})"
             )
             try:
                 self.func(*args, **kwargs)
-            except Exception:
+            except Exception:  # pylint: disable=broad-except
                 e_type, e_value, e_tb = sys.exc_info()
                 o_err = [line.rstrip().encode('utf-8') for line in traceback.format_tb(e_tb)]
                 o_err.append(('-=' * 20).encode('ascii'))
                 o_err.extend([_exc.rstrip().encode('utf-8') for _exc in
-                              traceback.format_exception_only(e_type, e_value)])
+                              traceback.format_exception_only(
+                                  e_type, e_value)])
                 os.write(sys.__stdout__.fileno(), b'\n'.join(o_err))
                 os.close(sys.__stdout__.fileno())
                 os.close(sys.__stderr__.fileno())
@@ -151,6 +148,7 @@ class as_subprocess():
                     cov.save()
                 os._exit(0)
 
+        # detect rare fork in test runner, when bad bugs happen
         if pid_testrunner != os.getpid():
             print(f'TEST RUNNER HAS FORKED, {pid_testrunner}=>{os.getpid()}: EXIT', file=sys.stderr)
             os._exit(1)
@@ -161,33 +159,48 @@ class as_subprocess():
             try:
                 _exc = os.read(master_fd, 65534)
             except OSError:
+                # linux EOF
                 break
             if not _exc:
+                # bsd EOF
                 break
             exc_output += decoder.decode(_exc)
 
+        # parent process asserts exit code is 0, causing test
+        # to fail if child process raised an exception/assertion
+        # Use non-blocking wait with timeout to detect hung child processes
         timeout = MAX_SUBPROC_TIME_SECONDS
         start_time = time.time()
         status = None
         while True:
             pid_result, status = os.waitpid(pid, os.WNOHANG)
             if pid_result != 0:
+                # Child has exited
                 break
             if time.time() - start_time > timeout:
+                # Child hasn't exited, it's hung - kill it and report what we know
                 try:
                     os.kill(pid, signal.SIGKILL)
-                    os.waitpid(pid, 0)
+                    os.waitpid(pid, 0)  # Clean up zombie
                 except OSError:
                     pass
                 os.close(master_fd)
-                raise AssertionError(
+                # Show the output we captured - this likely contains the root cause
+                exc_output_msg = (
                     f'Child process hung and did not exit within {timeout}s.\n'
-                    f'Output captured from child:\n{"=" * 40}\n{exc_output}\n{"=" * 40}')
-            time.sleep(0.05)
+                    f'Output captured from child:\n{"=" * 40}\n{exc_output}\n{"=" * 40}'
+                )
+                raise AssertionError(exc_output_msg)
+            time.sleep(0.05)  # Poll every 50ms
 
         os.close(master_fd)
-        exc_output_msg = f'Output in child process:\n{exc_output}'
+
+        # Display any output written by child process
+        # (esp. any AssertionError exceptions written to stderr).
+        exc_output_msg = f'Output in child process:\n{"=" * 40}\n{exc_output}\n{"=" * 40}'
         assert exc_output == '', exc_output_msg
+
+        # Also test exit status is non-zero
         assert os.WEXITSTATUS(status) == 0
 
 
@@ -256,31 +269,18 @@ def echo_off(fd):
         yield
 
 
-def unicode_cap(cap, term=None):
+def unicode_cap(cap, term):
     """Return the result of ``tigetstr`` except as Unicode."""
-    if term is not None:
-        val = term._jinxed_term.tigetstr(cap)
-    else:
-        try:
-            val = jinxed.tigetstr(cap)
-        except jinxed.error:
-            val = None
-
+    val = term._jinxed_term.tigetstr(cap)
     return val.decode('latin1') if val else ''
 
 
-def unicode_parm(cap, *parms, term=None):
+def unicode_parm(cap, term, *parms):
     """Return the result of ``tparm(tigetstr())`` except as Unicode."""
-    if term is not None:
-        cap = term._jinxed_term.tigetstr(cap)
-    else:
+    cap_str = term._jinxed_term.tigetstr(cap)
+    if cap_str:
         try:
-            cap = jinxed.tigetstr(cap)
-        except jinxed.error:
-            cap = None
-    if cap:
-        try:
-            val = jinxed.tparm(cap, *parms)
+            val = jinxed.tparm(cap_str, *parms)
         except jinxed.error:
             val = None
         if val:

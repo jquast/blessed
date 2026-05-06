@@ -262,8 +262,6 @@ XTGETTCAP_CAPABILITIES = (
     ("csr", "Change scroll region"),
     ("smam", "Enable line wrap"),
     ("rmam", "Disable line wrap"),
-    ("smacs", "Enter alt charset"),
-    ("rmacs", "Exit alt charset"),
     ("flash", "Flash screen"),
     ("bel", "Bell"),
     ("cr", "Carriage return"),
