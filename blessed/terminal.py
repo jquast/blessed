@@ -288,7 +288,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
             # Step 3: Inject XTGETTCAP overrides into jinxed
             if self._xtgettcap_cache is not None and self._does_styling:
-                self._jinxed_term.apply_capabilities(
+                self._jinxed_term.overlay_capabilities(
                     **self._xtgettcap_cache.make_jinxed_capabilities())
 
         # Step 4: Initialize keyboard infrastructure
