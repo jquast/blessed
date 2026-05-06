@@ -14,7 +14,8 @@ import os
 import re
 import time
 import select
-from typing import Dict
+import termios
+from typing import Dict, Optional
 
 # local
 from ._capabilities import XTGETTCAP_CAPABILITIES, TermcapResponse
@@ -24,7 +25,11 @@ _RE_CPR_BYTES = re.compile(rb'\x1b\[([0-9]+);([0-9]+)R')
 
 
 def _read_response(fd: int, timeout: float) -> str:
-    """Read bytes from fd until CPR arrives or timeout; decode once at end."""
+    """Read bytes from fd until CPR arrives or timeout; decode once at end.
+
+    The terminal must already be in raw (non-canonical) mode;
+    this is the caller's responsibility.
+    """
     stime = time.time()
     data = b''
     while True:
@@ -46,17 +51,49 @@ def _read_response(fd: int, timeout: float) -> str:
     return data.decode('latin-1', errors='replace')
 
 
-def query_xtgettcap(stream_fd: int, timeout: float = 1.0) -> TermcapResponse:
+def query_xtgettcap(stream_fd: int, timeout: float = 1.0,
+                    input_fd: Optional[int] = None) -> TermcapResponse:
     """
     Spray XTGETTCAP queries and gather responses.
 
     Writes all capabilities to *stream_fd* in rapid succession (spray), then reads responses
-    (gather).  Uses a trailing CPR query as a fence to detect when all responses have arrived.
+    from *input_fd* (gather).  Uses a trailing CPR query as a fence to detect when all
+    responses have arrived.
 
-    :arg int stream_fd: File descriptor for terminal output (and input).
+    :arg int stream_fd: File descriptor for terminal output (write queries).
     :arg float timeout: Per-read timeout in seconds.
+    :arg int input_fd: File descriptor for terminal input (read responses).
+        When omitted or ``None``, falls back to *stream_fd*.
     :returns: Parsed response with discovered capabilities.
     """
+    if input_fd is None:
+        input_fd = stream_fd
+
+    # Set terminal to raw (non-canonical, no echo) so os.read returns
+    # bytes immediately and does not echo them back to the screen.
+    # XTGETTCAP/CPR responses do not contain newlines, so canonical
+    # mode would buffer them indefinitely; ECHO would leak them.
+    try:
+        saved_attrs = termios.tcgetattr(input_fd)
+        raw_attrs = termios.tcgetattr(input_fd)
+        raw_attrs[3] &= ~(termios.ICANON | termios.ECHO)
+        raw_attrs[6][termios.VMIN] = 1
+        raw_attrs[6][termios.VTIME] = 0
+        termios.tcsetattr(input_fd, termios.TCSANOW, raw_attrs)
+        was_raw = True
+    except termios.error:
+        was_raw = False
+
+    try:
+        return _query_xtgettcap_impl(stream_fd, input_fd, timeout)
+    finally:
+        if was_raw:
+            termios.tcsetattr(input_fd, termios.TCSANOW, saved_attrs)
+
+
+def _query_xtgettcap_impl(stream_fd: int, input_fd: int,
+                          timeout: float) -> TermcapResponse:
+    """Core XTGETTCAP query logic (terminal already in raw mode)."""
     capabilities: Dict[str, str] = {}
 
     # Phase 1: Probe with a single capability to check support.
@@ -64,7 +101,7 @@ def query_xtgettcap(stream_fd: int, timeout: float = 1.0) -> TermcapResponse:
     os.write(stream_fd,
              f'\x1bP+q{TermcapResponse.hex_encode(probe_cap)}\x1b\\'.encode())
     os.write(stream_fd, b'\x1b[6n')  # CPR fence
-    raw = _read_response(stream_fd, timeout)
+    raw = _read_response(input_fd, timeout)
 
     if not raw:
         return TermcapResponse(supported=False)
@@ -84,7 +121,7 @@ def query_xtgettcap(stream_fd: int, timeout: float = 1.0) -> TermcapResponse:
         os.write(stream_fd,
                  f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\'.encode())
     os.write(stream_fd, b'\x1b[6n')  # CPR fence
-    raw = _read_response(stream_fd, timeout)
+    raw = _read_response(input_fd, timeout)
 
     if raw:
         capabilities.update(TermcapResponse.parse_capabilities(raw))

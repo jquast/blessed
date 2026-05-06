@@ -2,6 +2,9 @@
 # std imports
 import io
 import os
+import select
+import termios
+import time
 
 # 3rd party
 import pytest
@@ -11,6 +14,7 @@ from unittest import mock
 from blessed._capabilities import Decrqss
 from blessed._capabilities import TermcapResponse, ITerm2Capabilities
 from blessed.terminal import Terminal
+from blessed.xtgettcap import query_xtgettcap
 from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, as_subprocess, pty_test
 
@@ -232,6 +236,76 @@ class TestGetXtgettcap:
 
         assert term.does_xtgettcap() is False
 
+    def test_caps_all_in_cache_returns_cached(self):
+        """caps= with all names already in cache returns cache as-is."""
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        cached = TermcapResponse(supported=True,
+                                 capabilities={'TN': 'xterm', 'RV': '1.0'})
+        term._xtgettcap_cache = cached
+        result = term.get_xtgettcap(caps=['RV'])
+        assert result is cached
+
+    def test_caps_incremental_queries_missing(self):
+        """caps= with names absent from cache queries only missing ones."""
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._xtgettcap_cache = TermcapResponse(
+            supported=True, capabilities={'TN': 'xterm'})
+        old_cache = term._xtgettcap_cache
+        # Inject response for the missing cap: RV=1.0 + CPR fence
+        hex_rv = TermcapResponse.hex_encode('RV')
+        term.ungetch(
+            f'\x1bP1+r{hex_rv}=312e30\x1b\\'
+            '\x1b[10;20R')
+        result = term.get_xtgettcap(caps=['RV'], timeout=0.1)
+        assert 'RV' not in old_cache.capabilities     # wasn't there before
+        assert result['TN'] == 'xterm'                # preserved from cache
+        assert result['RV'] == '1.0'                  # newly queried
+        assert 'RV' in term._xtgettcap_cache.capabilities  # cache updated
+
+    def test_caps_force_queries_all(self):
+        """force=True with caps= queries everything in single batch."""
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._xtgettcap_cache = TermcapResponse(
+            supported=True, capabilities={'TN': 'old'})
+        # force=True sprays standard + extra caps, reads responses
+        hex_tn = TermcapResponse.hex_encode('TN')
+        hex_rv = TermcapResponse.hex_encode('RV')
+        term.ungetch(
+            f'\x1bP1+r{hex_tn}=787465726d\x1b\\'
+            f'\x1bP1+r{hex_rv}=312e30\x1b\\'
+            '\x1b[10;20R')
+        result = term.get_xtgettcap(timeout=0.1, force=True, caps=['RV'])
+        assert result['TN'] == 'xterm'
+        assert result['RV'] == '1.0'
+
+    def test_caps_ignores_sticky_failure(self):
+        """caps= with sticky failure still attempts query."""
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._xtgettcap_cache = None
+        term._xtgettcap_first_query_failed = True
+        # Inject DCS response for RV + CPR (probe is skipped when
+        # cache is None but extra caps are requested and sticky is set:
+        # we go straight to probe+batch).
+        hex_tn = TermcapResponse.hex_encode('TN')
+        hex_rv = TermcapResponse.hex_encode('RV')
+        term.ungetch(
+            f'\x1bP1+r{hex_tn}=787465726d\x1b\\'
+            f'\x1bP1+r{hex_rv}=312e30\x1b\\'
+            '\x1b[10;20R'
+            '\x1b[11;21R')
+        result = term.get_xtgettcap(timeout=0.1, caps=['RV'])
+        assert result is not None
+        assert result['TN'] == 'xterm'
+        assert result['RV'] == '1.0'
+
 
 class TestStyledUnderlines:
     """Terminal.does_styled_underlines() and does_colored_underlines()."""
@@ -437,11 +511,14 @@ def test_get_xtgettcap_full_success():
 
 @pytestmark_pty
 def test_get_xtgettcap_probe_failure():
-    """Phase 1 probe failure sets sticky flag and writes clear_eol."""
+    """Phase 1 probe failure sets sticky flag."""
     def child(term):
-        # Only CPR, no DCS response -- probe fails
+        # Clear the injected cache so we exercise the real probe path
+        term._xtgettcap_cache = None
+        term._xtgettcap_first_query_failed = False
+        # Inject only CPR, no DCS response: probe fails
         term.ungetch('\x1b[10;20R')
-        result = term.get_xtgettcap(timeout=0.1, force=True)
+        result = term.get_xtgettcap(timeout=0.1)
         assert result is None
         assert term._xtgettcap_first_query_failed is True
         return b'OK'
@@ -899,6 +976,70 @@ def test_get_decrqss_invalid():
     assert 'OK' in output
 
 
+# -- init-time XTGETTCAP PTY integration tests ---------------------------------------
+
+
+@pytestmark_pty
+def test_terminal_init_xtgettcap_success():
+    """Terminal() init with real XTGETTCAP probe and batch succeeds."""
+    def parent(master_fd):
+        # Phase 1: wait for probe DCS +q and CPR, then respond
+        data = b''
+        stime = time.time()
+        while b'\x1b[6n' not in data:
+            remaining = 2.0 - (time.time() - stime)
+            if remaining <= 0:
+                break
+            ready, _, _ = select.select([master_fd], [], [], remaining)
+            if ready:
+                data += os.read(master_fd, 4096)
+        os.write(master_fd, b'\x1bP1+r544e=787465726d\x1b\\')
+        os.write(master_fd, b'\x1b[10;20R')
+        # Phase 2: wait for batch queries + CPR, then respond
+        data = b''
+        stime = time.time()
+        while b'\x1b[6n' not in data:
+            remaining = 2.0 - (time.time() - stime)
+            if remaining <= 0:
+                break
+            ready, _, _ = select.select([master_fd], [], [], remaining)
+            if ready:
+                data += os.read(master_fd, 4096)
+        os.write(master_fd, b'\x1bP1+r436f=323536\x1b\\')
+        os.write(master_fd, b'\x1b[11;21R')
+
+    def child(term):
+        assert term._xtgettcap_cache is not None
+        assert term._xtgettcap_cache.supported is True
+        assert term._xtgettcap_cache['TN'] == 'xterm'
+        assert term._xtgettcap_cache['Co'] == '256'
+        # Verify no stray input leaked after probe
+        with term.cbreak():
+            leaked = term.inkey(timeout=0)
+            assert not leaked
+        return b'OK'
+
+    output = pty_test(child, parent,
+                      test_name='test_terminal_init_xtgettcap_success',
+                      _xtgettcap_data=None)
+    assert 'OK' in output
+
+
+@pytestmark_pty
+def test_terminal_init_xtgettcap_timeout():
+    """Terminal() init with XTGETTCAP probe that times out."""
+
+    def child(term):
+        assert term._xtgettcap_cache is not None
+        assert term._xtgettcap_cache.supported is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_terminal_init_xtgettcap_timeout',
+                      _xtgettcap_data=None)
+    assert 'OK' in output
+
+
 @pytest.mark.parametrize('init_descriptor,query_side_effect,expected', [
     (999, None, None),
     (999, OSError, None),
@@ -998,3 +1139,27 @@ def test_force_bypasses_cache(method, capabilities):
         supported=True, capabilities=capabilities)
     result = getattr(term, method)(timeout=0.01, force=True)
     assert result is False
+
+
+def test_query_xtgettcap_input_fd_fallback():
+    """query_xtgettcap defaults input_fd to stream_fd when not provided."""
+    rfd, wfd = os.pipe()
+    try:
+        result = query_xtgettcap(stream_fd=wfd, timeout=0.01)
+        assert result.supported is False
+    finally:
+        os.close(rfd)
+        os.close(wfd)
+
+
+def test_query_xtgettcap_termios_error():
+    """query_xtgettcap survives termios.error on input_fd."""
+    rfd, wfd = os.pipe()
+    try:
+        with mock.patch('blessed.xtgettcap.termios.tcgetattr',
+                        side_effect=termios.error):
+            result = query_xtgettcap(stream_fd=wfd, input_fd=rfd, timeout=0.01)
+            assert result.supported is False
+    finally:
+        os.close(rfd)
+        os.close(wfd)

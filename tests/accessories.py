@@ -299,7 +299,12 @@ def _setwinsize(fd, rows, cols):
     fcntl.ioctl(fd, TIOCSWINSZ, s)
 
 
-def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
+# Sentinel to distinguish "use default fake XTGETTCAP" from "force real probe"
+_NO_XTGETTCAP_DATA = object()
+
+
+def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80,
+             _xtgettcap_data=_NO_XTGETTCAP_DATA):
     """
     Wrapper for PTY-based tests to reduce boilerplate.
 
@@ -315,6 +320,9 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
         test_name: Optional name for coverage tracking. Auto-derived from child_func if None.
         rows: Terminal height in rows (default 24)
         cols: Terminal width in columns (default 80)
+        _xtgettcap_data: Passed through to TestTerminal. Default (sentinel) uses
+            standard fake XTGETTCAP response. Pass ``None`` to force a real probe
+            attempt, or a ``TermcapResponse`` to inject specific test data.
 
     Returns:
         str: Output from child process (everything written to stdout)
@@ -336,7 +344,11 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
     # pylint: disable=missing-raises-doc,missing-type-doc,too-many-statements
     if IS_WINDOWS:
         # On Windows, just run child_func directly without PTY
-        term = TestTerminal()
+        if _xtgettcap_data is _NO_XTGETTCAP_DATA:
+            term = TestTerminal()
+        else:
+            term = TestTerminal(
+                _xtgettcap_data=_xtgettcap_data, force_styling=True)
         result = child_func(term)
         return result.decode('utf-8') if isinstance(result, bytes) else (result or '')
 
@@ -363,7 +375,12 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         cov = init_subproc_coverage(test_name)
         try:
-            term = TestTerminal()
+            if _xtgettcap_data is _NO_XTGETTCAP_DATA:
+                term = TestTerminal()
+            else:
+                term = TestTerminal(
+                    _xtgettcap_data=_xtgettcap_data,
+                    force_styling=True)
             result = child_func(term)
 
             # Write result to stdout if provided

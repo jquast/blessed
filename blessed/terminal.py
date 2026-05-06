@@ -16,7 +16,7 @@ import platform
 import warnings
 import contextlib
 import collections
-from typing import IO, Dict, List, Match, Tuple, Union, Optional, Generator, SupportsIndex
+from typing import IO, Dict, Iterable, List, Match, Tuple, Union, Optional, Generator, SupportsIndex
 
 # 3rd party
 import jinxed
@@ -261,7 +261,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 if _xtgettcap_data is None and self.is_a_tty and self._init_descriptor is not None:
                     try:
                         _xtgettcap_data = query_xtgettcap(
-                            stream_fd=self._init_descriptor, timeout=1)
+                            stream_fd=self._init_descriptor, timeout=1,
+                            input_fd=self._keyboard_fd)
                     except OSError:
                         self.errors.append('XTGETTCAP probe failed (OSError)')
                         self._xtgettcap_first_query_failed = True
@@ -1585,29 +1586,77 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         response = self.get_dec_mode(_DecPrivateMode.FOCUS_IN_OUT_EVENTS, timeout=timeout)
         return response.supported
 
-    def get_xtgettcap(self, timeout: Optional[float] = 1,  # pylint: disable=too-complex
-                      force: bool = False) -> Optional[TermcapResponse]:
+    def get_xtgettcap(self, timeout: Optional[float] = 1,
+                      force: bool = False,
+                      caps: Optional[Iterable[str]] = None
+                      ) -> Optional[TermcapResponse]:
         """
         Query terminal capabilities via XTGETTCAP (DCS +q).
 
-        Uses a probe-first CPR-fenced strategy to avoid visible garbage on
-        unsupported terminals and to stop reading as soon as all responses
-        arrive.  Keyboard input arriving during the query is preserved via
-        ``flushinp`` / ``ungetch``.
+        On the first call (no cache), a single-capability probe is sent
+        before the batch to avoid visible garbage on unsupported terminals.
+        Responses are cached; subsequent calls return the cache immediately
+        unless *force* is True or *caps* requests capabilities not yet cached.
 
-        When :attr:`is_a_tty` is False, returns ``None``.
-        Responses are cached unless *force* is True.
+        When *caps* names capabilities absent from the cache, only those
+        missing capabilities are queried (incremental), merged into the
+        existing cache, and the updated cache is returned.
+
+        When *force* is True, the probe and sticky-failure guard are
+        skipped: all capabilities are sprayed in a single batch with a
+        CPR fence.
+
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Bypass cache, sticky-failure, and probe.
+        :arg caps: Additional capability names to query beyond the
+            standard set (e.g. ``['RV', 'TN']``).
+        :rtype: TermcapResponse or None
         """
         if not self.is_a_tty:
             return None
-        if self._xtgettcap_cache is not None and not force:
-            return self._xtgettcap_cache
-        if self._xtgettcap_first_query_failed and not force:
+
+        timeout = timeout if timeout is not None else 1
+
+        # Build the set of standard capability names
+        _std_names = {c[0] for c in XTGETTCAP_CAPABILITIES}
+        _extra = set(caps) if caps else set()
+        all_requested = _std_names | _extra
+
+        # force=True: single batch, no probe, no cache, no sticky
+        if force:
+            result = self._xtgettcap_batch(
+                [(name, '') for name in all_requested],
+                capabilities={},
+                timeout=timeout)
+            if result is not None:
+                self._xtgettcap_cache = result
+            return result
+
+        # cache hit (no explicit extra caps: return cache as-is)
+        if self._xtgettcap_cache is not None and self._xtgettcap_cache.supported:
+            if not _extra:
+                return self._xtgettcap_cache
+            cached_names = set(self._xtgettcap_cache.capabilities.keys())
+            missing = _extra - cached_names
+            if not missing:
+                return self._xtgettcap_cache
+            # Incremental: query only missing extra caps, merge into cache
+            result = self._xtgettcap_batch(
+                [(name, '') for name in missing],
+                capabilities=dict(self._xtgettcap_cache.capabilities),
+                timeout=timeout)
+            if result is not None:
+                self._xtgettcap_cache = result
+            return result
+
+        # sticky failure (no explicit caps requested)
+        if self._xtgettcap_first_query_failed and not _extra:
             return None
 
-        # Phase 1: Probe with single capability to check support.
+        # first query: probe + batch
         probe_cap = XTGETTCAP_CAPABILITIES[0][0]
-        probe_query = f'\x1bP+q{TermcapResponse.hex_encode(probe_cap)}\x1b\\'
+        probe_query = (
+            f'\x1bP+q{TermcapResponse.hex_encode(probe_cap)}\x1b\\')
         match = self._query_with_boundary(
             probe_query, TermcapResponse._RE_XTGETTCAP_RESPONSE, timeout)
         if match is None:
@@ -1618,20 +1667,55 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         name, value = TermcapResponse.from_match(match)
         capabilities[name] = value
 
-        # Phase 2: Spray remaining capabilities, drain responses, preserve keyboard input.
-        for capname, _desc in XTGETTCAP_CAPABILITIES[1:]:
-            self.stream.write(f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\')
-        self.stream.flush()
-        raw = self.flushinp(timeout=timeout)
-        if raw:
-            capabilities.update(TermcapResponse.parse_capabilities(raw))
-            remaining = TermcapResponse._RE_XTGETTCAP_RESPONSE.sub('', raw)
+        # Remaining standard caps (after probe) plus any extras
+        batch_caps = [
+            (c[0], c[1]) for c in XTGETTCAP_CAPABILITIES[1:]
+        ] + [(name, '') for name in _extra - _std_names]
+
+        result = self._xtgettcap_batch(
+            batch_caps, capabilities=capabilities, timeout=timeout)
+        self._xtgettcap_cache = result
+        return result
+
+    def _xtgettcap_batch(self, batch_caps, capabilities, timeout):
+        """Spray *batch_caps* + CPR fence, read responses, return TermcapResponse.
+
+        Returns ``None`` when the CPR fence never arrives (terminal does not
+        respond to XTGETTCAP at all).
+        """
+        if not batch_caps:
+            return TermcapResponse(supported=True, capabilities=capabilities)
+
+        ctx = None
+        try:
+            if self._line_buffered:
+                ctx = self.cbreak()
+                ctx.__enter__()
+            for capname, _desc in batch_caps:
+                self.stream.write(
+                    f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\')
+            self.stream.write('\x1b[6n')  # CPR fence
+            self.stream.flush()
+            match, data = _read_until(
+                self, _RE_CPR_BOUNDARY.pattern, timeout)
+        finally:
+            if ctx is not None:
+                ctx.__exit__(None, None, None)
+
+        if match is None:
+            # CPR fence never arrived -- terminal did not answer at all
+            return None
+
+        # Strip the CPR itself from the response data
+        data = data[:match.start()] + data[match.end():]
+
+        if data:
+            capabilities.update(TermcapResponse.parse_capabilities(data))
+            remaining = TermcapResponse._RE_XTGETTCAP_RESPONSE.sub('', data)
             if remaining:
                 self.ungetch(remaining)
 
-        result = TermcapResponse(supported=True, capabilities=capabilities)
-        self._xtgettcap_cache = result
-        return result
+        return TermcapResponse(supported=True, capabilities=capabilities)
 
     def does_xtgettcap(self, timeout: Optional[float] = 1,
                        force: bool = False) -> bool:
