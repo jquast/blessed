@@ -306,34 +306,23 @@ class NullCallableString(str):
         return ''.join(args)
 
 
-def get_proxy_string(term: 'Terminal', attr: str) -> Optional[ParameterizingProxyString]:
+def get_proxy_string(term: 'Terminal', attr: str) -> None:
     """
     Proxy and return callable string for proxied attributes.
 
-    :arg Terminal term: :class:`~.Terminal` instance.
-    :arg str attr: terminal capability name that may be proxied.
-    :rtype: None or :class:`ParameterizingProxyString`.
-    :returns: :class:`ParameterizingProxyString` for some attributes
-        of some terminal types that support it, where the terminfo(5)
-        database would otherwise come up empty, such as ``civis``
-        or ``sc``/``rc`` for ``term.kind`` of ``ansi``.  Otherwise, None.
+    .. deprecated::
+
+        As of release 1.40, all previously-proxied terminfo(5) capabilities
+        are now provided directly by the capability database in jinxed.
+
+        This function always returns ``None``.
     """
-    # normalize 'ansi.sys' to its basic name 'ansi'
-    term_kind = next(iter(_kind for _kind in ('ansi',)
-                          if term.kind.startswith(_kind)), term.kind)
-    _proxy_table: Dict[str, Dict[str, object]] = {  # pragma: no cover
-        'ansi': {
-            # proxy show/hide cursor for 'ansi' terminal type.  There is some
-            # demand for a richly working ANSI terminal type for some reason.
-            'civis': ParameterizingProxyString(
-                ('\x1b[?25l', lambda *arg: ()), term.normal, attr),
-            'cnorm': ParameterizingProxyString(
-                ('\x1b[?25h', lambda *arg: ()), term.normal, attr),
-            'sc': '\x1b[s',
-            'rc': '\x1b[u',
-        }
-    }
-    return _proxy_table.get(term_kind, {}).get(attr, None)
+    import warnings
+    warnings.warn(
+        'get_proxy_string is deprecated; all capabilities are now '
+        'provided directly by the jinxed terminfo database.',
+        DeprecationWarning, stacklevel=2)
+    return None
 
 
 def split_compound(compound: str) -> List[str]:
@@ -469,13 +458,4 @@ def resolve_attribute(term: 'Terminal', attr: str) -> Union[ParameterizingString
     # that when called, performs and returns the final string after curses
     # capability lookup is performed.
     tparm_capseq = resolve_capability(term, attr)
-    if not tparm_capseq:
-        # and, for special terminals, such as 'screen', provide a Proxy
-        # ParameterizingString for attributes they do not claim to support,
-        # but actually do! (such as 'hpa' and 'vpa').
-        proxy = get_proxy_string(term,
-                                 term._sugar.get(attr, attr))  # pylint: disable=protected-access
-        if proxy is not None:
-            return proxy
-
     return ParameterizingString(tparm_capseq, term.normal, attr)

@@ -11,14 +11,7 @@ import pytest
 # local
 from .conftest import IS_WINDOWS
 from .accessories import (
-    MockTigetstr, TestTerminal, unicode_cap, unicode_parm, as_subprocess, pty_test)
-
-try:
-    # std imports
-    from unittest import mock
-except ImportError:
-    # 3rd party
-    import mock
+    TestTerminal, unicode_cap, unicode_parm, as_subprocess, pty_test)
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="requires real tty")
@@ -164,21 +157,19 @@ def test_vertical_location(any_term):
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="requires multiprocess")
-def test_inject_move_x():
-    """Test injection of hpa attribute for screen/ansi (issue #55)."""
+def test_screen_ansi_hpa_from_jinxed():
+    """hpa for screen and ansi comes from jinxed terminfo directly."""
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         COL = 5
-        with mock.patch('jinxed.tigetstr', side_effect=MockTigetstr(hpa=None)):
-            with t.location(x=COL):
-                pass
+        with t.location(x=COL):
+            pass
         expected_output = ''.join((
             unicode_cap('sc', t) or '\x1b[s',
-            f'\x1b[{COL + 1}G',
+            t.move_x(COL),
             unicode_cap('rc', t) or '\x1b[u',
         ))
         assert t.stream.getvalue() == expected_output
-        assert t.move_x(COL) == f'\x1b[{COL + 1}G'
 
     child('screen')
     child('screen-256color')
@@ -186,21 +177,19 @@ def test_inject_move_x():
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="requires multiprocess")
-def test_inject_move_y():
-    """Test injection of vpa attribute for screen/ansi (issue #55)."""
+def test_screen_ansi_vpa_from_jinxed():
+    """vpa for screen and ansi comes from jinxed terminfo directly."""
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         ROW = 5
-        with mock.patch('jinxed.tigetstr', side_effect=MockTigetstr(vpa=None)):
-            with t.location(y=ROW):
-                pass
+        with t.location(y=ROW):
+            pass
         expected_output = ''.join((
             unicode_cap('sc', t) or '\x1b[s',
-            f'\x1b[{ROW + 1}d',
+            t.move_y(ROW),
             unicode_cap('rc', t) or '\x1b[u',
         ))
         assert t.stream.getvalue() == expected_output
-        assert t.move_y(ROW) == f'\x1b[{ROW + 1}d'
 
     child('screen')
     child('screen-256color')
@@ -208,26 +197,32 @@ def test_inject_move_y():
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="requires multiprocess")
-def test_inject_civis_and_cnorm_for_ansi():
-    """Test injection of civis attribute for ansi."""
+def test_ansi_civis_cnorm_from_jinxed():
+    """civis and cnorm for ansi come from jinxed terminfo directly."""
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.hidden_cursor():
             pass
-        expected_output = '\x1b[?25l\x1b[?25h'
+        expected_output = ''.join((
+            unicode_cap('civis', t),
+            unicode_cap('cnorm', t),
+        ))
         assert t.stream.getvalue() == expected_output
 
     child('ansi')
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="requires multiprocess")
-def test_inject_sc_and_rc_for_ansi():
-    """Test injection of sc and rc (save and restore cursor) for ansi."""
+def test_ansi_sc_rc_from_jinxed():
+    """sc and rc for ansi come from jinxed terminfo directly."""
     def child(kind):
         t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location():
             pass
-        expected_output = '\x1b[s\x1b[u'
+        expected_output = ''.join((
+            unicode_cap('sc', t),
+            unicode_cap('rc', t),
+        ))
         assert t.stream.getvalue() == expected_output
 
     child('ansi')
@@ -769,5 +764,14 @@ def test_supports_index(any_term):
         seq = Sequence('abcd' * 30, term)
         assert seq.truncate(100) == seq.truncate(indexable)
 
-    kind = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
-    child(kind)
+
+def test_get_proxy_string_deprecated():
+    """get_proxy_string() raises DeprecationWarning and returns None."""
+    import warnings
+    from blessed.formatters import get_proxy_string
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        result = get_proxy_string(None, 'any_cap')
+        assert result is None
+        assert len(w) == 1
+        assert issubclass(w[0].category, DeprecationWarning)

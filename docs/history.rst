@@ -3,6 +3,9 @@
 Version History
 ===============
 
+1.40
+  * TODO ..
+
 1.39
   * introduced: :meth:`~.Terminal.progress_bar` for `OSC 9;4 sequence
     <https://ghostty.org/docs/vt/osc/conemu#change-progress-state-(osc-94)>`_.
