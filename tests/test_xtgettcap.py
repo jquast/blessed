@@ -899,109 +899,102 @@ def test_get_decrqss_invalid():
     assert 'OK' in output
 
 
-class TestLightweightXtgettcap:
-    """XTGETTCAP probe during Terminal.__init__ via query_xtgettcap mock."""
+@pytest.mark.parametrize('init_descriptor,query_side_effect,expected', [
+    (999, None, None),
+    (999, OSError, None),
+    (999, TermcapResponse(supported=True,
+                          capabilities={'TN': 'xterm', 'colors': '256'}), 'supported'),
+    (999, TermcapResponse(supported=False), 'unsupported'),
+])
+def test_init_xtgettcap_probe(init_descriptor, query_side_effect, expected):
+    """XTGETTCAP probe during init populates _xtgettcap_cache correctly."""
+    def mock_init_streams(term_self):
+        term_self._is_a_tty = True
+        term_self._init_descriptor = init_descriptor
+        term_self._keyboard_fd = None
+        term_self.errors = term_self.errors or []
+        term_self._encoding = 'UTF-8'
 
-    @pytest.mark.parametrize('init_descriptor,query_side_effect,expected', [
-        (999, None, None),
-        (999, OSError, None),
-        (999, TermcapResponse(supported=True,
-                              capabilities={'TN': 'xterm', 'colors': '256'}), 'supported'),
-        (999, TermcapResponse(supported=False), 'unsupported'),
-    ])
-    def test_init_xtgettcap_probe(self, init_descriptor, query_side_effect, expected):
-        """XTGETTCAP probe during init populates _xtgettcap_cache correctly."""
-        def mock_init_streams(term_self):
-            term_self._is_a_tty = True
-            term_self._init_descriptor = init_descriptor
-            term_self._keyboard_fd = None
-            term_self.errors = term_self.errors or []
-            term_self._encoding = 'UTF-8'
-
-        if isinstance(query_side_effect, TermcapResponse):
-            patcher = mock.patch('blessed.terminal.query_xtgettcap',
-                                 return_value=query_side_effect)
-        elif query_side_effect is None:
-            patcher = mock.patch('blessed.terminal.query_xtgettcap',
-                                 return_value=None)
-        else:
-            patcher = mock.patch('blessed.terminal.query_xtgettcap',
-                                 side_effect=query_side_effect)
-        with patcher, \
-             mock.patch.object(Terminal, '_Terminal__init__streams',
-                               mock_init_streams):
-            term = TestTerminal(
-                stream=io.StringIO(), force_styling=True,
-                _xtgettcap_data=None)
-        cache = term._xtgettcap_cache
-        if expected is None:
-            assert cache is None
-        elif expected == 'supported':
-            assert cache is not None
-            assert cache.supported is True
-            assert cache.capabilities['TN'] == 'xterm'
-        elif expected == 'unsupported':
-            assert cache is not None
-            assert cache.supported is False
+    if isinstance(query_side_effect, TermcapResponse):
+        patcher = mock.patch('blessed.terminal.query_xtgettcap',
+                             return_value=query_side_effect)
+    elif query_side_effect is None:
+        patcher = mock.patch('blessed.terminal.query_xtgettcap',
+                             return_value=None)
+    else:
+        patcher = mock.patch('blessed.terminal.query_xtgettcap',
+                             side_effect=query_side_effect)
+    with patcher, \
+         mock.patch.object(Terminal, '_Terminal__init__streams',
+                           mock_init_streams):
+        term = TestTerminal(
+            stream=io.StringIO(), force_styling=True,
+            _xtgettcap_data=None)
+    cache = term._xtgettcap_cache
+    if expected is None:
+        assert cache is None
+    elif expected == 'supported':
+        assert cache is not None
+        assert cache.supported is True
+        assert cache.capabilities['TN'] == 'xterm'
+    elif expected == 'unsupported':
+        assert cache is not None
+        assert cache.supported is False
 
 
-class TestInitLightweightCache:
-    """Terminal.__init__ lightweight XTGETTCAP cache population."""
-
-    @pytest.mark.parametrize('xtgettcap_data,assertions', [
-        (TermcapResponse(supported=True,
-                         capabilities={'TN': 'xterm', 'colors': '256'}),
-         [('cache', 'not_none'),
-          ('_xtgettcap_cache.capabilities["colors"]', '256')]),
-        (TermcapResponse(supported=True,
-                         capabilities={'TN': 'foot'}),
-         [('term.kind', 'foot')]),
-        (TermcapResponse(supported=False),
-         [('cache', 'not_none'),
-          ('_xtgettcap_cache.supported', False)]),
-        (None,
-         [('cache', 'is_none')]),
-    ])
-    def test_init_cache_population(self, xtgettcap_data, assertions):
-        """__init__ cache integration with injected or probed XTGETTCAP results."""
-        kwargs: dict = {}
-        if xtgettcap_data is not None:
-            kwargs['_xtgettcap_data'] = xtgettcap_data
-        else:
-            # None means: skip injection, force a real probe (which fails)
-            kwargs['_xtgettcap_data'] = None
-            kwargs['is_a_tty'] = True
-        term = TestTerminal(stream=io.StringIO(), force_styling=True, **kwargs)
-        for attr, expected_val in assertions:
-            if attr == 'cache':
-                if expected_val == 'not_none':
-                    assert term._xtgettcap_cache is not None
-                elif expected_val == 'is_none':
-                    assert term._xtgettcap_cache is None
-            elif attr == 'term.kind':
-                assert term.kind == expected_val
-            elif attr.startswith('_xtgettcap_cache.'):
-                _, rest = attr.split('.', 1)
-                if rest == 'supported':
-                    assert term._xtgettcap_cache.supported == expected_val
-                elif rest.startswith('capabilities['):
-                    cap_name = rest.split('"')[1]
-                    assert term._xtgettcap_cache.capabilities[cap_name] == expected_val
+# -- init-time XTGETTCAP cache population --------------------------------------------
 
 
-class TestDoesForceRequery:
-    """does_* methods with force=True bypass cache and re-query."""
+@pytest.mark.parametrize('xtgettcap_data,assertions', [
+    (TermcapResponse(supported=True,
+                     capabilities={'TN': 'xterm', 'colors': '256'}),
+     [('cache', 'not_none'),
+      ('_xtgettcap_cache.capabilities["colors"]', '256')]),
+    (TermcapResponse(supported=True,
+                     capabilities={'TN': 'foot'}),
+     [('term.kind', 'foot')]),
+    (TermcapResponse(supported=False),
+     [('cache', 'not_none'),
+      ('_xtgettcap_cache.supported', False)]),
+    (None,
+     [('cache', 'is_none')]),
+])
+def test_init_cache_population(xtgettcap_data, assertions):
+    """__init__ cache integration with injected or probed XTGETTCAP results."""
+    kwargs: dict = {}
+    if xtgettcap_data is not None:
+        kwargs['_xtgettcap_data'] = xtgettcap_data
+    else:
+        kwargs['_xtgettcap_data'] = None
+        kwargs['is_a_tty'] = True
+    term = TestTerminal(stream=io.StringIO(), force_styling=True, **kwargs)
+    for attr, expected_val in assertions:
+        if attr == 'cache':
+            if expected_val == 'not_none':
+                assert term._xtgettcap_cache is not None
+            elif expected_val == 'is_none':
+                assert term._xtgettcap_cache is None
+        elif attr == 'term.kind':
+            assert term.kind == expected_val
+        elif attr.startswith('_xtgettcap_cache.'):
+            _, rest = attr.split('.', 1)
+            if rest == 'supported':
+                assert term._xtgettcap_cache.supported == expected_val
+            elif rest.startswith('capabilities['):
+                cap_name = rest.split('"')[1]
+                assert term._xtgettcap_cache.capabilities[cap_name] == expected_val
 
-    @pytest.mark.parametrize('method,capabilities', [
-        ('does_styled_underlines', {'Smulx': '\x1b[4:%p1%dm'}),
-        ('does_colored_underlines', {'Setulc': '\x1b[58;2;%p1%d;%p2%d;%p3%dm'}),
-        ('does_xtgettcap', {'TN': 'xterm'}),
-    ])
-    def test_force_bypasses_cache(self, method, capabilities):
-        """force=True causes re-query even with populated cache, returns False."""
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._is_a_tty = True
-        term._xtgettcap_cache = TermcapResponse(
-            supported=True, capabilities=capabilities)
-        result = getattr(term, method)(timeout=0.01, force=True)
-        assert result is False
+
+@pytest.mark.parametrize('method,capabilities', [
+    ('does_styled_underlines', {'Smulx': '\x1b[4:%p1%dm'}),
+    ('does_colored_underlines', {'Setulc': '\x1b[58;2;%p1%d;%p2%d;%p3%dm'}),
+    ('does_xtgettcap', {'TN': 'xterm'}),
+])
+def test_force_bypasses_cache(method, capabilities):
+    """force=True causes re-query even with populated cache, returns False."""
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    term._is_a_tty = True
+    term._xtgettcap_cache = TermcapResponse(
+        supported=True, capabilities=capabilities)
+    result = getattr(term, method)(timeout=0.01, force=True)
+    assert result is False

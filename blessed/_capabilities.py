@@ -423,8 +423,12 @@ class TermcapResponse:
                 capabilities[name] = value
         return capabilities
 
-    def make_jinxed_capabilities(self) -> 'JinxedCapabilities':
-        """Classify discovered capabilities for injection into a jinxed Terminal."""
+    def make_jinxed_capabilities(self) -> 'Dict[str, Dict[str, str] | Dict[str, int] | Set[str]]':
+        """Classify discovered capabilities for injection into a jinxed Terminal.
+
+        :returns: dict with keys ``str_caps``, ``num_caps``, ``bool_caps``, matching
+            the keyword arguments accepted by jinxed Terminal method, ``apply_capabilities()``
+        """
         str_caps: Dict[str, str] = {}
         num_caps: Dict[str, int] = {}
         bool_caps: Set[str] = set()
@@ -442,14 +446,7 @@ class TermcapResponse:
                 continue
             str_caps[capname] = value
 
-        return JinxedCapabilities(str_caps=str_caps, num_caps=num_caps, bool_caps=bool_caps)
-
-
-class JinxedCapabilities(typing.NamedTuple):
-    """Classified terminfo capabilities ready for jinxed injection."""
-    str_caps: Dict[str, str] = {}
-    num_caps: Dict[str, int] = {}
-    bool_caps: Set[str] = set()
+        return {'str_caps': str_caps, 'num_caps': num_caps, 'bool_caps': bool_caps}
 
 
 class ITerm2Capabilities:
