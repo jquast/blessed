@@ -280,6 +280,7 @@ XTGETTCAP_CAPABILITIES = (
     ("kich1", "Insert character key"),
     ("kdch1", "Delete character key"),
     ("kbs", "Backspace key"),
+    ("kcbt", "Back-tab key"),
     # String capabilities -- keypad application mode keys
     ("ka1", "Keypad upper left"),
     ("ka3", "Keypad upper right"),
@@ -430,6 +431,60 @@ class TermcapResponse:
         except ValueError:
             return ''
 
+    @staticmethod
+    def unescape_terminfo(value: str) -> str:
+        """
+        Unescape terminfo source-level escape sequences.
+
+        Terminfo source format uses ``\\E``, ``\\n``, ``\\t``, ``\\r``,
+        ``\\b``, ``\\f``, ``\\\\``, ``\\^``, ``\\:``, ``\\NNN`` octal,
+        and ``^X`` control-character notation.  XTGETTCAP responses from
+        some terminals (e.g. ghostty, kitty, foot, rio) report values in
+        this source format rather than as raw binary.  Convert these to
+        their actual byte values.
+        """
+        result = []
+        i = 0
+        while i < len(value):
+            ch = value[i]
+            if ch == '\\' and i + 1 < len(value):
+                nxt = value[i + 1]
+                if nxt == 'E' or nxt == 'e':
+                    result.append('\x1b'); i += 2; continue
+                if nxt == 'n':
+                    result.append('\n'); i += 2; continue
+                if nxt == 't':
+                    result.append('\t'); i += 2; continue
+                if nxt == 'r':
+                    result.append('\r'); i += 2; continue
+                if nxt == 'b':
+                    result.append('\b'); i += 2; continue
+                if nxt == 'f':
+                    result.append('\f'); i += 2; continue
+                if nxt == '\\':
+                    result.append('\\'); i += 2; continue
+                if nxt == '^':
+                    result.append('^'); i += 2; continue
+                if nxt == ':':
+                    result.append(':'); i += 2; continue
+                if nxt in '01234567':
+                    j = i + 2
+                    while j < len(value) and value[j] in '01234567':
+                        j += 1
+                    if j > i + 2:
+                        result.append(chr(int(value[i + 2:j], 8)))
+                        i = j
+                        continue
+            elif ch == '^' and i + 1 < len(value):
+                c = value[i + 1]
+                if 'A' <= c <= '_':
+                    result.append(chr(ord(c) - ord('A') + 1)); i += 2; continue
+                if c == '?':
+                    result.append('\x7f'); i += 2; continue
+            result.append(ch)
+            i += 1
+        return ''.join(result)
+
     # XTGETTCAP DCS response: DCS <success>+r<hex-name>=<hex-value> ST
     _RE_XTGETTCAP_RESPONSE: typing.ClassVar[typing.Pattern[str]] = re.compile(
         r'\x1bP([01])\+r([0-9a-fA-F]+)(?:=([0-9a-fA-F]*))?\x1b\\')
@@ -439,7 +494,10 @@ class TermcapResponse:
         """Parse a single XTGETTCAP DCS +r regex match into (name, value)."""
         cap_name = cls.hex_decode(match.group(2))
         val_hex = match.group(3)
-        value = cls.hex_decode(val_hex) if val_hex is not None else ''
+        if val_hex is not None:
+            value = cls.unescape_terminfo(cls.hex_decode(val_hex))
+        else:
+            value = ''
         return cap_name, value
 
     @classmethod
