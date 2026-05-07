@@ -190,6 +190,7 @@ XTGETTCAP_CAPABILITIES = (
     ("lines", "Lines"),
     ("it", "Init tabs"),
     ("pairs", "Max color pairs"),
+    ("RGB", "Bits per color channel (8 = 24-bit truecolor)"),
     # Boolean capabilities
     ("am", "Auto right margin"),
     ("bce", "Background color erase"),
