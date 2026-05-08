@@ -1597,32 +1597,18 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     def get_xtgettcap(self, timeout: Optional[float] = 1,
                       force: bool = False,
                       caps: Optional[Iterable[str]] = None,
-                      all: bool = False  # pylint: disable=redefined-builtin
                       ) -> Optional[TermcapResponse]:
         """
         Query terminal capabilities via XTGETTCAP (DCS +q).
 
-        On the first call (no cache), a single-capability probe is sent
-        before the batch to avoid visible garbage on unsupported terminals.
-        Responses are cached; subsequent calls return the cache immediately
-        unless *force* is True or *caps* requests capabilities not yet cached.
-
-        When *caps* is specified, only those capabilities are queried (unless
-        already cached).  When *all* is True (or neither *caps* nor *all* is
-        given), all standard XTGETTCAP capabilities are queried.
-
-        Capabilities that are queried but not answered by the terminal are
-        tracked internally with a ``None`` sentinel so they are not
-        re-queried unless *force* is True.  These ``None`` entries are
-        filtered from the returned :class:`TermcapResponse`.
+        When *caps* is specified, only those capabilities are returned. When unspecified, all known
+        XTGETTCAP capabilities are queried and returned.  All results are memoized permenently,
+        using ``force=True`` to force re-request.
 
         :arg float timeout: Timeout in seconds.
-        :arg bool force: Bypass cache, sticky-failure, and probe.
-        :arg caps: Capability names to query.  When specified, only these
-            capabilities are queried (incremental on cache).
-        :arg bool all: When True, query all standard XTGETTCAP capabilities.
-            Defaults to False; when *caps* is also unspecified, all standard
-            capabilities are queried automatically.
+        :arg bool force: Always re-query for latest values.
+        :arg caps: Capability names to query.  When specified, only these additional capabilities
+            may queried (incremental on cache).  when unspecified, it as though `all=True` was used.
         :rtype: TermcapResponse or None
         """
         if not self.is_a_tty:
@@ -1645,14 +1631,14 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 batch_list, capabilities={}, timeout=timeout)
             if result is not None:
                 self._xtgettcap_cache = result
-            return self._filter_xtgettcap_response(result)
+            return self._filter_xtgettcap_response(result, _requested)
 
         # cache hit: check if all requested caps are already known
         if self._xtgettcap_cache is not None and self._xtgettcap_cache.supported:
             cached_names = set(self._xtgettcap_cache.capabilities.keys())
             missing = _requested - cached_names
             if not missing:
-                return self._filter_xtgettcap_response(self._xtgettcap_cache)
+                return self._filter_xtgettcap_response(self._xtgettcap_cache, _requested)
             # Incremental: query only missing caps, merge into cache
             result = self._xtgettcap_batch(
                 [(name, '') for name in missing],
@@ -1660,7 +1646,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 timeout=timeout)
             if result is not None:
                 self._xtgettcap_cache = result
-            return self._filter_xtgettcap_response(self._xtgettcap_cache)
+            return self._filter_xtgettcap_response(self._xtgettcap_cache, _requested)
 
         # sticky failure (no explicit caps requested)
         if self._xtgettcap_first_query_failed and caps is None:
@@ -1695,15 +1681,23 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                     result.capabilities[capname] = None  # type: ignore[assignment]
 
         self._xtgettcap_cache = result
-        return self._filter_xtgettcap_response(result)
+        return self._filter_xtgettcap_response(result, _requested)
 
     @staticmethod
     def _filter_xtgettcap_response(
-            tc: Optional[TermcapResponse]) -> Optional[TermcapResponse]:
-        """Return *tc* with ``None``-valued capabilities filtered out."""
+            tc: Optional[TermcapResponse],
+            requested: Optional[set] = None,
+    ) -> Optional[TermcapResponse]:
+        """Return *tc* with ``None``-valued capabilities filtered out.
+
+        When *requested* is provided, additionally limit capabilities to
+        only those names.
+        """
         if tc is None:
             return None
         filtered = {k: v for k, v in tc.capabilities.items() if v is not None}
+        if requested is not None:
+            filtered = {k: v for k, v in filtered.items() if k in requested}
         return TermcapResponse(supported=tc.supported, capabilities=filtered)
 
     def _xtgettcap_batch(self, batch_caps, capabilities, timeout):

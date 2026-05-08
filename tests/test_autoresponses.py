@@ -11,7 +11,7 @@ except ImportError:
     import mock
 
 # local
-from blessed._capabilities import ITerm2Capabilities, TextSizingResult
+from blessed._capabilities import Decrqss, ITerm2Capabilities, TextSizingResult
 from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, as_subprocess, pty_test
 
@@ -542,3 +542,190 @@ def test_text_sized_ValueError():
     term = _sizing_term(True)
     with pytest.raises(ValueError):
         term.text_sized('X' * 4097, scale=2)
+
+
+# Decrqss tests (moved from test_xtgettcap.py)
+
+def test_decrqss_not_a_tty():
+    """Returns False when not a TTY."""
+    term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                        is_a_tty=False)
+    assert term.does_decrqss(timeout=0.01) is False
+
+
+def test_decrqss_cached_result():
+    """Returns cached result without re-querying."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    term._decrqss_supported = True
+    assert term.does_decrqss() is True
+
+
+def test_decrqss_force_bypasses_cache():
+    """force=True bypasses cached result."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    term._decrqss_supported = True
+    result = term.does_decrqss(timeout=0.01, force=True)
+    assert result is False
+
+
+def test_get_decrqss_not_a_tty():
+    """Returns None when not a TTY."""
+    term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                        is_a_tty=False)
+    assert term.get_decrqss(timeout=0.01) is None
+
+
+def test_get_decrqss_default_setting_is_sgr():
+    """Default setting_id is SGR."""
+    term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                        is_a_tty=False)
+    assert Decrqss.SGR == 'm'
+    assert term.get_decrqss() is None
+
+
+
+@pytestmark
+def test_does_decrqss_supported():
+    """DECRQSS detected from DCS 1 $ r response."""
+    def child(term):
+        resp = '\x1bP1$r0m\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.does_decrqss(timeout=0.1)
+        assert result is True
+        assert term._decrqss_supported is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_decrqss_supported')
+    assert 'OK' in output
+
+
+@pytestmark
+def test_does_decrqss_unsupported():
+    """DECRQSS not detected when only CPR arrives."""
+    def child(term):
+        cpr = '\x1b[10;20R'
+        term.ungetch(cpr)
+        result = term.does_decrqss(timeout=0.1)
+        assert result is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_decrqss_unsupported')
+    assert 'OK' in output
+
+
+@pytestmark
+def test_does_decrqss_invalid():
+    """DECRQSS returns False on DCS 0 $ r."""
+    def child(term):
+        resp = '\x1bP0$r\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.does_decrqss(timeout=0.1)
+        assert result is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_decrqss_invalid')
+    assert 'OK' in output
+
+
+@pytestmark
+def test_get_decrqss_sgr():
+    """get_decrqss returns SGR parameter value."""
+    def child(term):
+        resp = '\x1bP1$r0m\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.get_decrqss(Decrqss.SGR, timeout=0.1)
+        assert result == '0'
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_decrqss_sgr')
+    assert 'OK' in output
+
+
+@pytestmark
+def test_get_decrqss_sgr_with_attrs():
+    """get_decrqss returns compound SGR values."""
+    def child(term):
+        resp = '\x1bP1$r1;4;38;5;12m\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.get_decrqss(Decrqss.SGR, timeout=0.1)
+        assert result == '1;4;38;5;12'
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_decrqss_sgr_with_attrs')
+    assert 'OK' in output
+
+
+@pytestmark
+def test_get_decrqss_cursor_style():
+    """get_decrqss returns cursor style value for DECSCUSR."""
+    def child(term):
+        resp = '\x1bP1$r2 q\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.get_decrqss(Decrqss.DECSCUSR, timeout=0.1)
+        assert result == '2'
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_decrqss_cursor_style')
+    assert 'OK' in output
+
+
+@pytestmark
+def test_get_decrqss_scroll_region():
+    """get_decrqss returns top/bottom margins for DECSTBM."""
+    def child(term):
+        resp = '\x1bP1$r1;24r\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.get_decrqss(Decrqss.DECSTBM, timeout=0.1)
+        assert result == '1;24'
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_decrqss_scroll_region')
+    assert 'OK' in output
+
+
+@pytestmark
+def test_get_decrqss_unsupported():
+    """get_decrqss returns None when terminal does not respond."""
+    def child(term):
+        cpr = '\x1b[10;20R'
+        term.ungetch(cpr)
+        result = term.get_decrqss(Decrqss.SGR, timeout=0.1)
+        assert result is None
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_decrqss_unsupported')
+    assert 'OK' in output
+
+
+@pytestmark
+def test_get_decrqss_invalid():
+    """get_decrqss returns None on DCS 0 $ r."""
+    def child(term):
+        resp = '\x1bP0$r\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.get_decrqss(Decrqss.SGR, timeout=0.1)
+        assert result is None
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_decrqss_invalid')
+    assert 'OK' in output

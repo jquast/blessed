@@ -94,10 +94,6 @@ def parse_numeric(value):  # type: (str | None) -> int | None
 
 def main():
     """Compare jinxed terminfo against XTGETTCAP."""
-    if not sys.stdout.isatty():
-        print("stdout is not a TTY, cannot query XTGETTCAP", file=sys.stderr)
-        sys.exit(1)
-
     stream_fd = sys.stdout.fileno()
     try:
         input_fd = sys.stdin.fileno()
@@ -199,7 +195,7 @@ def main():
     # --- Extended capabilities ---
     print("\n=== Extended Capabilities ===")
     for capname in CRITICAL_EXT:
-        xt_val = result.capabilities.get(capname, '(not reported)')
+        xt_val = result.capabilities.get(capname, '(not reported)') or '(not supported)'
         desc = dict(XTGETTCAP_CAPABILITIES).get(capname, '')
         print(f"{capname:>6s}  {xt_val:<30s}  {desc}")
 
