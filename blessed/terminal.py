@@ -262,7 +262,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                     try:
                         _xtgettcap_data = query_xtgettcap(
                             stream_fd=self._init_descriptor, timeout=1,
-                            input_fd=self._keyboard_fd)
+                            input_fd=self._keyboard_fd,
+                            caps=['Co', 'RGB', 'TN'])
                     except OSError:
                         self.errors.append('XTGETTCAP probe failed (OSError)')
                         self._xtgettcap_first_query_failed = True
@@ -436,6 +437,13 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             self.number_of_colors = 0
         elif IS_WINDOWS or os.environ.get('COLORTERM') in {'truecolor', '24bit'}:
             self.number_of_colors = 1 << 24
+        elif (self._xtgettcap_cache is not None
+              and self._xtgettcap_cache.supported):
+            rgb_val = self._xtgettcap_cache.capabilities.get('RGB', '0')
+            if int(rgb_val.split('/')[0]) == 8:
+                self.number_of_colors = 1 << 24
+            else:
+                self.number_of_colors = max(0, self._jinxed_term.tigetnum('colors') or -1)
         else:
             self.number_of_colors = max(0, self._jinxed_term.tigetnum('colors') or -1)
 
@@ -1588,7 +1596,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
     def get_xtgettcap(self, timeout: Optional[float] = 1,
                       force: bool = False,
-                      caps: Optional[Iterable[str]] = None
+                      caps: Optional[Iterable[str]] = None,
+                      all: bool = False  # pylint: disable=redefined-builtin
                       ) -> Optional[TermcapResponse]:
         """
         Query terminal capabilities via XTGETTCAP (DCS +q).
@@ -1598,18 +1607,22 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         Responses are cached; subsequent calls return the cache immediately
         unless *force* is True or *caps* requests capabilities not yet cached.
 
-        When *caps* names capabilities absent from the cache, only those
-        missing capabilities are queried (incremental), merged into the
-        existing cache, and the updated cache is returned.
+        When *caps* is specified, only those capabilities are queried (unless
+        already cached).  When *all* is True (or neither *caps* nor *all* is
+        given), all standard XTGETTCAP capabilities are queried.
 
-        When *force* is True, the probe and sticky-failure guard are
-        skipped: all capabilities are sprayed in a single batch with a
-        CPR fence.
+        Capabilities that are queried but not answered by the terminal are
+        tracked internally with a ``None`` sentinel so they are not
+        re-queried unless *force* is True.  These ``None`` entries are
+        filtered from the returned :class:`TermcapResponse`.
 
         :arg float timeout: Timeout in seconds.
         :arg bool force: Bypass cache, sticky-failure, and probe.
-        :arg caps: Additional capability names to query beyond the
-            standard set (e.g. ``['RV', 'TN']``).
+        :arg caps: Capability names to query.  When specified, only these
+            capabilities are queried (incremental on cache).
+        :arg bool all: When True, query all standard XTGETTCAP capabilities.
+            Defaults to False; when *caps* is also unspecified, all standard
+            capabilities are queried automatically.
         :rtype: TermcapResponse or None
         """
         if not self.is_a_tty:
@@ -1617,44 +1630,45 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         timeout = timeout if timeout is not None else 1
 
-        # Build the set of standard capability names
         _std_names = {c[0] for c in XTGETTCAP_CAPABILITIES}
-        _extra = set(caps) if caps else set()
-        all_requested = _std_names | _extra
+
+        # Determine which capabilities to query
+        if caps is not None:
+            _requested = set(caps)
+        else:
+            _requested = _std_names.copy()
 
         # force=True: single batch, no probe, no cache, no sticky
         if force:
+            batch_list = [(name, '') for name in _requested]
             result = self._xtgettcap_batch(
-                [(name, '') for name in all_requested],
-                capabilities={},
-                timeout=timeout)
+                batch_list, capabilities={}, timeout=timeout)
             if result is not None:
                 self._xtgettcap_cache = result
-            return result
+            return self._filter_xtgettcap_response(result)
 
-        # cache hit (no explicit extra caps: return cache as-is)
+        # cache hit: check if all requested caps are already known
         if self._xtgettcap_cache is not None and self._xtgettcap_cache.supported:
-            if not _extra:
-                return self._xtgettcap_cache
             cached_names = set(self._xtgettcap_cache.capabilities.keys())
-            missing = _extra - cached_names
+            missing = _requested - cached_names
             if not missing:
-                return self._xtgettcap_cache
-            # Incremental: query only missing extra caps, merge into cache
+                return self._filter_xtgettcap_response(self._xtgettcap_cache)
+            # Incremental: query only missing caps, merge into cache
             result = self._xtgettcap_batch(
                 [(name, '') for name in missing],
                 capabilities=dict(self._xtgettcap_cache.capabilities),
                 timeout=timeout)
             if result is not None:
                 self._xtgettcap_cache = result
-            return result
+            return self._filter_xtgettcap_response(self._xtgettcap_cache)
 
         # sticky failure (no explicit caps requested)
-        if self._xtgettcap_first_query_failed and not _extra:
+        if self._xtgettcap_first_query_failed and caps is None:
             return None
 
         # first query: probe + batch
-        probe_cap = XTGETTCAP_CAPABILITIES[0][0]
+        cap_list = list(_requested)
+        probe_cap = cap_list[0]
         probe_query = (
             f'\x1bP+q{TermcapResponse.hex_encode(probe_cap)}\x1b\\')
         match = self._query_with_boundary(
@@ -1667,21 +1681,38 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         name, value = TermcapResponse.from_match(match)
         capabilities[name] = value
 
-        # Remaining standard caps (after probe) plus any extras
-        batch_caps = [
-            (c[0], c[1]) for c in XTGETTCAP_CAPABILITIES[1:]
-        ] + [(name, '') for name in _extra - _std_names]
+        # Remaining requested caps (after probe)
+        remaining = cap_list[1:]
+        batch_caps = [(name, '') for name in remaining]
 
         result = self._xtgettcap_batch(
             batch_caps, capabilities=capabilities, timeout=timeout)
+
+        # Mark any requested-but-unanswered caps as None sentinel
+        if result is not None:
+            for capname in _requested:
+                if capname not in result.capabilities:
+                    result.capabilities[capname] = None  # type: ignore[assignment]
+
         self._xtgettcap_cache = result
-        return result
+        return self._filter_xtgettcap_response(result)
+
+    @staticmethod
+    def _filter_xtgettcap_response(
+            tc: Optional[TermcapResponse]) -> Optional[TermcapResponse]:
+        """Return *tc* with ``None``-valued capabilities filtered out."""
+        if tc is None:
+            return None
+        filtered = {k: v for k, v in tc.capabilities.items() if v is not None}
+        return TermcapResponse(supported=tc.supported, capabilities=filtered)
 
     def _xtgettcap_batch(self, batch_caps, capabilities, timeout):
         """Spray *batch_caps* + CPR fence, read responses, return TermcapResponse.
 
         Returns ``None`` when the CPR fence never arrives (terminal does not
-        respond to XTGETTCAP at all).
+        respond to XTGETTCAP at all).  Capabilities in *batch_caps* that are
+        not answered are recorded as ``None`` in the returned
+        ``capabilities`` dict so they are not re-queried on future calls.
         """
         if not batch_caps:
             return TermcapResponse(supported=True, capabilities=capabilities)
@@ -1714,6 +1745,11 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             remaining = TermcapResponse._RE_XTGETTCAP_RESPONSE.sub('', data)
             if remaining:
                 self.ungetch(remaining)
+
+        # Track caps that were requested but not answered
+        for capname, _desc in batch_caps:
+            if capname not in capabilities:
+                capabilities[capname] = None  # type: ignore[assignment]
 
         return TermcapResponse(supported=True, capabilities=capabilities)
 
@@ -1931,7 +1967,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return True
 
         # Strategy 2: XTGETTCAP Ms capability
-        tcap = self.get_xtgettcap(timeout=timeout, force=force)
+        tcap = self.get_xtgettcap(timeout=timeout, force=force, caps=['Ms'])
         if tcap is not None and 'Ms' in tcap.capabilities:
             self._osc52_clipboard_supported = True
             return True
@@ -2139,7 +2175,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :arg bool force: Bypass cached result.
         :rtype: bool
         """
-        tc = self.get_xtgettcap(timeout=timeout, force=force)
+        tc = self.get_xtgettcap(timeout=timeout, force=force, caps=['Smulx'])
         return tc is not None and 'Smulx' in tc
 
     def does_colored_underlines(self, timeout: Optional[float] = 1,
@@ -2153,7 +2189,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :arg bool force: Bypass cached result.
         :rtype: bool
         """
-        tc = self.get_xtgettcap(timeout=timeout, force=force)
+        tc = self.get_xtgettcap(timeout=timeout, force=force, caps=['Setulc'])
         return tc is not None and 'Setulc' in tc
 
     def does_text_sizing(self, timeout: float = 1,

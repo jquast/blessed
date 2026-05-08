@@ -469,11 +469,11 @@ class TermcapResponse:
                 if nxt == ':':
                     result.append(':'); i += 2; continue
                 if nxt in '01234567':
-                    j = i + 2
+                    j = i + 1
                     while j < len(value) and value[j] in '01234567':
                         j += 1
-                    if j > i + 2:
-                        result.append(chr(int(value[i + 2:j], 8)))
+                    if j > i + 1:
+                        result.append(chr(int(value[i + 1:j], 8)))
                         i = j
                         continue
             elif ch == '^' and i + 1 < len(value):
@@ -530,7 +530,14 @@ class TermcapResponse:
                 try:
                     num_caps[capname] = int(value)
                 except ValueError:
-                    pass
+                    try:
+                        num_caps[capname] = int(value.split('/')[0])
+                    except (ValueError, IndexError):
+                        try:
+                            num_caps[capname] = int.from_bytes(
+                                value.encode('latin-1'), 'big')
+                        except (ValueError, OverflowError):
+                            pass
                 continue
             str_caps[capname] = value
 

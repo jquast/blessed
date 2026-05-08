@@ -15,7 +15,7 @@ import re
 import time
 import select
 import termios
-from typing import Dict, Optional
+from typing import Dict, Iterable, Optional
 
 # local
 from ._capabilities import XTGETTCAP_CAPABILITIES, TermcapResponse
@@ -52,18 +52,21 @@ def _read_response(fd: int, timeout: float) -> str:
 
 
 def query_xtgettcap(stream_fd: int, timeout: float = 1.0,
-                    input_fd: Optional[int] = None) -> TermcapResponse:
+                    input_fd: Optional[int] = None,
+                    caps: Optional[Iterable[str]] = None) -> TermcapResponse:
     """
     Spray XTGETTCAP queries and gather responses.
 
-    Writes all capabilities to *stream_fd* in rapid succession (spray), then reads responses
-    from *input_fd* (gather).  Uses a trailing CPR query as a fence to detect when all
-    responses have arrived.
+    Writes requested capabilities to *stream_fd* in rapid succession (spray), then reads
+    responses from *input_fd* (gather).  Uses a trailing CPR query as a fence to detect when
+    all responses have arrived.
 
     :arg int stream_fd: File descriptor for terminal output (write queries).
     :arg float timeout: Per-read timeout in seconds.
     :arg int input_fd: File descriptor for terminal input (read responses).
         When omitted or ``None``, falls back to *stream_fd*.
+    :arg caps: Capability names to query.  When ``None`` (default), all
+        standard XTGETTCAP capabilities are queried.
     :returns: Parsed response with discovered capabilities.
     """
     if input_fd is None:
@@ -85,19 +88,27 @@ def query_xtgettcap(stream_fd: int, timeout: float = 1.0,
         was_raw = False
 
     try:
-        return _query_xtgettcap_impl(stream_fd, input_fd, timeout)
+        return _query_xtgettcap_impl(stream_fd, input_fd, timeout, caps)
     finally:
         if was_raw:
             termios.tcsetattr(input_fd, termios.TCSANOW, saved_attrs)
 
 
 def _query_xtgettcap_impl(stream_fd: int, input_fd: int,
-                          timeout: float) -> TermcapResponse:
+                          timeout: float,
+                          caps: Optional[Iterable[str]] = None) -> TermcapResponse:
     """Core XTGETTCAP query logic (terminal already in raw mode)."""
     capabilities: Dict[str, str] = {}
 
-    # Phase 1: Probe with a single capability to check support.
-    probe_cap = XTGETTCAP_CAPABILITIES[0][0]
+    if caps is not None:
+        cap_list = list(caps)
+        if not cap_list:
+            return TermcapResponse(supported=False)
+    else:
+        cap_list = [c[0] for c in XTGETTCAP_CAPABILITIES]
+
+    # Phase 1: Probe with the first capability to check support.
+    probe_cap = cap_list[0]
     os.write(stream_fd,
              f'\x1bP+q{TermcapResponse.hex_encode(probe_cap)}\x1b\\'.encode())
     os.write(stream_fd, b'\x1b[6n')  # CPR fence
@@ -116,15 +127,22 @@ def _query_xtgettcap_impl(stream_fd: int, input_fd: int,
     name, value = TermcapResponse.from_match(probe_match)
     capabilities[name] = value
 
-    # Phase 2: Spray remaining capabilities.
-    for capname, _desc in XTGETTCAP_CAPABILITIES[1:]:
-        os.write(stream_fd,
-                 f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\'.encode())
-    os.write(stream_fd, b'\x1b[6n')  # CPR fence
-    raw = _read_response(input_fd, timeout)
+    # Phase 2: Spray remaining capabilities (skip probe cap).
+    remaining = cap_list[1:]
+    if remaining:
+        for capname in remaining:
+            os.write(stream_fd,
+                     f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\'.encode())
+        os.write(stream_fd, b'\x1b[6n')  # CPR fence
+        raw = _read_response(input_fd, timeout)
 
-    if raw:
-        capabilities.update(TermcapResponse.parse_capabilities(raw))
+        if raw:
+            capabilities.update(TermcapResponse.parse_capabilities(raw))
+
+    # Record None sentinel for any requested cap that wasn't answered.
+    for capname in cap_list:
+        if capname not in capabilities:
+            capabilities[capname] = None  # type: ignore[assignment]
 
     # Erase any visible DCS garbage on unsupported terminals
     os.write(stream_fd, b'\r\x1b[K')

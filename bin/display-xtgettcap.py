@@ -28,7 +28,7 @@ def main():
     print(f'{term.bold("XTGETTCAP")}: {reported}/{total} capabilities reported')
     print()
     print(f'   Terminal: {result.terminal_name}')
-    print(f'   Colors: {result.num_colors}')
+    print(f'   Colors: {term.number_of_colors}')
     print()
 
     # column widths

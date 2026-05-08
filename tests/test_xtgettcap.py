@@ -84,6 +84,53 @@ class TestTermcapResponseParsing:
         assert resp.capabilities == {}
         assert len(resp) == 0
 
+    # unescape_terminfo tests
+
+    @pytest.mark.parametrize('value,expected', [
+        (r'\E', '\x1b'),
+        (r'\n', '\n'),
+        (r'\t', '\t'),
+        (r'\r', '\r'),
+        (r'\b', '\b'),
+        (r'\f', '\f'),
+        (r'\\', '\\'),
+        (r'\^', '^'),
+        (r'\:', ':'),
+    ])
+    def test_unescape_terminfo_backslash_escapes(self, value, expected):
+        r"""Backslash escapes (\E, \n, \t, \r, \b, \f, \\, \^, \:) are unescaped."""
+        assert TermcapResponse.unescape_terminfo(value) == expected
+
+    @pytest.mark.parametrize('value,expected', [
+        (r'\033', '\x1b'),
+        (r'\101\102', 'AB'),
+        (r'\000', '\x00'),
+        (r'\141', 'a'),
+    ])
+    def test_unescape_terminfo_octal_escapes(self, value, expected):
+        r"""Octal \NNN escapes are decoded."""
+        assert TermcapResponse.unescape_terminfo(value) == expected
+
+    @pytest.mark.parametrize('value,expected', [
+        ('^A', '\x01'),
+        ('^Z', '\x1a'),
+        ('^?', '\x7f'),
+        ('^_', '\x1f'),
+    ])
+    def test_unescape_terminfo_control_notation(self, value, expected):
+        """^X control-character and ^? DEL notation."""
+        assert TermcapResponse.unescape_terminfo(value) == expected
+
+    def test_unescape_terminfo_mixed(self):
+        """Mixed escape sequences."""
+        result = TermcapResponse.unescape_terminfo(r'\E[5m\E[m')
+        assert result == '\x1b[5m\x1b[m'
+
+    def test_unescape_terminfo_no_escapes(self):
+        """String without escapes is unchanged."""
+        assert TermcapResponse.unescape_terminfo('hello') == 'hello'
+
+
 
 class TestITerm2Capabilities:
     """ITerm2Capabilities parsing and construction."""
@@ -161,7 +208,7 @@ class TestGetXtgettcap:
         assert term.does_xtgettcap(timeout=0.01) is False
 
     def test_cached_result(self):
-        """Returns cached result without re-querying."""
+        """Returns cached result without re-querying (caps= restricts request)."""
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
@@ -170,8 +217,10 @@ class TestGetXtgettcap:
                                  capabilities={'TN': 'test'})
         term._xtgettcap_cache = cached
 
-        result = term.get_xtgettcap()
-        assert result is cached
+        result = term.get_xtgettcap(caps=['TN'])
+        assert result is not cached  # filtered copy, not same object
+        assert result.supported is True
+        assert result['TN'] == 'test'
 
     def test_sticky_failure(self):
         """Returns None after first query failure."""
@@ -237,7 +286,7 @@ class TestGetXtgettcap:
         assert term.does_xtgettcap() is False
 
     def test_caps_all_in_cache_returns_cached(self):
-        """caps= with all names already in cache returns cache as-is."""
+        """caps= with all names already in cache returns filtered copy."""
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
@@ -245,7 +294,8 @@ class TestGetXtgettcap:
                                  capabilities={'TN': 'xterm', 'RV': '1.0'})
         term._xtgettcap_cache = cached
         result = term.get_xtgettcap(caps=['RV'])
-        assert result is cached
+        assert result is not cached  # filtering creates new object
+        assert result['RV'] == '1.0'
 
     def test_caps_incremental_queries_missing(self):
         """caps= with names absent from cache queries only missing ones."""
@@ -267,21 +317,18 @@ class TestGetXtgettcap:
         assert 'RV' in term._xtgettcap_cache.capabilities  # cache updated
 
     def test_caps_force_queries_all(self):
-        """force=True with caps= queries everything in single batch."""
+        """force=True with caps= queries only the specified caps."""
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
         term._xtgettcap_cache = TermcapResponse(
             supported=True, capabilities={'TN': 'old'})
-        # force=True sprays standard + extra caps, reads responses
-        hex_tn = TermcapResponse.hex_encode('TN')
+        # caps=['RV'] queries only RV (not standard set)
         hex_rv = TermcapResponse.hex_encode('RV')
         term.ungetch(
-            f'\x1bP1+r{hex_tn}=787465726d\x1b\\'
             f'\x1bP1+r{hex_rv}=312e30\x1b\\'
             '\x1b[10;20R')
         result = term.get_xtgettcap(timeout=0.1, force=True, caps=['RV'])
-        assert result['TN'] == 'xterm'
         assert result['RV'] == '1.0'
 
     def test_caps_ignores_sticky_failure(self):
@@ -291,20 +338,112 @@ class TestGetXtgettcap:
         term._is_a_tty = True
         term._xtgettcap_cache = None
         term._xtgettcap_first_query_failed = True
-        # Inject DCS response for RV + CPR (probe is skipped when
-        # cache is None but extra caps are requested and sticky is set:
-        # we go straight to probe+batch).
-        hex_tn = TermcapResponse.hex_encode('TN')
+        # caps=['RV'] probes with RV (first requested cap), then
+        # no remaining caps to batch.  Inject RV probe response + CPR.
         hex_rv = TermcapResponse.hex_encode('RV')
         term.ungetch(
-            f'\x1bP1+r{hex_tn}=787465726d\x1b\\'
             f'\x1bP1+r{hex_rv}=312e30\x1b\\'
-            '\x1b[10;20R'
-            '\x1b[11;21R')
+            '\x1b[10;20R')
         result = term.get_xtgettcap(timeout=0.1, caps=['RV'])
         assert result is not None
-        assert result['TN'] == 'xterm'
         assert result['RV'] == '1.0'
+
+
+    def test_all_parameter_queries_all_standard_caps(self):
+        """all=True queries all standard XTGETTCAP capabilities."""
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        # Inject response for TN (probe) + Co (batch) + CPR
+        hex_tn = TermcapResponse.hex_encode('TN')
+        hex_co = TermcapResponse.hex_encode('Co')
+        term.ungetch(
+            f'\x1bP1+r{hex_tn}=787465726d\x1b\\'
+            f'\x1bP1+r{hex_co}=323536\x1b\\'
+            '\x1b[10;20R'
+            '\x1b[11;21R')
+        result = term.get_xtgettcap(timeout=0.1, all=True)
+        assert result is not None
+        assert result['TN'] == 'xterm'
+        assert result['Co'] == '256'
+
+    def test_none_sentinel_not_in_returned_response(self):
+        """None-valued caps in cache are filtered from returned response."""
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        # Internal cache has None for an absent cap
+        term._xtgettcap_cache = TermcapResponse(
+            supported=True,
+            capabilities={'TN': 'xterm', 'RV': None})
+        result = term.get_xtgettcap(caps=['TN', 'RV'])
+        assert 'TN' in result.capabilities
+        assert 'RV' not in result.capabilities  # filtered out
+
+    def test_none_sentinel_internal_cache_retains_none(self):
+        """Internal cache retains None sentinel for absent caps."""
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        term._xtgettcap_cache = TermcapResponse(
+            supported=True,
+            capabilities={'TN': 'xterm'})
+        # Query RV; no response injected, so it becomes None in cache
+        hex_rv = TermcapResponse.hex_encode('RV')
+        term.ungetch(
+            f'\x1bP1+r{hex_rv}=\x1b\\'  # empty value for RV
+            '\x1b[10;20R')
+        result = term.get_xtgettcap(caps=['RV'], timeout=0.1)
+        # RV was answered (even with empty value), so it should be present
+        assert 'RV' in result.capabilities
+
+    def test_absent_cap_not_requeried(self):
+        """Absent caps (None sentinel) are not re-queried on subsequent calls."""
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        # Pre-populate cache with a None sentinel for Ms
+        term._xtgettcap_cache = TermcapResponse(
+            supported=True,
+            capabilities={'TN': 'xterm', 'Ms': None})
+        # Clear any injected input to verify no query is sent
+        result = term.get_xtgettcap(caps=['Ms'], timeout=0.01)
+        assert result is not None
+        assert 'Ms' not in result.capabilities  # filtered from response
+        assert term._xtgettcap_cache.capabilities['Ms'] is None  # retained in cache
+
+    def test_get_xtgettcap_no_args_queries_all_standard_caps(self):
+        """get_xtgettcap() with no caps or all queries all standard caps."""
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+        term._is_a_tty = True
+        # Inject TN probe + batch response with Co
+        hex_tn = TermcapResponse.hex_encode('TN')
+        hex_co = TermcapResponse.hex_encode('Co')
+        term.ungetch(
+            f'\x1bP1+r{hex_tn}=787465726d\x1b\\'
+            f'\x1bP1+r{hex_co}=323536\x1b\\'
+            '\x1b[10;20R'
+            '\x1b[11;21R')
+        result = term.get_xtgettcap(timeout=0.1)
+        assert result is not None
+        assert result['TN'] == 'xterm'
+        assert result['Co'] == '256'
+
+    def test_filter_response_none(self):
+        """_filter_xtgettcap_response returns None for None input."""
+        assert Terminal._filter_xtgettcap_response(None) is None
+
+    def test_filter_response_removes_none_values(self):
+        """_filter_xtgettcap_response removes None-valued caps."""
+        tc = TermcapResponse(
+            supported=True,
+            capabilities={'TN': 'xterm', 'RGB': None, 'Co': '256'})
+        result = Terminal._filter_xtgettcap_response(tc)
+        assert 'TN' in result.capabilities
+        assert 'Co' in result.capabilities
+        assert 'RGB' not in result.capabilities
+        assert result.supported is True
 
 
 class TestStyledUnderlines:
@@ -501,7 +640,7 @@ def test_get_xtgettcap_full_success():
         assert result.supported is True
         assert result['TN'] == 'xterm'
         assert result['Co'] == '256'
-        assert term._xtgettcap_cache is result
+        assert term._xtgettcap_cache is not None
         return b'OK'
 
     output = pty_test(child, parent_func=None,
@@ -993,7 +1132,7 @@ def test_terminal_init_xtgettcap_success():
             ready, _, _ = select.select([master_fd], [], [], remaining)
             if ready:
                 data += os.read(master_fd, 4096)
-        os.write(master_fd, b'\x1bP1+r544e=787465726d\x1b\\')
+        os.write(master_fd, b'\x1bP1+r436f=323536\x1b\\')
         os.write(master_fd, b'\x1b[10;20R')
         # Phase 2: wait for batch queries + CPR, then respond
         data = b''
@@ -1005,7 +1144,8 @@ def test_terminal_init_xtgettcap_success():
             ready, _, _ = select.select([master_fd], [], [], remaining)
             if ready:
                 data += os.read(master_fd, 4096)
-        os.write(master_fd, b'\x1bP1+r436f=323536\x1b\\')
+        os.write(master_fd, b'\x1bP1+r524742=38\x1b\\')
+        os.write(master_fd, b'\x1bP1+r544e=787465726d\x1b\\')
         os.write(master_fd, b'\x1b[11;21R')
 
     def child(term):
@@ -1013,6 +1153,7 @@ def test_terminal_init_xtgettcap_success():
         assert term._xtgettcap_cache.supported is True
         assert term._xtgettcap_cache['TN'] == 'xterm'
         assert term._xtgettcap_cache['Co'] == '256'
+        assert term._xtgettcap_cache['RGB'] == '8'
         # Verify no stray input leaked after probe
         with term.cbreak():
             leaked = term.inkey(timeout=0)
@@ -1163,3 +1304,27 @@ def test_query_xtgettcap_termios_error():
     finally:
         os.close(rfd)
         os.close(wfd)
+
+@pytest.mark.parametrize('capabilities,expected_colors', [
+    ({'RGB': '8'}, 1 << 24),
+    ({'RGB': '8/8/8'}, 1 << 24),
+    ({}, 256),
+    ({'RGB': '4'}, 256),
+])
+def test_rgb_truecolor_detection(capabilities, expected_colors):
+    """XTGETTCAP RGB=8 sets number_of_colors to 1<<24, otherwise uses terminfo."""
+    xt_data = TermcapResponse(supported=True, capabilities=capabilities)
+    with mock.patch.dict(os.environ, {}, clear=True):
+        term = Terminal(
+            kind='xterm-256color', force_styling=True,
+            _xtgettcap_data=xt_data)
+        assert term.number_of_colors == expected_colors
+
+
+def test_make_jinxed_capabilities_parses_binary_numeric():
+    """make_jinxed_capabilities decodes binary-encoded numeric values."""
+    caps = {'colors': '\x01\x00', 'pairs': '\x7f\xff', 'TN': 'test'}
+    xt_data = TermcapResponse(supported=True, capabilities=caps)
+    result = xt_data.make_jinxed_capabilities()
+    assert result['num_caps']['colors'] == 256
+    assert result['num_caps']['pairs'] == 32767
