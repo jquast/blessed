@@ -236,9 +236,9 @@ def test_setupterm_invalid_issue39():
     """Unknown TERM falls back to kind_fallback silently."""
     def child():
         warnings.filterwarnings("error", category=UserWarning)
-        # Unknown terminal kind gracefully falls back to kind_fallback.
         term = TestTerminal(kind='unknown', force_styling=True)
         assert term.does_styling
+        assert term.kind == 'xterm-256color'
 
     child()
 

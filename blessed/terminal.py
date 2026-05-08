@@ -183,7 +183,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                  kind: Optional[str] = None,
                  stream: Optional[IO[str]] = None,
                  force_styling: Union[bool, None] = False,
-                 *,
                  kind_fallback: str = 'xterm-256color',
                  _xtgettcap_data: Optional[TermcapResponse] = None) -> None:
         """
@@ -286,6 +285,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 self.errors.append(
                     f'jinxed.Terminal({self._kind!r}, {self._init_descriptor}) '
                     f'will try again using kind_fallback={kind_fallback!r}')
+                self._kind = kind_fallback
                 self._jinxed_term = jinxed.Terminal(kind_fallback, self._init_descriptor)
 
             # Step 3: Inject XTGETTCAP overrides into jinxed
