@@ -1747,8 +1747,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                     f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\')
             self.stream.write('\x1b[6n')  # CPR fence
             self.stream.flush()
-            match, data = _read_until(
-                self, _RE_CPR_BOUNDARY.pattern, timeout)
+            match, data = _read_until(self, _RE_CPR_BOUNDARY.pattern, timeout)
         finally:
             if ctx is not None:
                 ctx.__exit__(None, None, None)
