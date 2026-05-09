@@ -288,7 +288,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self.__init__query_caches()
 
     def __init__xtgettcap(self, _xtgettcap_data: Optional[TermcapResponse]) -> None:
-        """Probe for core XTGETTCAP capabilities"""
+        """Probe for core XTGETTCAP capabilities."""
         # this is like an optimized version of get_xtgettcap() + get_location(), for only the
         # essentials: Co, RGB, and TN. Also nice to have are some self-reported capabilities that
         # some terminals report: blink, sitm/ritm (italics), and cvvis. These values were determined
@@ -318,7 +318,11 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 self._kind = _xtgettcap_data.terminal_name
 
     def __init__query_caches(self) -> None:
-        # Initialize Kitty keyboard protocol tracking
+        # So many terminal capabilities are static, except those queries through `get_decrqss()`.
+        # For that reason, to avoid unnecessary initialization to "query everything, use little",
+        # and to avoid latency to allow for for often-repeated overhead like
+        # `Terminal.does_synchronized_output()`, we memoize lots of caches to remember the state of
+        # our connected terminal when asked.  Initialize Kitty keyboard protocol tracking.
         self._kitty_kb_first_query_failed = False
 
         # Device Attributes (DA1) cache and sticky failure tracking
@@ -349,29 +353,20 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         # Kitty Graphics protocol detection cache
         self._kitty_graphics_supported: Optional[bool] = None
-
         # iTerm2 capabilities cache
         self._iterm2_capabilities_cache: Optional["ITerm2Capabilities"] = None
-
         # Kitty notifications (OSC 99) detection cache
         self._kitty_notifications_supported: Optional[bool] = None
-
         # Kitty clipboard protocol (DECRQM 5522) detection cache
         self._kitty_clipboard_supported: Optional[bool] = None
-
         # Kitty pointer shapes (OSC 22) detection cache
         self._kitty_pointer_shapes_result: Optional[Tuple[bool, str]] = None
-
         # Text sizing (OSC 66) detection cache
         self._text_sizing_cache: Optional[TextSizingResult] = None
-
         # OSC 52 clipboard detection cache
         self._osc52_clipboard_supported: Optional[bool] = None
-
         # Color scheme (dark/light mode) -- whether query is supported
         self._color_scheme_supported: Optional[bool] = None
-
-
         # DECRQSS detection cache
         self._decrqss_supported: Optional[bool] = None
 
@@ -2104,8 +2099,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             >>> term = Terminal()
             >>> term.does_kitty_query()
             True
-            >>> term.get_xtgettcap(caps=[f"kitty-query-{key}" for key in ["font_family", "bold_font",
-                "italic_font", "bold_italic_font", "font_size", "dpi_x", "dpi_y"]])
+            >>> term.get_xtgettcap(caps=[f"kitty-query-{key}" for key in ["font_family",
+                "bold_font", "italic_font", "bold_italic_font", "font_size", "dpi_x", "dpi_y"]])
             TermcapResponse(supported=True, capabilities={
                 'kitty-query-bold_font': 'NotoSansMono-Bold',
                 'kitty-query-bold_italic_font': 'NotoSansMono-Bold',

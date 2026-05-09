@@ -426,7 +426,8 @@ class TermcapResponse:
 
     @property
     def terminal_name(self) -> Optional[str]:
-        """Terminal name from ``TN`` capability, or ``None``.
+        """
+        Terminal name from ``TN`` capability, or ``None``.
 
         .. deprecated:: This alias is not useful or used by blessed.
         """
@@ -467,15 +468,13 @@ class TermcapResponse:
 
     @staticmethod
     def unescape_terminfo(value: str) -> str:
-        """
+        r"""
         Unescape terminfo source-level escape sequences.
 
-        Terminfo source format uses ``\\E``, ``\\n``, ``\\t``, ``\\r``,
-        ``\\b``, ``\\f``, ``\\\\``, ``\\^``, ``\\:``, ``\\NNN`` octal,
-        and ``^X`` control-character notation.  XTGETTCAP responses from
-        some terminals (e.g. ghostty, kitty, foot, rio) report values in
-        this source format rather than as raw binary.  Convert these to
-        their actual byte values.
+        Terminfo source format uses ``\E``, ``\n``, ``\t``, ``\r``, ``\b``, ``\f``, ``\\``, ``\^``,
+        ``\:``, ``\NNN`` octal, and ``^X`` control-character notation.  XTGETTCAP responses from
+        some terminals (e.g. ghostty, kitty, foot, rio) report values in this source format rather
+        than as raw binary.  Convert these to their actual byte values.
         """
         result = []
         i = 0
