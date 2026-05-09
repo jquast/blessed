@@ -2,12 +2,11 @@
 """Compare jinxed terminfo capabilities against XTGETTCAP responses."""
 import sys
 import os
-import termios
 from collections import OrderedDict
 
 import jinxed
 from blessed.xtgettcap import query_xtgettcap
-from blessed._capabilities import XTGETTCAP_CAPABILITIES, TermcapResponse
+from blessed._capabilities import XTGETTCAP_CAPABILITIES
 
 # Map of interesting string caps: capname -> description
 FOCUS_CAPS = OrderedDict()
@@ -72,6 +71,7 @@ def fmt_match(xt_val: str, jinxed_val: str) -> str:
         return 'XTGETTCAP ONLY'
     return 'MISMATCH'
 
+
 def parse_numeric(value):  # type: (str | None) -> int | None
     """Parse a numeric capability value, handling r/g/b and binary formats."""
     if value is None:
@@ -113,7 +113,10 @@ def main():
     # Determine jinxed kind from TN or TERM
     tn = result.capabilities.get('TN', '')
     term_kind = tn if tn else os.environ.get('TERM', '')
-    print(f"Terminal kind (from TN): {term_kind if tn else os.environ.get('TERM', '?')} ({'XTGETTCAP TN' if tn else 'TERM env'})")
+    info_src = 'XTGETTCAP TN' if tn else 'TERM env'
+    print(
+        f"Terminal kind (from TN): {term_kind if tn else os.environ.get('TERM', '?')} "
+        f"({info_src})")
 
     # Initialize jinxed
     try:

@@ -17,7 +17,6 @@ from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, as_subprocess
 
 
-
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_getch_raises_eoferror_on_eof():
     """getch() raises EOFError when keyboard fd is at EOF."""

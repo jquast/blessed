@@ -4,7 +4,20 @@ Version History
 ===============
 
 1.40
-  * TODO ..
+  * improved: jinxed_ is **now required on all platforms**, providing a curses-free and
+    `singleton-free <https://jinxed.readthedocs.io/en/stable/capabilities.html#singleton-free>`_
+    implementation of the subset of curses_ used by blessed.  The jinxed_ 1.5.0 release provides a
+    terminal `capability database
+    <https://jinxed.readthedocs.io/en/stable/capabilities.html#database>` of 45 terminals and their
+    common aliases.
+  * improved: Class initialization of :class:`~.Terminal()` now uses `XTGETTCAP`_ to determine
+    preferred terminal name ``TN``, 24-bit color support ``RGB``, number of colors ``Co``, `italic`,
+    and `blink` capabilities.
+
+    This improves detection of ``TERM`` over protocols like serial that cannot forward any
+    environment variables, to determine 24-bit value for :attr:`~.Terminal.number_of_colors` when
+    using protocols like ssh that do not forward ``COLORTERM``.
+
 
 1.39
   * introduced: :meth:`~.Terminal.progress_bar` for `OSC 9;4 sequence
@@ -499,4 +512,5 @@ Version History
 .. _FORCE_COLOR: https://force-color.org/
 .. _CLICOLOR_FORCE: https://bixense.com/clicolors/
 .. _NO_COLOR: https://no-color.org/
-
+.. _jinxed: https://jinxed.readthedocs.io/en/stable/
+.. _XTGETTCAP: https://codeberg.org/dnkl/foot#xtgettcap

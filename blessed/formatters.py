@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 # std imports
-from typing import TYPE_CHECKING, Set, Dict, List, Tuple, Union, Callable, Optional
+from typing import TYPE_CHECKING, Set, List, Tuple, Union, Callable
 
 # local
 from blessed.colorspace import CGA_COLORS, X11_COLORNAMES_TO_RGB
@@ -317,6 +317,7 @@ def get_proxy_string(term: 'Terminal', attr: str) -> None:
 
         This function always returns ``None``.
     """
+    # std imports
     import warnings
     warnings.warn(
         'get_proxy_string is deprecated; all capabilities are now '

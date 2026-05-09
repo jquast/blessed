@@ -66,45 +66,45 @@ FALLBACK_TERMINALS = {
 INFO_CAPS = {"TN"}
 
 
+_BACKSLASH_MAP = {
+    "E": 0x1B, "e": 0x1B,
+    "n": 0x0A, "t": 0x09, "r": 0x0D,
+    "b": 0x08, "f": 0x0C,
+    "\\": 0x5C, "^": 0x5E, ":": 0x3A,
+}
+
+
 def _parse_xt_val(val):
-    r"""Parse an XTGETTCAP string value, handling \E, ^X, etc.
-    Returns bytes."""
+    r"""Parse an XTGETTCAP string value, handling \E, ^X, etc. Returns bytes."""
     result = bytearray()
     i = 0
     s = str(val)
     while i < len(s):
         if s[i] == "\\" and i + 1 < len(s):
             nxt = s[i + 1]
-            if nxt == "E" or nxt == "e":
-                result.append(0x1B); i += 2; continue
-            if nxt == "n":
-                result.append(0x0A); i += 2; continue
-            if nxt == "t":
-                result.append(0x09); i += 2; continue
-            if nxt == "r":
-                result.append(0x0D); i += 2; continue
-            if nxt == "b":
-                result.append(0x08); i += 2; continue
-            if nxt == "f":
-                result.append(0x0C); i += 2; continue
-            if nxt == "\\":
-                result.append(0x5C); i += 2; continue
-            if nxt == "^":
-                result.append(0x5E); i += 2; continue
-            if nxt == ":":
-                result.append(0x3A); i += 2; continue
+            code = _BACKSLASH_MAP.get(nxt)
+            if code is not None:
+                result.append(code)
+                i += 2
+                continue
             if nxt in "01234567":
                 j = i + 2
                 while j < len(s) and s[j] in "01234567":
                     j += 1
                 if j > i + 2:
-                    result.append(int(s[i + 2:j], 8)); i = j; continue
+                    result.append(int(s[i + 2:j], 8))
+                    i = j
+                    continue
         elif s[i] == "^" and i + 1 < len(s):
             c = s[i + 1]
             if "A" <= c <= "_":
-                result.append(ord(c) - ord("A") + 1); i += 2; continue
+                result.append(ord(c) - ord("A") + 1)
+                i += 2
+                continue
             if c == "?":
-                result.append(0x7F); i += 2; continue
+                result.append(0x7F)
+                i += 2
+                continue
         result.append(ord(s[i]))
         i += 1
     return bytes(result)
@@ -123,8 +123,11 @@ def _norm_str(val):
 
 
 def compare_terminal(yaml_path, module_name):
-    """Compare XTGETTCAP data from YAML against jinxed module.
-    Returns (diffs, extension_caps, error)."""
+    """
+    Compare XTGETTCAP data from YAML against jinxed module.
+
+    Returns (diffs, extension_caps, error).
+    """
     with open(yaml_path) as f:
         data = yaml.safe_load(f)
 
@@ -178,7 +181,7 @@ def compare_terminal(yaml_path, module_name):
                 continue
             if capname == "RGB":
                 try:
-                    xt_rgb = int(xt_str)
+                    int(xt_str)
                 except ValueError:
                     continue
                 extensions.append((capname, "NUM_EXT", xt_str))
@@ -294,7 +297,6 @@ def main():
     if not diffs_found:
         print("All clear, no differences found.")
 
-    n_total = len(results)
     n_skipped = sum(1 for _, _, _, s, _, _ in results if s == "SKIP")
     print(f"\n{len(results)} terminals, {diffs_found} with diffs/exts, {n_skipped} no XTGETTCAP")
 

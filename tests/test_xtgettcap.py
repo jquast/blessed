@@ -328,7 +328,7 @@ def test_get_xtgettcap_caps_incremental_queries_missing():
     assert result['RV'] == '1.0'
     assert 'TN' not in result.capabilities
     assert 'RV' in term._xtgettcap_cache.capabilities
-    assert term._xtgettcap_cache.capabilities['TN'] == 'xterm' 
+    assert term._xtgettcap_cache.capabilities['TN'] == 'xterm'
 
 
 def test_get_xtgettcap_caps_force_queries_all():
@@ -573,7 +573,9 @@ def test_kitty_query_cached_result():
     stream = io.StringIO()
     term = TestTerminal(stream=stream, force_styling=True)
     term._is_a_tty = True
-    term._kitty_query_supported = True
+    term._xtgettcap_cache = TermcapResponse(
+        capabilities={'kitty-query-name': 'kitty'},
+        supported=True)
     assert term.does_kitty_query() is True
 
 
@@ -582,7 +584,9 @@ def test_kitty_query_force_bypasses_cache():
     stream = io.StringIO()
     term = TestTerminal(stream=stream, force_styling=True)
     term._is_a_tty = True
-    term._kitty_query_supported = True
+    term._xtgettcap_cache = TermcapResponse(
+        capabilities={'kitty-query-name': 'kitty'},
+        supported=True)
     result = term.does_kitty_query(timeout=0.01, force=True)
     assert result is False
 
@@ -621,7 +625,6 @@ def test_get_xtgettcap_probe_failure():
         term.ungetch('\x1b[10;20R')
         result = term.get_xtgettcap(timeout=0.1)
         assert result is None
-        assert term._xtgettcap_first_query_failed is True
         return b'OK'
 
     output = pty_test(child, parent_func=None,
@@ -888,7 +891,8 @@ def test_does_kitty_query_supported():
         term.ungetch(resp + cpr)
         result = term.does_kitty_query(timeout=0.1)
         assert result is True
-        assert term._kitty_query_supported is True
+        assert term._xtgettcap_cache is not None
+        assert 'kitty-query-name' in term._xtgettcap_cache.capabilities
         return b'OK'
 
     output = pty_test(child, parent_func=None,
@@ -927,7 +931,6 @@ def test_does_kitty_query_rejected():
     output = pty_test(child, parent_func=None,
                       test_name='test_does_kitty_query_rejected')
     assert 'OK' in output
-
 
 
 @pytestmark_pty
@@ -1135,3 +1138,20 @@ def test_make_jinxed_capabilities_parses_binary_numeric():
     result = xt_data.make_jinxed_capabilities()
     assert result['num_caps']['colors'] == 256
     assert result['num_caps']['pairs'] == 32767
+
+
+def test_get_xtgettcap_applies_overlay_to_jinxed():
+    """get_xtgettcap() applies discovered caps to jinxed for property access."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, kind='vt220', force_styling=True)
+    term._is_a_tty = True
+    assert term.dim == ''
+
+    hex_dim = TermcapResponse.hex_encode('dim')
+    term.ungetch(
+        '\x1bP1+r' + hex_dim + '=1b5b326d\x1b\\'
+        '\x1b[10;20R')
+    result = term.get_xtgettcap(timeout=0.1, force=True, caps=['dim'])
+    assert result is not None
+    assert result['dim'] == '\x1b[2m'
+    assert term.dim == '\x1b[2m'

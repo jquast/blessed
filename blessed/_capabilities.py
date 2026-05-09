@@ -2,7 +2,7 @@
 # std imports
 import re
 import typing
-from typing import Dict, Set, Optional
+from typing import Set, Dict, Optional
 from collections import OrderedDict
 
 # 3rd party
@@ -181,16 +181,65 @@ CAPABILITIES_CAUSE_MOVEMENT: typing.Tuple[str, ...] = tuple(CAPABILITIES_HORIZON
 )
 
 XTGETTCAP_CAPABILITIES = (
-    # Terminal identification
+    # Terminal identification and 24-bit color fields, note that the order of the first three
+    # matters for xterm compatibility, described at https://codeberg.org/dnkl/foot#xtgettcap
     ("TN", "Terminal name"),
-    # Numeric capabilities
     ("Co", "Number of colors"),
+    ("RGB", "Bits per color channel (8 = 24-bit truecolor)"),
+    # as well as the order of the next section, where xterm supports **only** keyboard capabilities
+    # via XTGETTCAP, and we have to be sensitive to request only supported capabilities, as xterm
+    # stops replying after the first unsupported (non-keyboard) capability after these,
+    # String capabilities -- keypad key sequences
+    ("kcuu1", "Up arrow key"),
+    ("kcud1", "Down arrow key"),
+    ("kcub1", "Left arrow key"),
+    ("kcuf1", "Right arrow key"),
+    ("khome", "Home key"),
+    ("kend", "End key"),
+    ("knp", "Next page key"),
+    ("kpp", "Previous page key"),
+    ("kich1", "Insert character key"),
+    ("kdch1", "Delete character key"),
+    ("kbs", "Backspace key"),
+    ("kcbt", "Back-tab key"),
+    # String capabilities -- keypad application mode keys
+    ("ka1", "Keypad upper left"),
+    ("ka3", "Keypad upper right"),
+    ("kb2", "Keypad center"),
+    ("kc1", "Keypad lower left"),
+    ("kc3", "Keypad lower right"),
+    # String capabilities -- function keys
+    ("kf1", "Function key F1"),
+    ("kf2", "Function key F2"),
+    ("kf3", "Function key F3"),
+    ("kf4", "Function key F4"),
+    ("kf5", "Function key F5"),
+    ("kf6", "Function key F6"),
+    ("kf7", "Function key F7"),
+    ("kf8", "Function key F8"),
+    ("kf9", "Function key F9"),
+    ("kf10", "Function key F10"),
+    ("kf11", "Function key F11"),
+    ("kf12", "Function key F12"),
+    # And here is where xterm-supported XTGETTCAP capbilities end.
+    #
+    # We otherwise expect foot and kitty behavior -- if we wanted to, we could go without jinxed's
+    # virtual capability database entirely, after careful audit I find only the following attributes
+    # that may be missing or different from xterm-256color, and can be commonly patched by XTGETTCAP
+    ("blink", "Enter blink mode"),
+    ("sitm", "Enter italics mode"),
+    ("ritm", "Exit italics mode"),
+    ("cvvis", "Very visible cursor"),
+    # And here is where blessed's integration ends. All remaining capabilities, for blessed's
+    # purposes, are informational only. Used by the downstream 'ucs-detect' tool for auditing and
+    # fingerprinting purposes, like "kitty-query-clipboard_control".
+    #
+    # Remaining numeric capabilities
     ("colors", "Max colors on screen"),
     ("cols", "Columns"),
     ("lines", "Lines"),
     ("it", "Init tabs"),
     ("pairs", "Max color pairs"),
-    ("RGB", "Bits per color channel (8 = 24-bit truecolor)"),
     # Boolean capabilities
     ("am", "Auto right margin"),
     ("bce", "Background color erase"),
@@ -210,14 +259,11 @@ XTGETTCAP_CAPABILITIES = (
     # String capabilities -- attributes
     ("bold", "Enter bold mode"),
     ("dim", "Enter dim mode"),
-    ("blink", "Enter blink mode"),
     ("rev", "Enter reverse mode"),
     ("smso", "Enter standout mode"),
     ("rmso", "Exit standout mode"),
     ("smul", "Enter underline mode"),
     ("rmul", "Exit underline mode"),
-    ("sitm", "Enter italics mode"),
-    ("ritm", "Exit italics mode"),
     ("sgr0", "Reset attributes"),
     # String capabilities -- colors
     ("setaf", "Set foreground color"),
@@ -228,7 +274,6 @@ XTGETTCAP_CAPABILITIES = (
     ("rc", "Restore cursor"),
     ("civis", "Hide cursor"),
     ("cnorm", "Normal cursor"),
-    ("cvvis", "Very visible cursor"),
     ("cup", "Cursor address"),
     ("home", "Cursor home"),
     ("hpa", "Horizontal position"),
@@ -269,47 +314,28 @@ XTGETTCAP_CAPABILITIES = (
     # String capabilities -- keypad
     ("smkx", "Keypad transmit mode"),
     ("rmkx", "Keypad local mode"),
-    # String capabilities -- keypad key sequences
-    ("kcuu1", "Up arrow key"),
-    ("kcud1", "Down arrow key"),
-    ("kcub1", "Left arrow key"),
-    ("kcuf1", "Right arrow key"),
-    ("khome", "Home key"),
-    ("kend", "End key"),
-    ("knp", "Next page key"),
-    ("kpp", "Previous page key"),
-    ("kich1", "Insert character key"),
-    ("kdch1", "Delete character key"),
-    ("kbs", "Backspace key"),
-    ("kcbt", "Back-tab key"),
-    # String capabilities -- keypad application mode keys
-    ("ka1", "Keypad upper left"),
-    ("ka3", "Keypad upper right"),
-    ("kb2", "Keypad center"),
-    ("kc1", "Keypad lower left"),
-    ("kc3", "Keypad lower right"),
-    # String capabilities -- function keys
-    ("kf1", "Function key F1"),
-    ("kf2", "Function key F2"),
-    ("kf3", "Function key F3"),
-    ("kf4", "Function key F4"),
-    ("kf5", "Function key F5"),
-    ("kf6", "Function key F6"),
-    ("kf7", "Function key F7"),
-    ("kf8", "Function key F8"),
-    ("kf9", "Function key F9"),
-    ("kf10", "Function key F10"),
-    ("kf11", "Function key F11"),
-    ("kf12", "Function key F12"),
     # String capabilities -- user-defined (xterm convention)
     ("u6", "CPR response format"),
     ("u7", "CPR request"),
     ("u8", "DA response format"),
     ("u9", "DA request"),
-    # Extended capabilities -- modern terminal features
-    ("Ms", "Clipboard via OSC 52"),
-    ("Smulx", "Styled underlines"),
-    ("Setulc", "Underline color"),
+    # Terminal-specific queries (kitty and foot extensions)
+    ("query-os-name", "OS name query"),
+    ("kitty-query-name", "terminal name"),
+    ("kitty-query-version", "version"),
+    ("kitty-query-allow_hyperlinks", "hyperlink support"),
+    ("kitty-query-font_family", "font family"),
+    ("kitty-query-bold_font", "bold font"),
+    ("kitty-query-italic_font", "italic font"),
+    ("kitty-query-bold_italic_font", "bold-italic font"),
+    ("kitty-query-font_size", "font size"),
+    ("kitty-query-dpi_x", "DPI X"),
+    ("kitty-query-dpi_y", "DPI Y"),
+    ("kitty-query-foreground", "foreground color"),
+    ("kitty-query-background", "background color"),
+    ("kitty-query-background_opacity", "background opacity"),
+    ("kitty-query-clipboard_control", "clipboard control"),
+    ("kitty-query-os_name", "OS name"),
 )
 
 
@@ -400,12 +426,19 @@ class TermcapResponse:
 
     @property
     def terminal_name(self) -> Optional[str]:
-        """Terminal name from ``TN`` capability, or ``None``."""
+        """Terminal name from ``TN`` capability, or ``None``.
+
+        .. deprecated:: This alias is not useful or used by blessed.
+        """
         return self.capabilities.get('TN')
 
     @property
     def num_colors(self) -> Optional[int]:
-        """Number of colors from ``colors`` capability, or ``None``."""
+        """
+        Number of colors from ``colors`` capability, or ``None``.
+
+        .. deprecated:: This value is not useful or used by blessed.
+        """
         val = self.capabilities.get('colors')
         if val is not None:
             try:
@@ -451,23 +484,41 @@ class TermcapResponse:
             if ch == '\\' and i + 1 < len(value):
                 nxt = value[i + 1]
                 if nxt == 'E' or nxt == 'e':
-                    result.append('\x1b'); i += 2; continue
+                    result.append('\x1b')
+                    i += 2
+                    continue
                 if nxt == 'n':
-                    result.append('\n'); i += 2; continue
+                    result.append('\n')
+                    i += 2
+                    continue
                 if nxt == 't':
-                    result.append('\t'); i += 2; continue
+                    result.append('\t')
+                    i += 2
+                    continue
                 if nxt == 'r':
-                    result.append('\r'); i += 2; continue
+                    result.append('\r')
+                    i += 2
+                    continue
                 if nxt == 'b':
-                    result.append('\b'); i += 2; continue
+                    result.append('\b')
+                    i += 2
+                    continue
                 if nxt == 'f':
-                    result.append('\f'); i += 2; continue
+                    result.append('\f')
+                    i += 2
+                    continue
                 if nxt == '\\':
-                    result.append('\\'); i += 2; continue
+                    result.append('\\')
+                    i += 2
+                    continue
                 if nxt == '^':
-                    result.append('^'); i += 2; continue
+                    result.append('^')
+                    i += 2
+                    continue
                 if nxt == ':':
-                    result.append(':'); i += 2; continue
+                    result.append(':')
+                    i += 2
+                    continue
                 if nxt in '01234567':
                     j = i + 1
                     while j < len(value) and value[j] in '01234567':
@@ -479,9 +530,13 @@ class TermcapResponse:
             elif ch == '^' and i + 1 < len(value):
                 c = value[i + 1]
                 if 'A' <= c <= '_':
-                    result.append(chr(ord(c) - ord('A') + 1)); i += 2; continue
+                    result.append(chr(ord(c) - ord('A') + 1))
+                    i += 2
+                    continue
                 if c == '?':
-                    result.append('\x7f'); i += 2; continue
+                    result.append('\x7f')
+                    i += 2
+                    continue
             result.append(ch)
             i += 1
         return ''.join(result)
@@ -512,7 +567,8 @@ class TermcapResponse:
         return capabilities
 
     def make_jinxed_capabilities(self) -> 'Dict[str, Dict[str, str] | Dict[str, int] | Set[str]]':
-        """Classify discovered capabilities for injection into a jinxed Terminal.
+        """
+        Classify discovered capabilities for injection into a jinxed Terminal.
 
         :returns: dict with keys ``str_caps``, ``num_caps``, ``bool_caps``, matching
             the keyword arguments accepted by jinxed Terminal method, ``apply_capabilities()``

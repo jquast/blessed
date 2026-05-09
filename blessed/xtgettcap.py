@@ -1,10 +1,10 @@
 """
 XTGETTCAP query and response parser.
 
-Used in blessed.Terminal.__init__, before jinxed is initialized, to gather capabilities
-for terminal override of jinxed's virtual terminfo database.  This module has *no* dependencies on
-jinxed, curses, or our keyboard.py or terminal.py's Terminal, so that it may be used so early in
-class initialization.
+Used in blessed.Terminal.__init__, before jinxed is initialized, to gather capabilities for terminal
+override of jinxed's virtual terminfo database.  This module has *no* dependencies on jinxed,
+curses, or our keyboard.py or terminal.py's Terminal, so that it may be used so early in class
+initialization.
 """
 
 from __future__ import annotations
@@ -25,10 +25,10 @@ _RE_CPR_BYTES = re.compile(rb'\x1b\[([0-9]+);([0-9]+)R')
 
 
 def _read_response(fd: int, timeout: float) -> str:
-    """Read bytes from fd until CPR arrives or timeout; decode once at end.
+    """
+    Read bytes from fd until CPR arrives or timeout; decode once at end.
 
-    The terminal must already be in raw (non-canonical) mode;
-    this is the caller's responsibility.
+    The terminal must already be in raw (non-canonical) mode; this is the caller's responsibility.
     """
     stime = time.time()
     data = b''

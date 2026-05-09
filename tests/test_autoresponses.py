@@ -587,7 +587,6 @@ def test_get_decrqss_default_setting_is_sgr():
     assert term.get_decrqss() is None
 
 
-
 @pytestmark
 def test_does_decrqss_supported():
     """DECRQSS detected from DCS 1 $ r response."""
