@@ -41,6 +41,7 @@ from wcwidth import center as wcwidth_center
 # local
 from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
 from .keyboard import (DEFAULT_ESCDELAY,
+                       TERMINAL_QUERY_TIMEOUT_SECONDS,
                        Keystroke,
                        ResizeEvent,
                        DeviceAttribute,
@@ -300,7 +301,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         if _xtgettcap_data is None and self.is_a_tty and self._init_descriptor is not None:
             try:
                 _xtgettcap_data = query_xtgettcap(
-                    stream_fd=self._init_descriptor, timeout=1,
+                    stream_fd=self._init_descriptor, timeout=TERMINAL_QUERY_TIMEOUT_SECONDS,
                     input_fd=self._keyboard_fd,
                     caps=['TN', 'Co', 'RGB', 'blink', 'sitm', 'ritm', 'cvvis'])
             except OSError as exc:
@@ -880,7 +881,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             self.stream.write(self.restore)
             self.stream.flush()
 
-    def get_location(self, timeout: float = 1) -> Tuple[int, int]:
+    def get_location(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Tuple[int, int]:
         r"""
         Return tuple (row, column) of cursor position.
 
@@ -952,7 +953,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # check or filters, such as if (x, y) != (-1, -1) or max(0, y).
         return -1, -1
 
-    def get_fgcolor(self, timeout: float = 1, bits: int = 16) -> Tuple[int, int, int]:
+    def get_fgcolor(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS, bits: int = 16) -> Tuple[int, int, int]:
         """
         Return tuple (r, g, b) of default foreground color.
 
@@ -991,7 +992,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return (-1, -1, -1)
         return tuple(xparse_color(val, bits=bits) for val in match.groups())
 
-    def get_bgcolor(self, timeout: float = 1, bits: int = 16) -> Tuple[int, int, int]:
+    def get_bgcolor(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS, bits: int = 16) -> Tuple[int, int, int]:
         """
         Return tuple (r, g, b) of default background color.
 
@@ -1030,7 +1031,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return (-1, -1, -1)
         return tuple(xparse_color(val, bits=bits) for val in match.groups())
 
-    def get_fgcolor_hex(self, timeout: float = 1, maybe_short: bool = False) -> str:
+    def get_fgcolor_hex(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS, maybe_short: bool = False) -> str:
         """
         Return default foreground color as hex string.
 
@@ -1048,7 +1049,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return ''
         return rgb_to_hex(*rgb, maybe_short=maybe_short)
 
-    def get_bgcolor_hex(self, timeout: float = 1, maybe_short: bool = False) -> str:
+    def get_bgcolor_hex(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS, maybe_short: bool = False) -> str:
         """
         Return default background color as hex string.
 
@@ -1066,7 +1067,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return ''
         return rgb_to_hex(*rgb, maybe_short=maybe_short)
 
-    def get_device_attributes(self, timeout: Optional[float] = 1,
+    def get_device_attributes(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                               force: bool = False) -> Optional[DeviceAttribute]:
         """
         Query the terminal's Device Attributes (DA1).
@@ -1098,7 +1099,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             term = Terminal()
 
             # Query device attributes
-            da = term.get_device_attributes(timeout=1.0)
+            da = term.get_device_attributes(timeout=TERMINAL_QUERY_TIMEOUT_SECONDS)
             if da is not None:
                 print(f"Service class: {da.service_class}")
                 print(f"Supports sixel: {da.supports_sixel}")
@@ -1127,7 +1128,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         return result
 
-    def get_software_version(self, timeout: Optional[float] = 1,
+    def get_software_version(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                              force: bool = False) -> Optional[SoftwareVersion]:
         """
         Query the terminal's software name and version using XTVERSION.
@@ -1159,7 +1160,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             term = Terminal()
 
             # Query software version
-            sv = term.get_software_version(timeout=1.0)
+            sv = term.get_software_version(timeout=TERMINAL_QUERY_TIMEOUT_SECONDS)
             if sv is not None:
                 print(f"Terminal: {sv.name} {sv.version}")
         """
@@ -1190,7 +1191,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         return None
 
-    def does_sixel(self, timeout: Optional[float] = 1, force: bool = False) -> bool:
+    def does_sixel(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS, force: bool = False) -> bool:
         """
         Query whether the terminal supports sixel graphics.
 
@@ -1215,7 +1216,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         da = self.get_device_attributes(timeout=timeout, force=force)
         return da.supports_sixel if da is not None else False
 
-    def detect_ambiguous_width(self, timeout: float = 1, fallback: int = 1) -> int:
+    def detect_ambiguous_width(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS, fallback: int = 1) -> int:
         r"""
         Detect whether terminal renders ambiguous width characters as width 1 or 2.
 
@@ -1278,7 +1279,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         return width if width in {1, 2} else fallback
 
     def get_dec_mode(self, mode: Union[int, _DecPrivateMode],
-                     timeout: float = 1, force: bool = False) -> DecModeResponse:
+                     timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS, force: bool = False) -> DecModeResponse:
         """
         Query the state of a DEC Private Mode (DECRQM).
 
@@ -1376,7 +1377,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
     @contextlib.contextmanager
     def dec_modes_enabled(self, *modes: Union[int, _DecPrivateMode],
-                          timeout: Optional[float] = 1) -> Generator[None, None, None]:
+                          timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
         """
         Context manager for temporarily enabling DEC Private Modes.
 
@@ -1427,7 +1428,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
     @contextlib.contextmanager
     def dec_modes_disabled(self, *modes: Union[int, _DecPrivateMode],
-                           timeout: Optional[float] = 1) -> Generator[None, None, None]:
+                           timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
         """
         Context manager for temporarily disabling DEC Private Modes.
 
@@ -1464,7 +1465,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
     def does_mouse(self, *, clicks: bool = True, report_pixels: bool = False,
                    report_drag: bool = False, report_motion: bool = False,
-                   timeout: float = 1.0) -> bool:
+                   timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> bool:
         """
         Check if the terminal supports the specified mouse tracking features.
 
@@ -1508,7 +1509,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         return True
 
-    def does_inband_resize(self, timeout: float = 1.0) -> bool:
+    def does_inband_resize(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> bool:
         """
         Check if the terminal supports in-band window resize notifications.
 
@@ -1534,7 +1535,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         response = self.get_dec_mode(_DecPrivateMode.IN_BAND_WINDOW_RESIZE, timeout=timeout)
         return response.supported
 
-    def does_bracketed_paste(self, timeout: float = 1.0) -> bool:
+    def does_bracketed_paste(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> bool:
         """
         Check if the terminal supports bracketed paste mode.
 
@@ -1550,7 +1551,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         response = self.get_dec_mode(_DecPrivateMode.BRACKETED_PASTE, timeout=timeout)
         return response.supported
 
-    def does_synchronized_output(self, timeout: float = 1.0) -> bool:
+    def does_synchronized_output(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> bool:
         """
         Check if the terminal supports synchronized output.
 
@@ -1566,7 +1567,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         response = self.get_dec_mode(_DecPrivateMode.SYNCHRONIZED_OUTPUT, timeout=timeout)
         return response.supported
 
-    def does_grapheme_clustering(self, timeout: float = 1.0) -> bool:
+    def does_grapheme_clustering(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> bool:
         """
         Check if the terminal supports grapheme clustering.
 
@@ -1582,7 +1583,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         response = self.get_dec_mode(_DecPrivateMode.GRAPHEME_CLUSTERING, timeout=timeout)
         return response.supported
 
-    def does_focus_events(self, timeout: float = 1.0) -> bool:
+    def does_focus_events(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> bool:
         """
         Check if the terminal supports focus in/out event reporting.
 
@@ -1598,7 +1599,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         response = self.get_dec_mode(_DecPrivateMode.FOCUS_IN_OUT_EVENTS, timeout=timeout)
         return response.supported
 
-    def get_xtgettcap(self, timeout: Optional[float] = 1,
+    def get_xtgettcap(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                       force: bool = False,
                       caps: Optional[Iterable[str]] = None,
                       ) -> Optional[TermcapResponse]:
@@ -1618,7 +1619,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         if not self.is_a_tty:
             return None
 
-        timeout = timeout if timeout is not None else 1
+        timeout = timeout if timeout is not None else TERMINAL_QUERY_TIMEOUT_SECONDS
 
         _std_names = {c[0] for c in XTGETTCAP_CAPABILITIES}
 
@@ -1767,7 +1768,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         return TermcapResponse(supported=True, capabilities=capabilities)
 
-    def does_xtgettcap(self, timeout: Optional[float] = 1,
+    def does_xtgettcap(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                        force: bool = False) -> bool:
         """
         Check if the terminal supports XTGETTCAP (DCS +q) queries.
@@ -1779,7 +1780,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         result = self.get_xtgettcap(timeout=timeout, force=force)
         return result is not None and result.supported
 
-    def does_kitty_graphics(self, timeout: Optional[float] = 1,
+    def does_kitty_graphics(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                             force: bool = False) -> bool:
         """
         Check if the terminal supports the Kitty graphics protocol.
@@ -1806,7 +1807,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._kitty_graphics_supported = supported
         return supported
 
-    def get_iterm2_capabilities(self, timeout: Optional[float] = 1,
+    def get_iterm2_capabilities(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                                 force: bool = False
                                 ) -> Optional["ITerm2Capabilities"]:
         """
@@ -1847,7 +1848,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._iterm2_capabilities_cache = result
         return result
 
-    def does_iterm2(self, timeout: Optional[float] = 1,
+    def does_iterm2(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                     force: bool = False) -> bool:
         """
         Check if the terminal supports any iTerm2 protocols.
@@ -1859,7 +1860,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         result = self.get_iterm2_capabilities(timeout=timeout, force=force)
         return result is not None and result.supported
 
-    def does_iterm2_graphics(self, timeout: Optional[float] = 1,
+    def does_iterm2_graphics(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                              force: bool = False) -> bool:
         """
         Check if the terminal supports iTerm2 inline image protocol.
@@ -1875,7 +1876,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         return self.does_iterm2(timeout=timeout, force=force)
 
-    def does_kitty_notifications(self, timeout: Optional[float] = 1,
+    def does_kitty_notifications(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                                  force: bool = False) -> bool:
         """
         Check if the terminal supports Kitty desktop notifications (OSC 99).
@@ -1903,7 +1904,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._kitty_notifications_supported = supported
         return supported
 
-    def does_kitty_clipboard(self, timeout: Optional[float] = 1,
+    def does_kitty_clipboard(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                              force: bool = False) -> bool:
         """
         Check if the terminal supports the Kitty clipboard protocol (mode 5522).
@@ -1928,7 +1929,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._kitty_clipboard_supported = supported
         return supported
 
-    def does_kitty_pointer_shapes(self, timeout: Optional[float] = 1,
+    def does_kitty_pointer_shapes(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                                   force: bool = False
                                   ) -> Optional[str]:
         """
@@ -1957,7 +1958,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._kitty_pointer_shapes_result = (False, '')
         return None
 
-    def does_osc52_clipboard(self, timeout: Optional[float] = 1,
+    def does_osc52_clipboard(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                              force: bool = False) -> bool:
         r"""
         Detect OSC 52 clipboard support without reading the clipboard.
@@ -2047,7 +2048,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         except ValueError:
             return None
 
-    def get_color_scheme(self, timeout: Optional[float] = 1,
+    def get_color_scheme(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                          force: bool = False) -> Optional[str]:
         """
         Query the terminal's color scheme preference (dark or light mode).
@@ -2080,7 +2081,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._color_scheme_supported = False
         return None
 
-    def does_kitty_query(self, timeout: Optional[float] = 1,
+    def does_kitty_query(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                          force: bool = False) -> bool:
         """
         Detect Kitty with XTGETTCAP query extensions.
@@ -2121,7 +2122,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         return result is not None and 'kitty-query-name' in result.capabilities
 
     def get_decrqss(self, setting_id: str = Decrqss.SGR,
-                    timeout: Optional[float] = 1) -> Optional[str]:
+                    timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Optional[str]:
         """
         Query terminal state via DECRQSS (Request Status String).
 
@@ -2158,7 +2159,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return pt
         return None
 
-    def does_decrqss(self, timeout: Optional[float] = 1,
+    def does_decrqss(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                      force: bool = False) -> bool:
         """
         Detect DECRQSS (Request Status String) support.
@@ -2182,7 +2183,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._decrqss_supported = supported
         return supported
 
-    def does_styled_underlines(self, timeout: Optional[float] = 1,
+    def does_styled_underlines(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                                force: bool = False) -> bool:
         """
         Detect extended underline style support (curly, dotted, dashed).
@@ -2198,7 +2199,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         tc = self.get_xtgettcap(timeout=timeout, force=force, caps=['Smulx'])
         return tc is not None and 'Smulx' in tc
 
-    def does_colored_underlines(self, timeout: Optional[float] = 1,
+    def does_colored_underlines(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                                 force: bool = False) -> bool:
         """
         Detect colored underline support (``CSI 58;2;r;g;b m``).
@@ -2212,7 +2213,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         tc = self.get_xtgettcap(timeout=timeout, force=force, caps=['Setulc'])
         return tc is not None and 'Setulc' in tc
 
-    def does_text_sizing(self, timeout: float = 1,
+    def does_text_sizing(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS,
                          force: bool = False) -> TextSizingResult:
         """
         Detect Kitty text sizing protocol support (OSC 66).
@@ -2267,7 +2268,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     @contextlib.contextmanager
     def mouse_enabled(self, *, clicks: bool = True, report_pixels: bool = False,
                       report_drag: bool = False, report_motion: bool = False,
-                      timeout: float = 1.0) -> Generator[None, None, None]:
+                      timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
         """
         Context manager for enabling mouse tracking with various reporting modes.
 
@@ -2317,7 +2318,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             yield
 
     @contextlib.contextmanager
-    def bracketed_paste(self, timeout: float = 1.0) -> Generator[None, None, None]:
+    def bracketed_paste(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
         """
         Context manager for enabling bracketed paste mode.
 
@@ -2338,7 +2339,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             yield
 
     @contextlib.contextmanager
-    def synchronized_output(self, timeout: float = 1.0) -> Generator[None, None, None]:
+    def synchronized_output(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
         """
         Context manager for enabling synchronized output mode.
 
@@ -2351,7 +2352,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             yield
 
     @contextlib.contextmanager
-    def focus_events(self, timeout: float = 1.0) -> Generator[None, None, None]:
+    def focus_events(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
         """
         Context manager for enabling focus event reporting.
 
@@ -2364,7 +2365,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             yield
 
     @contextlib.contextmanager
-    def notify_on_resize(self, timeout: float = 1.0) -> Generator[None, None, None]:
+    def notify_on_resize(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
         """
         Context manager for enabling in-band window resize notifications.
 
@@ -2480,7 +2481,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         for mode_num in mode_numbers:
             self._dec_mode_cache[mode_num] = DecModeResponse.RESET
 
-    def get_sixel_height_and_width(self, timeout: Optional[float] = 1,
+    def get_sixel_height_and_width(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                                    force: bool = False) -> Tuple[int, int]:
         # pylint: disable=too-complex,too-many-branches
         """
@@ -2564,7 +2565,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # All methods failed
         return (-1, -1)
 
-    def get_sixel_colors(self, timeout: Optional[float] = 1,
+    def get_sixel_colors(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                          force: bool = False) -> int:
         """
         Query number of sixel color registers (XTSMGRAPHICS).
@@ -2602,7 +2603,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         return self._xtsmgraphics_colors_cache
 
-    def get_cell_height_and_width(self, timeout: Optional[float] = 1,
+    def get_cell_height_and_width(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                                   force: bool = False) -> Tuple[int, int]:
         """
         Query character cell pixel dimensions (XTWINOPS).
@@ -2678,7 +2679,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         return int(match.group(1))
 
-    def get_kitty_keyboard_state(self, timeout: Optional[float] = 1,
+    def get_kitty_keyboard_state(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                                  force: bool = False) -> Optional[KittyKeyboardProtocol]:
         """
         Query the current Kitty keyboard protocol flags.
@@ -2732,7 +2733,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     def enable_kitty_keyboard(self, *, disambiguate: bool = True, report_events: bool = False,
                               report_alternates: bool = False, report_all_keys: bool = False,
                               report_text: bool = False, mode: int = 1,
-                              timeout: Optional[float] = 1,
+                              timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                               force: bool = False) -> Generator[None, None, None]:
         """
         Context manager that enables Kitty keyboard protocol features.

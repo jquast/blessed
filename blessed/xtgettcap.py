@@ -19,6 +19,7 @@ from typing import Dict, Iterable, Optional
 
 # local
 from ._capabilities import XTGETTCAP_CAPABILITIES, TermcapResponse
+from .keyboard import TERMINAL_QUERY_TIMEOUT_SECONDS
 
 # CPR response regex (bytes for raw I/O via os.read).
 _RE_CPR_BYTES = re.compile(rb'\x1b\[([0-9]+);([0-9]+)R')
@@ -51,7 +52,7 @@ def _read_response(fd: int, timeout: float) -> str:
     return data.decode('latin-1', errors='replace')
 
 
-def query_xtgettcap(stream_fd: int, timeout: float = 1.0,
+def query_xtgettcap(stream_fd: int, timeout: Optional[float] = None,
                     input_fd: Optional[int] = None,
                     caps: Optional[Iterable[str]] = None) -> TermcapResponse:
     """
@@ -95,9 +96,11 @@ def query_xtgettcap(stream_fd: int, timeout: float = 1.0,
 
 
 def _query_xtgettcap_impl(stream_fd: int, input_fd: int,
-                          timeout: float,
+                          timeout: Optional[float],
                           caps: Optional[Iterable[str]] = None) -> TermcapResponse:
     """Core XTGETTCAP query logic (terminal already in raw mode)."""
+    if timeout is None:
+        timeout = TERMINAL_QUERY_TIMEOUT_SECONDS
     capabilities: Dict[str, str] = {}
 
     if caps is not None:

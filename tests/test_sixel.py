@@ -262,7 +262,7 @@ def test_sixel_height_and_width_fallback_to_xtwinops():
 def test_sixel_height_and_width_both_timeout():
     """Test sixel height and width returns (-1, -1) when all methods timeout."""
 
-    timeout = 1.0
+    timeout = 0.1
 
     def child(term):
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
@@ -290,8 +290,9 @@ def test_sixel_height_and_width_both_timeout():
     dimensions, duration = output.split('|')
 
     assert dimensions == '-1x-1'
-    # Should take around timeout/3 * 3 = 1.0s for the three queries
-    assert 0.90 <= float(duration) <= timeout * PCT_MAXWAIT_KEYSTROKE
+    # Should take around timeout * 0.72s for the parent's sleep phases
+    dur = float(duration)
+    assert timeout * 0.60 <= dur <= timeout * PCT_MAXWAIT_KEYSTROKE, f'duration={dur} timeout={timeout}'
     assert math.floor(time.time() - stime) <= timeout * PCT_MAXWAIT_KEYSTROKE
 
 

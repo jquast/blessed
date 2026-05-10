@@ -766,12 +766,7 @@ def test_supports_index(any_term):
 
 
 def test_get_proxy_string_deprecated():
-    """get_proxy_string() raises DeprecationWarning and returns None."""
-    import warnings
+    """get_proxy_string() returns None (deprecated, no warning emitted)."""
     from blessed.formatters import get_proxy_string
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter('always')
-        result = get_proxy_string(None, 'any_cap')
-        assert result is None
-        assert len(w) == 1
-        assert issubclass(w[0].category, DeprecationWarning)
+    result = get_proxy_string(None, 'any_cap')
+    assert result is None

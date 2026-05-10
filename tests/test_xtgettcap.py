@@ -284,7 +284,7 @@ def test_does_xtgettcap_with_cached():
     term._xtgettcap_cache = TermcapResponse(
         supported=True, capabilities={'TN': 'test'})
 
-    assert term.does_xtgettcap() is True
+    assert term.does_xtgettcap(timeout=0.1) is True
 
 
 def test_does_xtgettcap_unsupported():
@@ -476,7 +476,7 @@ def test_styled_underlines_unsupported():
     term._is_a_tty = True
     term._xtgettcap_cache = TermcapResponse(
         supported=True, capabilities={'TN': 'xterm'})
-    assert term.does_styled_underlines() is False
+    assert term.does_styled_underlines(timeout=0.1) is False
 
 
 def test_styled_underlines_no_xtgettcap():
@@ -485,7 +485,7 @@ def test_styled_underlines_no_xtgettcap():
     term = TestTerminal(stream=stream, force_styling=True)
     term._is_a_tty = True
     term._xtgettcap_first_query_failed = True
-    assert term.does_styled_underlines() is False
+    assert term.does_styled_underlines(timeout=0.1) is False
 
 
 def test_colored_underlines_supported():
@@ -506,7 +506,7 @@ def test_colored_underlines_unsupported():
     term._is_a_tty = True
     term._xtgettcap_cache = TermcapResponse(
         supported=True, capabilities={'TN': 'xterm'})
-    assert term.does_colored_underlines() is False
+    assert term.does_colored_underlines(timeout=0.1) is False
 
 
 def test_osc52_clipboard_not_a_tty():

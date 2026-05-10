@@ -27,6 +27,9 @@ from blessed.dec_modes import DecPrivateMode
 
 _T = TypeVar('_T', bound='Keystroke')
 
+TERMINAL_QUERY_TIMEOUT_SECONDS = 1.0
+"""Default timeout in seconds for terminal query operations (XTGETTCAP, OSC, DCS, etc.)."""
+
 
 # DEC event namedtuples
 BracketedPasteEvent = namedtuple('BracketedPasteEvent', 'text')

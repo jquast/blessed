@@ -15,6 +15,8 @@ from jinxed import win32
 
 # local
 from .terminal import WINSZ
+from .keyboard import TERMINAL_QUERY_TIMEOUT_SECONDS
+from .keyboard import TERMINAL_QUERY_TIMEOUT_SECONDS
 from .terminal import Terminal as _Terminal
 from .dec_modes import DecPrivateMode as _DecPrivateMode
 from .dec_modes import DecModeResponse
@@ -316,7 +318,7 @@ class Terminal(_Terminal):
     @contextlib.contextmanager
     def mouse_enabled(self, *, clicks: bool = True, report_pixels: bool = False,
                       report_drag: bool = False, report_motion: bool = False,
-                      timeout: float = 1.0) -> Generator[None, None, None]:
+                      timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
         """
         Context manager for enabling mouse tracking.
 
@@ -367,7 +369,7 @@ class Terminal(_Terminal):
 
     def does_mouse(self, *, clicks: bool = True, report_pixels: bool = False,
                    report_drag: bool = False, report_motion: bool = False,
-                   timeout: float = 1.0) -> bool:
+                   timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> bool:
         """
         Check if the terminal supports mouse tracking.
 
@@ -381,7 +383,7 @@ class Terminal(_Terminal):
         return True
 
     @contextlib.contextmanager
-    def notify_on_resize(self, timeout: float = 1.0) -> Generator[None, None, None]:
+    def notify_on_resize(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
         """
         Context manager for enabling in-band window resize notifications.
 
@@ -426,7 +428,7 @@ class Terminal(_Terminal):
             self._preferred_size_cache = None  # pylint: disable=attribute-defined-outside-init
             win32.set_console_mode(filehandle, save_mode)
 
-    def does_inband_resize(self, timeout: float = 1.0) -> bool:
+    def does_inband_resize(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> bool:
         """
         Check if the terminal supports in-band window resize notifications.
 

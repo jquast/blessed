@@ -116,11 +116,14 @@ class ParameterizingProxyString(str):
     r"""
     A Unicode string which can be called to proxy missing termcap entries.
 
-    This class supports the function :func:`get_proxy_string`, and mirrors
-    the behavior of :class:`ParameterizingString`, except that instead of
-    a capability name, receives a format string, and callable to filter the
-    given positional ``*args`` of :meth:`ParameterizingProxyString.__call__`
-    into a terminal sequence.
+    .. deprecated 1.40::
+
+        All previously-proxied terminfo(5) capabilities are now provided directly by the capability
+        database in jinxed.  This class is unused by blessed but kept for API compatibility.
+
+    This class mirrors the behavior of :class:`ParameterizingString`, except that instead of a
+    capability name, receives a format string, and callable to filter the given positional ``*args``
+    of :meth:`ParameterizingProxyString.__call__` into a terminal sequence.
 
     For example::
 
@@ -306,24 +309,21 @@ class NullCallableString(str):
         return ''.join(args)
 
 
-def get_proxy_string(term: 'Terminal', attr: str) -> None:
+def get_proxy_string(  # pylint: disable=unused-argument
+        term: 'Terminal', attr: str) -> None:
     """
     Proxy and return callable string for proxied attributes.
 
-    .. deprecated::
+    .. deprecated 1.40::
 
-        As of release 1.40, all previously-proxied terminfo(5) capabilities
-        are now provided directly by the capability database in jinxed.
+        All previously-proxied terminfo(5) capabilities are now provided directly by the capability
+        database in jinxed as "patches" in
+        https://github.com/Rockhopper-Technologies/jinxed/blob/main/terminals.toml.
 
         This function always returns ``None``.
     """
-    # std imports
-    import warnings
-    warnings.warn(
-        'get_proxy_string is deprecated; all capabilities are now '
-        'provided directly by the jinxed terminfo database.',
-        DeprecationWarning, stacklevel=2)
     return None
+
 
 
 def split_compound(compound: str) -> List[str]:

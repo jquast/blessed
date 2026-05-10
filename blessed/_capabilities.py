@@ -220,7 +220,25 @@ XTGETTCAP_CAPABILITIES = (
     ("kf9", "Function key F9"),
     ("kf10", "Function key F10"),
     ("kf11", "Function key F11"),
+    # Function keys kf1-kf12 only: higher-numbered F-keys (kf13-kf63) do not
+    # meaningfully differ between terminals; they describe F-key-with-modifier support,
+    # and differences across terminal descriptions are limited to kf1-kf5 at most.
     ("kf12", "Function key F12"),
+    # String capabilities -- modified navigation key sequences
+    ("kDC", "Shifted delete-char key"),
+    ("kEND", "Shifted end key"),
+    ("kHOM", "Shifted home key"),
+    ("kIC", "Shifted insert-char key"),
+    ("kLFT", "Shifted left-arrow key"),
+    ("kRIT", "Shifted right-arrow key"),
+    ("kDN", "Shifted down-arrow key"),
+    ("kUP", "Shifted up-arrow key"),
+    ("kNXT", "Shifted next-page key"),
+    ("kPRV", "Shifted previous-page key"),
+    ("kent", "Enter/send key"),
+    ("kind", "Scroll-down key"),
+    ("kri", "Scroll-up key"),
+    ("kmous", "Mouse key"),
     # And here is where xterm-supported XTGETTCAP capbilities end.
     #
     # We otherwise expect foot and kitty behavior -- if we wanted to, we could go without jinxed's
@@ -256,6 +274,14 @@ XTGETTCAP_CAPABILITIES = (
     ("ul", "Transparent underline"),
     ("xenl", "Newline glitch"),
     ("xt", "Destructive tabs"),
+    ("mc5i", "Will not echo input"),
+    ("AX", "Supports default colors"),
+    ("Tc", "Truecolor (24-bit RGB)"),
+    ("Su", "Colored underlines"),
+    ("XT", "Xterm extensions"),
+    ("fullkbd", "Full Kitty keyboard protocol"),
+    ("xvpa", "Extended vertical positioning"),
+    ("XF", "Extended functionality"),
     # String capabilities -- attributes
     ("bold", "Enter bold mode"),
     ("dim", "Enter dim mode"),
@@ -336,6 +362,120 @@ XTGETTCAP_CAPABILITIES = (
     ("kitty-query-background_opacity", "background opacity"),
     ("kitty-query-clipboard_control", "clipboard control"),
     ("kitty-query-os_name", "OS name"),
+    # String capabilities -- extended attributes
+    ("Smulx", "Styled underline"),
+    ("Setulc", "Set underline color"),
+    ("Ss", "Set underline style"),
+    ("Se", "Reset underline style"),
+    ("Smol", "Set overline mode"),
+    ("Rmol", "Reset overline mode"),
+    ("Smxx", "Enter extended modes"),
+    ("Rmxx", "Exit extended modes"),
+    ("acsc", "Alternate character set"),
+    ("smacs", "Enter alternate charset mode"),
+    ("rmacs", "Exit alternate charset mode"),
+    # String capabilities -- terminal features
+    ("Ms", "Clipboard set"),
+    ("Sync", "Synchronized output"),
+    ("E3", "Erase scrollback"),
+    ("Cr", "Set cursor color"),
+    ("Cs", "Reset cursor color"),
+    # String capabilities -- editing
+    ("ht", "Horizontal tab"),
+    ("hts", "Set tab stop"),
+    ("tbc", "Clear all tabs"),
+    ("ich1", "Insert character"),
+    ("rep", "Repeat character"),
+    # String capabilities -- cursor
+    ("invis", "Invisible cursor"),
+    ("initc", "Initialize color"),
+    # String capabilities -- screen
+    ("oc", "Original colors"),
+    ("ri", "Reverse index"),
+    ("smir", "Enter insert mode"),
+    ("rmir", "Exit insert mode"),
+    ("rs1", "Reset string 1"),
+    ("rs2", "Reset string 2"),
+    ("dsl", "Disable status line"),
+    ("fsl", "From status line"),
+    ("tsl", "To status line"),
+    # String capabilities -- colors
+    ("setrgbb", "Set RGB background"),
+    ("setrgbf", "Set RGB foreground"),
+    ("sgr", "Set attributes"),
+    # String capabilities -- terminal features (continued)
+    ("Rect", "Rectangle operations"),
+    ("TS", "Terminal state query"),
+    ("nel", "Newline"),
+    ("rmm", "Reset meta mode"),
+    ("setal", "Set ANSI label"),
+    # String capabilities -- kitty extensions
+    ("BD", "Enter bold mode (kitty)"),
+    ("BE", "Exit bold mode (kitty)"),
+    ("PS", "Presentation start (kitty)"),
+    ("PE", "Presentation end (kitty)"),
+    ("XM", "Enter marks mode (kitty)"),
+    ("xm", "Exit marks mode (kitty)"),
+    ("RV", "Enter reverse mode (kitty)"),
+    ("rv", "Exit reverse mode (kitty)"),
+    ("XR", "Enter reset mode (kitty)"),
+    ("xr", "Exit reset mode (kitty)"),
+    ("fe", "Exit font mode (kitty)"),
+    ("fd", "Enter font mode (kitty)"),
+    ("kxIN", "Keyboard in (kitty)"),
+    ("kxOUT", "Keyboard out (kitty)"),
+    ("is2", "Init 2 string"),
+        # String capabilities -- modifier key sequences (kitty keyboard protocol)
+    ("kDC3", "Alt delete-char key"),
+    ("kDC4", "Alt-Shift delete-char key"),
+    ("kDC5", "Ctrl delete-char key"),
+    ("kDC6", "Ctrl-Shift delete-char key"),
+    ("kDC7", "Ctrl-Alt delete-char key"),
+    ("kDN3", "Alt down-arrow key"),
+    ("kDN4", "Alt-Shift down-arrow key"),
+    ("kDN5", "Ctrl down-arrow key"),
+    ("kDN6", "Ctrl-Shift down-arrow key"),
+    ("kDN7", "Ctrl-Alt down-arrow key"),
+    ("kEND3", "Alt end key"),
+    ("kEND4", "Alt-Shift end key"),
+    ("kEND5", "Ctrl end key"),
+    ("kEND6", "Ctrl-Shift end key"),
+    ("kEND7", "Ctrl-Alt end key"),
+    ("kHOM3", "Alt home key"),
+    ("kHOM4", "Alt-Shift home key"),
+    ("kHOM5", "Ctrl home key"),
+    ("kHOM6", "Ctrl-Shift home key"),
+    ("kHOM7", "Ctrl-Alt home key"),
+    ("kIC3", "Alt insert-char key"),
+    ("kIC4", "Alt-Shift insert-char key"),
+    ("kIC5", "Ctrl insert-char key"),
+    ("kIC6", "Ctrl-Shift insert-char key"),
+    ("kIC7", "Ctrl-Alt insert-char key"),
+    ("kLFT3", "Alt left-arrow key"),
+    ("kLFT4", "Alt-Shift left-arrow key"),
+    ("kLFT5", "Ctrl left-arrow key"),
+    ("kLFT6", "Ctrl-Shift left-arrow key"),
+    ("kLFT7", "Ctrl-Alt left-arrow key"),
+    ("kNXT3", "Alt next-page key"),
+    ("kNXT4", "Alt-Shift next-page key"),
+    ("kNXT5", "Ctrl next-page key"),
+    ("kNXT6", "Ctrl-Shift next-page key"),
+    ("kNXT7", "Ctrl-Alt next-page key"),
+    ("kPRV3", "Alt previous-page key"),
+    ("kPRV4", "Alt-Shift previous-page key"),
+    ("kPRV5", "Ctrl previous-page key"),
+    ("kPRV6", "Ctrl-Shift previous-page key"),
+    ("kPRV7", "Ctrl-Alt previous-page key"),
+    ("kRIT3", "Alt right-arrow key"),
+    ("kRIT4", "Alt-Shift right-arrow key"),
+    ("kRIT5", "Ctrl right-arrow key"),
+    ("kRIT6", "Ctrl-Shift right-arrow key"),
+    ("kRIT7", "Ctrl-Alt right-arrow key"),
+    ("kUP3", "Alt up-arrow key"),
+    ("kUP4", "Alt-Shift up-arrow key"),
+    ("kUP5", "Ctrl up-arrow key"),
+    ("kUP6", "Ctrl-Shift up-arrow key"),
+    ("kUP7", "Ctrl-Alt up-arrow key"),
 )
 
 
@@ -482,7 +622,7 @@ class TermcapResponse:
             ch = value[i]
             if ch == '\\' and i + 1 < len(value):
                 nxt = value[i + 1]
-                if nxt == 'E' or nxt == 'e':
+                if nxt in {'E', 'e'}:
                     result.append('\x1b')
                     i += 2
                     continue
@@ -549,10 +689,7 @@ class TermcapResponse:
         """Parse a single XTGETTCAP DCS +r regex match into (name, value)."""
         cap_name = cls.hex_decode(match.group(2))
         val_hex = match.group(3)
-        if val_hex is not None:
-            value = cls.unescape_terminfo(cls.hex_decode(val_hex))
-        else:
-            value = ''
+        value = cls.unescape_terminfo(cls.hex_decode(val_hex)) if val_hex is not None else ''
         return cap_name, value
 
     @classmethod
