@@ -14,8 +14,17 @@ import os
 import re
 import time
 import select
-import termios
-from typing import Dict, Iterable, Optional
+import signal
+import array
+import contextlib
+from typing import Iterable, Iterator, Optional
+
+try:
+    import fcntl
+    import termios
+    HAS_TERMIOS = True
+except ImportError:
+    HAS_TERMIOS = False
 
 # local
 from ._capabilities import XTGETTCAP_CAPABILITIES, TermcapResponse
@@ -25,11 +34,43 @@ from .keyboard import TERMINAL_QUERY_TIMEOUT_SECONDS
 _RE_CPR_BYTES = re.compile(rb'\x1b\[([0-9]+);([0-9]+)R')
 
 
+@contextlib.contextmanager
+def _cbreak_fd(fd: int) -> Iterator[bool]:
+    """
+    Context manager that puts *fd* into cbreak (non-canonical, no echo) mode,
+    guarding against SIGTTOU for background processes, and restores the
+    original termios settings on exit.
+
+    :yields: ``True`` if cbreak mode was successfully set, ``False`` otherwise.
+    """
+    if not HAS_TERMIOS:
+        yield False
+        return
+    old_sigttou = signal.signal(signal.SIGTTOU, signal.SIG_IGN)
+    was_raw = False
+    try:
+        try:
+            saved_attrs = termios.tcgetattr(fd)
+            raw_attrs = termios.tcgetattr(fd)
+            raw_attrs[3] &= ~(termios.ICANON | termios.ECHO)
+            raw_attrs[6][termios.VMIN] = 1
+            raw_attrs[6][termios.VTIME] = 0
+            termios.tcsetattr(fd, termios.TCSANOW, raw_attrs)
+            was_raw = True
+        except termios.error:
+            pass
+        yield was_raw
+    finally:
+        if was_raw:
+            termios.tcsetattr(fd, termios.TCSADRAIN, saved_attrs)
+        signal.signal(signal.SIGTTOU, old_sigttou)
+
+
 def _read_response(fd: int, timeout: float) -> str:
     """
     Read bytes from fd until CPR arrives or timeout; decode once at end.
 
-    The terminal must already be in raw (non-canonical) mode; this is the caller's responsibility.
+    The terminal must already be in cbreak (non-canonical) mode; this is the caller's responsibility.
     """
     stime = time.time()
     data = b''
@@ -52,7 +93,8 @@ def _read_response(fd: int, timeout: float) -> str:
     return data.decode('latin-1', errors='replace')
 
 
-def query_xtgettcap(stream_fd: int, timeout: Optional[float] = None,
+def query_xtgettcap(stream_fd: int,
+                    timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                     input_fd: Optional[int] = None,
                     caps: Optional[Iterable[str]] = None) -> TermcapResponse:
     """
@@ -70,84 +112,52 @@ def query_xtgettcap(stream_fd: int, timeout: Optional[float] = None,
         standard XTGETTCAP capabilities are queried.
     :returns: Parsed response with discovered capabilities.
     """
+    if not HAS_TERMIOS:
+        return TermcapResponse(supported=False)
+
     if input_fd is None:
         input_fd = stream_fd
 
-    # Set terminal to raw (non-canonical, no echo) so os.read returns
-    # bytes immediately and does not echo them back to the screen.
-    # XTGETTCAP/CPR responses do not contain newlines, so canonical
-    # mode would buffer them indefinitely; ECHO would leak them.
+    # A PTY with no window size (rows=0, cols=0) will not answer
+    # XTGETTCAP or CPR queries; return early to avoid timeout delay.
     try:
-        saved_attrs = termios.tcgetattr(input_fd)
-        raw_attrs = termios.tcgetattr(input_fd)
-        raw_attrs[3] &= ~(termios.ICANON | termios.ECHO)
-        raw_attrs[6][termios.VMIN] = 1
-        raw_attrs[6][termios.VTIME] = 0
-        termios.tcsetattr(input_fd, termios.TCSANOW, raw_attrs)
-        was_raw = True
-    except termios.error:
-        was_raw = False
-
-    try:
-        return _query_xtgettcap_impl(stream_fd, input_fd, timeout, caps)
-    finally:
-        if was_raw:
-            termios.tcsetattr(input_fd, termios.TCSANOW, saved_attrs)
-
-
-def _query_xtgettcap_impl(stream_fd: int, input_fd: int,
-                          timeout: Optional[float],
-                          caps: Optional[Iterable[str]] = None) -> TermcapResponse:
-    """Core XTGETTCAP query logic (terminal already in raw mode)."""
-    if timeout is None:
-        timeout = TERMINAL_QUERY_TIMEOUT_SECONDS
-    capabilities: Dict[str, str] = {}
-
-    if caps is not None:
-        cap_list = list(caps)
-        if not cap_list:
+        buf = array.array('H', [0, 0, 0, 0])
+        fcntl.ioctl(input_fd, termios.TIOCGWINSZ, buf)
+        if buf[0] == 0 and buf[1] == 0:
             return TermcapResponse(supported=False)
-    else:
-        cap_list = [c[0] for c in XTGETTCAP_CAPABILITIES]
+    except OSError:
+        pass
 
-    # Phase 1: Probe with the first capability to check support.
-    probe_cap = cap_list[0]
-    os.write(stream_fd,
-             f'\x1bP+q{TermcapResponse.hex_encode(probe_cap)}\x1b\\'.encode())
-    os.write(stream_fd, b'\x1b[6n')  # CPR fence
-    raw = _read_response(input_fd, timeout)
+    with _cbreak_fd(input_fd) as in_cbreak:
+        if not in_cbreak:
+            return TermcapResponse(supported=False)
+        if timeout is None:
+            timeout = TERMINAL_QUERY_TIMEOUT_SECONDS
 
-    if not raw:
-        return TermcapResponse(supported=False)
+        if caps is not None:
+            cap_list = list(caps)
+            if not cap_list:
+                return TermcapResponse(supported=False)
+        else:
+            cap_list = [c[0] for c in XTGETTCAP_CAPABILITIES]
 
-    # Check if probe got a valid XTGETTCAP response
-    probe_match = TermcapResponse._RE_XTGETTCAP_RESPONSE.search(raw)
-    if probe_match is None or probe_match.group(1) != '1':
-        # Not supported; clean up any garbage on the terminal
-        os.write(stream_fd, b'\r\x1b[K')
-        return TermcapResponse(supported=False)
-
-    name, value = TermcapResponse.from_match(probe_match)
-    capabilities[name] = value
-
-    # Phase 2: Spray remaining capabilities (skip probe cap).
-    remaining = cap_list[1:]
-    if remaining:
-        for capname in remaining:
+        # Spray all capabilities at once, then CPR fence.
+        for capname in cap_list:
             os.write(stream_fd,
                      f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\'.encode())
         os.write(stream_fd, b'\x1b[6n')  # CPR fence
-        raw = _read_response(input_fd, timeout)
+        if not (raw := _read_response(input_fd, timeout)):
+            return TermcapResponse(supported=False)
 
-        if raw:
-            capabilities.update(TermcapResponse.parse_capabilities(raw))
+        # Process any valid XTGETTCAP response exists.
+        if TermcapResponse._RE_XTGETTCAP_RESPONSE.search(raw) is None:
+            return TermcapResponse(supported=False)
 
-    # Record None sentinel for any requested cap that wasn't answered.
-    for capname in cap_list:
-        if capname not in capabilities:
-            capabilities[capname] = None  # type: ignore[assignment]
+        capabilities = TermcapResponse.parse_capabilities(raw)
 
-    # Erase any visible DCS garbage on unsupported terminals
-    os.write(stream_fd, b'\r\x1b[K')
+        # Record None sentinel for any requested cap that wasn't answered.
+        for capname in cap_list:
+            if capname not in capabilities:
+                capabilities[capname] = None  # type: ignore[assignment]
 
-    return TermcapResponse(supported=True, capabilities=capabilities)
+        return TermcapResponse(supported=True, capabilities=capabilities)

@@ -301,20 +301,22 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         if _xtgettcap_data is None and self.is_a_tty and self._init_descriptor is not None:
             try:
                 _xtgettcap_data = query_xtgettcap(
-                    stream_fd=self._init_descriptor, timeout=TERMINAL_QUERY_TIMEOUT_SECONDS,
+                    stream_fd=self._init_descriptor,
+                    timeout=TERMINAL_QUERY_TIMEOUT_SECONDS,
                     input_fd=self._keyboard_fd,
                     caps=['TN', 'Co', 'RGB', 'blink', 'sitm', 'ritm', 'cvvis'])
             except OSError as exc:
                 self.errors.append(f'XTGETTCAP probe failed, OSError: {exc}')
                 self._xtgettcap_first_query_failed = True
-            if _xtgettcap_data is None:
-                self.errors.append('XTGETTCAP probe failed response')
-                self._xtgettcap_first_query_failed = True
+            else:
+                if _xtgettcap_data is None or not _xtgettcap_data.supported:
+                    if _xtgettcap_data is None:
+                        self.errors.append('XTGETTCAP probe failed response')
+                    else:
+                        self.errors.append('XTGETTCAP probe: no support')
+                    self._xtgettcap_first_query_failed = True
         if _xtgettcap_data is not None:
-            if not _xtgettcap_data.supported:
-                self.errors.append('XTGETTCAP probe: no support')
             self._xtgettcap_cache = _xtgettcap_data
-
             if _xtgettcap_data.terminal_name:
                 self._kind = _xtgettcap_data.terminal_name
 
@@ -817,8 +819,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 data = data[:match.start()] + data[match.end():]
 
             # Check if the feature response arrived before the CPR
-            feature_match = feature_re.search(data)
-            if feature_match:
+            if (feature_match := feature_re.search(data)):
                 data = data[:feature_match.start()] + data[feature_match.end():]
 
             # Re-buffer any remaining keyboard input
@@ -1532,8 +1533,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 # Fall back to SIGWINCH or other methods
                 pass
         """
-        response = self.get_dec_mode(_DecPrivateMode.IN_BAND_WINDOW_RESIZE, timeout=timeout)
-        return response.supported
+        return self.get_dec_mode(_DecPrivateMode.IN_BAND_WINDOW_RESIZE, timeout=timeout).supported
 
     def does_bracketed_paste(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> bool:
         """
@@ -1548,8 +1548,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :returns: True if bracketed paste mode is supported.
         :rtype: bool
         """
-        response = self.get_dec_mode(_DecPrivateMode.BRACKETED_PASTE, timeout=timeout)
-        return response.supported
+        return self.get_dec_mode(_DecPrivateMode.BRACKETED_PASTE, timeout=timeout).supported
 
     def does_synchronized_output(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> bool:
         """
@@ -1564,8 +1563,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :returns: True if synchronized output is supported.
         :rtype: bool
         """
-        response = self.get_dec_mode(_DecPrivateMode.SYNCHRONIZED_OUTPUT, timeout=timeout)
-        return response.supported
+        return self.get_dec_mode(_DecPrivateMode.SYNCHRONIZED_OUTPUT, timeout=timeout).supported
 
     def does_grapheme_clustering(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> bool:
         """
@@ -1580,8 +1578,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :returns: True if grapheme clustering is supported.
         :rtype: bool
         """
-        response = self.get_dec_mode(_DecPrivateMode.GRAPHEME_CLUSTERING, timeout=timeout)
-        return response.supported
+        return self.get_dec_mode(_DecPrivateMode.GRAPHEME_CLUSTERING, timeout=timeout).supported
 
     def does_focus_events(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> bool:
         """
@@ -1596,13 +1593,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :returns: True if focus event reporting is supported.
         :rtype: bool
         """
-        response = self.get_dec_mode(_DecPrivateMode.FOCUS_IN_OUT_EVENTS, timeout=timeout)
-        return response.supported
+        return self.get_dec_mode(_DecPrivateMode.FOCUS_IN_OUT_EVENTS, timeout=timeout).supported
 
     def get_xtgettcap(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                       force: bool = False,
                       caps: Optional[Iterable[str]] = None,
-                      ) -> Optional[TermcapResponse]:
+                      ) -> TermcapResponse:
         """
         Query terminal capabilities via XTGETTCAP (DCS +q).
 
@@ -1614,10 +1610,10 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :arg bool force: Always re-query for latest values.
         :arg caps: Capability names to query.  When specified, only these additional capabilities
             may queried (incremental on cache).  when unspecified, it as though `all=True` was used.
-        :rtype: TermcapResponse or None
+        :rtype: TermcapResponse
         """
         if not self.is_a_tty:
-            return None
+            return TermcapResponse(supported=False)
 
         timeout = timeout if timeout is not None else TERMINAL_QUERY_TIMEOUT_SECONDS
 
@@ -1629,18 +1625,20 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         else:
             _requested = _std_names.copy()
 
-        # force=True: single batch, no probe, no cache, no sticky
-        if force:
-            batch_list = [(name, '') for name in _requested]
-            result = self._xtgettcap_batch(
-                batch_list, capabilities={}, timeout=timeout)
-            if result is not None:
-                self._xtgettcap_cache = result
+        # force=True or no cache: single batch
+        if force or self._xtgettcap_cache is None:
+            # sticky failure (no explicit caps requested)
+            if self._xtgettcap_first_query_failed and caps is None and not force:
+                return TermcapResponse(supported=False)
+            batch_caps = [(name, '') for name in _requested]
+            result = self._xtgettcap_batch(batch_caps, capabilities={}, timeout=timeout)
+            self._xtgettcap_cache = result
+            if result.supported:
                 self._apply_xtgettcap_overlay()
             return self._filter_xtgettcap_response(result, _requested)
 
         # cache hit: check if all requested caps are already known
-        if self._xtgettcap_cache is not None and self._xtgettcap_cache.supported:
+        if self._xtgettcap_cache.supported:
             cached_names = set(self._xtgettcap_cache.capabilities.keys())
             missing = _requested - cached_names
             if not missing:
@@ -1650,46 +1648,13 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 [(name, '') for name in missing],
                 capabilities=dict(self._xtgettcap_cache.capabilities),
                 timeout=timeout)
-            if result is not None:
+            if result.supported:
                 self._xtgettcap_cache = result
                 self._apply_xtgettcap_overlay()
             return self._filter_xtgettcap_response(self._xtgettcap_cache, _requested)
 
-        # sticky failure (no explicit caps requested)
-        if self._xtgettcap_first_query_failed and caps is None:
-            return None
+        return TermcapResponse(supported=False)
 
-        # first query: probe + batch
-        cap_list = list(_requested)
-        probe_cap = cap_list[0]
-        probe_query = (
-            f'\x1bP+q{TermcapResponse.hex_encode(probe_cap)}\x1b\\')
-        match = self._query_with_boundary(
-            probe_query, TermcapResponse._RE_XTGETTCAP_RESPONSE, timeout)
-        if match is None:
-            return None
-
-        capabilities: Dict[str, str] = {}
-        name, value = TermcapResponse.from_match(match)
-        capabilities[name] = value
-
-        # Remaining requested caps (after probe)
-        remaining = cap_list[1:]
-        batch_caps = [(name, '') for name in remaining]
-
-        result = self._xtgettcap_batch(
-            batch_caps, capabilities=capabilities, timeout=timeout)
-
-        # Mark any requested-but-unanswered caps as None sentinel
-        if result is not None:
-            for capname in _requested:
-                if capname not in result.capabilities:
-                    result.capabilities[capname] = None  # type: ignore[assignment]
-
-        self._xtgettcap_cache = result
-        if result is not None:
-            self._apply_xtgettcap_overlay()
-        return self._filter_xtgettcap_response(result, _requested)
 
     def _apply_xtgettcap_overlay(self) -> None:
         """Apply cached XTGETTCAP capabilities to jinxed terminal."""
@@ -1701,16 +1666,14 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
     @staticmethod
     def _filter_xtgettcap_response(
-            tc: Optional[TermcapResponse],
+            tc: TermcapResponse,
             requested: Optional[Set[str]] = None,
-    ) -> Optional[TermcapResponse]:
+    ) -> TermcapResponse:
         """
         Return *tc* with ``None``-valued capabilities filtered out.
 
         When *requested* is provided, additionally limit capabilities to only those names.
         """
-        if tc is None:
-            return None
         filtered = {k: v for k, v in tc.capabilities.items() if v is not None}
         if requested is not None:
             filtered = {k: v for k, v in filtered.items() if k in requested}
@@ -1721,11 +1684,11 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             batch_caps: List[Tuple[str, str]],
             capabilities: Dict[str, str],
             timeout: float,
-    ) -> Optional[TermcapResponse]:
+    ) -> TermcapResponse:
         """
         Spray *batch_caps* + CPR fence, read responses, return TermcapResponse.
 
-        Returns ``None`` when the CPR fence never arrives (terminal does not
+        Returns ``supported=False`` when the CPR fence never arrives or no capabilities are answered. Previously it would return ``None`` when the terminal does not
         respond to XTGETTCAP at all).  Capabilities in *batch_caps* that are
         not answered are recorded as ``None`` in the returned
         ``capabilities`` dict so they are not re-queried on future calls.
@@ -1750,13 +1713,14 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         if match is None:
             # CPR fence never arrived -- terminal did not answer at all
-            return None
+            return TermcapResponse(supported=False, capabilities=capabilities)
 
         # Strip the CPR itself from the response data
         data = data[:match.start()] + data[match.end():]
 
         if data:
-            capabilities.update(TermcapResponse.parse_capabilities(data))
+            parsed = TermcapResponse.parse_capabilities(data)
+            capabilities.update(parsed)
             remaining = TermcapResponse._RE_XTGETTCAP_RESPONSE.sub('', data)
             if remaining:
                 self.ungetch(remaining)
@@ -1766,7 +1730,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             if capname not in capabilities:
                 capabilities[capname] = None  # type: ignore[assignment]
 
-        return TermcapResponse(supported=True, capabilities=capabilities)
+        # Terminal supports XTGETTCAP iff any capability was answered.
+        supported = any(value is not None for value in capabilities.values())
+        return TermcapResponse(supported=supported, capabilities=capabilities)
 
     def does_xtgettcap(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                        force: bool = False) -> bool:
@@ -1778,7 +1744,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :rtype: bool
         """
         result = self.get_xtgettcap(timeout=timeout, force=force)
-        return result is not None and result.supported
+        return result.supported
 
     def does_kitty_graphics(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                             force: bool = False) -> bool:
@@ -1983,7 +1949,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         # Strategy 2: XTGETTCAP Ms capability
         tcap = self.get_xtgettcap(timeout=timeout, force=force, caps=['Ms'])
-        if tcap is not None and 'Ms' in tcap.capabilities:
+        if 'Ms' in tcap.capabilities:
             self._osc52_clipboard_supported = True
             return True
 
@@ -2119,7 +2085,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # but kept in perpetuity anyway for API compatibility.
         result = self.get_xtgettcap(
             timeout=timeout, force=force, caps=['kitty-query-name'])
-        return result is not None and 'kitty-query-name' in result.capabilities
+        return 'kitty-query-name' in result.capabilities
 
     def get_decrqss(self, setting_id: str = Decrqss.SGR,
                     timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Optional[str]:
@@ -2197,7 +2163,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :rtype: bool
         """
         tc = self.get_xtgettcap(timeout=timeout, force=force, caps=['Smulx'])
-        return tc is not None and 'Smulx' in tc
+        return 'Smulx' in tc
 
     def does_colored_underlines(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                                 force: bool = False) -> bool:
@@ -2211,7 +2177,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :rtype: bool
         """
         tc = self.get_xtgettcap(timeout=timeout, force=force, caps=['Setulc'])
-        return tc is not None and 'Setulc' in tc
+        return 'Setulc' in tc
 
     def does_text_sizing(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS,
                          force: bool = False) -> TextSizingResult:
@@ -3756,30 +3722,32 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             see http://www.unixwiz.net/techtips/termios-vmin-vtime.html
         """
         if HAS_TTY and self._keyboard_fd is not None:
-            # Temporarily ignore SIGTTOU: when running in a background
-            # process group, tcsetattr() would otherwise stop the process.
-            old_sigttou = signal.signal(signal.SIGTTOU, signal.SIG_IGN)
-            try:
-                # Save current terminal mode:
-                save_mode = termios.tcgetattr(self._keyboard_fd)
-                save_line_buffered = self._line_buffered
-                # pylint: disable-next=possibly-used-before-assignment
-                tty.setcbreak(self._keyboard_fd, termios.TCSANOW)
-                try:
-                    self._line_buffered = False
-                    yield
-                finally:
-                    # Restore prior mode.  TCSADRAIN (not TCSAFLUSH) so that
-                    # keystrokes buffered during the mode switch are preserved;
-                    # TCSAFLUSH discards unread input, dropping user keystrokes.
-                    termios.tcsetattr(self._keyboard_fd,
-                                      termios.TCSADRAIN,
-                                      save_mode)
-                    self._line_buffered = save_line_buffered
-            finally:
-                signal.signal(signal.SIGTTOU, old_sigttou)
+            with self._enter_termios_mode(tty.setcbreak):
+                yield
         else:
             yield
+
+    @contextlib.contextmanager
+    def _enter_termios_mode(self, setter) -> Generator[None, None, None]:
+        """
+        Put the keyboard terminal into a raw-ish mode using *setter*,
+        guarding against SIGTTOU for background processes.
+        """
+        old_sigttou = signal.signal(signal.SIGTTOU, signal.SIG_IGN)
+        try:
+            save_mode = termios.tcgetattr(self._keyboard_fd)
+            save_line_buffered = self._line_buffered
+            setter(self._keyboard_fd, termios.TCSANOW)
+            try:
+                self._line_buffered = False
+                yield
+            finally:
+                termios.tcsetattr(self._keyboard_fd,
+                                  termios.TCSADRAIN,
+                                  save_mode)
+                self._line_buffered = save_line_buffered
+        finally:
+            signal.signal(signal.SIGTTOU, old_sigttou)
 
     @contextlib.contextmanager
     def raw(self) -> Generator[None, None, None]:
@@ -3802,27 +3770,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 print("printing in raw mode", end="\r\n")
         """
         if HAS_TTY and self._keyboard_fd is not None:
-            # Temporarily ignore SIGTTOU: when running in a background
-            # process group, tcsetattr() would otherwise stop the process.
-            old_sigttou = signal.signal(signal.SIGTTOU, signal.SIG_IGN)
-            try:
-                # Save current terminal mode:
-                save_mode = termios.tcgetattr(self._keyboard_fd)
-                save_line_buffered = self._line_buffered
-                tty.setraw(self._keyboard_fd, termios.TCSANOW)
-                try:
-                    self._line_buffered = False
-                    yield
-                finally:
-                    # Restore prior mode.  TCSADRAIN (not TCSAFLUSH) so that
-                    # keystrokes buffered during the mode switch are preserved;
-                    # TCSAFLUSH discards unread input, dropping user keystrokes.
-                    termios.tcsetattr(self._keyboard_fd,
-                                      termios.TCSADRAIN,
-                                      save_mode)
-                    self._line_buffered = save_line_buffered
-            finally:
-                signal.signal(signal.SIGTTOU, old_sigttou)
+            with self._enter_termios_mode(tty.setraw):
+                yield
         else:
             yield
 

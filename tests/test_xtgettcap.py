@@ -203,7 +203,7 @@ def test_get_xtgettcap_not_a_tty():
     """Returns None when not a TTY."""
     term = TestTerminal(stream=io.StringIO(), force_styling=True,
                         is_a_tty=False)
-    assert term.get_xtgettcap(timeout=0.01) is None
+    assert not term.get_xtgettcap(timeout=0.01).supported
 
 
 def test_does_xtgettcap_not_a_tty():
@@ -238,7 +238,7 @@ def test_get_xtgettcap_sticky_failure():
     term._xtgettcap_first_query_failed = True
 
     result = term.get_xtgettcap()
-    assert result is None
+    assert not result.supported
 
 
 def test_get_xtgettcap_force_bypasses_cache():
@@ -253,7 +253,7 @@ def test_get_xtgettcap_force_bypasses_cache():
     term._xtgettcap_first_query_failed = True
 
     result = term.get_xtgettcap(timeout=0.01, force=True)
-    assert result is None
+    assert not result.supported
 
 
 def test_parse_xtgettcap_responses():
@@ -418,7 +418,7 @@ def test_get_xtgettcap_absent_cap_not_requeried():
         supported=True,
         capabilities={'TN': 'xterm', 'Ms': None})
     result = term.get_xtgettcap(caps=['Ms'], timeout=0.01)
-    assert result is not None
+    assert result.supported
     assert 'Ms' not in result.capabilities
     assert term._xtgettcap_cache.capabilities['Ms'] is None
 
@@ -439,11 +439,6 @@ def test_get_xtgettcap_no_args():
     assert result is not None
     assert result['TN'] == 'xterm'
     assert result['Co'] == '256'
-
-
-def test_filter_xtgettcap_response_none():
-    """_filter_xtgettcap_response returns None for None input."""
-    assert Terminal._filter_xtgettcap_response(None) is None
 
 
 def test_filter_xtgettcap_response_removes_none_values():
@@ -617,18 +612,20 @@ def test_get_xtgettcap_full_success():
 
 
 @pytestmark_pty
-def test_get_xtgettcap_probe_failure():
-    """Phase 1 probe failure sets sticky flag."""
+def test_get_xtgettcap_batch_empty():
+    """Batch with CPR-only response returns supported=False."""
     def child(term):
         term._xtgettcap_cache = None
         term._xtgettcap_first_query_failed = False
         term.ungetch('\x1b[10;20R')
         result = term.get_xtgettcap(timeout=0.1)
-        assert result is None
+        assert result is not None
+        assert result.supported is False
+        assert result.capabilities == {}
         return b'OK'
 
     output = pty_test(child, parent_func=None,
-                      test_name='test_get_xtgettcap_probe_failure')
+                      test_name='test_get_xtgettcap_batch_empty')
     assert 'OK' in output
 
 
@@ -947,19 +944,9 @@ def test_terminal_init_xtgettcap_success():
             if ready:
                 data += os.read(master_fd, 4096)
         os.write(master_fd, b'\x1bP1+r436f=323536\x1b\\')
-        os.write(master_fd, b'\x1b[10;20R')
-        data = b''
-        stime = time.time()
-        while b'\x1b[6n' not in data:
-            remaining = 2.0 - (time.time() - stime)
-            if remaining <= 0:
-                break
-            ready, _, _ = select.select([master_fd], [], [], remaining)
-            if ready:
-                data += os.read(master_fd, 4096)
         os.write(master_fd, b'\x1bP1+r524742=38\x1b\\')
         os.write(master_fd, b'\x1bP1+r544e=787465726d\x1b\\')
-        os.write(master_fd, b'\x1b[11;21R')
+        os.write(master_fd, b'\x1b[10;20R')
 
     def child(term):
         assert term._xtgettcap_cache is not None
@@ -1106,8 +1093,7 @@ def test_query_xtgettcap_termios_error():
     """query_xtgettcap survives termios.error on input_fd."""
     rfd, wfd = os.pipe()
     try:
-        with mock.patch('blessed.xtgettcap.termios.tcgetattr',
-                        side_effect=termios.error):
+        with mock.patch('blessed.xtgettcap.termios.tcgetattr', side_effect=termios.error):
             result = query_xtgettcap(stream_fd=wfd, input_fd=rfd, timeout=0.01)
             assert result.supported is False
     finally:

@@ -688,8 +688,11 @@ class TermcapResponse:
     def from_match(cls, match: 're.Match[str]') -> 'tuple[str, str]':
         """Parse a single XTGETTCAP DCS +r regex match into (name, value)."""
         cap_name = cls.hex_decode(match.group(2))
-        val_hex = match.group(3)
-        value = cls.unescape_terminfo(cls.hex_decode(val_hex)) if val_hex is not None else ''
+        value = (
+            cls.unescape_terminfo(cls.hex_decode(val_hex))
+            if (val_hex := match.group(3)) is not None
+            else ''
+        )
         return cap_name, value
 
     @classmethod
