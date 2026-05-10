@@ -254,6 +254,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._encoding = 'UTF-8'
         self._init_descriptor = None
         self._is_a_tty = False
+        self._keyboard_buf: 'collections.deque[str]' = collections.deque()
+        self._xtgettcap_cache: TermcapResponse = TermcapResponse(supported=False)
         self.__init__streams()
 
         if IS_WINDOWS and self._init_descriptor is not None:
@@ -294,9 +296,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
     def __init__keyboard_state(self) -> None:
         """Initialize minimal keyboard state needed for XTGETTCAP probe."""
-        # keyboard stream buffer
-        self._keyboard_buf: collections.deque[str] = collections.deque()
-
         # Build database of int code <=> KEY_NAME (static, no jinxed deps).
         self._keycodes = get_keyboard_codes()
 
@@ -313,33 +312,25 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
     def __init__xtgettcap(self, _xtgettcap_data: Optional[TermcapResponse]) -> None:
         """Probe for core XTGETTCAP capabilities."""
-        # this is like an optimized version of get_xtgettcap() + get_location(), for only the
-        # essentials: Co, RGB, and TN. Also nice to have are some self-reported capabilities that
-        # some terminals report: blink, sitm/ritm (italics), and cvvis. These values were determined
-        # by using bin/compare_caps.py on modern terminals with XTGETTCAP support beyond TN, Co, and
-        # RGB.
-        self._xtgettcap_cache: TermcapResponse = TermcapResponse(supported=False)
         self._xtgettcap_first_query_failed = False
 
-        if _xtgettcap_data is None and self.is_a_tty and self._keyboard_fd is not None:
+        if _xtgettcap_data is not None:
+            self._xtgettcap_cache = _xtgettcap_data
+        elif self.is_a_tty and self._keyboard_fd is not None:
             try:
-                _xtgettcap_data = self._xtgettcap_batch(
+                self._xtgettcap_cache = self._xtgettcap_batch(
                     caps=['TN', 'Co', 'RGB', 'blink', 'sitm', 'ritm', 'cvvis'],
                     timeout=TERMINAL_QUERY_TIMEOUT_SECONDS)
             except OSError as exc:
                 self.errors.append(f'XTGETTCAP probe failed, OSError: {exc}')
                 self._xtgettcap_first_query_failed = True
             else:
-                if _xtgettcap_data is None or not _xtgettcap_data.supported:
-                    if _xtgettcap_data is None:
-                        self.errors.append('XTGETTCAP probe failed response')
-                    else:
-                        self.errors.append('XTGETTCAP probe: no support')
+                if not self._xtgettcap_cache.supported:
+                    self.errors.append('XTGETTCAP probe: no support')
                     self._xtgettcap_first_query_failed = True
-        if _xtgettcap_data is not None:
-            self._xtgettcap_cache = _xtgettcap_data
-            if _xtgettcap_data.terminal_name:
-                self._kind = _xtgettcap_data.terminal_name
+
+        if self._xtgettcap_cache.supported and self._xtgettcap_cache.terminal_name:
+            self._kind = self._xtgettcap_cache.terminal_name
 
     def __init__query_caches(self) -> None:
         # So many terminal capabilities are static, except those queries through `get_decrqss()`.
@@ -602,11 +593,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         if not self._does_styling:
             return NullCallableString()
-        # Never attempt to resolve _jinxed_term or other private
-        # attributes that aren't yet initialized as capabilities.
-        if attr == '_jinxed_term' or (
-            attr.startswith('_') and '_jinxed_term' not in self.__dict__
-        ):
+        # Private attributes are not terminal capabilities
+        # (except jinxed internals like _cuf1).
+        if attr.startswith('_') and '_jinxed_term' not in self.__dict__:
             raise AttributeError(attr)
         # Fetch the missing 'attribute' into some kind of curses-resolved
         # capability, and cache by attaching to this Terminal class instance.
@@ -1656,7 +1645,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :rtype: TermcapResponse
         """
         if not self.is_a_tty:
-            return TermcapResponse(supported=False)
+            return None
 
         timeout = timeout if timeout is not None else TERMINAL_QUERY_TIMEOUT_SECONDS
 
@@ -1673,56 +1662,43 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         # sticky failure (no explicit caps requested)
         if self._xtgettcap_first_query_failed and caps is None and not force:
-            return TermcapResponse(supported=False)
+            return None
 
         # force=True: single batch
         if force:
             caps = list(_requested)
             result = self._xtgettcap_batch(caps, timeout=timeout)
-            return self._filter_xtgettcap_response(
-                self._update_xtgettcap_cache(result), _requested)
+            return self._maybe_none(self._filter_xtgettcap_response(
+                self._update_xtgettcap_cache(result), _requested))
 
         # cache hit: check if all requested caps are already known
         if self._xtgettcap_cache.supported:
             cached_names = set(self._xtgettcap_cache.capabilities.keys())
             missing = _requested - cached_names
             if not missing:
-                return self._filter_xtgettcap_response(self._xtgettcap_cache, _requested)
+                return self._maybe_none(self._filter_xtgettcap_response(self._xtgettcap_cache, _requested))
             # Incremental: query only missing caps, merge into cache
             result = self._xtgettcap_batch(list(missing), timeout=timeout)
-            return self._filter_xtgettcap_response(
-                self._update_xtgettcap_cache(result, merge=True), _requested)
+            return self._maybe_none(self._filter_xtgettcap_response(
+                self._update_xtgettcap_cache(result), _requested))
 
         # cache unsupported but specific caps requested: try query
         if caps is not None:
             result = self._xtgettcap_batch(list(_requested), timeout=timeout)
-            return self._filter_xtgettcap_response(
-                self._update_xtgettcap_cache(result), _requested)
+            return self._maybe_none(self._filter_xtgettcap_response(
+                self._update_xtgettcap_cache(result), _requested))
 
-        return TermcapResponse(supported=False)
+        return None
 
-    def _update_xtgettcap_cache(self,
-                               result: TermcapResponse,
-                               merge: bool = False) -> TermcapResponse:
-        """Update ``_xtgettcap_cache`` with *result* and apply overlay if supported."""
-        if merge and self._xtgettcap_cache.supported and result.supported:
-            self._xtgettcap_cache.capabilities.update(result.capabilities)
-        else:
-            self._xtgettcap_cache = result
-        if self._xtgettcap_cache.supported:
-            self._jinxed_term.overlay_capabilities(
-                **self._xtgettcap_cache.make_jinxed_capabilities())
-            for capname in self._xtgettcap_cache.capabilities:
-                self.__dict__.pop(capname, None)
+    def _update_xtgettcap_cache(self, result: TermcapResponse) -> TermcapResponse:
+        """Merge *result* into ``_xtgettcap_cache``, clearing cached attributes."""
+        self._xtgettcap_cache.capabilities.update(result.capabilities)
+        self._xtgettcap_cache = TermcapResponse(
+            supported=self._xtgettcap_cache.supported or result.supported,
+            capabilities=self._xtgettcap_cache.capabilities)
+        for capname in result.capabilities:
+            self.__dict__.pop(capname, None)
         return self._xtgettcap_cache
-
-    def _apply_xtgettcap_overlay(self) -> None:
-        """Apply cached XTGETTCAP capabilities to jinxed terminal."""
-        if self._xtgettcap_cache.supported:
-            self._jinxed_term.overlay_capabilities(
-                **self._xtgettcap_cache.make_jinxed_capabilities())
-            for capname in self._xtgettcap_cache.capabilities:
-                self.__dict__.pop(capname, None)
 
     @staticmethod
     def _filter_xtgettcap_response(
@@ -1739,6 +1715,11 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             filtered = {k: v for k, v in filtered.items() if k in requested}
         return TermcapResponse(supported=tc.supported, capabilities=filtered)
 
+    @staticmethod
+    def _maybe_none(tc: TermcapResponse) -> Optional[TermcapResponse]:
+        """Return *tc* or None if unsupported or empty."""
+        return tc if tc.supported and tc.capabilities else None
+
     def _xtgettcap_batch(
             self,
             caps: List[str],
@@ -1752,7 +1733,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         re-queried on future calls.
         """
         if not caps:
-            return TermcapResponse(supported=False)
+            return None
 
         ctx = None
         try:
@@ -1770,7 +1751,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 ctx.__exit__(None, None, None)
 
         if match is None:
-            return TermcapResponse(supported=False)
+            return None
 
         # Strip the CPR itself from the response data
         data = data[:match.start()] + data[match.end():]
