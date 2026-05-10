@@ -14,9 +14,8 @@ from typing import IO, List, Union, Optional, Generator
 from jinxed import win32
 
 # local
+from .keyboard import TERMINAL_QUERY_TIMEOUT_SECONDS
 from .terminal import WINSZ
-from .keyboard import TERMINAL_QUERY_TIMEOUT_SECONDS
-from .keyboard import TERMINAL_QUERY_TIMEOUT_SECONDS
 from .terminal import Terminal as _Terminal
 from .dec_modes import DecPrivateMode as _DecPrivateMode
 from .dec_modes import DecModeResponse
@@ -122,7 +121,6 @@ class Terminal(_Terminal):
         # As of May 2026, the latest Windows Terminal.exe is without XTGETTCAP support,
         # and so on it is not checked or negotiated for as a side-effect of the class initializer
         # like the base class, does.
-
 
     def getch(self, decode_latin1: bool = False) -> str:
         r"""
@@ -322,7 +320,8 @@ class Terminal(_Terminal):
     @contextlib.contextmanager
     def mouse_enabled(self, *, clicks: bool = True, report_pixels: bool = False,
                       report_drag: bool = False, report_motion: bool = False,
-                      timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
+                      timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS
+                      ) -> Generator[None, None, None]:
         """
         Context manager for enabling mouse tracking.
 
@@ -387,7 +386,8 @@ class Terminal(_Terminal):
         return True
 
     @contextlib.contextmanager
-    def notify_on_resize(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
+    def notify_on_resize(
+            self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
         """
         Context manager for enabling in-band window resize notifications.
 

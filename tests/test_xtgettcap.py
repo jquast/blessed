@@ -13,7 +13,6 @@ from unittest import mock
 # local
 from blessed._capabilities import TermcapResponse, ITerm2Capabilities
 from blessed.terminal import Terminal
-from blessed.xtgettcap import query_xtgettcap
 from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, as_subprocess, pty_test
 
@@ -234,7 +233,7 @@ def test_get_xtgettcap_sticky_failure():
     stream = io.StringIO()
     term = TestTerminal(stream=stream, force_styling=True)
     term._is_a_tty = True
-    term._xtgettcap_cache = None
+    term._xtgettcap_cache = TermcapResponse(supported=False)
     term._xtgettcap_first_query_failed = True
 
     result = term.get_xtgettcap()
@@ -292,7 +291,7 @@ def test_does_xtgettcap_unsupported():
     stream = io.StringIO()
     term = TestTerminal(stream=stream, force_styling=True)
     term._is_a_tty = True
-    term._xtgettcap_cache = None
+    term._xtgettcap_cache = TermcapResponse(supported=False)
     term._xtgettcap_first_query_failed = True
 
     assert term.does_xtgettcap() is False
@@ -351,7 +350,7 @@ def test_get_xtgettcap_caps_ignores_sticky_failure():
     stream = io.StringIO()
     term = TestTerminal(stream=stream, force_styling=True)
     term._is_a_tty = True
-    term._xtgettcap_cache = None
+    term._xtgettcap_cache = TermcapResponse(supported=False)
     term._xtgettcap_first_query_failed = True
     hex_rv = TermcapResponse.hex_encode('RV')
     term.ungetch(
@@ -615,7 +614,7 @@ def test_get_xtgettcap_full_success():
 def test_get_xtgettcap_batch_empty():
     """Batch with CPR-only response returns supported=False."""
     def child(term):
-        term._xtgettcap_cache = None
+        term._xtgettcap_cache = TermcapResponse(supported=False)
         term._xtgettcap_first_query_failed = False
         term.ungetch('\x1b[10;20R')
         result = term.get_xtgettcap(timeout=0.1)
@@ -980,47 +979,31 @@ def test_terminal_init_xtgettcap_timeout():
     assert 'OK' in output
 
 
-@pytest.mark.parametrize('init_descriptor,query_side_effect,expected', [
-    (999, None, None),
-    (999, OSError, None),
-    (999, TermcapResponse(supported=True,
-                          capabilities={'TN': 'xterm', 'colors': '256'}), 'supported'),
-    (999, TermcapResponse(supported=False), 'unsupported'),
-])
-def test_init_xtgettcap_probe(init_descriptor, query_side_effect, expected):
-    """XTGETTCAP probe during init populates _xtgettcap_cache correctly."""
-    def mock_init_streams(term_self):
-        term_self._is_a_tty = True
-        term_self._init_descriptor = init_descriptor
-        term_self._keyboard_fd = None
-        term_self.errors = term_self.errors or []
-        term_self._encoding = 'UTF-8'
+@pytestmark_pty
+def test_terminal_init_xtgettcap_unsupported():
+    """Terminal() init with XTGETTCAP probe that gets CPR-only response."""
+    def parent(master_fd):
+        data = b''
+        stime = time.time()
+        while b'\x1b[6n' not in data:
+            remaining = 2.0 - (time.time() - stime)
+            if remaining <= 0:
+                break
+            ready, _, _ = select.select([master_fd], [], [], remaining)
+            if ready:
+                data += os.read(master_fd, 4096)
+        # Send only CPR, no XTGETTCAP responses -- terminal does not support it.
+        os.write(master_fd, b'\x1b[10;20R')
 
-    if isinstance(query_side_effect, TermcapResponse):
-        patcher = mock.patch('blessed.terminal.query_xtgettcap',
-                             return_value=query_side_effect)
-    elif query_side_effect is None:
-        patcher = mock.patch('blessed.terminal.query_xtgettcap',
-                             return_value=None)
-    else:
-        patcher = mock.patch('blessed.terminal.query_xtgettcap',
-                             side_effect=query_side_effect)
-    with patcher, \
-         mock.patch.object(Terminal, '_Terminal__init__streams',
-                           mock_init_streams):
-        term = TestTerminal(
-            stream=io.StringIO(), force_styling=True,
-            _xtgettcap_data=None)
-    cache = term._xtgettcap_cache
-    if expected is None:
-        assert cache is None
-    elif expected == 'supported':
-        assert cache is not None
-        assert cache.supported is True
-        assert cache.capabilities['TN'] == 'xterm'
-    elif expected == 'unsupported':
-        assert cache is not None
-        assert cache.supported is False
+    def child(term):
+        assert term._xtgettcap_cache is not None
+        assert term._xtgettcap_cache.supported is False
+        return b'OK'
+
+    output = pty_test(child, parent,
+                      test_name='test_terminal_init_xtgettcap_unsupported',
+                      _xtgettcap_data=None)
+    assert 'OK' in output
 
 
 @pytest.mark.parametrize('xtgettcap_data,assertions', [
@@ -1051,7 +1034,8 @@ def test_init_cache_population(xtgettcap_data, assertions):
             if expected_val == 'not_none':
                 assert term._xtgettcap_cache is not None
             elif expected_val == 'is_none':
-                assert term._xtgettcap_cache is None
+                assert term._xtgettcap_cache is not None
+                assert term._xtgettcap_cache.supported is False
         elif attr == 'term.kind':
             assert term.kind == expected_val
         elif attr.startswith('_xtgettcap_cache.'):
@@ -1076,29 +1060,6 @@ def test_force_bypasses_cache(method, capabilities):
         supported=True, capabilities=capabilities)
     result = getattr(term, method)(timeout=0.01, force=True)
     assert result is False
-
-
-def test_query_xtgettcap_input_fd_fallback():
-    """query_xtgettcap defaults input_fd to stream_fd when not provided."""
-    rfd, wfd = os.pipe()
-    try:
-        result = query_xtgettcap(stream_fd=wfd, timeout=0.01)
-        assert result.supported is False
-    finally:
-        os.close(rfd)
-        os.close(wfd)
-
-
-def test_query_xtgettcap_termios_error():
-    """query_xtgettcap survives termios.error on input_fd."""
-    rfd, wfd = os.pipe()
-    try:
-        with mock.patch('blessed.xtgettcap.termios.tcgetattr', side_effect=termios.error):
-            result = query_xtgettcap(stream_fd=wfd, input_fd=rfd, timeout=0.01)
-            assert result.supported is False
-    finally:
-        os.close(rfd)
-        os.close(wfd)
 
 
 @pytest.mark.parametrize('capabilities,expected_colors', [

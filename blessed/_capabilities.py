@@ -425,7 +425,7 @@ XTGETTCAP_CAPABILITIES = (
     ("kxIN", "Keyboard in (kitty)"),
     ("kxOUT", "Keyboard out (kitty)"),
     ("is2", "Init 2 string"),
-        # String capabilities -- modifier key sequences (kitty keyboard protocol)
+    # String capabilities -- modifier key sequences (kitty keyboard protocol)
     ("kDC3", "Alt delete-char key"),
     ("kDC4", "Alt-Shift delete-char key"),
     ("kDC5", "Ctrl delete-char key"),

@@ -325,7 +325,6 @@ def get_proxy_string(  # pylint: disable=unused-argument
     return None
 
 
-
 def split_compound(compound: str) -> List[str]:
     """
     Split compound formatting string into segments.

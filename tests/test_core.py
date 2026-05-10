@@ -377,7 +377,7 @@ def test_unknown_preferredencoding_warned_and_fallback():
     """Ensure a locale without a codec emits a warning."""
     def child():
         with mock.patch('locale.getpreferredencoding') as get_enc, \
-             mock.patch('os.isatty', return_value=True):
+                mock.patch('os.isatty', return_value=True):
             get_enc.return_value = '---unknown--encoding---'
             with pytest.warns(UserWarning, match=(
                     'LookupError: unknown encoding: ---unknown--encoding---, '

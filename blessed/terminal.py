@@ -23,6 +23,7 @@ from typing import (IO,
                     Match,
                     Tuple,
                     Union,
+                    Callable,
                     Iterable,
                     Optional,
                     Generator,
@@ -56,7 +57,6 @@ from .keyboard import (DEFAULT_ESCDELAY,
 from .dec_modes import DecPrivateMode as _DecPrivateMode
 from .dec_modes import DecModeResponse
 from .sequences import Termcap, Sequence
-from .xtgettcap import query_xtgettcap
 from .colorspace import RGB_256TABLE, hex_to_rgb, rgb_to_hex, xparse_color
 from .formatters import (COLORS,
                          COMPOUNDABLES,
@@ -195,7 +195,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                  stream: Optional[IO[str]] = None,
                  force_styling: Union[bool, None] = False,
                  kind_fallback: str = 'xterm-256color',
-                 _xtgettcap_data: Optional[TermcapResponse] = None) -> None:
+                 _xtgettcap_data: Optional[TermcapResponse] = None
+                 ) -> None:
         """
         Initialize the terminal.
 
@@ -262,6 +263,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         self.__init_set_styling(force_styling)
         if self.does_styling:
+            # Initialize keyboard state needed for XTGETTCAP probe
+            self.__init__keyboard_state()
+
             # Step 1: XTGETTCAP capability negotiation
             self.__init__xtgettcap(_xtgettcap_data)
 
@@ -276,7 +280,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 self._jinxed_term = jinxed.Terminal(kind_fallback, self._init_descriptor)
 
             # Step 3: Inject XTGETTCAP overrides into jinxed
-            if self._xtgettcap_cache is not None and self._does_styling:
+            if self._xtgettcap_cache.supported and self._does_styling:
                 self._jinxed_term.overlay_capabilities(
                     **self._xtgettcap_cache.make_jinxed_capabilities())
 
@@ -288,6 +292,25 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self.__init__capabilities()
         self.__init__query_caches()
 
+    def __init__keyboard_state(self) -> None:
+        """Initialize minimal keyboard state needed for XTGETTCAP probe."""
+        # keyboard stream buffer
+        self._keyboard_buf: collections.deque[str] = collections.deque()
+
+        # Build database of int code <=> KEY_NAME (static, no jinxed deps).
+        self._keycodes = get_keyboard_codes()
+
+        # Store attributes as: self.KEY_NAME = code.
+        for key_code, key_name in self._keycodes.items():
+            setattr(self, key_name, key_code)
+
+        # Empty sequence maps -- __init__keycodes will fill these after jinxed init.
+        self._keymap: collections.OrderedDict[str, int] = collections.OrderedDict()
+        self._keymap_prefixes: set[str] = set()
+
+        # Empty dec mode cache -- __init__query_caches will set defaults later.
+        self._dec_mode_cache: dict[int, int] = {}
+
     def __init__xtgettcap(self, _xtgettcap_data: Optional[TermcapResponse]) -> None:
         """Probe for core XTGETTCAP capabilities."""
         # this is like an optimized version of get_xtgettcap() + get_location(), for only the
@@ -295,16 +318,14 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # some terminals report: blink, sitm/ritm (italics), and cvvis. These values were determined
         # by using bin/compare_caps.py on modern terminals with XTGETTCAP support beyond TN, Co, and
         # RGB.
-        self._xtgettcap_cache: Optional[TermcapResponse] = None
+        self._xtgettcap_cache: TermcapResponse = TermcapResponse(supported=False)
         self._xtgettcap_first_query_failed = False
 
-        if _xtgettcap_data is None and self.is_a_tty and self._init_descriptor is not None:
+        if _xtgettcap_data is None and self.is_a_tty and self._keyboard_fd is not None:
             try:
-                _xtgettcap_data = query_xtgettcap(
-                    stream_fd=self._init_descriptor,
-                    timeout=TERMINAL_QUERY_TIMEOUT_SECONDS,
-                    input_fd=self._keyboard_fd,
-                    caps=['TN', 'Co', 'RGB', 'blink', 'sitm', 'ritm', 'cvvis'])
+                _xtgettcap_data = self._xtgettcap_batch(
+                    caps=['TN', 'Co', 'RGB', 'blink', 'sitm', 'ritm', 'cvvis'],
+                    timeout=TERMINAL_QUERY_TIMEOUT_SECONDS)
             except OSError as exc:
                 self.errors.append(f'XTGETTCAP probe failed, OSError: {exc}')
                 self._xtgettcap_first_query_failed = True
@@ -438,6 +459,22 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             except ValueError as err:
                 self.errors.append(f'Unable to determine __stdout__ file descriptor: {err}')
 
+        # Determine keyboard encoding early so XTGETTCAP probe can use it.
+        if self._keyboard_fd is not None:
+            if IS_WINDOWS:
+                self._encoding = get_console_input_encoding() \
+                    or locale.getpreferredencoding() or 'UTF-8'
+            else:
+                self._encoding = locale.getpreferredencoding() or 'UTF-8'
+            try:
+                self._keyboard_decoder = codecs.getincrementaldecoder(self._encoding)()
+            except LookupError as err:
+                err_msg = f'LookupError: {err}, defaulting to UTF-8 for keyboard.'
+                warnings.warn(err_msg)
+                self.errors.append(err_msg)
+                self._encoding = 'UTF-8'
+                self._keyboard_decoder = codecs.getincrementaldecoder(self._encoding)()
+
     def __init__color_capabilities(self) -> None:
         self._color_distance_algorithm = 'cie2000'
         if not self.does_styling:
@@ -446,7 +483,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self.number_of_colors = max(0, self._jinxed_term.tigetnum('colors') or -1)
         if IS_WINDOWS or os.environ.get('COLORTERM') in {'truecolor', '24bit'}:
             self.number_of_colors = 1 << 24
-        elif (self._xtgettcap_cache is not None and self._xtgettcap_cache.supported):
+        elif self._xtgettcap_cache.supported:
             rgb_val = self._xtgettcap_cache.capabilities.get('RGB', '0')
             try:
                 if int(rgb_val.split('/', 1)[0]) == 8:
@@ -528,35 +565,14 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         # Add DEC event prefixes (mouse, bracketed paste, focus tracking) These
         # are not in the keymap but need to be recognized as valid "prefixes",
-        # so that they are not detected early as metaSendsEscape sequence until
+        # so that they are *not* detected as a 'metaSendsEscape' sequence until
         # after esc_delay has elapsed.
         self._keymap_prefixes.update([
             '\x1b[M',     # Legacy mouse (needs 3 more bytes)
             '\x1b[<',     # SGR mouse (variable length)
             '\x1b[200',   # Bracketed paste start and its starting prefixes,
             '\x1b[20',
-            '\x1b[2',
-        ])
-
-        # keyboard stream buffer
-        self._keyboard_buf: collections.deque[str] = collections.deque()
-
-        if self._keyboard_fd is not None:
-            # set input encoding and initialize incremental decoder
-
-            if IS_WINDOWS:
-                self._encoding = get_console_input_encoding() \
-                    or locale.getpreferredencoding() or 'UTF-8'
-            else:
-                self._encoding = locale.getpreferredencoding() or 'UTF-8'
-
-            try:
-                self._keyboard_decoder = codecs.getincrementaldecoder(self._encoding)()
-            except LookupError as err:
-                # encoding is illegal or unsupported, use 'UTF-8'
-                warnings.warn(f'LookupError: {err}, defaulting to UTF-8 for keyboard.')
-                self._encoding = 'UTF-8'
-                self._keyboard_decoder = codecs.getincrementaldecoder(self._encoding)()
+            '\x1b[2'])
 
     def __getattr__(self,
                     attr: str) -> Union[NullCallableString,
@@ -586,6 +602,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         if not self._does_styling:
             return NullCallableString()
+        # Never attempt to resolve _jinxed_term or other private
+        # attributes that aren't yet initialized as capabilities.
+        if attr == '_jinxed_term' or (
+            attr.startswith('_') and '_jinxed_term' not in self.__dict__
+        ):
+            raise AttributeError(attr)
         # Fetch the missing 'attribute' into some kind of curses-resolved
         # capability, and cache by attaching to this Terminal class instance.
         #
@@ -954,7 +976,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # check or filters, such as if (x, y) != (-1, -1) or max(0, y).
         return -1, -1
 
-    def get_fgcolor(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS, bits: int = 16) -> Tuple[int, int, int]:
+    def get_fgcolor(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS,
+                    bits: int = 16) -> Tuple[int, int, int]:
         """
         Return tuple (r, g, b) of default foreground color.
 
@@ -993,7 +1016,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return (-1, -1, -1)
         return tuple(xparse_color(val, bits=bits) for val in match.groups())
 
-    def get_bgcolor(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS, bits: int = 16) -> Tuple[int, int, int]:
+    def get_bgcolor(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS,
+                    bits: int = 16) -> Tuple[int, int, int]:
         """
         Return tuple (r, g, b) of default background color.
 
@@ -1032,7 +1056,10 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return (-1, -1, -1)
         return tuple(xparse_color(val, bits=bits) for val in match.groups())
 
-    def get_fgcolor_hex(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS, maybe_short: bool = False) -> str:
+    def get_fgcolor_hex(
+            self,
+            timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS,
+            maybe_short: bool = False) -> str:
         """
         Return default foreground color as hex string.
 
@@ -1050,7 +1077,10 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return ''
         return rgb_to_hex(*rgb, maybe_short=maybe_short)
 
-    def get_bgcolor_hex(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS, maybe_short: bool = False) -> str:
+    def get_bgcolor_hex(
+            self,
+            timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS,
+            maybe_short: bool = False) -> str:
         """
         Return default background color as hex string.
 
@@ -1192,7 +1222,10 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         return None
 
-    def does_sixel(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS, force: bool = False) -> bool:
+    def does_sixel(
+            self,
+            timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
+            force: bool = False) -> bool:
         """
         Query whether the terminal supports sixel graphics.
 
@@ -1217,7 +1250,10 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         da = self.get_device_attributes(timeout=timeout, force=force)
         return da.supports_sixel if da is not None else False
 
-    def detect_ambiguous_width(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS, fallback: int = 1) -> int:
+    def detect_ambiguous_width(
+            self,
+            timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS,
+            fallback: int = 1) -> int:
         r"""
         Detect whether terminal renders ambiguous width characters as width 1 or 2.
 
@@ -1279,8 +1315,11 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         width = new_col - initial_col
         return width if width in {1, 2} else fallback
 
-    def get_dec_mode(self, mode: Union[int, _DecPrivateMode],
-                     timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS, force: bool = False) -> DecModeResponse:
+    def get_dec_mode(self,
+                     mode: Union[int,
+                                 _DecPrivateMode],
+                     timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS,
+                     force: bool = False) -> DecModeResponse:
         """
         Query the state of a DEC Private Mode (DECRQM).
 
@@ -1377,8 +1416,10 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         return DecModeResponse(mode, response_value)
 
     @contextlib.contextmanager
-    def dec_modes_enabled(self, *modes: Union[int, _DecPrivateMode],
-                          timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
+    def dec_modes_enabled(self,
+                          *modes: Union[int, _DecPrivateMode],
+                          timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS
+                          ) -> Generator[None, None, None]:
         """
         Context manager for temporarily enabling DEC Private Modes.
 
@@ -1428,8 +1469,10 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             self._dec_mode_set_disabled(*enabled_modes)
 
     @contextlib.contextmanager
-    def dec_modes_disabled(self, *modes: Union[int, _DecPrivateMode],
-                           timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
+    def dec_modes_disabled(self,
+                           *modes: Union[int, _DecPrivateMode],
+                           timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS
+                           ) -> Generator[None, None, None]:
         """
         Context manager for temporarily disabling DEC Private Modes.
 
@@ -1597,14 +1640,14 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
     def get_xtgettcap(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                       force: bool = False,
-                      caps: Optional[Iterable[str]] = None,
-                      ) -> TermcapResponse:
+                      caps: Optional[Iterable[str]] = None) -> TermcapResponse:
         """
         Query terminal capabilities via XTGETTCAP (DCS +q).
 
         When *caps* is specified, only those capabilities are returned. When unspecified, all known
-        XTGETTCAP capabilities are queried and returned.  All results are memoized permenently,
-        using ``force=True`` to force re-request.
+        XTGETTCAP capabilities are queried and returned.  All results from XTGETTCAP are memoized
+        permanently, unlike DECRQSS :meth:`get_decrqss` which may change. Using ``force=True`` to
+        re-retrieve any request.
 
         :arg float timeout: Timeout in seconds.
         :arg bool force: Always re-query for latest values.
@@ -1621,21 +1664,23 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         # Determine which capabilities to query
         if caps is not None:
-            _requested = set(caps)
+            if isinstance(caps, str):
+                _requested = {caps}
+            else:
+                _requested = set(caps)
         else:
             _requested = _std_names.copy()
 
-        # force=True or no cache: single batch
-        if force or self._xtgettcap_cache is None:
-            # sticky failure (no explicit caps requested)
-            if self._xtgettcap_first_query_failed and caps is None and not force:
-                return TermcapResponse(supported=False)
-            batch_caps = [(name, '') for name in _requested]
-            result = self._xtgettcap_batch(batch_caps, capabilities={}, timeout=timeout)
-            self._xtgettcap_cache = result
-            if result.supported:
-                self._apply_xtgettcap_overlay()
-            return self._filter_xtgettcap_response(result, _requested)
+        # sticky failure (no explicit caps requested)
+        if self._xtgettcap_first_query_failed and caps is None and not force:
+            return TermcapResponse(supported=False)
+
+        # force=True: single batch
+        if force:
+            caps = list(_requested)
+            result = self._xtgettcap_batch(caps, timeout=timeout)
+            return self._filter_xtgettcap_response(
+                self._update_xtgettcap_cache(result), _requested)
 
         # cache hit: check if all requested caps are already known
         if self._xtgettcap_cache.supported:
@@ -1644,21 +1689,36 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             if not missing:
                 return self._filter_xtgettcap_response(self._xtgettcap_cache, _requested)
             # Incremental: query only missing caps, merge into cache
-            result = self._xtgettcap_batch(
-                [(name, '') for name in missing],
-                capabilities=dict(self._xtgettcap_cache.capabilities),
-                timeout=timeout)
-            if result.supported:
-                self._xtgettcap_cache = result
-                self._apply_xtgettcap_overlay()
-            return self._filter_xtgettcap_response(self._xtgettcap_cache, _requested)
+            result = self._xtgettcap_batch(list(missing), timeout=timeout)
+            return self._filter_xtgettcap_response(
+                self._update_xtgettcap_cache(result, merge=True), _requested)
+
+        # cache unsupported but specific caps requested: try query
+        if caps is not None:
+            result = self._xtgettcap_batch(list(_requested), timeout=timeout)
+            return self._filter_xtgettcap_response(
+                self._update_xtgettcap_cache(result), _requested)
 
         return TermcapResponse(supported=False)
 
+    def _update_xtgettcap_cache(self,
+                               result: TermcapResponse,
+                               merge: bool = False) -> TermcapResponse:
+        """Update ``_xtgettcap_cache`` with *result* and apply overlay if supported."""
+        if merge and self._xtgettcap_cache.supported and result.supported:
+            self._xtgettcap_cache.capabilities.update(result.capabilities)
+        else:
+            self._xtgettcap_cache = result
+        if self._xtgettcap_cache.supported:
+            self._jinxed_term.overlay_capabilities(
+                **self._xtgettcap_cache.make_jinxed_capabilities())
+            for capname in self._xtgettcap_cache.capabilities:
+                self.__dict__.pop(capname, None)
+        return self._xtgettcap_cache
 
     def _apply_xtgettcap_overlay(self) -> None:
         """Apply cached XTGETTCAP capabilities to jinxed terminal."""
-        if self._xtgettcap_cache is not None and self._xtgettcap_cache.supported:
+        if self._xtgettcap_cache.supported:
             self._jinxed_term.overlay_capabilities(
                 **self._xtgettcap_cache.make_jinxed_capabilities())
             for capname in self._xtgettcap_cache.capabilities:
@@ -1681,27 +1741,25 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
     def _xtgettcap_batch(
             self,
-            batch_caps: List[Tuple[str, str]],
-            capabilities: Dict[str, str],
+            caps: List[str],
             timeout: float,
     ) -> TermcapResponse:
         """
-        Spray *batch_caps* + CPR fence, read responses, return TermcapResponse.
+        Spray *caps* + CPR fence, read responses.
 
-        Returns ``supported=False`` when the CPR fence never arrives or no capabilities are answered. Previously it would return ``None`` when the terminal does not
-        respond to XTGETTCAP at all).  Capabilities in *batch_caps* that are
-        not answered are recorded as ``None`` in the returned
-        ``capabilities`` dict so they are not re-queried on future calls.
+        Returns a ``TermcapResponse`` for the requested capabilities.  Caps
+        that are not answered are recorded as ``None`` so they are not
+        re-queried on future calls.
         """
-        if not batch_caps:
-            return TermcapResponse(supported=True, capabilities=capabilities)
+        if not caps:
+            return TermcapResponse(supported=False)
 
         ctx = None
         try:
             if self._line_buffered:
                 ctx = self.cbreak()
                 ctx.__enter__()
-            for capname, _desc in batch_caps:
+            for capname in caps:
                 self.stream.write(
                     f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\')
             self.stream.write('\x1b[6n')  # CPR fence
@@ -1712,25 +1770,23 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 ctx.__exit__(None, None, None)
 
         if match is None:
-            # CPR fence never arrived -- terminal did not answer at all
-            return TermcapResponse(supported=False, capabilities=capabilities)
+            return TermcapResponse(supported=False)
 
         # Strip the CPR itself from the response data
         data = data[:match.start()] + data[match.end():]
 
+        capabilities: Dict[str, str] = {}
         if data:
-            parsed = TermcapResponse.parse_capabilities(data)
-            capabilities.update(parsed)
+            capabilities.update(TermcapResponse.parse_capabilities(data))
             remaining = TermcapResponse._RE_XTGETTCAP_RESPONSE.sub('', data)
             if remaining:
                 self.ungetch(remaining)
 
-        # Track caps that were requested but not answered
-        for capname, _desc in batch_caps:
+        # Record None sentinel for any requested cap that wasn't answered.
+        for capname in caps:
             if capname not in capabilities:
                 capabilities[capname] = None  # type: ignore[assignment]
 
-        # Terminal supports XTGETTCAP iff any capability was answered.
         supported = any(value is not None for value in capabilities.values())
         return TermcapResponse(supported=supported, capabilities=capabilities)
 
@@ -2052,37 +2108,30 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         Detect Kitty with XTGETTCAP query extensions.
 
-        Kitty extends the standard ``XTGETTCAP`` (``DCS +q``) mechanism with ``kitty-query-*`` keys
-        that expose runtime metadata such as the terminal name, version, font family, DPI, and
-        clipboard control policy.
+        This is a trifle convenience wrapper of :meth:`get_xtgettcap()`.
 
-        This method probes for ``kitty-query-name`` support.  A successful response indicates the
-        full set of Kitty query extensions are available.
+        This method probes for ``kitty-query-name`` support.  A successful response indicates that
+        some set of Kitty query extensions are available.
 
-        To retrieve their values, use :meth:`get_xtgettcap` directly, for example:
+        To retrieve their values, follow up with :meth:`get_xtgettcap` directly, for example:
 
         .. code-block:: python
 
             >>> term = Terminal()
             >>> term.does_kitty_query()
             True
-            >>> term.get_xtgettcap(caps=[f"kitty-query-{key}" for key in ["font_family",
-                "bold_font", "italic_font", "bold_italic_font", "font_size", "dpi_x", "dpi_y"]])
+            >>> term.get_xtgettcap(caps=[f"kitty-query-{key}" for key in [
+                "font_family", "font_size", "dpi_x", "dpi_y"]])
             TermcapResponse(supported=True, capabilities={
-                'kitty-query-bold_font': 'NotoSansMono-Bold',
-                'kitty-query-bold_italic_font': 'NotoSansMono-Bold',
-                'kitty-query-dpi_x': '96',
-                'kitty-query-dpi_y': '96',
                 'kitty-query-font_family': 'NotoSansMono-Regular',
                 'kitty-query-font_size': '19',
-                'kitty-query-italic_font': 'NotoSansMono-Regular'})
+                'kitty-query-dpi_x': '96',
+                'kitty-query-dpi_y': '96'})
 
         :arg float timeout: Timeout in seconds.
         :arg bool force: Bypass cached result.
         :rtype: bool
         """
-        # get_xtgettcap() can just as easy to be used directly, this is a trifle convenience method
-        # but kept in perpetuity anyway for API compatibility.
         result = self.get_xtgettcap(
             timeout=timeout, force=force, caps=['kitty-query-name'])
         return 'kitty-query-name' in result.capabilities
@@ -2234,7 +2283,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     @contextlib.contextmanager
     def mouse_enabled(self, *, clicks: bool = True, report_pixels: bool = False,
                       report_drag: bool = False, report_motion: bool = False,
-                      timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
+                      timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS
+                      ) -> Generator[None, None, None]:
         """
         Context manager for enabling mouse tracking with various reporting modes.
 
@@ -2284,7 +2334,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             yield
 
     @contextlib.contextmanager
-    def bracketed_paste(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
+    def bracketed_paste(
+            self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
         """
         Context manager for enabling bracketed paste mode.
 
@@ -2305,7 +2356,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             yield
 
     @contextlib.contextmanager
-    def synchronized_output(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
+    def synchronized_output(
+            self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
         """
         Context manager for enabling synchronized output mode.
 
@@ -2318,7 +2370,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             yield
 
     @contextlib.contextmanager
-    def focus_events(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
+    def focus_events(
+            self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
         """
         Context manager for enabling focus event reporting.
 
@@ -2331,7 +2384,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             yield
 
     @contextlib.contextmanager
-    def notify_on_resize(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
+    def notify_on_resize(
+            self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Generator[None, None, None]:
         """
         Context manager for enabling in-band window resize notifications.
 
@@ -3728,11 +3782,10 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             yield
 
     @contextlib.contextmanager
-    def _enter_termios_mode(self, setter) -> Generator[None, None, None]:
-        """
-        Put the keyboard terminal into a raw-ish mode using *setter*,
-        guarding against SIGTTOU for background processes.
-        """
+    def _enter_termios_mode(self, setter: Callable[[int, int], None]
+                            ) -> Generator[None, None, None]:
+        """Put the keyboard terminal into a raw-ish mode using *setter*, guarding against SIGTTOU
+        for background processes."""
         old_sigttou = signal.signal(signal.SIGTTOU, signal.SIG_IGN)
         try:
             save_mode = termios.tcgetattr(self._keyboard_fd)

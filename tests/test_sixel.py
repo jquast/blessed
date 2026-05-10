@@ -292,7 +292,8 @@ def test_sixel_height_and_width_both_timeout():
     assert dimensions == '-1x-1'
     # Should take around timeout * 0.72s for the parent's sleep phases
     dur = float(duration)
-    assert timeout * 0.60 <= dur <= timeout * PCT_MAXWAIT_KEYSTROKE, f'duration={dur} timeout={timeout}'
+    assert timeout * 0.60 <= dur <= timeout * \
+        PCT_MAXWAIT_KEYSTROKE, f'duration={dur} timeout={timeout}'
     assert math.floor(time.time() - stime) <= timeout * PCT_MAXWAIT_KEYSTROKE
 
 

@@ -5,7 +5,7 @@ import os
 from collections import OrderedDict
 
 import jinxed
-from blessed.xtgettcap import query_xtgettcap
+from blessed import Terminal
 from blessed._capabilities import XTGETTCAP_CAPABILITIES
 
 # Map of interesting string caps: capname -> description
@@ -94,14 +94,9 @@ def parse_numeric(value):  # type: (str | None) -> int | None
 
 def main():
     """Compare jinxed terminfo against XTGETTCAP."""
-    stream_fd = sys.stdout.fileno()
-    try:
-        input_fd = sys.stdin.fileno()
-    except (AttributeError, ValueError):
-        input_fd = stream_fd
-
     print("=== XTGETTCAP Probe ===")
-    result = query_xtgettcap(stream_fd=stream_fd, input_fd=input_fd, timeout=2)
+    term = Terminal(force_styling=True)
+    result = term.get_xtgettcap(timeout=2)
 
     if result is None:
         print("XTGETTCAP query returned None")
