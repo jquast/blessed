@@ -180,6 +180,18 @@ CAPABILITIES_CAUSE_MOVEMENT: typing.Tuple[str, ...] = tuple(CAPABILITIES_HORIZON
     'scroll_forward',
 )
 
+XTGETTCAP_INIT_CAPABILITIES = (
+        # Terminal capabilities requested at Initialization time:
+        # - TN: determines preferred TERM
+        # - Co, RGB: determines 24-bit color support without COLORTERM
+        # - blink, sitm, ritm, cvvis: nice to haves, often omitted
+        # - 
+        # This was chosen from a May 2026 survey of all popular terminal emulators, comparing: what
+        # capabilities and their values are reported by XTGETTCAP that are otherwise not discovered
+        # by the latest ncurses termcap matching their defined TERM?
+        'TN', 'Co', 'RGB', 'blink', 'sitm', 'ritm', 'cvvis', 'Smulx', 'Setulc', 'Ms')
+
+
 XTGETTCAP_CAPABILITIES = (
     # Terminal identification and 24-bit color fields, note that the order of the first three
     # matters for xterm compatibility, described at https://codeberg.org/dnkl/foot#xtgettcap
@@ -607,7 +619,9 @@ class TermcapResponse:
             return ''
 
     @staticmethod
-    def unescape_terminfo(value: str) -> str:
+    def unescape_terminfo(  # pylint: disable=too-complex,too-many-branches,too-many-statements
+        value: str,
+    ) -> str:
         r"""
         Unescape terminfo source-level escape sequences.
 
@@ -717,24 +731,20 @@ class TermcapResponse:
         bool_caps: Set[str] = set()
 
         for capname, value in self.capabilities.items():
+            if capname == 'RGB':
+                # 'RGB' is not drawn, "RGB - number of bits per color channel (different semantics
+                # from the RGB capability in file-based terminfo definitions!)."
+                continue
             if not value:
                 if capname in jinxed.terminfo.BOOL_CAPS:
                     bool_caps.add(capname)
-                continue
-            if capname in jinxed.terminfo.NUM_CAPS:
+            elif capname in jinxed.terminfo.NUM_CAPS:
                 try:
                     num_caps[capname] = int(value)
                 except ValueError:
-                    try:
-                        num_caps[capname] = int(value.split('/')[0])
-                    except (ValueError, IndexError):
-                        try:
-                            num_caps[capname] = int.from_bytes(
-                                value.encode('latin-1'), 'big')
-                        except (ValueError, OverflowError):
-                            pass
-                continue
-            str_caps[capname] = value
+                    pass
+            else:
+                str_caps[capname] = value
 
         return {'str_caps': str_caps, 'num_caps': num_caps, 'bool_caps': bool_caps}
 

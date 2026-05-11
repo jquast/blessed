@@ -67,14 +67,23 @@ _MESSAGE = (
 
 
 def _sized_char(ch, target, term, v_align=0, h_align=0):
+    """Return text-sizing sequence and display width for *ch* at *target* scale.
+
+    Alignment parameters (*v_align*, *h_align*) are only applied when
+    fractional scaling is in effect (0 < n < d), per the Kitty text sizing
+    protocol: alignment describes how the fractionally-scaled render area
+    fits inside the full cell grid; it has no meaning for integer scaling.
+    """
     if not term.does_text_sizing().scale:
         return ch, wcswidth(ch)
     s, w, n, d = _scale_params(target)
     if s == 1 and n == 0:
         return ch, wcswidth(ch)
+    is_fractional = n > 0 and n < d
     params = TextSizingParams(
         scale=s, width=w, numerator=n, denominator=d,
-        vertical_align=v_align, horizontal_align=h_align)
+        vertical_align=v_align if is_fractional else 0,
+        horizontal_align=h_align if is_fractional else 0)
     seq = TextSizing(params, ch, '\x07').make_sequence()
     width = TextSizing(params, ch, '\x07').display_width()
     return seq, width

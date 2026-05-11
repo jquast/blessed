@@ -202,7 +202,7 @@ def test_get_xtgettcap_not_a_tty():
     """Returns None when not a TTY."""
     term = TestTerminal(stream=io.StringIO(), force_styling=True,
                         is_a_tty=False)
-    assert not term.get_xtgettcap(timeout=0.01).supported
+    assert term.get_xtgettcap(timeout=0.01) is None
 
 
 def test_does_xtgettcap_not_a_tty():
@@ -234,10 +234,9 @@ def test_get_xtgettcap_sticky_failure():
     term = TestTerminal(stream=stream, force_styling=True)
     term._is_a_tty = True
     term._xtgettcap_cache = TermcapResponse(supported=False)
-    term._xtgettcap_first_query_failed = True
 
     result = term.get_xtgettcap()
-    assert not result.supported
+    assert result is None
 
 
 def test_get_xtgettcap_force_bypasses_cache():
@@ -249,9 +248,9 @@ def test_get_xtgettcap_force_bypasses_cache():
     cached = TermcapResponse(supported=True,
                              capabilities={'TN': 'old'})
     term._xtgettcap_cache = cached
-    term._xtgettcap_first_query_failed = True
 
     result = term.get_xtgettcap(timeout=0.01, force=True)
+    assert result is not None
     assert result.supported
 
 
@@ -292,7 +291,6 @@ def test_does_xtgettcap_unsupported():
     term = TestTerminal(stream=stream, force_styling=True)
     term._is_a_tty = True
     term._xtgettcap_cache = TermcapResponse(supported=False)
-    term._xtgettcap_first_query_failed = True
 
     assert term.does_xtgettcap() is False
 
@@ -303,11 +301,11 @@ def test_get_xtgettcap_caps_all_in_cache():
     term = TestTerminal(stream=stream, force_styling=True)
     term._is_a_tty = True
     cached = TermcapResponse(supported=True,
-                             capabilities={'TN': 'xterm', 'RV': '1.0'})
+                             capabilities={'TN': 'xterm', 'FAKE_CAP': 'FAKE_VAL'})
     term._xtgettcap_cache = cached
-    result = term.get_xtgettcap(caps=['RV'])
+    result = term.get_xtgettcap(caps=['FAKE_CAP'])
     assert result is not cached
-    assert result['RV'] == '1.0'
+    assert result['FAKE_CAP'] == 'FAKE_VAL'
 
 
 def test_get_xtgettcap_caps_incremental_queries_missing():
@@ -317,14 +315,14 @@ def test_get_xtgettcap_caps_incremental_queries_missing():
     term._is_a_tty = True
     term._xtgettcap_cache = TermcapResponse(
         supported=True, capabilities={'TN': 'xterm'})
-    hex_rv = TermcapResponse.hex_encode('RV')
+    hex_fake = TermcapResponse.hex_encode('FAKE_CAP')
     term.ungetch(
-        f'\x1bP1+r{hex_rv}=312e30\x1b\\'
+        f'\x1bP1+r{hex_fake}=46414b455f56414c\x1b\\'
         '\x1b[10;20R')
-    result = term.get_xtgettcap(caps=['RV'], timeout=0.1)
-    assert result['RV'] == '1.0'
+    result = term.get_xtgettcap(caps=['FAKE_CAP'], timeout=0.1)
+    assert result['FAKE_CAP'] == 'FAKE_VAL'
     assert 'TN' not in result.capabilities
-    assert 'RV' in term._xtgettcap_cache.capabilities
+    assert 'FAKE_CAP' in term._xtgettcap_cache.capabilities
     assert term._xtgettcap_cache.capabilities['TN'] == 'xterm'
 
 
@@ -335,12 +333,12 @@ def test_get_xtgettcap_caps_force_queries_all():
     term._is_a_tty = True
     term._xtgettcap_cache = TermcapResponse(
         supported=True, capabilities={'TN': 'old'})
-    hex_rv = TermcapResponse.hex_encode('RV')
+    hex_fake = TermcapResponse.hex_encode('FAKE_CAP')
     term.ungetch(
-        f'\x1bP1+r{hex_rv}=312e30\x1b\\'
+        f'\x1bP1+r{hex_fake}=46414b455f56414c\x1b\\'
         '\x1b[10;20R')
-    result = term.get_xtgettcap(timeout=0.1, force=True, caps=['RV'])
-    assert result['RV'] == '1.0'
+    result = term.get_xtgettcap(timeout=0.1, force=True, caps=['FAKE_CAP'])
+    assert result['FAKE_CAP'] == 'FAKE_VAL'
 
 
 def test_get_xtgettcap_caps_ignores_sticky_failure():
@@ -348,15 +346,13 @@ def test_get_xtgettcap_caps_ignores_sticky_failure():
     stream = io.StringIO()
     term = TestTerminal(stream=stream, force_styling=True)
     term._is_a_tty = True
-    term._xtgettcap_cache = TermcapResponse(supported=False)
-    term._xtgettcap_first_query_failed = True
-    hex_rv = TermcapResponse.hex_encode('RV')
+    hex_fake = TermcapResponse.hex_encode('FAKE_CAP')
     term.ungetch(
-        f'\x1bP1+r{hex_rv}=312e30\x1b\\'
+        f'\x1bP1+r{hex_fake}=46414b455f56414c\x1b\\'
         '\x1b[10;20R')
-    result = term.get_xtgettcap(timeout=0.1, caps=['RV'])
+    result = term.get_xtgettcap(timeout=0.1, caps=['FAKE_CAP'])
     assert result is not None
-    assert result['RV'] == '1.0'
+    assert result['FAKE_CAP'] == 'FAKE_VAL'
 
 
 def test_get_xtgettcap_all_parameter():
@@ -384,10 +380,10 @@ def test_get_xtgettcap_none_sentinel_not_in_returned_response():
     term._is_a_tty = True
     term._xtgettcap_cache = TermcapResponse(
         supported=True,
-        capabilities={'TN': 'xterm', 'RV': None})
-    result = term.get_xtgettcap(caps=['TN', 'RV'])
+        capabilities={'TN': 'xterm', 'FAKE_CAP': None})
+    result = term.get_xtgettcap(caps=['TN', 'FAKE_CAP'])
     assert 'TN' in result.capabilities
-    assert 'RV' not in result.capabilities
+    assert 'FAKE_CAP' not in result.capabilities
 
 
 def test_get_xtgettcap_none_sentinel_internal_cache_retains_none():
@@ -398,12 +394,12 @@ def test_get_xtgettcap_none_sentinel_internal_cache_retains_none():
     term._xtgettcap_cache = TermcapResponse(
         supported=True,
         capabilities={'TN': 'xterm'})
-    hex_rv = TermcapResponse.hex_encode('RV')
+    hex_fake = TermcapResponse.hex_encode('FAKE_CAP')
     term.ungetch(
-        f'\x1bP1+r{hex_rv}=\x1b\\'
+        f'\x1bP1+r{hex_fake}=\x1b\\'
         '\x1b[10;20R')
-    result = term.get_xtgettcap(caps=['RV'], timeout=0.1)
-    assert 'RV' in result.capabilities
+    result = term.get_xtgettcap(caps=['FAKE_CAP'], timeout=0.1)
+    assert 'FAKE_CAP' in result.capabilities
 
 
 def test_get_xtgettcap_absent_cap_not_requeried():
@@ -415,6 +411,7 @@ def test_get_xtgettcap_absent_cap_not_requeried():
         supported=True,
         capabilities={'TN': 'xterm', 'Ms': None})
     result = term.get_xtgettcap(caps=['Ms'], timeout=0.01)
+    assert result is not None
     assert result.supported
     assert 'Ms' not in result.capabilities
     assert term._xtgettcap_cache.capabilities['Ms'] is None
@@ -476,7 +473,7 @@ def test_styled_underlines_no_xtgettcap():
     stream = io.StringIO()
     term = TestTerminal(stream=stream, force_styling=True)
     term._is_a_tty = True
-    term._xtgettcap_first_query_failed = True
+    term._xtgettcap_cache = TermcapResponse(supported=False)
     assert term.does_styled_underlines(timeout=0.1) is False
 
 
@@ -613,12 +610,9 @@ def test_get_xtgettcap_batch_empty():
     """Batch with CPR-only response returns supported=False."""
     def child(term):
         term._xtgettcap_cache = TermcapResponse(supported=False)
-        term._xtgettcap_first_query_failed = False
         term.ungetch('\x1b[10;20R')
         result = term.get_xtgettcap(timeout=0.1)
-        assert result is not None
-        assert result.supported is False
-        assert result.capabilities == {}
+        assert result is None
         return b'OK'
 
     output = pty_test(child, parent_func=None,
