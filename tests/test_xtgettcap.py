@@ -123,10 +123,22 @@ def test_make_jinxed_capabilities_skips_rgb():
 def test_xtgettcap_probe_oserror():
     """XTGETTCAP probe OSError is recorded in errors list."""
     with mock.patch('os.isatty', return_value=True), \
-         mock.patch.object(Terminal, '_xtgettcap_batch',
-                           side_effect=OSError('broken pipe')):
+        mock.patch.object(Terminal, '_xtgettcap_batch',
+                          side_effect=OSError('broken pipe')):
         t = Terminal(stream=sys.__stdout__, force_styling=True)
         assert any('OSError' in err for err in t.errors)
+
+
+def test_init_descriptor_stdout_valueerror():
+    """ValueError from sys.__stdout__.fileno() is recorded in errors."""
+    mock_term = mock.MagicMock()
+    mock_term.tigetnum.return_value = 0
+    with mock.patch.object(sys.__stdout__, 'fileno',
+                           side_effect=ValueError('detached stdout')), \
+            mock.patch('blessed.terminal.jinxed.Terminal', return_value=mock_term):
+        t = Terminal(stream=io.StringIO(), force_styling=True)
+        assert any('stdout may be detached or closed' in err for err in t.errors)
+        assert t.number_of_colors == 0
 
 
 @pytest.mark.parametrize('value,expected', [

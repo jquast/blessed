@@ -79,6 +79,8 @@ from ._capabilities import (CAPABILITY_DATABASE,
                             TextSizingResult,
                             ITerm2Capabilities)
 
+_ALL_XTGETTCAP_CAPS = frozenset({c[0] for c in XTGETTCAP_CAPABILITIES})
+
 HAS_TTY = True  # pylint: disable=invalid-name
 IS_WINDOWS = platform.system() == 'Windows'
 if IS_WINDOWS:
@@ -459,7 +461,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             try:
                 self._init_descriptor = sys.__stdout__.fileno()  # type: ignore[union-attr]
             except ValueError as err:
-                self.errors.append(f'Unable to determine __stdout__ file descriptor: {err}')
+                self.errors.append(
+                    f'sys.__stdout__.fileno() failed, stdout may be detached or closed: {err}')
 
         # Determine keyboard encoding early so XTGETTCAP probe can use it.
         if self._keyboard_fd is not None:
@@ -1677,39 +1680,33 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         timeout = timeout if timeout is not None else TERMINAL_QUERY_TIMEOUT_SECONDS
 
-        _std_names = {c[0] for c in XTGETTCAP_CAPABILITIES}
-
-        # Determine which capabilities to query
-        if caps is not None:
-            _requested = set(caps)
+        if caps is None:
+            caps = set(_ALL_XTGETTCAP_CAPS)
         else:
-            _requested = _std_names.copy()
+            caps = set(caps)
 
         # force=True: single batch
         if force:
-            result = self._xtgettcap_batch(list(_requested), timeout=timeout)
+            result = self._xtgettcap_batch(list(caps), timeout=timeout)
             return self._maybe_none(self._filter_xtgettcap_response(
-                self._update_xtgettcap_cache(result), _requested))
+                self._update_xtgettcap_cache(result), caps))
 
         # cache hit: check if all requested caps are already known
         if self._xtgettcap_cache.supported:
             cached_names = set(self._xtgettcap_cache.capabilities.keys())
-            missing = _requested - cached_names
+            missing = caps - cached_names
             if not missing:
                 return self._maybe_none(self._filter_xtgettcap_response(
-                    self._xtgettcap_cache, _requested))
+                    self._xtgettcap_cache, caps))
             # Incremental: query only missing caps, merge into cache
             result = self._xtgettcap_batch(list(missing), timeout=timeout)
             return self._maybe_none(self._filter_xtgettcap_response(
-                self._update_xtgettcap_cache(result), _requested))
+                self._update_xtgettcap_cache(result), caps))
 
         # cache unsupported but specific caps requested: try query
-        if caps is not None:
-            result = self._xtgettcap_batch(list(_requested), timeout=timeout)
-            return self._maybe_none(self._filter_xtgettcap_response(
-                self._update_xtgettcap_cache(result), _requested))
-
-        return None
+        result = self._xtgettcap_batch(list(caps), timeout=timeout)
+        return self._maybe_none(self._filter_xtgettcap_response(
+            self._update_xtgettcap_cache(result), caps))
 
     def _update_xtgettcap_cache(self, result: TermcapResponse) -> TermcapResponse:
         """Merge *result* into ``_xtgettcap_cache``, clearing cached attributes."""
