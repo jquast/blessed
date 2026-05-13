@@ -5,13 +5,12 @@ import platform
 from io import StringIO
 
 # 3rd party
-import jinxed
 import pytest
 
 # local
 from .conftest import IS_WINDOWS
 from .accessories import (
-    TestTerminal, unicode_cap, unicode_parm, as_subprocess, pty_test)
+    TestTerminal, unicode_cap, unicode_parm, pty_test)
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="requires real tty")
@@ -379,6 +378,8 @@ def test_nested_formatting(any_term):
             t.normal, t.green, ' off', t.normal))
         assert given == expected
 
+    child(any_term)
+
 
 def test_formatting_functions_without_tty(any_term):
     """Test crazy-ass formatting wrappers when there's no tty."""
@@ -458,7 +459,7 @@ def test_padd():
     """Test Terminal.padd(seq)."""
     def child(kind):
         # local
-        from blessed import Terminal
+
         from blessed.sequences import Sequence
         term = TestTerminal(kind=kind)
         assert Sequence('xyz\b', term).padd() == 'xy'
@@ -474,7 +475,7 @@ def test_split_seqs(any_term):
     """Test Terminal.split_seqs."""
     def child(kind):
         # local
-        from blessed import Terminal
+
         term = TestTerminal(kind=kind)
 
         if term.sc and term.rc:
@@ -490,7 +491,7 @@ def test_split_seqs_maxsplit1(any_term):
     """Test Terminal.split_seqs with maxsplit=1."""
     def child(kind):
         # local
-        from blessed import Terminal
+
         term = TestTerminal(kind=kind)
 
         if term.bold:
@@ -509,7 +510,7 @@ def test_split_seqs_term_right(any_term):
     """Test Terminal.split_seqs with parameterized sequence"""
     def child(kind):
         # local
-        from blessed import Terminal
+
         term = TestTerminal(kind=kind)
 
         if term.move_up:
@@ -525,7 +526,7 @@ def test_split_seqs_maxsplit3_and_term_right(any_term):
     """Test Terminal.split_seqs with parameterized sequence."""
     def child(kind):
         # local
-        from blessed import Terminal
+
         term = TestTerminal(kind=kind)
 
         if term.move_right(32):
@@ -604,7 +605,7 @@ def test_truncate(any_term):
     """Test terminal.truncate and make sure it agrees with terminal.length"""
     def child(kind):
         # local
-        from blessed import Terminal
+
         term = TestTerminal(kind=kind)
 
         test_string = (
@@ -629,7 +630,7 @@ def test_truncate_wide_end(any_term):
     """Ensure that terminal.truncate has the correct behaviour for wide characters."""
     def child(kind):
         # local
-        from blessed import Terminal
+
         term = TestTerminal(kind=kind)
         # ABＣ where Ｃ is width 2 - truncating to 3 fills with space
         test_string = "AB\uff23"
@@ -643,7 +644,7 @@ def test_truncate_wcwidth_clipping(any_term):
     """Ensure that terminal.truncate has the correct behaviour for control characters."""
     def child(kind):
         # local
-        from blessed import Terminal
+
         term = TestTerminal(kind=kind)
         assert term.truncate("", 4) == ""
         # Control character \x01 has zero width
@@ -659,7 +660,7 @@ def test_truncate_padding(any_term):
     """Ensure that terminal.truncate correctly handles cursor movement sequences."""
     def child(kind):
         # local
-        from blessed import Terminal
+
         term = TestTerminal(kind=kind)
 
         if term.move_right(5):
@@ -700,7 +701,7 @@ def test_truncate_zwj_emoji(any_term):
     """Test truncate handles ZWJ emoji sequences."""
     def child(kind):
         # local
-        from blessed import Terminal
+
         term = TestTerminal(kind=kind)
 
         # Family emoji: 👨 + ZWJ + 👩 + ZWJ + 👧 (wcswidth=2)
@@ -723,7 +724,7 @@ def test_truncate_vs16_emoji(any_term):
     """Test truncate handles VS-16 emoji sequences."""
     def child(kind):
         # local
-        from blessed import Terminal
+
         term = TestTerminal(kind=kind)
 
         # Heart ❤ (U+2764) + VS-16 has width 2; truncating to 1 fills with space
@@ -743,7 +744,6 @@ def test_supports_index(any_term):
 
     def child(kind):
         # local
-        from blessed.terminal import Terminal
         from blessed.sequences import Sequence
 
         class Indexable:
@@ -764,9 +764,10 @@ def test_supports_index(any_term):
         seq = Sequence('abcd' * 30, term)
         assert seq.truncate(100) == seq.truncate(indexable)
 
+    child(any_term)
+
 
 def test_get_proxy_string_deprecated():
     """get_proxy_string() returns None (deprecated, no warning emitted)."""
     from blessed.formatters import get_proxy_string
-    result = get_proxy_string(None, 'any_cap')
-    assert result is None
+    assert get_proxy_string(None, 'any_cap') is None

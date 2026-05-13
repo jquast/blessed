@@ -9,8 +9,6 @@ import contextlib
 import time
 import signal
 import warnings
-from importlib import import_module
-from typing import Dict
 
 # local
 from blessed import Terminal
@@ -28,22 +26,45 @@ if not IS_WINDOWS:
 MAX_SUBPROC_TIME_SECONDS = 2  # no test should ever take over 2 seconds
 # extra time given for timeout-related tests for CI/slow machines, by percent
 PCT_MAXWAIT_KEYSTROKE = 1.5
+# Short timeout value for tests that only need to verify timeout behavior,
+# not specific timing.  select() on an empty PTY resolves near-instantly.
+TEST_TIMEOUT_SHORT = 0.05
 
 TEST_KIND = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
 
 DEFAULT_TERMCAP_RESPONSE = TermcapResponse(
-        supported=True, capabilities={'TN': TEST_KIND, 'colors': '256', 'RGB': '8'})
+    supported=True, capabilities={'TN': TEST_KIND, 'colors': '256', 'RGB': '8'})
 
 # Sentinel to distinguish "use default fake XTGETTCAP" from "force real probe"
 NO_XTGETTCAP_DATA = object()
 
-def TestTerminal(is_a_tty=None, _xtgettcap_data=DEFAULT_TERMCAP_RESPONSE, **kwargs):  # type: (...) -> Terminal  # noqa: E501
+
+def TestTerminal(is_a_tty=None, _xtgettcap_data=DEFAULT_TERMCAP_RESPONSE,
+                 _xtgettcap_timeout=None, _esc_delay=None, **kwargs) -> Terminal:
     """Create a Terminal instance with optional is_a_tty override and default _xtgettcap_data."""
+    from unittest.mock import patch
+    import blessed.keyboard
+
     if 'kind' not in kwargs:
         kwargs['kind'] = TEST_KIND
     if _xtgettcap_data is not NO_XTGETTCAP_DATA:
         kwargs['_xtgettcap_data'] = _xtgettcap_data
-    term = Terminal(**kwargs)
+
+    patches = []
+    if _xtgettcap_timeout is not None:
+        patches.append(patch.object(
+            blessed.keyboard, 'TERMINAL_QUERY_TIMEOUT_SECONDS', _xtgettcap_timeout))
+    if _esc_delay is not None:
+        patches.append(patch.object(
+            blessed.keyboard, 'DEFAULT_ESCDELAY', _esc_delay))
+
+    for p in patches:
+        p.start()
+    try:
+        term = Terminal(**kwargs)
+    finally:
+        for p in patches:
+            p.stop()
     if is_a_tty is not None:
         term._is_a_tty = is_a_tty
     return term
@@ -242,7 +263,6 @@ def read_until_eof(fd, encoding='utf8'):
 def echo_off(fd):
     """Ensure any bytes written to pty fd are not duplicated as output."""
     if not IS_WINDOWS:
-        # pylint: disable=possibly-used-before-assignment
         try:
             attrs = termios.tcgetattr(fd)
             attrs[3] = attrs[3] & ~termios.ECHO
@@ -285,7 +305,8 @@ def _setwinsize(fd, rows, cols):
     fcntl.ioctl(fd, TIOCSWINSZ, s)
 
 
-def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80, _xtgettcap_data=None):
+def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80,
+             _xtgettcap_data=None, _xtgettcap_timeout=None, _esc_delay=None):
     """
     Wrapper for PTY-based tests to reduce boilerplate.
 
@@ -301,9 +322,6 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80, _xt
         test_name: Optional name for coverage tracking. Auto-derived from child_func if None.
         rows: Terminal height in rows (default 24)
         cols: Terminal width in columns (default 80)
-        _xtgettcap_data: Passed through to TestTerminal. Default (sentinel) uses
-            standard fake XTGETTCAP response. Pass ``None`` to force a real probe
-            attempt, or a ``TermcapResponse`` to inject specific test data.
 
     Returns:
         str: Output from child process (everything written to stdout)
@@ -323,12 +341,16 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80, _xt
     """
     # pylint: disable=too-complex,too-many-branches,too-many-locals
     # pylint: disable=missing-raises-doc,missing-type-doc,too-many-statements
-    #assert False, _xtgettcap_data
+    # assert False, _xtgettcap_data
     if _xtgettcap_data is not NO_XTGETTCAP_DATA:
-        _xtgettcap_data = _xtgettcap_data if _xtgettcap_data is not None else DEFAULT_TERMCAP_RESPONSE
+        _xtgettcap_data = (_xtgettcap_data if _xtgettcap_data is not None
+                           else DEFAULT_TERMCAP_RESPONSE)
     if IS_WINDOWS:
         # On Windows, just run child_func directly without PTY
-        term = TestTerminal(_xtgettcap_data=_xtgettcap_data, force_styling=True)
+        term = TestTerminal(_xtgettcap_data=_xtgettcap_data,
+                            _xtgettcap_timeout=_xtgettcap_timeout,
+                            _esc_delay=_esc_delay,
+                            force_styling=True)
         result = child_func(term)
         return result.decode('utf-8') if isinstance(result, bytes) else (result or '')
 
@@ -355,7 +377,10 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80, _xt
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         cov = init_subproc_coverage(test_name)
         try:
-            term = TestTerminal(_xtgettcap_data=_xtgettcap_data, force_styling=True)
+            term = TestTerminal(_xtgettcap_data=_xtgettcap_data,
+                                _xtgettcap_timeout=_xtgettcap_timeout,
+                                _esc_delay=_esc_delay,
+                                force_styling=True)
             result = child_func(term)
 
             # Write result to stdout if provided

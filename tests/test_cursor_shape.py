@@ -8,7 +8,7 @@ import pytest
 
 # local
 from blessed.cursor_shape import CursorShape
-from .accessories import TestTerminal, as_subprocess
+from .accessories import TestTerminal
 
 
 def test_constant_values():

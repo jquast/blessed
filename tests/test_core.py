@@ -113,17 +113,10 @@ def test_number_of_colors_without_tty():
                          _xtgettcap_data=TermcapResponse(supported=False))
         assert t.number_of_colors == 0
 
-    def child_24bit_forcestyle_with_colorterm():
-        os.environ['COLORTERM'] = 'truecolor'
-        t = TestTerminal(kind='vt220', stream=StringIO(),
-                         force_styling=True)
-        assert t.number_of_colors == 1 << 24
-
     child_0_forcestyle()
     child_8_forcestyle()
     child_256_forcestyle()
     child_256_nostyle()
-
 
 
 def test_multiple_terminal_kinds():
@@ -140,9 +133,6 @@ def test_multiple_terminal_kinds():
 
     assert term_a.number_of_colors == 256
     assert term_b.number_of_colors == 0
-
-
-
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="requires more than 1 tty")
@@ -264,7 +254,7 @@ def test_kind_resolution_kind_preferred():
 def test_kind_resolution_tn_via_xtgettcap():
     """TN from XTGETTCAP used when kind is not specified."""
     _xtgettcap_data = TermcapResponse(
-            supported=True, capabilities={'TN': 'ansi'})
+        supported=True, capabilities={'TN': 'ansi'})
     term = TestTerminal(kind=None, force_styling=True,
                         _xtgettcap_data=_xtgettcap_data)
     assert term.kind == 'ansi'
@@ -272,21 +262,24 @@ def test_kind_resolution_tn_via_xtgettcap():
 
 def test_kind_resolution_term_kind():
     """kind_fallback used when kind is invalid and TERM is unset (xtgettcap path)."""
-    assert 'TERM' not in os.environ, 'TERM is expected unset, check: tox.ini and conftest.py:pytest_configure'
+    assert 'TERM' not in os.environ, (
+        'TERM is expected unset, check: tox.ini and conftest.py:pytest_configure')
     term = TestTerminal(kind='unknown', force_styling=True, _xtgettcap_data=None)
     assert term.kind == 'xterm-256color'
 
 
 def test_kind_resolution_kind_fallback():
     """kind_fallback used when kind is invalid and TERM is unset."""
-    assert 'TERM' not in os.environ, 'TERM is expected unset, check: tox.ini and conftest.py:pytest_configure'
+    assert 'TERM' not in os.environ, (
+        'TERM is expected unset, check: tox.ini and conftest.py:pytest_configure')
     term = TestTerminal(kind='unknown', force_styling=True)
     assert term.kind == 'xterm-256color'
 
 
 def test_kind_resolution_all_fail():
     """jinxed.error raised when kind, TERM, and kind_fallback all fail."""
-    assert 'TERM' not in os.environ, 'TERM is expected unset, check: tox.ini and conftest.py:pytest_configure'
+    assert 'TERM' not in os.environ, (
+        'TERM is expected unset, check: tox.ini and conftest.py:pytest_configure')
     with pytest.raises(jinxed.error, match='xxBadFallbackXx'):
         TestTerminal(
             kind='xxUnknownXx', force_styling=True,
@@ -519,8 +512,6 @@ def test_termcap_repr():
     expected = r"<Termcap cursor_up:'\x1b\\[A'>"
 
     def child():
-        # local
-        import blessed
         term = TestTerminal(kind=given_ttype, force_styling=True)
         given = repr(term.caps[given_capname])
         assert given == expected
@@ -580,7 +571,7 @@ def test_scroll_region_context_manager():
         return stream.getvalue()
 
     output = pty_test(
-            child, rows=24, cols=80,)
+        child, rows=24, cols=80,)
     assert output == '\x1b[6;15r\x1b[1;24r'
 
 

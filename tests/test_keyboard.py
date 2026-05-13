@@ -2,7 +2,6 @@
 # std imports
 import io
 import os
-import platform
 import sys
 import tempfile
 import collections

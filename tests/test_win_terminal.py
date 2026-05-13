@@ -22,7 +22,7 @@ if IS_WINDOWS:
     )
     from blessed.dec_modes import DecPrivateMode
     from jinxed import win32
-    from .accessories import TestTerminal, as_subprocess
+    from .accessories import TestTerminal
 
 
 def _mock_mouse_event(x=0, y=0, button_state=0, event_flags=0,

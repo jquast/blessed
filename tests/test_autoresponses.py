@@ -13,7 +13,7 @@ except ImportError:
 # local
 from blessed._capabilities import Decrqss, ITerm2Capabilities, TextSizingResult
 from .conftest import IS_WINDOWS
-from .accessories import TestTerminal, as_subprocess, pty_test
+from .accessories import TestTerminal, pty_test
 
 pytestmark = pytest.mark.skipif(
     IS_WINDOWS, reason="ungetch and PTY testing not supported on Windows")

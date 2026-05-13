@@ -11,7 +11,7 @@ from blessed import Terminal
 from blessed.keyboard import Keystroke, _match_dec_event
 from blessed.mouse import MouseEvent, MouseSGREvent, MouseLegacyEvent
 from blessed.dec_modes import DecModeResponse
-from .accessories import TestTerminal, as_subprocess, make_enabled_dec_cache
+from .accessories import TestTerminal, make_enabled_dec_cache
 from .conftest import IS_WINDOWS
 
 

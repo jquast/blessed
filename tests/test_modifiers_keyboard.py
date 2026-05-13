@@ -1,10 +1,9 @@
 """Tests for advanced keyboard protocol support."""
 import functools
-import platform
 
 import pytest
 
-from .accessories import (TestTerminal, as_subprocess, assert_modifiers,
+from .accessories import (TestTerminal, assert_modifiers,
                           assert_modifiers_value, assert_only_modifiers)
 from blessed.keyboard import Keystroke, LegacyCSIKeyEvent, ModifyOtherKeysEvent, resolve_sequence
 

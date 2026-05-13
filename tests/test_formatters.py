@@ -1,14 +1,13 @@
 """Tests string formatting functions."""
 # std imports
 import pickle
-import platform
 import multiprocessing
 
 # 3rd party
 import pytest
 
 # local
-from .accessories import TestTerminal, as_subprocess
+from .accessories import TestTerminal
 
 try:
     # std imports

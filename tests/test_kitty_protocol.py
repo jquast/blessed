@@ -5,15 +5,13 @@ import sys
 import time
 import math
 import pytest
-import platform
 
-from blessed import Terminal
 from blessed.keyboard import (
     KEY_TAB, KEY_LEFT_SHIFT, KEY_LEFT_CONTROL, KEY_RIGHT_ALT,
     _match_kitty_key, KittyKeyEvent, Keystroke, KittyKeyboardProtocol, resolve_sequence,
     _match_legacy_csi_letter_form,
 )
-from tests.accessories import (as_subprocess, SEMAPHORE, TestTerminal,
+from tests.accessories import (SEMAPHORE, TestTerminal,
                                read_until_semaphore, pty_test)
 from tests.conftest import IS_WINDOWS, TEST_KEYBOARD
 

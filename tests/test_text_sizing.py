@@ -11,7 +11,7 @@ except ImportError:
     import mock
 
 # local
-from .accessories import TestTerminal, as_subprocess
+from .accessories import TestTerminal
 
 
 def test_string_vertical_align_top():

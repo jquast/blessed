@@ -3,7 +3,6 @@
 import io
 import os
 import select
-import termios
 import time
 
 # 3rd party
@@ -14,7 +13,7 @@ from unittest import mock
 from blessed._capabilities import TermcapResponse, ITerm2Capabilities
 from blessed.terminal import Terminal
 from .conftest import IS_WINDOWS
-from .accessories import TestTerminal, as_subprocess, pty_test, NO_XTGETTCAP_DATA
+from .accessories import TestTerminal, pty_test, NO_XTGETTCAP_DATA
 
 
 def test_hex_encode():
@@ -969,7 +968,8 @@ def test_terminal_init_xtgettcap_timeout():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_terminal_init_xtgettcap_timeout',
-                      _xtgettcap_data=NO_XTGETTCAP_DATA)
+                      _xtgettcap_data=NO_XTGETTCAP_DATA,
+                      _xtgettcap_timeout=0.01)
     assert 'OK' in output
 
 

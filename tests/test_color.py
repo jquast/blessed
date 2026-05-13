@@ -11,7 +11,7 @@ from blessed.color import COLOR_DISTANCE_ALGORITHMS
 from blessed.colorspace import RGBColor
 from blessed.formatters import FormattingString, NullCallableString
 # local
-from .accessories import TestTerminal, as_subprocess
+from .accessories import TestTerminal
 
 
 @pytest.fixture(params=COLOR_DISTANCE_ALGORITHMS.keys())

@@ -13,8 +13,8 @@ import pytest
 from .conftest import TEST_QUICK, IS_WINDOWS
 from .accessories import (
     SEMAPHORE,
+    TEST_TIMEOUT_SHORT,
     TestTerminal,
-    as_subprocess,
     read_until_semaphore,
     pty_test,
     PCT_MAXWAIT_KEYSTROKE,
@@ -45,10 +45,10 @@ def test_does_sixel_returns_false_on_timeout():
     """Test does_sixel() returns False when timeout occurs."""
     def child(term):
         stime = time.time()
-        result = term.does_sixel(timeout=0.1)
+        result = term.does_sixel(timeout=TEST_TIMEOUT_SHORT)
         elapsed = time.time() - stime
         assert result is False
-        assert 0.08 <= elapsed <= 0.15
+        assert TEST_TIMEOUT_SHORT * 0.5 <= elapsed <= TEST_TIMEOUT_SHORT * PCT_MAXWAIT_KEYSTROKE
         return b'SIXEL_TIMEOUT'
 
     output = pty_test(child, parent_func=None, test_name='test_does_sixel_returns_false_on_timeout')
@@ -148,8 +148,8 @@ def test_get_sixel_height_and_width_0s_ungetch():
 
 
 @pytest.mark.parametrize('method_name,expected_result,timeout_val', [
-    ('get_sixel_height_and_width', (-1, -1), 0.3),
-    ('get_sixel_colors', -1, 0.3),
+    ('get_sixel_height_and_width', (-1, -1), TEST_TIMEOUT_SHORT),
+    ('get_sixel_colors', -1, TEST_TIMEOUT_SHORT),
 ])
 def test_sixel_methods_timeout(method_name, expected_result, timeout_val):
     """Sixel query methods return failure values on timeout."""
@@ -157,7 +157,6 @@ def test_sixel_methods_timeout(method_name, expected_result, timeout_val):
 
     def child(term):
         stime = time.time()
-
         result = getattr(term, method_name)(timeout=timeout_val)
         elapsed = time.time() - stime
         assert timeout_val * 0.5 <= elapsed <= max_time
@@ -325,7 +324,7 @@ def test_timeout_reduction_subprocess():
     def child(term):
         # Call with a real timeout to trigger the timeout path
         # All methods will timeout (no ungetch)
-        result = term.get_sixel_height_and_width(timeout=0.2, force=True)
+        result = term.get_sixel_height_and_width(timeout=TEST_TIMEOUT_SHORT, force=True)
         assert result == (-1, -1)
         # Should cache failure in all caches
         assert term._xtwinops_cell_cache == (-1, -1)
@@ -421,8 +420,8 @@ def test_cell_cache_sticky_failure():
 
 
 @pytest.mark.parametrize('method_name,expected_failure,timeout_val', [
-    ('get_sixel_height_and_width', (-1, -1), 0.3),
-    ('get_sixel_colors', -1, 0.3),
+    ('get_sixel_height_and_width', (-1, -1), TEST_TIMEOUT_SHORT),
+    ('get_sixel_colors', -1, TEST_TIMEOUT_SHORT),
 ])
 def test_cached_failure_returns_immediately(method_name, expected_failure, timeout_val):
     """Test that cached failure results return immediately on subsequent calls."""

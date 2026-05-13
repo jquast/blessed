@@ -282,7 +282,7 @@ def main():
                 parts.append(f"{capname} differs")
                 str_diffs.append((capname, jn_val, xt_val))
             elif d_type == "NUM_PARSE":
-                parts.append(f"{capname} unparseable")
+                parts.append(f"{capname} unparsable")
         for capname, e_type, xt_val in (exts or []):
             parts.append(f"{capname}(ext)")
 

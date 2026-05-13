@@ -25,9 +25,9 @@ import pytest
 # local
 from .conftest import TEST_KEYBOARD, IS_WINDOWS
 from .accessories import (
+    TEST_TIMEOUT_SHORT,
     TestTerminal,
     pty_test,
-    as_subprocess,
 )
 from blessed.keyboard import SoftwareVersion
 
@@ -109,10 +109,10 @@ def test_get_software_version_timeout():
     """Test get_software_version() timeout without response."""
     def child(term):
         stime = time.time()
-        sv = term.get_software_version(timeout=0.1)
+        sv = term.get_software_version(timeout=TEST_TIMEOUT_SHORT)
         elapsed = time.time() - stime
         assert sv is None
-        assert 0.08 <= elapsed <= 0.15
+        assert TEST_TIMEOUT_SHORT * 0.5 <= elapsed <= TEST_TIMEOUT_SHORT * 1.5
         return b'TIMEOUT'
 
     output = pty_test(child, parent_func=None, test_name='test_get_software_version_timeout')

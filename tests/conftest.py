@@ -14,6 +14,7 @@ def pytest_configure(config: pytest.Config) -> None:
     os.environ.pop('TERM', None)
     os.environ['COLORTERM'] = 'false'
 
+
 try:
     from pytest_codspeed import BenchmarkFixture  # noqa: F401  pylint: disable=unused-import
 except ImportError:

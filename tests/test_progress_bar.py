@@ -3,7 +3,7 @@
 import pytest
 
 # local
-from .accessories import TestTerminal, as_subprocess
+from .accessories import TestTerminal
 
 
 def test_progress_bar_normal():

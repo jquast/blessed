@@ -24,7 +24,7 @@ from blessed.keyboard import (
     get_leading_prefixes,
     DeviceAttribute,
 )
-from .accessories import TestTerminal, as_subprocess, make_enabled_dec_cache
+from .accessories import TestTerminal, make_enabled_dec_cache
 from .conftest import IS_WINDOWS
 
 # For backwards compatibility and convenience in tests
@@ -688,6 +688,7 @@ def test_context_manager_no_styling_and_invalid_args():
 
 def test_context_manager_exception_handling():
     """Test context managers properly restore state on exception."""
+    # pylint: disable=missing-raises-doc
     stream = io.StringIO()
     term = TestTerminal(stream=stream, force_styling=True)
 

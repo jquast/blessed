@@ -266,8 +266,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
             # Step 1: XTGETTCAP capability negotiation
             self._xtgettcap_cache = (
-                    _xtgettcap_data if _xtgettcap_data is not None
-                    else self.__init__xtgettcap())
+                _xtgettcap_data if _xtgettcap_data is not None
+                else self.__init__xtgettcap())
 
             # Step 2: Initialize using jinxed for its terminfo(5) database.
             self.__init_termcap_kind(kind_preferred=kind, kind_fallback=kind_fallback)
@@ -281,7 +281,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self.__init__keycodes()
 
         # Step 5: Finalize capabilities using best available data
-        self.__init__color_capabilities()
+        self.number_of_colors = self.__init__color_capabilities()
         self.__init__capabilities()
         self.__init__query_caches()
 
@@ -298,7 +298,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._keymap: collections.OrderedDict[str, int] = collections.OrderedDict()
         self._keymap_prefixes: set[str] = set()
 
-    def __init__xtgettcap(self) -> None:
+    def __init__xtgettcap(self) -> TermcapResponse:
         """Probe for core XTGETTCAP capabilities."""
         _xtgettcap_cache = TermcapResponse(supported=False)
         if (self.is_a_tty and self._keyboard_fd is not None):
@@ -316,18 +316,15 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     def __init_termcap_kind(self, kind_preferred: Optional[str], kind_fallback: str) -> None:
         """Determine terminal 'kind' jinxed.setupterm() capability database."""
         # Previous to 1.40, blessed could fallback to 'dumb' when it could not find a meaningful
-        # type, but now kind_fallback='xterm-256color' is always guaranteed available and used.  It
-        # is now a safe fallback for the year 2026, if you host a specific retroterminal or BBS
-        # system, then, like getty(8), it is the host's responsibility to define an
-        # application-specific fallback or default, like 'ansi' or 'vt102' or any other item
-        # available in jinxed's virtual capability database.
+        # type, but now kind_fallback='xterm-256color' is always guaranteed available and used
+        # instead of 'dumb'.
+        #
+        # I believe now xterm-256 sequences are safe as unknown fallback for the year 2026. If dumb
+        # *is*, use NO_COLOR or force_styling=False which has the same general result.
         tn_kind = self._xtgettcap_cache.capabilities.get('TN')
-
-        if IS_WINDOWS and self._init_descriptor is not None:
-            term_kind = jinxed.get_term(self._init_descriptor)
-        else:
-            term_kind = os.environ.get('TERM')
-
+        term_kind = (jinxed.get_term(self._init_descriptor)
+                     if IS_WINDOWS and self._init_descriptor is not None
+                     else os.environ.get('TERM'))
         kind_resolution_order = list(dict.fromkeys(
             filter(None, [kind_preferred, tn_kind, term_kind, kind_fallback])))
         last_exc = None
@@ -480,7 +477,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 self._encoding = 'UTF-8'
                 self._keyboard_decoder = codecs.getincrementaldecoder(self._encoding)()
 
-    def __init__color_capabilities(self) -> None:
+    def __init__color_capabilities(self) -> int:
         """Initialize color distance algorithm and determine Terminal.number_of_colors."""
         # Resolution order:
         # - COLORTERM environment value
@@ -489,33 +486,26 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # - termcap 'colors' (jinxed)
         self._color_distance_algorithm = 'cie2000'
         if not self.does_styling:
-            self.number_of_colors = 0
-            return
+            return 0
         if os.environ.get('COLORTERM') in {'truecolor', '24bit'}:
-            self.number_of_colors = 1 << 24
-            return
+            return 1 << 24
         if (rgb_val := self._xtgettcap_cache.capabilities.get('RGB')):
             try:
                 if int(rgb_val.split('/', 1)[0]) == 8:
-                    self.number_of_colors = 1 << 24
-                    return
+                    return 1 << 24
             except ValueError:
                 pass
-        if IS_WINDOWS:
-            # Windows 10 build 14931+ (2016) supports 24-bit color natively.
-            # Older Windows (7, 8) lack truecolor and fall through to jinxed terminfo.
+        if IS_WINDOWS and (
+                tuple(int(n) for n in platform.version().split('.') if n.isdigit())
+                >= (10, 0, 14931)):
+            # Windows 10 build 14931+ (2016) supports 24-bit color natively, but they do not set
+            # COLORTERM. Older Windows releases and versions of ConHost.exe lack truecolor and fall
+            # through to jinxed terminfo (8 or 16 colors).
             # https://devblogs.microsoft.com/commandline/24-bit-color-in-the-windows-console/
-            if tuple(int(n) for n in platform.version().split('.')) >= (10, 0, 14931):
-                self.number_of_colors = 1 << 24
-                return
-
-        if (xt_colors := (self._xtgettcap_cache.capabilities.get('colors'))):
-            try:
-                self.number_of_colors = int(xt_colors)
-                return
-            except ValueError:
-                pass
-        self.number_of_colors = max(0, self._jinxed_term.tigetnum('colors') or 0)
+            return 1 << 24
+        if (xt_colors := self._xtgettcap_cache.capabilities.get('colors')) and xt_colors.isdigit():
+            return int(xt_colors)
+        return max(0, self._jinxed_term.tigetnum('colors'))
 
     def __clear_color_capabilities(self) -> None:
         for cached_color_cap in set(dir(self)) & COLORS:
@@ -3794,6 +3784,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             see http://www.unixwiz.net/techtips/termios-vmin-vtime.html
         """
         if HAS_TTY and self._keyboard_fd is not None:
+            # pylint: disable=possibly-used-before-assignment
+            # why is pylint only noticing an error here, but not in raw() ?!
             with self._enter_termios_mode(tty.setcbreak):
                 yield
         else:

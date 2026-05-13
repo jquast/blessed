@@ -40,6 +40,7 @@ import pytest
 # local
 from .conftest import TEST_KEYBOARD, IS_WINDOWS
 from .accessories import (
+    TEST_TIMEOUT_SHORT,
     TestTerminal,
     pty_test,
 )
@@ -104,10 +105,10 @@ def test_get_device_attributes_timeout():
     """Test get_device_attributes() timeout without response."""
     def child(term):
         stime = time.time()
-        da = term.get_device_attributes(timeout=0.1)
+        da = term.get_device_attributes(timeout=TEST_TIMEOUT_SHORT)
         elapsed = time.time() - stime
         assert da is None
-        assert 0.08 <= elapsed <= 0.15
+        assert TEST_TIMEOUT_SHORT * 0.5 <= elapsed <= TEST_TIMEOUT_SHORT * 1.5
         return b'TIMEOUT'
 
     output = pty_test(child, parent_func=None, test_name='test_get_device_attributes_timeout')
