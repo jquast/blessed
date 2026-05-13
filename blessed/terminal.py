@@ -497,7 +497,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 pass
         if (xt_colors := self._xtgettcap_cache.capabilities.get('colors')) and xt_colors.isdigit():
             return int(xt_colors)
-        _win_build = tuple(int(n) for n in platform.version().split('.') if n.isdigit() if IS_WINDOWS else 0
+        _win_build = tuple(int(n) for n in platform.version().split('.')
+                           if n.isdigit()) if IS_WINDOWS else 0
         if IS_WINDOWS and self._kind == 'vtwin10' and _win_build >= (10, 0, 14931):
             # Windows 10 build 14931+ (2016) supports 24-bit color natively, but they do not set
             # COLORTERM. Older Windows releases and versions of ConHost.exe lack truecolor and fall
