@@ -265,7 +265,10 @@ def test_kind_resolution_term_kind():
     assert 'TERM' not in os.environ, (
         'TERM is expected unset, check: tox.ini and conftest.py:pytest_configure')
     term = TestTerminal(kind='unknown', force_styling=True, _xtgettcap_data=None)
-    assert term.kind == 'xterm-256color'
+    if IS_WINDOWS:
+        assert term.kind == 'vtwin10'
+    else:
+        assert term.kind == 'xterm-256color'
 
 
 def test_kind_resolution_kind_fallback():
@@ -273,7 +276,10 @@ def test_kind_resolution_kind_fallback():
     assert 'TERM' not in os.environ, (
         'TERM is expected unset, check: tox.ini and conftest.py:pytest_configure')
     term = TestTerminal(kind='unknown', force_styling=True)
-    assert term.kind == 'xterm-256color'
+    if IS_WINDOWS:
+        assert term.kind == 'vtwin10'
+    else:
+        assert term.kind == 'xterm-256color'
 
 
 def test_kind_resolution_all_fail():

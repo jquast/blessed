@@ -482,8 +482,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # Resolution order:
         # - COLORTERM environment value
         # - XTGETTCAP 'RGB' (24-bit), then 'colors'
-        # - Windows 10+ (native 24-bit color since build 14931)
         # - termcap 'colors' (jinxed)
+        # - Windows native console (vtwin10) gets 24-bit boost
         self._color_distance_algorithm = 'cie2000'
         if not self.does_styling:
             return 0
@@ -495,17 +495,18 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                     return 1 << 24
             except ValueError:
                 pass
-        if IS_WINDOWS and (
-                tuple(int(n) for n in platform.version().split('.') if n.isdigit())
+        if (xt_colors := self._xtgettcap_cache.capabilities.get('colors')) and xt_colors.isdigit():
+            return int(xt_colors)
+        jinxed_colors = max(0, self._jinxed_term.tigetnum('colors'))
+        if (IS_WINDOWS and self._kind == 'vtwin10' and jinxed_colors
+                and tuple(int(n) for n in platform.version().split('.') if n.isdigit())
                 >= (10, 0, 14931)):
             # Windows 10 build 14931+ (2016) supports 24-bit color natively, but they do not set
             # COLORTERM. Older Windows releases and versions of ConHost.exe lack truecolor and fall
             # through to jinxed terminfo (8 or 16 colors).
             # https://devblogs.microsoft.com/commandline/24-bit-color-in-the-windows-console/
             return 1 << 24
-        if (xt_colors := self._xtgettcap_cache.capabilities.get('colors')) and xt_colors.isdigit():
-            return int(xt_colors)
-        return max(0, self._jinxed_term.tigetnum('colors'))
+        return jinxed_colors
 
     def __clear_color_capabilities(self) -> None:
         for cached_color_cap in set(dir(self)) & COLORS:
