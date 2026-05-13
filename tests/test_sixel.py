@@ -15,6 +15,7 @@ from .accessories import (
     SEMAPHORE,
     TEST_TIMEOUT_SHORT,
     TestTerminal,
+    assert_timeout_elapsed,
     read_until_semaphore,
     pty_test,
     PCT_MAXWAIT_KEYSTROKE,
@@ -48,7 +49,7 @@ def test_does_sixel_returns_false_on_timeout():
         result = term.does_sixel(timeout=TEST_TIMEOUT_SHORT)
         elapsed = time.time() - stime
         assert result is False
-        assert TEST_TIMEOUT_SHORT * 0.5 <= elapsed <= TEST_TIMEOUT_SHORT * PCT_MAXWAIT_KEYSTROKE
+        assert_timeout_elapsed(elapsed, TEST_TIMEOUT_SHORT)
         return b'SIXEL_TIMEOUT'
 
     output = pty_test(child, parent_func=None, test_name='test_does_sixel_returns_false_on_timeout')
@@ -153,13 +154,12 @@ def test_get_sixel_height_and_width_0s_ungetch():
 ])
 def test_sixel_methods_timeout(method_name, expected_result, timeout_val):
     """Sixel query methods return failure values on timeout."""
-    max_time = timeout_val * PCT_MAXWAIT_KEYSTROKE
 
     def child(term):
         stime = time.time()
         result = getattr(term, method_name)(timeout=timeout_val)
         elapsed = time.time() - stime
-        assert timeout_val * 0.5 <= elapsed <= max_time
+        assert_timeout_elapsed(elapsed, timeout_val)
         assert result == expected_result
         return b'OK'
 
@@ -433,21 +433,21 @@ def test_cached_failure_returns_immediately(method_name, expected_failure, timeo
         result1 = getattr(term, method_name)(timeout=timeout_val, force=True)
         elapsed1 = time.time() - stime1
         assert result1 == expected_failure
-        assert timeout_val * 0.5 <= elapsed1 <= max_time
+        assert_timeout_elapsed(elapsed1, timeout_val)
 
         # Second call - should return cached failure immediately (no timeout)
         stime2 = time.time()
         result2 = getattr(term, method_name)(timeout=timeout_val)
         elapsed2 = time.time() - stime2
         assert result2 == expected_failure
-        assert elapsed2 < max_time * 0.5  # Should be instant from cache
+        assert elapsed2 < max_time * 0.5  # instant from cache
 
         # Third call with force=True - bypasses cache and re-queries
         stime3 = time.time()
         result3 = getattr(term, method_name)(timeout=timeout_val, force=True)
         elapsed3 = time.time() - stime3
         assert result3 == expected_failure
-        assert timeout_val * 0.5 <= elapsed3 <= max_time  # Should timeout again
+        assert_timeout_elapsed(elapsed3, timeout_val)  # Should timeout again
         return b'OK'
 
     output = pty_test(child, parent_func=None,

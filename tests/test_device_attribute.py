@@ -42,6 +42,7 @@ from .conftest import TEST_KEYBOARD, IS_WINDOWS
 from .accessories import (
     TEST_TIMEOUT_SHORT,
     TestTerminal,
+    assert_timeout_elapsed,
     pty_test,
 )
 from blessed.keyboard import DeviceAttribute
@@ -108,7 +109,7 @@ def test_get_device_attributes_timeout():
         da = term.get_device_attributes(timeout=TEST_TIMEOUT_SHORT)
         elapsed = time.time() - stime
         assert da is None
-        assert TEST_TIMEOUT_SHORT * 0.5 <= elapsed <= TEST_TIMEOUT_SHORT * 1.5
+        assert_timeout_elapsed(elapsed, TEST_TIMEOUT_SHORT)
         return b'TIMEOUT'
 
     output = pty_test(child, parent_func=None, test_name='test_get_device_attributes_timeout')

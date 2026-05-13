@@ -12,7 +12,9 @@ import pytest
 def pytest_configure(config: pytest.Config) -> None:
     """Normalize environment for consistent test results outside of tox."""
     os.environ.pop('TERM', None)
-    os.environ['COLORTERM'] = 'false'
+    os.environ.pop('COLORTERM', None)
+    os.environ.pop('TERM_PROGRAM', None)
+    os.environ.pop('TERM_PROGRAM_VERSION', None)
 
 
 try:

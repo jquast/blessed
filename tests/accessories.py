@@ -30,6 +30,18 @@ PCT_MAXWAIT_KEYSTROKE = 1.5
 # not specific timing.  select() on an empty PTY resolves near-instantly.
 TEST_TIMEOUT_SHORT = 0.05
 
+
+def assert_timeout_elapsed(elapsed, timeout):
+    """Assert elapsed time is within expected range for a timeout operation.
+
+    The floor is timeout * 0.5 (some overhead always exists).  The ceiling is
+    timeout * PCT_MAXWAIT_KEYSTROKE (tolerance for CI/slow machines).
+    """
+    assert timeout * 0.5 <= elapsed <= timeout * PCT_MAXWAIT_KEYSTROKE, (
+        f'elapsed={elapsed:.4f} not in [{timeout * 0.5:.4f}, '
+        f'{timeout * PCT_MAXWAIT_KEYSTROKE:.4f}]'
+    )
+
 TEST_KIND = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
 
 DEFAULT_TERMCAP_RESPONSE = TermcapResponse(
@@ -40,31 +52,16 @@ NO_XTGETTCAP_DATA = object()
 
 
 def TestTerminal(is_a_tty=None, _xtgettcap_data=DEFAULT_TERMCAP_RESPONSE,
-                 _xtgettcap_timeout=None, _esc_delay=None, **kwargs) -> Terminal:
+                 _xtgettcap_timeout=None, **kwargs) -> Terminal:
     """Create a Terminal instance with optional is_a_tty override and default _xtgettcap_data."""
-    from unittest.mock import patch
-    import blessed.keyboard
-
     if 'kind' not in kwargs:
         kwargs['kind'] = TEST_KIND
     if _xtgettcap_data is not NO_XTGETTCAP_DATA:
         kwargs['_xtgettcap_data'] = _xtgettcap_data
-
-    patches = []
     if _xtgettcap_timeout is not None:
-        patches.append(patch.object(
-            blessed.keyboard, 'TERMINAL_QUERY_TIMEOUT_SECONDS', _xtgettcap_timeout))
-    if _esc_delay is not None:
-        patches.append(patch.object(
-            blessed.keyboard, 'DEFAULT_ESCDELAY', _esc_delay))
-
-    for p in patches:
-        p.start()
-    try:
-        term = Terminal(**kwargs)
-    finally:
-        for p in patches:
-            p.stop()
+        import blessed.terminal
+        blessed.terminal.TERMINAL_QUERY_TIMEOUT_SECONDS = _xtgettcap_timeout
+    term = Terminal(**kwargs)
     if is_a_tty is not None:
         term._is_a_tty = is_a_tty
     return term
@@ -306,7 +303,7 @@ def _setwinsize(fd, rows, cols):
 
 
 def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80,
-             _xtgettcap_data=None, _xtgettcap_timeout=None, _esc_delay=None):
+             _xtgettcap_data=None, _xtgettcap_timeout=None):
     """
     Wrapper for PTY-based tests to reduce boilerplate.
 
@@ -349,7 +346,6 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80,
         # On Windows, just run child_func directly without PTY
         term = TestTerminal(_xtgettcap_data=_xtgettcap_data,
                             _xtgettcap_timeout=_xtgettcap_timeout,
-                            _esc_delay=_esc_delay,
                             force_styling=True)
         result = child_func(term)
         return result.decode('utf-8') if isinstance(result, bytes) else (result or '')
@@ -379,7 +375,6 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80,
         try:
             term = TestTerminal(_xtgettcap_data=_xtgettcap_data,
                                 _xtgettcap_timeout=_xtgettcap_timeout,
-                                _esc_delay=_esc_delay,
                                 force_styling=True)
             result = child_func(term)
 

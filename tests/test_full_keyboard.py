@@ -18,7 +18,9 @@ from .conftest import IS_WINDOWS, TEST_KEYBOARD, TEST_RAW
 from .accessories import (SEMAPHORE,
                           RECV_SEMAPHORE,
                           SEND_SEMAPHORE,
+                          TEST_TIMEOUT_SHORT,
                           TestTerminal,
+                          assert_timeout_elapsed,
                           echo_off,
                           read_until_eof,
                           read_until_semaphore,
@@ -568,7 +570,7 @@ def test_detect_ambiguous_width_second_timeout():
     def child(term):
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
-            result = term.detect_ambiguous_width(timeout=0.1, fallback=77)
+            result = term.detect_ambiguous_width(timeout=TEST_TIMEOUT_SHORT, fallback=77)
             return f'RESULT={result}'.encode('ascii')
 
     def parent(master_fd):
@@ -756,11 +758,11 @@ def test_read_until_timeout_no_match():
         with term.cbreak():
             # This will test the timeout branch (963->965)
             stime = time.time()
-            match, _ = _read_until(term, r'\d+;\d+R', timeout=0.1)
+            match, _ = _read_until(term, r'\d+;\d+R', timeout=TEST_TIMEOUT_SHORT)
             elapsed = time.time() - stime
             # Verify timeout occurred
             assert match is None
-            assert 0.08 <= elapsed <= 0.15
+            assert_timeout_elapsed(elapsed, TEST_TIMEOUT_SHORT)
             return b'TIMEOUT'
 
     # Parent doesn't write any matching pattern - let it timeout

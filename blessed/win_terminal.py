@@ -14,6 +14,7 @@ from typing import IO, List, Union, Optional, Generator
 from jinxed import win32
 
 # local
+from ._capabilities import TermcapResponse
 from .keyboard import TERMINAL_QUERY_TIMEOUT_SECONDS
 from .terminal import WINSZ
 from .terminal import Terminal as _Terminal
@@ -111,9 +112,14 @@ class Terminal(_Terminal):
     def __init__(self,
                  kind: Optional[str] = None,
                  stream: Optional[IO[str]] = None,
-                 force_styling: Union[bool, None] = False) -> None:
+                 force_styling: Union[bool, None] = False,
+                 kind_fallback: str = 'vtwin10',
+                 _xtgettcap_data: Optional[TermcapResponse] = None
+                 ) -> None:
         """Initialize Windows terminal instance."""
-        super().__init__(kind=kind, stream=stream, force_styling=force_styling)
+        super().__init__(kind=kind, stream=stream, force_styling=force_styling,
+                         kind_fallback=kind_fallback,
+                         _xtgettcap_data=_xtgettcap_data)
         self._event_buf: collections.deque[str] = collections.deque()
         self._prev_button_state: int = 0
         self._native_mouse: bool = False

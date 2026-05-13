@@ -106,7 +106,7 @@ def test_async_inkey_mouse_x10():
             loop = asyncio.new_event_loop()
             try:
                 ks = loop.run_until_complete(
-                    term.async_inkey(timeout=0.5))
+                    term.async_inkey(timeout=0.5, esc_delay=0.01))
             finally:
                 loop.close()
             assert ks.is_mouse
