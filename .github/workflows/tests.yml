@@ -53,7 +53,7 @@ jobs:
             os: windows-latest
             test_quick: 0
 
-          - python-version: '3.8'
+          - python-version: '3.9'
             os: windows-latest
             test_quick: 0
 
