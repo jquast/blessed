@@ -181,23 +181,23 @@ CAPABILITIES_CAUSE_MOVEMENT: typing.Tuple[str, ...] = tuple(CAPABILITIES_HORIZON
 )
 
 XTGETTCAP_INIT_CAPABILITIES = (
-        # Terminal capabilities requested at Initialization time:
-        # - TN: determines preferred TERM
-        # - Co, RGB: determines 24-bit color support without COLORTERM
-        # - blink, sitm, ritm, cvvis: nice to haves, often omitted
-        # - 
-        # This was chosen from a May 2026 survey of all popular terminal emulators, comparing: what
-        # capabilities and their values are reported by XTGETTCAP that are otherwise not discovered
-        # by the latest ncurses termcap matching their defined TERM?
-        'TN', 'Co', 'RGB', 'blink', 'sitm', 'ritm', 'cvvis', 'Smulx', 'Setulc', 'Ms')
+    # Terminal capabilities requested at Initialization time:
+    # - TN: determines preferred TERM
+    # - colors, RGB: determines Terminal.number_of_colors
+    # - blink, sitm, ritm, cvvis: nice to have as overlays, often omitted
+    #
+    # These were chosen from a May 2026 survey of all popular terminal emulators: what capabilities
+    # and their values are reported by XTGETTCAP that are otherwise not discovered by the latest
+    # ncurses termcap matching their defined TERM?
+    'TN', 'RGB', 'colors', 'blink', 'sitm', 'ritm', 'cvvis', 'Smulx', 'Setulc', 'Ms')
 
 
 XTGETTCAP_CAPABILITIES = (
     # Terminal identification and 24-bit color fields, note that the order of the first three
     # matters for xterm compatibility, described at https://codeberg.org/dnkl/foot#xtgettcap
     ("TN", "Terminal name"),
-    ("Co", "Number of colors"),
     ("RGB", "Bits per color channel (8 = 24-bit truecolor)"),
+    ("colors", "Number of colors"),
     # as well as the order of the next section, where xterm supports **only** keyboard capabilities
     # via XTGETTCAP, and we have to be sensitive to request only supported capabilities, as xterm
     # stops replying after the first unsupported (non-keyboard) capability after these,
@@ -554,7 +554,19 @@ class TermcapResponse:
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html>`_
     """
 
-    def __init__(self, supported: bool,
+    _TERMINFO_ESCAPE: typing.ClassVar[typing.Dict[str, str]] = {
+        'E': '\x1b', 'e': '\x1b',
+        'n': '\n', 't': '\t', 'r': '\r',
+        'b': '\b', 'f': '\f',
+        '\\': '\\', '^': '^', ':': ':',
+    }
+
+    # XTGETTCAP DCS response: DCS <success>+r<hex-name>=<hex-value> ST
+    # TODO: 0 *or* 1? why 0 *or* 1 for success? check
+    _RE_XTGETTCAP_RESPONSE: typing.ClassVar[typing.Pattern[str]] = re.compile(
+        r'\x1bP([01])\+r([0-9a-fA-F]+)(?:=([0-9a-fA-F]*))?\x1b\\')
+
+    def __init__(self, supported: bool = False,
                  capabilities: Optional[Dict[str, str]] = None) -> None:
         """Initialize TermcapResponse with support status and capabilities."""
         self.supported = supported
@@ -619,7 +631,7 @@ class TermcapResponse:
             return ''
 
     @staticmethod
-    def unescape_terminfo(  # pylint: disable=too-complex,too-many-branches,too-many-statements
+    def unescape_terminfo(
         value: str,
     ) -> str:
         r"""
@@ -631,72 +643,37 @@ class TermcapResponse:
         than as raw binary.  Convert these to their actual byte values.
         """
         result = []
-        i = 0
-        while i < len(value):
-            ch = value[i]
-            if ch == '\\' and i + 1 < len(value):
-                nxt = value[i + 1]
-                if nxt in {'E', 'e'}:
-                    result.append('\x1b')
-                    i += 2
-                    continue
-                if nxt == 'n':
-                    result.append('\n')
-                    i += 2
-                    continue
-                if nxt == 't':
-                    result.append('\t')
-                    i += 2
-                    continue
-                if nxt == 'r':
-                    result.append('\r')
-                    i += 2
-                    continue
-                if nxt == 'b':
-                    result.append('\b')
-                    i += 2
-                    continue
-                if nxt == 'f':
-                    result.append('\f')
-                    i += 2
-                    continue
-                if nxt == '\\':
-                    result.append('\\')
-                    i += 2
-                    continue
-                if nxt == '^':
-                    result.append('^')
-                    i += 2
-                    continue
-                if nxt == ':':
-                    result.append(':')
-                    i += 2
+        idx = 0
+        while idx < len(value):
+            cur = value[idx]
+            if cur == '\\' and idx + 1 < len(value):
+                nxt = value[idx + 1]
+                esc = TermcapResponse._TERMINFO_ESCAPE.get(nxt)
+                if esc is not None:
+                    result.append(esc)
+                    idx += 2
                     continue
                 if nxt in '01234567':
-                    j = i + 1
-                    while j < len(value) and value[j] in '01234567':
-                        j += 1
-                    if j > i + 1:
-                        result.append(chr(int(value[i + 1:j], 8)))
-                        i = j
+                    end = idx + 1
+                    while end < len(value) and value[end] in '01234567':
+                        end += 1
+                    if end > idx + 1:
+                        result.append(chr(int(value[idx + 1:end], 8)))
+                        idx = end
                         continue
-            elif ch == '^' and i + 1 < len(value):
-                c = value[i + 1]
-                if 'A' <= c <= '_':
-                    result.append(chr(ord(c) - ord('A') + 1))
-                    i += 2
+            elif cur == '^' and idx + 1 < len(value):
+                nxt = value[idx + 1]
+                if 'A' <= nxt <= '_':
+                    result.append(chr(ord(nxt) - ord('A') + 1))
+                    idx += 2
                     continue
-                if c == '?':
+                if nxt == '?':
                     result.append('\x7f')
-                    i += 2
+                    idx += 2
                     continue
-            result.append(ch)
-            i += 1
+            result.append(cur)
+            idx += 1
         return ''.join(result)
-
-    # XTGETTCAP DCS response: DCS <success>+r<hex-name>=<hex-value> ST
-    _RE_XTGETTCAP_RESPONSE: typing.ClassVar[typing.Pattern[str]] = re.compile(
-        r'\x1bP([01])\+r([0-9a-fA-F]+)(?:=([0-9a-fA-F]*))?\x1b\\')
 
     @classmethod
     def from_match(cls, match: 're.Match[str]') -> 'tuple[str, str]':
@@ -732,8 +709,9 @@ class TermcapResponse:
 
         for capname, value in self.capabilities.items():
             if capname == 'RGB':
-                # 'RGB' is not drawn, "RGB - number of bits per color channel (different semantics
-                # from the RGB capability in file-based terminfo definitions!)."
+                # 'RGB' is not a terminfo(5) capability, as noted by foot, "RGB - number of bits per
+                # color channel (different semantics from the RGB capability in file-based terminfo
+                # definitions!)." https://codeberg.org/dnkl/foot#xtgettcap
                 continue
             if not value:
                 if capname in jinxed.terminfo.BOOL_CAPS:
@@ -781,7 +759,7 @@ class ITerm2Capabilities:
         'Sx': ('sixel', 'bool', 0),
     }
 
-    def __init__(self, supported: bool,
+    def __init__(self, supported: bool = False,
                  features: Optional[Dict[str, typing.Any]] = None) -> None:
         """Initialize ITerm2Capabilities with support status and features."""
         self.supported = supported
@@ -800,12 +778,14 @@ class ITerm2Capabilities:
                     name, ftype, bits = ITerm2Capabilities.FEATURE_MAP[code]
                     pos += code_len
                     if ftype == 'int' and bits > 0:
+                        # parse integer value
                         digits = ''
                         while pos < len(feature_str) and feature_str[pos].isdigit():
                             digits += feature_str[pos]
                             pos += 1
                         features[name] = int(digits) if digits else 0
                     else:
+                        # non-ints are bools, when present
                         features[name] = True
                     matched = True
                     break

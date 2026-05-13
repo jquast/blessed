@@ -8,6 +8,12 @@ import platform
 # 3rd party
 import pytest
 
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Normalize environment for consistent test results outside of tox."""
+    os.environ.pop('TERM', None)
+    os.environ['COLORTERM'] = 'false'
+
 try:
     from pytest_codspeed import BenchmarkFixture  # noqa: F401  pylint: disable=unused-import
 except ImportError:
@@ -87,8 +93,6 @@ def any_term():
     """A single deterministically rotated terminal kind from jinxed's database."""
     return next(_term_cycle)
 
-
-# -- Keep old parametrized versions for backward compatibility --
 
 @pytest.fixture(params=many_lines_params)
 def many_lines(request):

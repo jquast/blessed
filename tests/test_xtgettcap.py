@@ -14,7 +14,7 @@ from unittest import mock
 from blessed._capabilities import TermcapResponse, ITerm2Capabilities
 from blessed.terminal import Terminal
 from .conftest import IS_WINDOWS
-from .accessories import TestTerminal, as_subprocess, pty_test
+from .accessories import TestTerminal, as_subprocess, pty_test, NO_XTGETTCAP_DATA
 
 
 def test_hex_encode():
@@ -361,7 +361,7 @@ def test_get_xtgettcap_all_parameter():
     term = TestTerminal(stream=stream, force_styling=True)
     term._is_a_tty = True
     hex_tn = TermcapResponse.hex_encode('TN')
-    hex_co = TermcapResponse.hex_encode('Co')
+    hex_co = TermcapResponse.hex_encode('colors')
     term.ungetch(
         f'\x1bP1+r{hex_tn}=787465726d\x1b\\'
         f'\x1bP1+r{hex_co}=323536\x1b\\'
@@ -370,7 +370,7 @@ def test_get_xtgettcap_all_parameter():
     result = term.get_xtgettcap(timeout=0.1)
     assert result is not None
     assert result['TN'] == 'xterm'
-    assert result['Co'] == '256'
+    assert result['colors'] == '256'
 
 
 def test_get_xtgettcap_none_sentinel_not_in_returned_response():
@@ -423,7 +423,7 @@ def test_get_xtgettcap_no_args():
     term = TestTerminal(stream=stream, force_styling=True)
     term._is_a_tty = True
     hex_tn = TermcapResponse.hex_encode('TN')
-    hex_co = TermcapResponse.hex_encode('Co')
+    hex_co = TermcapResponse.hex_encode('colors')
     term.ungetch(
         f'\x1bP1+r{hex_tn}=787465726d\x1b\\'
         f'\x1bP1+r{hex_co}=323536\x1b\\'
@@ -432,17 +432,17 @@ def test_get_xtgettcap_no_args():
     result = term.get_xtgettcap(timeout=0.1)
     assert result is not None
     assert result['TN'] == 'xterm'
-    assert result['Co'] == '256'
+    assert result['colors'] == '256'
 
 
 def test_filter_xtgettcap_response_removes_none_values():
     """_filter_xtgettcap_response removes None-valued caps."""
     tc = TermcapResponse(
         supported=True,
-        capabilities={'TN': 'xterm', 'RGB': None, 'Co': '256'})
+        capabilities={'TN': 'xterm', 'RGB': None, 'colors': '256'})
     result = Terminal._filter_xtgettcap_response(tc)
     assert 'TN' in result.capabilities
-    assert 'Co' in result.capabilities
+    assert 'colors' in result.capabilities
     assert 'RGB' not in result.capabilities
     assert result.supported is True
 
@@ -590,13 +590,13 @@ def test_get_xtgettcap_full_success():
     def child(term):
         probe_resp = '\x1bP1+r544e=787465726d\x1b\\'
         cpr = '\x1b[10;20R'
-        batch_resp = '\x1bP1+r436f=323536\x1b\\'
+        batch_resp = '\x1bP1+r636f6c6f7273=323536\x1b\\'
         term.ungetch(probe_resp + cpr + batch_resp)
         result = term.get_xtgettcap(timeout=0.1, force=True)
         assert result is not None
         assert result.supported is True
         assert result['TN'] == 'xterm'
-        assert result['Co'] == '256'
+        assert result['colors'] == '256'
         assert term._xtgettcap_cache is not None
         return b'OK'
 
@@ -626,13 +626,13 @@ def test_get_xtgettcap_batch_with_remaining_input():
     def child(term):
         probe_resp = '\x1bP1+r544e=787465726d\x1b\\'
         cpr = '\x1b[10;20R'
-        batch_resp = '\x1bP1+r436f=323536\x1b\\'
+        batch_resp = '\x1bP1+r636f6c6f7273=323536\x1b\\'
         keyboard_data = 'x'
         term.ungetch(probe_resp + cpr + batch_resp + keyboard_data)
         result = term.get_xtgettcap(timeout=0.1, force=True)
         assert result is not None
         assert result['TN'] == 'xterm'
-        assert result['Co'] == '256'
+        assert result['colors'] == '256'
         with term.cbreak():
             inp = term.inkey(timeout=0)
             assert inp == 'x'
@@ -878,13 +878,15 @@ def test_does_kitty_query_supported():
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
         result = term.does_kitty_query(timeout=0.1)
-        assert result is True
+        assert result is True, (term._xtgettcap_cache, term.does_styling)
         assert term._xtgettcap_cache is not None
-        assert 'kitty-query-name' in term._xtgettcap_cache.capabilities
+        assert term._xtgettcap_cache.capabilities.get('kitty-query-name') == 'kitty'
         return b'OK'
 
     output = pty_test(child, parent_func=None,
-                      test_name='test_does_kitty_query_supported')
+                      test_name='test_does_kitty_query_supported',
+                      _xtgettcap_data=TermcapResponse(supported=True),
+                      )
     assert 'OK' in output
 
 
@@ -925,16 +927,16 @@ def test_does_kitty_query_rejected():
 def test_terminal_init_xtgettcap_success():
     """Terminal() init with real XTGETTCAP probe and batch succeeds."""
     def parent(master_fd):
-        data = b''
+        # Wait for child to emit queries (indicates it's past
+        # read_until_semaphore).  No need to drain stdout -- child's
+        # _read_until reads from stdin (what we write to master_fd),
+        # not stdout (what we read from master_fd).
         stime = time.time()
-        while b'\x1b[6n' not in data:
-            remaining = 2.0 - (time.time() - stime)
-            if remaining <= 0:
-                break
-            ready, _, _ = select.select([master_fd], [], [], remaining)
+        while time.time() - stime < 0.5:
+            ready, _, _ = select.select([master_fd], [], [], 0.05)
             if ready:
-                data += os.read(master_fd, 4096)
-        os.write(master_fd, b'\x1bP1+r436f=323536\x1b\\')
+                break
+        os.write(master_fd, b'\x1bP1+r636f6c6f7273=323536\x1b\\')
         os.write(master_fd, b'\x1bP1+r524742=38\x1b\\')
         os.write(master_fd, b'\x1bP1+r544e=787465726d\x1b\\')
         os.write(master_fd, b'\x1b[10;20R')
@@ -943,7 +945,7 @@ def test_terminal_init_xtgettcap_success():
         assert term._xtgettcap_cache is not None
         assert term._xtgettcap_cache.supported is True
         assert term._xtgettcap_cache['TN'] == 'xterm'
-        assert term._xtgettcap_cache['Co'] == '256'
+        assert term._xtgettcap_cache['colors'] == '256'
         assert term._xtgettcap_cache['RGB'] == '8'
         with term.cbreak():
             leaked = term.inkey(timeout=0)
@@ -952,7 +954,7 @@ def test_terminal_init_xtgettcap_success():
 
     output = pty_test(child, parent,
                       test_name='test_terminal_init_xtgettcap_success',
-                      _xtgettcap_data=None)
+                      _xtgettcap_data=NO_XTGETTCAP_DATA)
     assert 'OK' in output
 
 
@@ -967,7 +969,7 @@ def test_terminal_init_xtgettcap_timeout():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_terminal_init_xtgettcap_timeout',
-                      _xtgettcap_data=None)
+                      _xtgettcap_data=NO_XTGETTCAP_DATA)
     assert 'OK' in output
 
 
@@ -994,7 +996,7 @@ def test_terminal_init_xtgettcap_unsupported():
 
     output = pty_test(child, parent,
                       test_name='test_terminal_init_xtgettcap_unsupported',
-                      _xtgettcap_data=None)
+                      _xtgettcap_data=NO_XTGETTCAP_DATA)
     assert 'OK' in output
 
 
@@ -1014,7 +1016,7 @@ def test_terminal_init_xtgettcap_unsupported():
 ])
 def test_init_cache_population(xtgettcap_data, assertions):
     """__init__ cache integration with injected or probed XTGETTCAP results."""
-    kwargs: dict = {}
+    kwargs: dict = {'kind': None}
     if xtgettcap_data is not None:
         kwargs['_xtgettcap_data'] = xtgettcap_data
     else:
@@ -1068,15 +1070,6 @@ def test_rgb_truecolor_detection(capabilities, expected_colors):
             kind='xterm-256color', force_styling=True,
             _xtgettcap_data=xt_data)
         assert term.number_of_colors == expected_colors
-
-
-def test_make_jinxed_capabilities_parses_binary_numeric():
-    """make_jinxed_capabilities decodes binary-encoded numeric values."""
-    caps = {'colors': '\x01\x00', 'pairs': '\x7f\xff', 'TN': 'test'}
-    xt_data = TermcapResponse(supported=True, capabilities=caps)
-    result = xt_data.make_jinxed_capabilities()
-    assert result['num_caps']['colors'] == 256
-    assert result['num_caps']['pairs'] == 32767
 
 
 def test_get_xtgettcap_applies_overlay_to_jinxed():

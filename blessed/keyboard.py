@@ -1293,31 +1293,6 @@ def get_keyboard_codes() -> Dict[int, str]:
     return dict(zip(keycodes.values(), keycodes.keys()))
 
 
-def _alternative_left_right(term: 'Terminal') -> typing.Dict[str, int]:
-    r"""
-    Determine and return mapping of left and right arrow keys sequences.
-
-    :arg blessed.Terminal term: :class:`~.Terminal` instance.
-    :rtype: dict
-    :returns: Dictionary of sequences ``term._cuf1``, and ``term._cub1``,
-        valued as ``KEY_RIGHT``, ``KEY_LEFT`` (when appropriate).
-
-    This function supports :func:`get_terminal_sequences` to discover
-    the preferred input sequence for the left and right application keys.
-
-    It is necessary to check the value of these sequences to ensure we do not
-    use ``' '`` and ``'\b'`` for ``KEY_RIGHT`` and ``KEY_LEFT``,
-    preferring their true application key sequence, instead.
-    """
-    # pylint: disable=protected-access
-    keymap: typing.Dict[str, int] = {}
-    if term._cuf1 and term._cuf1 != ' ':
-        keymap[term._cuf1] = jinxed.KEY_RIGHT
-    if term._cub1 and term._cub1 != '\b':
-        keymap[term._cub1] = jinxed.KEY_LEFT
-    return keymap
-
-
 def get_keyboard_sequences(  # pylint: disable=protected-access
         term: 'Terminal') -> typing.OrderedDict[str, int]:
     r"""
@@ -1355,7 +1330,6 @@ def get_keyboard_sequences(  # pylint: disable=protected-access
         ) if seq
     } if term.does_styling else {}
 
-    sequence_map.update(_alternative_left_right(term))
     sequence_map.update(DEFAULT_SEQUENCE_MIXIN)
 
     # This is for fast lookup matching of sequences, preferring

@@ -18,7 +18,8 @@ import pytest
 
 # local
 from .conftest import IS_WINDOWS
-from .accessories import TestTerminal, unicode_cap, as_subprocess, pty_test
+from .accessories import TestTerminal, unicode_cap, as_subprocess, pty_test, NO_XTGETTCAP_DATA
+from blessed._capabilities import TermcapResponse
 
 
 def test_export_only_Terminal():
@@ -31,7 +32,7 @@ def test_export_only_Terminal():
 def test_null_location(any_term):
     """Make sure ``location()`` with no args just does position restoration."""
     def child(kind):
-        t = TestTerminal(stream=StringIO(), force_styling=True)
+        t = TestTerminal(kind=kind, stream=StringIO(), force_styling=True)
         with t.location():
             pass
         expected_output = ''.join(
@@ -91,23 +92,25 @@ def test_number_of_colors_without_tty():
         del os.environ['COLORTERM']
 
     def child_256_nostyle():
-        t = TestTerminal(stream=StringIO())
+        t = TestTerminal(stream=StringIO(), _xtgettcap_data=TermcapResponse(supported=False))
         assert t.number_of_colors == 0
 
     def child_256_forcestyle():
-        t = TestTerminal(stream=StringIO(), force_styling=True)
+        t = TestTerminal(stream=StringIO(), force_styling=True,
+                         _xtgettcap_data=TermcapResponse(supported=False))
         assert t.number_of_colors == 256
 
     def child_8_forcestyle():
         # 'ansi' on freebsd returns 0 colors. We use 'cons25', compatible with its kernel tty.c
         kind = 'cons25' if platform.system().lower() == 'freebsd' else 'ansi'
         t = TestTerminal(kind=kind, stream=StringIO(),
-                         force_styling=True)
+                         force_styling=True,
+                         _xtgettcap_data=TermcapResponse(supported=False))
         assert t.number_of_colors == 8
 
     def child_0_forcestyle():
-        t = TestTerminal(kind='vt220', stream=StringIO(),
-                         force_styling=True)
+        t = TestTerminal(kind='vt220', stream=StringIO(), force_styling=True,
+                         _xtgettcap_data=TermcapResponse(supported=False))
         assert t.number_of_colors == 0
 
     def child_24bit_forcestyle_with_colorterm():
@@ -122,20 +125,40 @@ def test_number_of_colors_without_tty():
     child_256_nostyle()
 
 
+
+def test_multiple_terminal_kinds():
+    """Multiple Terminal instances with different kinds retain correct capabilities."""
+    term_a = TestTerminal(kind='xterm-256color', force_styling=True,
+                          _xtgettcap_data=TermcapResponse(supported=False))
+    colors_a = term_a.number_of_colors
+    assert colors_a == 256
+
+    term_b = TestTerminal(kind='vt220', force_styling=True,
+                          _xtgettcap_data=TermcapResponse(supported=False))
+    colors_b = term_b.number_of_colors
+    assert colors_b == 0
+
+    assert term_a.number_of_colors == 256
+    assert term_b.number_of_colors == 0
+
+
+
+
+
 @pytest.mark.skipif(IS_WINDOWS, reason="requires more than 1 tty")
 def test_number_of_colors_with_tty():
     """test ``number_of_colors`` 0, 8, and 256."""
     def child_256():
-        t = TestTerminal(force_styling=True)
+        t = TestTerminal(force_styling=True, _xtgettcap_data=NO_XTGETTCAP_DATA)
         assert t.number_of_colors == 256
 
     def child_8():
         kind = 'cons25' if platform.system().lower() == 'freebsd' else 'ansi'
-        t = TestTerminal(kind=kind, force_styling=True)
+        t = TestTerminal(kind=kind, force_styling=True, _xtgettcap_data=NO_XTGETTCAP_DATA)
         assert t.number_of_colors == 8
 
     def child_0():
-        t = TestTerminal(kind='vt220', force_styling=True)
+        t = TestTerminal(kind='vt220', force_styling=True, _xtgettcap_data=NO_XTGETTCAP_DATA)
         assert t.number_of_colors == 0
 
     child_0()
@@ -232,24 +255,43 @@ def test_setupterm_singleton_issue_33():
     child()
 
 
-def test_setupterm_invalid_issue39():
-    """Unknown TERM falls back to kind_fallback silently."""
-    def child():
-        warnings.filterwarnings("error", category=UserWarning)
-        term = TestTerminal(kind='unknown', force_styling=True)
-        assert term.does_styling
-        assert term.kind == 'xterm-256color'
-
-    child()
+def test_kind_resolution_kind_preferred():
+    """kind= takes priority over TN, TERM, and kind_fallback."""
+    term = TestTerminal(kind='vt220', force_styling=True)
+    assert term.kind == 'vt220'
 
 
-def test_setupterm_invalid_has_no_styling():
-    """An unknown TERM with bad fallback raises jinxed.error."""
-    with pytest.raises(jinxed.error, match='xxXbadXxx'):
+def test_kind_resolution_tn_via_xtgettcap():
+    """TN from XTGETTCAP used when kind is not specified."""
+    _xtgettcap_data = TermcapResponse(
+            supported=True, capabilities={'TN': 'ansi'})
+    term = TestTerminal(kind=None, force_styling=True,
+                        _xtgettcap_data=_xtgettcap_data)
+    assert term.kind == 'ansi'
+
+
+def test_kind_resolution_term_kind():
+    """kind_fallback used when kind is invalid and TERM is unset (xtgettcap path)."""
+    assert 'TERM' not in os.environ, 'TERM is expected unset, check: tox.ini and conftest.py:pytest_configure'
+    term = TestTerminal(kind='unknown', force_styling=True, _xtgettcap_data=None)
+    assert term.kind == 'xterm-256color'
+
+
+def test_kind_resolution_kind_fallback():
+    """kind_fallback used when kind is invalid and TERM is unset."""
+    assert 'TERM' not in os.environ, 'TERM is expected unset, check: tox.ini and conftest.py:pytest_configure'
+    term = TestTerminal(kind='unknown', force_styling=True)
+    assert term.kind == 'xterm-256color'
+
+
+def test_kind_resolution_all_fail():
+    """jinxed.error raised when kind, TERM, and kind_fallback all fail."""
+    assert 'TERM' not in os.environ, 'TERM is expected unset, check: tox.ini and conftest.py:pytest_configure'
+    with pytest.raises(jinxed.error, match='xxBadFallbackXx'):
         TestTerminal(
-            kind='xxXunknownXxx', force_styling=True,
-            kind_fallback='xxXbadXxx')
-    warnings.resetwarnings()
+            kind='xxUnknownXx', force_styling=True,
+            kind_fallback='xxBadFallbackXx',
+            _xtgettcap_data=TermcapResponse(supported=False))
 
 
 def test_IOUnsupportedOperation():
@@ -375,12 +417,12 @@ def test_no_preferredencoding_fallback():
 @pytest.mark.skipif(IS_WINDOWS, reason="requires fcntl")
 def test_unknown_preferredencoding_warned_and_fallback():
     """Ensure a locale without a codec emits a warning."""
+    @as_subprocess
     def child():
-        with mock.patch('locale.getpreferredencoding') as get_enc, \
-                mock.patch('os.isatty', return_value=True):
-            get_enc.return_value = '---unknown--encoding---'
+        with mock.patch('locale.getpreferredencoding') as get_enc:
+            get_enc.return_value = 'unknown'
             with pytest.warns(UserWarning, match=(
-                    'LookupError: unknown encoding: ---unknown--encoding---, '
+                    'LookupError: unknown encoding: unknown, '
                     'defaulting to UTF-8 for keyboard.')):
                 t = TestTerminal(force_styling=True)
                 assert t._encoding == 'UTF-8'
@@ -469,22 +511,19 @@ def test_time_left_infinite_None():
     assert _time_left(stime=time.time(), timeout=None) is None
 
 
-@pytest.mark.skipif(IS_WINDOWS, reason="can't multiprocess")
 def test_termcap_repr():
-    """Ensure ``hidden_cursor()`` writes hide_cursor and normal_cursor."""
+    """Ensure Termcap repr includes escaped pattern string."""
 
     given_ttype = 'vt220'
     given_capname = 'cursor_up'
-    expected = [r"<Termcap cursor_up:'\x1b\\[A'>",
-                r"<Termcap cursor_up:'\\\x1b\\[A'>",
-                r"<Termcap cursor_up:'\\\x1b\\[A'>"]
+    expected = r"<Termcap cursor_up:'\x1b\\[A'>"
 
     def child():
         # local
         import blessed
         term = TestTerminal(kind=given_ttype, force_styling=True)
         given = repr(term.caps[given_capname])
-        assert given in expected
+        assert given == expected
 
     child()
 
@@ -540,7 +579,8 @@ def test_scroll_region_context_manager():
             pass
         return stream.getvalue()
 
-    output = pty_test(child, rows=24, cols=80)
+    output = pty_test(
+            child, rows=24, cols=80,)
     assert output == '\x1b[6;15r\x1b[1;24r'
 
 
@@ -565,20 +605,6 @@ def test_get_fgcolor_bgcolor_invalid_bits():
         term.get_fgcolor(bits=24)
     with pytest.raises(ValueError, match=r"bits must be 8 or 16, got 32"):
         term.get_bgcolor(bits=32)
-
-
-def test_multiple_terminal_kinds():
-    """Multiple Terminal instances with different kinds retain correct capabilities."""
-    term_a = TestTerminal(kind='xterm-256color', force_styling=True)
-    colors_a = term_a.number_of_colors
-    assert colors_a == 256
-
-    term_b = TestTerminal(kind='vt220', force_styling=True)
-    colors_b = term_b.number_of_colors
-    assert colors_b == 0
-
-    assert term_a.number_of_colors == 256
-    assert term_b.number_of_colors == 0
 
 
 def test_multiple_terminal_kinds_bool_caps():

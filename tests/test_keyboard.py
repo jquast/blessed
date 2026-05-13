@@ -262,43 +262,6 @@ def test_get_keyboard_codes():
             assert getattr(jinxed, keycode) == value
 
 
-def test_alternative_left_right():
-    """Test _alternative_left_right behavior for space/backspace."""
-    from blessed.keyboard import _alternative_left_right
-    term = mock.Mock()
-    term._cuf1 = ''
-    term._cub1 = ''
-    assert not bool(_alternative_left_right(term))
-    term._cuf1 = ' '
-    term._cub1 = '\b'
-    assert not bool(_alternative_left_right(term))
-    term._cuf1 = 'seq-right'
-    term._cub1 = 'seq-left'
-    assert (_alternative_left_right(term) == {
-        'seq-right': jinxed.KEY_RIGHT,
-        'seq-left': jinxed.KEY_LEFT})
-
-
-def test_cuf1_and_cub1_as_RIGHT_LEFT(any_term):
-    """Test that cuf1 and cub1 are assigned KEY_RIGHT and KEY_LEFT."""
-    from blessed.keyboard import get_keyboard_sequences
-
-    def child(kind):
-        term = TestTerminal(kind=kind, force_styling=True)
-        keymap = get_keyboard_sequences(term)
-        if term._cuf1:
-            assert term._cuf1 in keymap
-            assert keymap[term._cuf1] == term.KEY_RIGHT
-        if term._cub1:
-            assert term._cub1 in keymap
-            if term._cub1 == '\b':
-                assert keymap[term._cub1] == term.KEY_BACKSPACE
-            else:
-                assert keymap[term._cub1] == term.KEY_LEFT
-
-    child(any_term)
-
-
 def test_get_keyboard_sequences_sort_order():
     """ordereddict ensures sequences are ordered longest-first."""
     def child(kind):
@@ -319,12 +282,10 @@ def test_get_keyboard_sequence(monkeypatch):
 
     (KEY_SMALL, KEY_LARGE, KEY_MIXIN) = range(3)
     (CAP_SMALL, CAP_LARGE) = 'cap-small cap-large'.split()
-    (SEQ_SMALL, SEQ_LARGE, SEQ_MIXIN, SEQ_ALT_CUF1, SEQ_ALT_CUB1) = (
+    (SEQ_SMALL, SEQ_LARGE, SEQ_MIXIN) = (
         b'seq-small-a',
         b'seq-large-abcdefg',
-        b'seq-mixin',
-        b'seq-alt-cuf1',
-        b'seq-alt-cub1_')
+        b'seq-mixin')
 
     # patch jinxed functions
     def tigetstr_func(cap):
@@ -341,11 +302,8 @@ def test_get_keyboard_sequence(monkeypatch):
                         'DEFAULT_SEQUENCE_MIXIN', (
                             (SEQ_MIXIN.decode('latin1'), KEY_MIXIN),))
 
-    # patch for _alternative_left_right
     term = mock.Mock()
     term.does_styling = True
-    term._cuf1 = SEQ_ALT_CUF1.decode('latin1')
-    term._cub1 = SEQ_ALT_CUB1.decode('latin1')
     jinxed_mock = mock.Mock()
     jinxed_mock.tigetstr = tigetstr_func
     term._jinxed_term = jinxed_mock
@@ -353,8 +311,6 @@ def test_get_keyboard_sequence(monkeypatch):
 
     assert list(keymap.items()) == [
         (SEQ_LARGE.decode('latin1'), KEY_LARGE),
-        (SEQ_ALT_CUB1.decode('latin1'), jinxed.KEY_LEFT),
-        (SEQ_ALT_CUF1.decode('latin1'), jinxed.KEY_RIGHT),
         (SEQ_SMALL.decode('latin1'), KEY_SMALL),
         (SEQ_MIXIN.decode('latin1'), KEY_MIXIN)]
 

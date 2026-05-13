@@ -15,7 +15,7 @@ from typing import Dict
 # local
 from blessed import Terminal
 from blessed.dec_modes import DecModeResponse
-# local
+from blessed._capabilities import TermcapResponse
 from .conftest import IS_WINDOWS
 
 # 3rd party
@@ -29,34 +29,20 @@ MAX_SUBPROC_TIME_SECONDS = 2  # no test should ever take over 2 seconds
 # extra time given for timeout-related tests for CI/slow machines, by percent
 PCT_MAXWAIT_KEYSTROKE = 1.5
 
-test_kind = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
+TEST_KIND = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
 
+DEFAULT_TERMCAP_RESPONSE = TermcapResponse(
+        supported=True, capabilities={'TN': TEST_KIND, 'colors': '256', 'RGB': '8'})
 
-def TestTerminal(is_a_tty=None, **kwargs):  # type: (...) -> Terminal
-    """
-    Create a Terminal instance with optional is_a_tty override.
+# Sentinel to distinguish "use default fake XTGETTCAP" from "force real probe"
+NO_XTGETTCAP_DATA = object()
 
-    'is_a_tty' is useful to pass "is a tty" tests without pty_test
-    """
+def TestTerminal(is_a_tty=None, _xtgettcap_data=DEFAULT_TERMCAP_RESPONSE, **kwargs):  # type: (...) -> Terminal  # noqa: E501
+    """Create a Terminal instance with optional is_a_tty override and default _xtgettcap_data."""
     if 'kind' not in kwargs:
-        kwargs['kind'] = test_kind
-    if '_xtgettcap_data' not in kwargs:
-        from blessed._capabilities import TermcapResponse
-        kind = kwargs['kind']
-        mod_name = f'jinxed.terminfo.{kind.replace("-", "_")}'
-        try:
-            mod = import_module(mod_name)
-        except ImportError:
-            mod = import_module('jinxed.terminfo.xterm_256color')
-        capabilities: Dict[str, str] = {'TN': kind}
-        for cap in mod.BOOL_CAPS:
-            capabilities[cap] = ''
-        for cap, val in mod.NUM_CAPS.items():
-            capabilities[cap] = str(val)
-        for cap, val in mod.STR_CAPS.items():
-            capabilities[cap] = val.decode('latin-1')
-        kwargs['_xtgettcap_data'] = TermcapResponse(
-            supported=True, capabilities=capabilities)
+        kwargs['kind'] = TEST_KIND
+    if _xtgettcap_data is not NO_XTGETTCAP_DATA:
+        kwargs['_xtgettcap_data'] = _xtgettcap_data
     term = Terminal(**kwargs)
     if is_a_tty is not None:
         term._is_a_tty = is_a_tty
@@ -299,12 +285,7 @@ def _setwinsize(fd, rows, cols):
     fcntl.ioctl(fd, TIOCSWINSZ, s)
 
 
-# Sentinel to distinguish "use default fake XTGETTCAP" from "force real probe"
-_NO_XTGETTCAP_DATA = object()
-
-
-def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80,
-             _xtgettcap_data=_NO_XTGETTCAP_DATA):
+def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80, _xtgettcap_data=None):
     """
     Wrapper for PTY-based tests to reduce boilerplate.
 
@@ -342,13 +323,12 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80,
     """
     # pylint: disable=too-complex,too-many-branches,too-many-locals
     # pylint: disable=missing-raises-doc,missing-type-doc,too-many-statements
+    #assert False, _xtgettcap_data
+    if _xtgettcap_data is not NO_XTGETTCAP_DATA:
+        _xtgettcap_data = _xtgettcap_data if _xtgettcap_data is not None else DEFAULT_TERMCAP_RESPONSE
     if IS_WINDOWS:
         # On Windows, just run child_func directly without PTY
-        if _xtgettcap_data is _NO_XTGETTCAP_DATA:
-            term = TestTerminal()
-        else:
-            term = TestTerminal(
-                _xtgettcap_data=_xtgettcap_data, force_styling=True)
+        term = TestTerminal(_xtgettcap_data=_xtgettcap_data, force_styling=True)
         result = child_func(term)
         return result.decode('utf-8') if isinstance(result, bytes) else (result or '')
 
@@ -375,12 +355,7 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80,
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         cov = init_subproc_coverage(test_name)
         try:
-            if _xtgettcap_data is _NO_XTGETTCAP_DATA:
-                term = TestTerminal()
-            else:
-                term = TestTerminal(
-                    _xtgettcap_data=_xtgettcap_data,
-                    force_styling=True)
+            term = TestTerminal(_xtgettcap_data=_xtgettcap_data, force_styling=True)
             result = child_func(term)
 
             # Write result to stdout if provided

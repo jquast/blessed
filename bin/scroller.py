@@ -67,7 +67,8 @@ _MESSAGE = (
 
 
 def _sized_char(ch, target, term, v_align=0, h_align=0):
-    """Return text-sizing sequence and display width for *ch* at *target* scale.
+    """
+    Return text-sizing sequence and display width for *ch* at *target* scale.
 
     Alignment parameters (*v_align*, *h_align*) are only applied when
     fractional scaling is in effect (0 < n < d), per the Kitty text sizing
