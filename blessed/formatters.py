@@ -2,10 +2,15 @@
 from __future__ import annotations
 
 # std imports
+import os
+import pkgutil
+import warnings
+import importlib
 from typing import TYPE_CHECKING, Set, List, Tuple, Union, Callable
 
 # local
 from blessed.colorspace import CGA_COLORS, X11_COLORNAMES_TO_RGB
+from blessed._capabilities import CAPABILITY_DATABASE
 
 if TYPE_CHECKING:  # pragma: no cover
     # local
@@ -13,6 +18,28 @@ if TYPE_CHECKING:  # pragma: no cover
 
 # 3rd party
 import jinxed
+import jinxed.terminfo
+
+
+def _build_known_capability_names() -> 'frozenset[str]':
+    """Return frozenset of all terminal capability names known to jinxed."""
+    caps: set[str] = set(jinxed.terminfo.BOOL_CAPS)
+    caps.update(jinxed.terminfo.NUM_CAPS)
+    for _, modname, _ in pkgutil.iter_modules(jinxed.terminfo.__path__):
+        if modname.startswith('_'):
+            continue
+        mod = importlib.import_module(f'jinxed.terminfo.{modname}')
+        if hasattr(mod, 'STR_CAPS'):
+            caps.update(mod.STR_CAPS.keys())
+    # Also include attribute names from blessed's own capability database.
+    for _name, (attr, _) in CAPABILITY_DATABASE.items():
+        caps.add(attr)
+    return frozenset(caps)
+
+
+_KNOWN_CAPABILITY_NAMES = _build_known_capability_names()
+
+_NOWARN_UNKNOWN_CAPS = bool(os.environ.get('BLESSED_NOWARN_UNKNOWN_CAPS'))
 
 
 def _make_colors() -> Set[str]:
@@ -361,11 +388,18 @@ def resolve_capability(term: 'Terminal', attr: str) -> str:
     """
     if not term.does_styling:
         return ''
-    val = term._jinxed_term.tigetstr(  # pylint: disable=protected-access
-        term._sugar.get(attr, attr))  # pylint: disable=protected-access
+    capname = term._sugar.get(attr, attr)  # pylint: disable=protected-access
+    val = term._jinxed_term.tigetstr(capname)  # pylint: disable=protected-access
+    if val is None:
+        if capname not in _KNOWN_CAPABILITY_NAMES and not _NOWARN_UNKNOWN_CAPS:
+            warnings.warn(
+                f"unknown terminal capability: {capname!r}",
+                stacklevel=4,
+            )
+        return ''
     # Decode sequences as latin1, as they are always 8-bit bytes, so when
     # b'\xff' is returned, this is decoded as '\xff'.
-    return '' if val is None else val.decode('latin1')
+    return val.decode('latin1')
 
 
 def resolve_color(term: 'Terminal', color: str) -> Union[NullCallableString, FormattingString]:

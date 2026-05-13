@@ -49,7 +49,7 @@ CAPABILITY_DATABASE: \
         ('enter_fullscreen', ('smcup', {})),
         ('enter_standout_mode', ('standout', {})),
         ('enter_superscript_mode', ('superscript', {})),
-        ('enter_susimpleript_mode', ('susimpleript', {})),
+        ('enter_susimpleript_mode', ('ssubm', {})),
         ('enter_underline_mode', ('underline', {})),
         ('erase_chars', ('ech', {'nparams': 1})),
         ('exit_alt_charset_mode', ('rmacs', {})),

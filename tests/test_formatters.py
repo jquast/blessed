@@ -223,7 +223,7 @@ def test_resolve_capability(monkeypatch):
     jinxed_mock.tigetstr = tigetstr_none
 
     # exercise,
-    assert resolve_capability(term, 'natural') == ''
+    assert resolve_capability(term, 'am') == ''
 
     # given, where does_styling is False
     def raises_exception(*args):
@@ -234,6 +234,110 @@ def test_resolve_capability(monkeypatch):
 
     # exercise,
     assert resolve_capability(term, 'natural') == ''
+
+
+def test_resolve_capability_warns_unknown():
+    """Test resolve_capability warns on unknown capability names."""
+    import warnings
+    from blessed.formatters import resolve_capability, _KNOWN_CAPABILITY_NAMES
+
+    term = mock.Mock()
+    term.does_styling = True
+    term._sugar = {}
+    jinxed_mock = mock.Mock()
+    jinxed_mock.tigetstr = lambda cap: (
+        None if cap not in _KNOWN_CAPABILITY_NAMES
+        else 'seq-known'.encode('latin1')
+    )
+    term._jinxed_term = jinxed_mock
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        result = resolve_capability(term, 'bold')
+        assert 'seq-known' == result
+        assert len(w) == 0
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        result = resolve_capability(term, 'nonexistent_capability_xyz')
+        assert result == ''
+        assert len(w) == 1
+        assert 'nonexistent_capability_xyz' in str(w[0].message)
+
+
+def test_resolve_capability_no_warn_on_absent_known():
+    """Test no warning when a known cap is absent from this terminal."""
+    import warnings
+    from blessed.formatters import resolve_capability, _KNOWN_CAPABILITY_NAMES
+
+    term = mock.Mock()
+    term.does_styling = True
+    term._sugar = {}
+    jinxed_mock = mock.Mock()
+    jinxed_mock.tigetstr = lambda cap: None
+    term._jinxed_term = jinxed_mock
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        result = resolve_capability(term, 'am')
+        assert result == ''
+        warning_texts = [str(x.message) for x in w]
+        assert not any('am' in t for t in warning_texts)
+
+
+def test_resolve_capability_nowarn_env(monkeypatch):
+    """Test BLESSED_NOWARN_UNKNOWN_CAPS suppresses the warning."""
+    import warnings
+    import blessed.formatters
+    resolve_capability = blessed.formatters.resolve_capability
+    monkeypatch.setattr(blessed.formatters, '_NOWARN_UNKNOWN_CAPS', True)
+
+    term = mock.Mock()
+    term.does_styling = True
+    term._sugar = {}
+    jinxed_mock = mock.Mock()
+    jinxed_mock.tigetstr = lambda cap: None
+    term._jinxed_term = jinxed_mock
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        result = resolve_capability(term, 'nonexistent_capability_xyz')
+        assert result == ''
+        assert len(w) == 0
+
+
+def test_resolve_capability_warns_unknown_sugar():
+    """Test warning names the resolved capname, not the sugar key."""
+    import warnings
+    from blessed.formatters import resolve_capability, _KNOWN_CAPABILITY_NAMES
+
+    term = mock.Mock()
+    term.does_styling = True
+    term._sugar = {'mnemonic': 'nonexistent_capability_xyz'}
+    jinxed_mock = mock.Mock()
+    jinxed_mock.tigetstr = lambda cap: None
+    term._jinxed_term = jinxed_mock
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        result = resolve_capability(term, 'mnemonic')
+        assert result == ''
+        assert len(w) == 1
+        assert 'nonexistent_capability_xyz' in str(w[0].message)
+
+
+def test_resolve_capability_empty_bytes_returns_empty():
+    """Test jinxed EMPTY_CAPS returning b'' produces '' with no warning."""
+    import warnings
+    from blessed.formatters import resolve_capability
+
+    term = TestTerminal(force_styling=True)
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        result = resolve_capability(term, 'enacs')
+        assert result == ''
+        assert len(w) == 0
 
 
 def test_resolve_color(monkeypatch):

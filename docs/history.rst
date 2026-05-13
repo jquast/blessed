@@ -17,6 +17,13 @@ Version History
     This improves detection of ``TERM`` over protocols like serial that cannot forward any
     environment variables, to determine 24-bit value for :attr:`~.Terminal.number_of_colors` when
     using protocols like ssh that do not forward ``COLORTERM``.
+  * introduced: A :exc:`UserWarning` is emitted when :meth:`~.Terminal.__getattr__` resolves an
+    unknown terminal capability name, helping developers catch typos like ``term.bld``
+    (missing ``bold``).  The warning can be suppressed by setting the environment variable
+    ``BLESSED_NOWARN_UNKNOWN_CAPS``.
+  * bugfix: Fixed internal typo ``susimpleript`` to the correct terminfo name ``ssubm`` for the
+    ``enter_susimpleript_mode`` capability.  This was previously masked by curses_ returning
+    an empty string for unknown capabilities.
 
 
 1.39

@@ -1000,45 +1000,40 @@ def test_terminal_init_xtgettcap_unsupported():
     assert 'OK' in output
 
 
-@pytest.mark.parametrize('xtgettcap_data,assertions', [
-    (TermcapResponse(supported=True,
-                     capabilities={'TN': 'xterm', 'colors': '256'}),
-     [('cache', 'not_none'),
-      ('_xtgettcap_cache.capabilities["colors"]', '256')]),
-    (TermcapResponse(supported=True,
-                     capabilities={'TN': 'foot'}),
-     [('term.kind', 'foot')]),
-    (TermcapResponse(supported=False),
-     [('cache', 'not_none'),
-      ('_xtgettcap_cache.supported', False)]),
-    (None,
-     [('cache', 'is_none')]),
-])
-def test_init_cache_population(xtgettcap_data, assertions):
-    """__init__ cache integration with injected or probed XTGETTCAP results."""
-    kwargs: dict = {'kind': None}
-    if xtgettcap_data is not None:
-        kwargs['_xtgettcap_data'] = xtgettcap_data
-    else:
-        kwargs['_xtgettcap_data'] = None
-        kwargs['is_a_tty'] = True
-    term = TestTerminal(stream=io.StringIO(), force_styling=True, **kwargs)
-    for attr, expected_val in assertions:
-        if attr == 'cache':
-            if expected_val == 'not_none':
-                assert term._xtgettcap_cache is not None
-            elif expected_val == 'is_none':
-                assert term._xtgettcap_cache is not None
-                assert term._xtgettcap_cache.supported is False
-        elif attr == 'term.kind':
-            assert term.kind == expected_val
-        elif attr.startswith('_xtgettcap_cache.'):
-            _, rest = attr.split('.', 1)
-            if rest == 'supported':
-                assert term._xtgettcap_cache.supported == expected_val
-            elif rest.startswith('capabilities['):
-                cap_name = rest.split('"')[1]
-                assert term._xtgettcap_cache.capabilities[cap_name] == expected_val
+def test_init_cache_populated_from_xtgettcap_data():
+    """Injected XTGETTCAP data populates _xtgettcap_cache."""
+    xt_data = TermcapResponse(
+        supported=True, capabilities={'TN': 'xterm', 'colors': '256'})
+    term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                        kind=None, _xtgettcap_data=xt_data)
+    assert term._xtgettcap_cache is not None
+    assert term._xtgettcap_cache.capabilities['colors'] == '256'
+
+
+def test_init_kind_set_from_xtgettcap_tn():
+    """XTGETTCAP TN capability updates terminal kind."""
+    xt_data = TermcapResponse(
+        supported=True, capabilities={'TN': 'foot'})
+    term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                        kind=None, _xtgettcap_data=xt_data)
+    assert term.kind == 'foot'
+
+
+def test_init_cache_unsupported_from_data():
+    """Injected unsupported TermcapResponse stored in cache."""
+    xt_data = TermcapResponse(supported=False)
+    term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                        kind=None, _xtgettcap_data=xt_data)
+    assert term._xtgettcap_cache is not None
+    assert term._xtgettcap_cache.supported is False
+
+
+def test_init_cache_unsupported_from_probe_timeout():
+    """XTGETTCAP probe timeout sets supported=False in cache."""
+    term = TestTerminal(stream=io.StringIO(), force_styling=True,
+                        kind=None, _xtgettcap_data=None, is_a_tty=True)
+    assert term._xtgettcap_cache is not None
+    assert term._xtgettcap_cache.supported is False
 
 
 @pytest.mark.parametrize('method,capabilities', [
