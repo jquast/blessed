@@ -152,8 +152,9 @@ def test_number_of_colors_bad_rgb_value():
     t = TestTerminal(force_styling=True, stream=StringIO(),
                      _xtgettcap_data=TermcapResponse(
                          supported=True,
-                         capabilities={'RGB': 'not_a_number'}))
-    assert t.number_of_colors == 256  # falls through to jinxed
+                         capabilities={'RGB': 'not_a_number',
+                                       'colors': '256'}))
+    assert t.number_of_colors == 256  # bad RGB skipped, colors used
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="requires more than 1 tty")
