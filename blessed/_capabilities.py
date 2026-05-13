@@ -657,10 +657,9 @@ class TermcapResponse:
                     end = idx + 1
                     while end < len(value) and value[end] in '01234567':
                         end += 1
-                    if end > idx + 1:
-                        result.append(chr(int(value[idx + 1:end], 8)))
-                        idx = end
-                        continue
+                    result.append(chr(int(value[idx + 1:end], 8)))
+                    idx = end
+                    continue
             elif cur == '^' and idx + 1 < len(value):
                 nxt = value[idx + 1]
                 if 'A' <= nxt <= '_':
@@ -717,10 +716,8 @@ class TermcapResponse:
                 if capname in jinxed.terminfo.BOOL_CAPS:
                     bool_caps.add(capname)
             elif capname in jinxed.terminfo.NUM_CAPS:
-                try:
+                if value.isdigit():
                     num_caps[capname] = int(value)
-                except ValueError:
-                    pass
             else:
                 str_caps[capname] = value
 

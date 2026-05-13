@@ -1681,10 +1681,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         # Determine which capabilities to query
         if caps is not None:
-            if isinstance(caps, str):
-                _requested = {caps}
-            else:
-                _requested = set(caps)
+            _requested = set(caps)
         else:
             _requested = _std_names.copy()
 

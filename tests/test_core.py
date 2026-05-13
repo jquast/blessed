@@ -135,6 +135,27 @@ def test_multiple_terminal_kinds():
     assert term_b.number_of_colors == 0
 
 
+@pytest.mark.parametrize('colorterm_value', ['truecolor', '24bit'])
+def test_number_of_colors_colorterm(colorterm_value):
+    """COLORTERM=truecolor|24bit yields 1<<24 colors."""
+    os.environ['COLORTERM'] = colorterm_value
+    try:
+        t = TestTerminal(force_styling=True,
+                         _xtgettcap_data=TermcapResponse(supported=False))
+        assert t.number_of_colors == 1 << 24
+    finally:
+        del os.environ['COLORTERM']
+
+
+def test_number_of_colors_bad_rgb_value():
+    """Bad RGB value (non-numeric) is handled gracefully."""
+    t = TestTerminal(force_styling=True, stream=StringIO(),
+                     _xtgettcap_data=TermcapResponse(
+                         supported=True,
+                         capabilities={'RGB': 'not_a_number'}))
+    assert t.number_of_colors == 256  # falls through to jinxed
+
+
 @pytest.mark.skipif(IS_WINDOWS, reason="requires more than 1 tty")
 def test_number_of_colors_with_tty():
     """test ``number_of_colors`` 0, 8, and 256."""

@@ -29,8 +29,7 @@ def _build_known_capability_names() -> 'frozenset[str]':
         if modname.startswith('_'):
             continue
         mod = importlib.import_module(f'jinxed.terminfo.{modname}')
-        if hasattr(mod, 'STR_CAPS'):
-            caps.update(mod.STR_CAPS.keys())
+        caps.update(getattr(mod, 'STR_CAPS', {}).keys())
     # Also include attribute names from blessed's own capability database.
     for _name, (attr, _) in CAPABILITY_DATABASE.items():
         caps.add(attr)
@@ -130,7 +129,7 @@ class ParameterizingString(str):
             # Somebody passed a non-string; I don't feel confident
             # guessing what they were trying to do.
             raise
-        except jinxed.error as err:
+        except jinxed.error as err:  # pragma: no cover
             # ignore 'tparm() returned NULL', you won't get any styling,
             # even if does_styling is True. This happens on win32 platforms
             # with http://www.lfd.uci.edu/~gohlke/pythonlibs/#curses installed

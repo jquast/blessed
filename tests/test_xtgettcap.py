@@ -3,6 +3,7 @@
 import io
 import os
 import select
+import sys
 import time
 
 # 3rd party
@@ -88,6 +89,46 @@ def test_defaults_empty_capabilities():
     assert len(resp) == 0
 
 
+def test_make_jinxed_capabilities_classifies_by_type():
+    """Bool, num, and str caps are routed to correct output dicts."""
+    resp = TermcapResponse(supported=True, capabilities={
+        'am': '',          # empty value + in BOOL_CAPS -> bool_caps
+        'colors': '256',   # digit value + in NUM_CAPS -> num_caps
+        'TN': 'xterm',     # non-empty + not in NUM_CAPS -> str_caps
+    })
+    result = resp.make_jinxed_capabilities()
+    assert 'am' in result['bool_caps']
+    assert result['num_caps'] == {'colors': 256}
+    assert result['str_caps'] == {'TN': 'xterm'}
+
+
+def test_make_jinxed_capabilities_non_digit_num_value():
+    """Non-digit NUM_CAPS value is skipped."""
+    resp = TermcapResponse(supported=True, capabilities={
+        'colors': 'not_a_number',
+    })
+    result = resp.make_jinxed_capabilities()
+    assert 'colors' not in result['num_caps']
+
+
+def test_make_jinxed_capabilities_skips_rgb():
+    """RGB capability is excluded from num_caps."""
+    resp = TermcapResponse(supported=True, capabilities={
+        'RGB': '8',
+    })
+    result = resp.make_jinxed_capabilities()
+    assert 'RGB' not in result['num_caps']
+
+
+def test_xtgettcap_probe_oserror():
+    """XTGETTCAP probe OSError is recorded in errors list."""
+    with mock.patch('os.isatty', return_value=True), \
+         mock.patch.object(Terminal, '_xtgettcap_batch',
+                           side_effect=OSError('broken pipe')):
+        t = Terminal(stream=sys.__stdout__, force_styling=True)
+        assert any('OSError' in err for err in t.errors)
+
+
 @pytest.mark.parametrize('value,expected', [
     (r'\E', '\x1b'),
     (r'\n', '\n'),
@@ -135,6 +176,15 @@ def test_unescape_terminfo_mixed():
 def test_unescape_terminfo_no_escapes():
     """String without escapes is unchanged."""
     assert TermcapResponse.unescape_terminfo('hello') == 'hello'
+
+
+@pytest.mark.parametrize('value,expected', [
+    (r'\9', r'\9'),
+    ('^0', '^0'),
+])
+def test_unescape_terminfo_pass_through(value, expected):
+    """Escape-like sequences that are not valid escapes pass through unchanged."""
+    assert TermcapResponse.unescape_terminfo(value) == expected
 
 
 @pytest.mark.parametrize('feature_str,expected', [

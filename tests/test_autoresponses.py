@@ -728,3 +728,19 @@ def test_get_decrqss_invalid():
     output = pty_test(child, parent_func=None,
                       test_name='test_get_decrqss_invalid')
     assert 'OK' in output
+
+
+@pytestmark
+def test_get_decrqss_value_without_setting_id_suffix():
+    """get_decrqss returns raw pt when value does not end with setting_id."""
+    def child(term):
+        resp = '\x1bP1$rvalue_without_expected_suffix\x1b\\'
+        cpr = '\x1b[10;20R'
+        term.ungetch(resp + cpr)
+        result = term.get_decrqss(Decrqss.SGR, timeout=0.1)
+        assert result == 'value_without_expected_suffix'
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_decrqss_value_without_setting_id_suffix')
+    assert 'OK' in output
