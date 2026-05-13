@@ -53,10 +53,6 @@ jobs:
             os: windows-latest
             test_quick: 0
 
-          - python-version: '3.9'
-            os: windows-latest
-            test_quick: 0
-
           # python release candidate testing
           - python-version: '3.15'
             container: 'python:3.15-rc'
