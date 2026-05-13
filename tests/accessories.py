@@ -42,6 +42,7 @@ def assert_timeout_elapsed(elapsed, timeout):
         f'{timeout * PCT_MAXWAIT_KEYSTROKE:.4f}]'
     )
 
+
 TEST_KIND = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
 
 DEFAULT_TERMCAP_RESPONSE = TermcapResponse(

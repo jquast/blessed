@@ -14,12 +14,12 @@ from typing import IO, List, Union, Optional, Generator
 from jinxed import win32
 
 # local
-from ._capabilities import TermcapResponse
 from .keyboard import TERMINAL_QUERY_TIMEOUT_SECONDS
 from .terminal import WINSZ
 from .terminal import Terminal as _Terminal
 from .dec_modes import DecPrivateMode as _DecPrivateMode
 from .dec_modes import DecModeResponse
+from ._capabilities import TermcapResponse
 
 # Maximum time to block in WaitForSingleObject before returning
 # to Python for signal processing (e.g. KeyboardInterrupt).
