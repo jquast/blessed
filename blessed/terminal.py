@@ -1680,10 +1680,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         timeout = timeout if timeout is not None else TERMINAL_QUERY_TIMEOUT_SECONDS
 
-        if caps is None:
-            caps = set(_ALL_XTGETTCAP_CAPS)
-        else:
-            caps = set(caps)
+        caps = set(_ALL_XTGETTCAP_CAPS) if caps is None else set(caps)
 
         # force=True: single batch
         if force:
