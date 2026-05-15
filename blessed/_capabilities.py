@@ -2,8 +2,11 @@
 # std imports
 import re
 import typing
-from typing import Dict, Optional
+from typing import Set, Dict, Optional
 from collections import OrderedDict
+
+# 3rd party
+import jinxed.terminfo
 
 __all__ = (
     'CAPABILITY_DATABASE',
@@ -551,6 +554,19 @@ class TermcapResponse:
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html>`_
     """
 
+    _TERMINFO_ESCAPE: typing.ClassVar[typing.Dict[str, str]] = {
+        'E': '\x1b', 'e': '\x1b',
+        'n': '\n', 't': '\t', 'r': '\r',
+        'b': '\b', 'f': '\f',
+        '\\': '\\', '^': '^', ':': ':',
+    }
+
+    # XTGETTCAP DCS response: DCS <valid>+r<hex-name>[=<hex-value>] ST
+    #   valid=1: terminal supports this capability, value follows
+    #   valid=0: terminal does not support this capability (negative acknowledgement)
+    _RE_XTGETTCAP_RESPONSE: typing.ClassVar[typing.Pattern[str]] = re.compile(
+        r'\x1bP([01])\+r([0-9a-fA-F]+)(?:=([0-9a-fA-F]*))?\x1b\\')
+
     def __init__(self, supported: bool = False,
                  capabilities: Optional[Dict[str, str]] = None) -> None:
         """Initialize TermcapResponse with support status and capabilities."""
@@ -578,7 +594,7 @@ class TermcapResponse:
         """
         Terminal name from ``TN`` capability, or ``None``.
 
-        .. deprecated:: This alias is not very useful or used by blessed.
+        .. deprecated:: This alias is not useful or used by blessed.
         """
         return self.capabilities.get('TN')
 
@@ -587,7 +603,7 @@ class TermcapResponse:
         """
         Number of colors from ``colors`` capability, or ``None``.
 
-        .. deprecated:: This value is not very useful or used by blessed.
+        .. deprecated:: This value is not useful or used by blessed.
         """
         val = self.capabilities.get('colors')
         if val is not None:
@@ -614,6 +630,99 @@ class TermcapResponse:
             return bytes.fromhex(hex_str).decode('ascii', errors='strict')
         except ValueError:
             return ''
+
+    @staticmethod
+    def unescape_terminfo(
+        value: str,
+    ) -> str:
+        r"""
+        Unescape terminfo source-level escape sequences.
+
+        Terminfo source format uses ``\E``, ``\n``, ``\t``, ``\r``, ``\b``, ``\f``, ``\\``, ``\^``,
+        ``\:``, ``\NNN`` octal, and ``^X`` control-character notation.  XTGETTCAP responses from
+        some terminals (e.g. ghostty, kitty, foot, rio) report values in this source format rather
+        than as raw binary.  Convert these to their actual byte values.
+        """
+        result = []
+        idx = 0
+        while idx < len(value):
+            cur = value[idx]
+            if cur == '\\' and idx + 1 < len(value):
+                nxt = value[idx + 1]
+                esc = TermcapResponse._TERMINFO_ESCAPE.get(nxt)
+                if esc is not None:
+                    result.append(esc)
+                    idx += 2
+                    continue
+                if nxt in '01234567':
+                    end = idx + 1
+                    while end < len(value) and value[end] in '01234567':
+                        end += 1
+                    result.append(chr(int(value[idx + 1:end], 8)))
+                    idx = end
+                    continue
+            elif cur == '^' and idx + 1 < len(value):
+                nxt = value[idx + 1]
+                if 'A' <= nxt <= '_':
+                    result.append(chr(ord(nxt) - ord('A') + 1))
+                    idx += 2
+                    continue
+                if nxt == '?':
+                    result.append('\x7f')
+                    idx += 2
+                    continue
+            result.append(cur)
+            idx += 1
+        return ''.join(result)
+
+    @classmethod
+    def from_match(cls, match: 're.Match[str]') -> 'tuple[str, str]':
+        """Parse a single XTGETTCAP DCS +r regex match into (name, value)."""
+        cap_name = cls.hex_decode(match.group(2))
+        value = (
+            cls.unescape_terminfo(cls.hex_decode(val_hex))
+            if (val_hex := match.group(3)) is not None
+            else ''
+        )
+        return cap_name, value
+
+    @classmethod
+    def parse_capabilities(cls, raw: str) -> 'Dict[str, str]':
+        """Parse all successful DCS +r responses from raw text."""
+        capabilities: Dict[str, str] = {}
+        for match in cls._RE_XTGETTCAP_RESPONSE.finditer(raw):
+            if match.group(1) == '1':
+                name, value = cls.from_match(match)
+                capabilities[name] = value
+        return capabilities
+
+    def make_jinxed_capabilities(self) -> 'Dict[str, Dict[str, str] | Dict[str, int] | Set[str]]':
+        """
+        Classify discovered capabilities for injection into a jinxed Terminal.
+
+        :returns: dict with keys ``str_caps``, ``num_caps``, ``bool_caps``, matching
+            the keyword arguments accepted by jinxed Terminal method, ``apply_capabilities()``
+        """
+        str_caps: Dict[str, str] = {}
+        num_caps: Dict[str, int] = {}
+        bool_caps: Set[str] = set()
+
+        for capname, value in self.capabilities.items():
+            if capname == 'RGB':
+                # 'RGB' is not a terminfo(5) capability, as noted by foot, "RGB - number of bits per
+                # color channel (different semantics from the RGB capability in file-based terminfo
+                # definitions!)." https://codeberg.org/dnkl/foot#xtgettcap
+                continue
+            if not value:
+                if capname in jinxed.terminfo.BOOL_CAPS:
+                    bool_caps.add(capname)
+            elif capname in jinxed.terminfo.NUM_CAPS:
+                if value.isdigit():
+                    num_caps[capname] = int(value)
+            else:
+                str_caps[capname] = value
+
+        return {'str_caps': str_caps, 'num_caps': num_caps, 'bool_caps': bool_caps}
 
 
 class ITerm2Capabilities:

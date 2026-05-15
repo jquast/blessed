@@ -16,7 +16,18 @@ import platform
 import warnings
 import contextlib
 import collections
-from typing import IO, Dict, List, Match, Tuple, Union, Callable, Optional, Generator, SupportsIndex
+from typing import (IO,
+                    Set,
+                    Dict,
+                    List,
+                    Match,
+                    Tuple,
+                    Union,
+                    Callable,
+                    Iterable,
+                    Optional,
+                    Generator,
+                    SupportsIndex)
 
 # 3rd party
 import jinxed
@@ -61,11 +72,14 @@ from ._capabilities import (CAPABILITY_DATABASE,
                             CAPABILITIES_ADDITIVES,
                             CAPABILITIES_RAW_MIXIN,
                             XTGETTCAP_CAPABILITIES,
+                            XTGETTCAP_INIT_CAPABILITIES,
                             CAPABILITIES_HORIZONTAL_DISTANCE,
                             Decrqss,
                             TermcapResponse,
                             TextSizingResult,
                             ITerm2Capabilities)
+
+_ALL_XTGETTCAP_CAPS = frozenset({c[0] for c in XTGETTCAP_CAPABILITIES})
 
 HAS_TTY = True  # pylint: disable=invalid-name
 IS_WINDOWS = platform.system() == 'Windows'
@@ -116,9 +130,6 @@ _RE_OSC52_RESPONSE = re.compile(r'\x1b\]52;[a-z]*;([^\x07\x1b]*)(?:\x07|\x1b\\)'
 _RE_COLOR_SCHEME_MODE_RESPONSE = re.compile(r'\x1b\[\?997;([12])n')
 # DECRQSS: DCS Ps $ r Pt ST (Ps=1 means valid)
 _RE_DECRQSS_RESPONSE = re.compile(r'\x1bP([01])\$r([^\x1b]*)\x1b\\')
-# XTGETTCAP: DCS Ps + r Pt ST (Ps=1 means valid, Pt=hex-encoded capname=value)
-_RE_XTGETTCAP_RESPONSE = re.compile(
-    r'\x1bP([01])\+r([0-9a-fA-F]+)(?:=([0-9a-fA-F]*))?\x1b\\')
 
 
 class Terminal():  # pylint: disable=attribute-defined-outside-init
@@ -256,8 +267,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             self.__init__keyboard_state()
 
             # Step 1: XTGETTCAP capability negotiation
-            self._xtgettcap_cache: Optional[TermcapResponse] = None
-            self._xtgettcap_first_query_failed = False
             self._xtgettcap_cache = (
                 _xtgettcap_data if _xtgettcap_data is not None
                 else self.__init__xtgettcap())
@@ -265,7 +274,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             # Step 2: Initialize using jinxed for its terminfo(5) database.
             self.__init_termcap_kind(kind_preferred=kind, kind_fallback=kind_fallback)
 
-        # Step 3: Initialize keyboard infrastructure
+            # Step 3: Inject XTGETTCAP overrides into jinxed
+            if self._xtgettcap_cache.supported and self.does_styling:
+                self._jinxed_term.overlay_capabilities(
+                    **self._xtgettcap_cache.make_jinxed_capabilities())
+
+        # Step 4: Initialize keyboard infrastructure
         self.__init__keycodes()
 
         # Step 5: Finalize capabilities using best available data
@@ -287,8 +301,19 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._keymap_prefixes: set[str] = set()
 
     def __init__xtgettcap(self) -> TermcapResponse:
-        """XTGETTCAP probing happens lazily on first call to get_xtgettcap()."""
-        return None
+        """Probe for core XTGETTCAP capabilities."""
+        _xtgettcap_cache = TermcapResponse(supported=False)
+        if (self.is_a_tty and self._keyboard_fd is not None):
+            try:
+                _xtgettcap_cache = self._xtgettcap_batch(
+                    caps=XTGETTCAP_INIT_CAPABILITIES,
+                    timeout=TERMINAL_QUERY_TIMEOUT_SECONDS)
+            except OSError as exc:
+                self.errors.append(f'XTGETTCAP probe failed, OSError: {exc}')
+            else:
+                if not _xtgettcap_cache.supported:
+                    self.errors.append('XTGETTCAP probe: no support')
+        return _xtgettcap_cache
 
     def __init_termcap_kind(self, kind_preferred: Optional[str], kind_fallback: str) -> None:
         """Determine terminal 'kind' jinxed.setupterm() capability database."""
@@ -298,8 +323,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         #
         # I believe now xterm-256 sequences are safe as unknown fallback for the year 2026. If dumb
         # *is*, use NO_COLOR or force_styling=False which has the same general result.
-        tn_kind = (self._xtgettcap_cache.capabilities.get('TN')
-                   if self._xtgettcap_cache is not None else None)
+        tn_kind = self._xtgettcap_cache.capabilities.get('TN')
         term_kind = (jinxed.get_term(self._init_descriptor)
                      if IS_WINDOWS and self._init_descriptor is not None
                      else os.environ.get('TERM'))
@@ -417,7 +441,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # Keyboard valid as stdin only when output stream is stdout or stderr and is a tty.
         if self._stream in (sys.__stdout__, sys.__stderr__):
             try:
-                self._keyboard_fd = sys.__stdin__.fileno()  # type: ignore[union-attr,assignment]
+                self._keyboard_fd = sys.__stdin__.fileno()  # type: ignore[union-attr]
             except (AttributeError, ValueError) as err:
                 self.errors.append(f'Unable to determine input stream file descriptor: {err}')
             else:
@@ -432,11 +456,11 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             self.errors.append('Output stream is not a default stream')
 
         # The descriptor to direct terminal initialization sequences to.
-        self._init_descriptor = stream_fd  # type: ignore[assignment]
+        self._init_descriptor = stream_fd
         if stream_fd is None:
             try:
                 self._init_descriptor = \
-                    sys.__stdout__.fileno()  # type: ignore[union-attr,assignment]
+                    sys.__stdout__.fileno()  # type: ignore[union-attr]
             except ValueError as err:
                 self.errors.append(
                     f'sys.__stdout__.fileno() failed, stdout may be detached or closed: {err}')
@@ -461,6 +485,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """Initialize color distance algorithm and determine Terminal.number_of_colors."""
         # Resolution order:
         # - COLORTERM environment value
+        # - XTGETTCAP 'RGB' (24-bit), then 'colors'
         # - termcap 'colors' (jinxed)
         # - Windows native console (vtwin10) gets 24-bit boost
         self._color_distance_algorithm = 'cie2000'
@@ -468,9 +493,21 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return 0
         if os.environ.get('COLORTERM') in {'truecolor', '24bit'}:
             return 1 << 24
+        if (rgb_val := self._xtgettcap_cache.capabilities.get('RGB')):
+            try:
+                if int(rgb_val.split('/', 1)[0]) == 8:
+                    return 1 << 24
+            except ValueError:
+                pass
+        if (xt_colors := self._xtgettcap_cache.capabilities.get('colors')) and xt_colors.isdigit():
+            return int(xt_colors)
         _win_build = tuple(int(n) for n in platform.version().split('.')
                            if n.isdigit()) if IS_WINDOWS else 0
         if IS_WINDOWS and self._kind == 'vtwin10' and _win_build >= (10, 0, 14931):
+            # Windows 10 build 14931+ (2016) supports 24-bit color natively, but they do not set
+            # COLORTERM. Older Windows releases and versions of ConHost.exe lack truecolor and fall
+            # through to jinxed terminfo (8 or 16 colors).
+            # https://devblogs.microsoft.com/commandline/24-bit-color-in-the-windows-console/
             return 1 << 24
         return max(0, self._jinxed_term.tigetnum('colors'))
 
@@ -820,8 +857,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 data = data[:match.start()] + data[match.end():]
 
             # Check if the feature response arrived before the CPR
-            feature_match = feature_re.search(data)
-            if feature_match:
+            if (feature_match := feature_re.search(data)):
                 data = data[:feature_match.start()] + data[feature_match.end():]
 
             # Re-buffer any remaining keyboard input
@@ -1617,103 +1653,133 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         return self.get_dec_mode(_DecPrivateMode.FOCUS_IN_OUT_EVENTS, timeout=timeout).supported
 
     def get_xtgettcap(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
-                      force: bool = False) -> Optional[TermcapResponse]:
-        # pylint: disable=too-complex
+                      force: bool = False,
+                      caps: Optional[Iterable[str]] = None) -> Optional[TermcapResponse]:
         """
         Query terminal capabilities via XTGETTCAP (DCS +q).
 
-        Sends XTGETTCAP queries to discover the terminal's built-in
-        terminfo capabilities, bypassing the local terminfo database.
-        Supported by xterm, foot, kitty, WezTerm, ghostty, and others.
+        When *caps* is specified, only those capabilities are returned. When unspecified, all known
+        XTGETTCAP capabilities are queried and returned.  All results from XTGETTCAP are memoized
+        permanently, unlike DECRQSS :meth:`get_decrqss` which may change. Using ``force=True`` to
+        re-retrieve any request.
 
-        Uses a probe-first strategy: sends a single capability query
-        first, then queries remaining capabilities only if the probe
-        succeeds.  This avoids visible garbage on terminals that do
-        not support XTGETTCAP.
-
-        When :attr:`is_a_tty` is False, returns ``None``.
-
-        Responses are cached unless *force* is True.
-
-        :arg float timeout: Timeout in seconds per query round.
-        :arg bool force: Bypass cache and re-query the terminal.
-        :rtype: TermcapResponse or None
+        :arg float timeout: Timeout in seconds.
+        :arg bool force: Always re-query for latest values.
+        :arg caps: Capability names to query.  When specified, only these additional capabilities
+            may queried (incremental on cache).  when unspecified, it as though `all=True` was used.
+        :rtype: TermcapResponse
         """
-        if not self.is_a_tty:
+        if not self.is_a_tty or (
+                not self._xtgettcap_cache.supported
+                and not force):
+            # sticky failure when not a tty, or XTGETTCAP not supported
             return None
 
-        if self._xtgettcap_first_query_failed and not force:
+        timeout = timeout if timeout is not None else TERMINAL_QUERY_TIMEOUT_SECONDS
+
+        caps = set(_ALL_XTGETTCAP_CAPS) if caps is None else set(caps)
+
+        # force=True: single batch
+        if force:
+            result = self._xtgettcap_batch(list(caps), timeout=timeout)
+            return self._maybe_none(self._filter_xtgettcap_response(
+                self._update_xtgettcap_cache(result), caps))
+
+        # cache hit: check if all requested caps are already known
+        cached_names = set(self._xtgettcap_cache.capabilities.keys())
+        missing = caps - cached_names
+        if not missing:
+            return self._maybe_none(self._filter_xtgettcap_response(
+                self._xtgettcap_cache, caps))
+
+        # Incremental: query only missing caps, merge into cache
+        result = self._xtgettcap_batch(list(missing), timeout=timeout)
+        return self._maybe_none(self._filter_xtgettcap_response(
+            self._update_xtgettcap_cache(result), caps))
+
+    def _update_xtgettcap_cache(self, result: TermcapResponse) -> TermcapResponse:
+        """Merge *result* into ``_xtgettcap_cache``, clearing cached attributes."""
+        base_caps = self._xtgettcap_cache.capabilities if self._xtgettcap_cache is not None else {}
+        next_caps = dict(base_caps)
+        next_caps.update(result.capabilities)
+        merged = TermcapResponse(
+            supported=self._xtgettcap_cache.supported or result.supported,
+            capabilities=next_caps)
+        self._xtgettcap_cache = merged
+        return merged
+
+    @staticmethod
+    def _filter_xtgettcap_response(
+            tc: TermcapResponse,
+            requested: Optional[Set[str]] = None,
+    ) -> TermcapResponse:
+        """
+        Return *tc* with ``None``-valued capabilities filtered out.
+
+        When *requested* is given, the result is further filtered to only contain those capability
+        names.
+        """
+        filtered = {k: v for k, v in tc.capabilities.items() if v is not None}
+        if requested is not None:
+            filtered = {k: v for k, v in filtered.items() if k in requested}
+        return TermcapResponse(supported=tc.supported, capabilities=filtered)
+
+    @staticmethod
+    def _maybe_none(tc: TermcapResponse) -> Optional[TermcapResponse]:
+        """Return *tc* or None if unsupported."""
+        return tc if tc.supported else None
+
+    def _xtgettcap_batch(
+            self,
+            caps: List[str],
+            timeout: float,
+    ) -> TermcapResponse:
+        """
+        Spray *caps* + CPR fence, read responses.
+
+        Returns a ``TermcapResponse`` for the requested capabilities.  Caps
+        that are not answered are recorded as ``None`` so they are not
+        re-queried on future calls.
+        """
+        if not caps:
             return None
 
-        if self._xtgettcap_cache is not None and not force:
-            if self._xtgettcap_cache.supported:
-                return self._xtgettcap_cache
-            return None
-
-        # Phase 1: Probe with single capability via _query_with_boundary,
-        # which safely preserves any concurrent keyboard input and uses
-        # CPR boundary guard for fast negative detection.
-        probe_cap = XTGETTCAP_CAPABILITIES[0][0]
-        probe_query = f'\x1bP+q{TermcapResponse.hex_encode(probe_cap)}\x1b\\'
-        match = self._query_with_boundary(
-            probe_query, _RE_XTGETTCAP_RESPONSE, timeout)
-
-        if match is None:
-            self._xtgettcap_first_query_failed = True
-            # Erase any visible garbage from unsupported terminals
-            if hasattr(self, '_jinxed_term'):
-                self.stream.write(f'\r{self.clear_eol}')
-                self.stream.flush()
-            return None
-
-        capabilities: Dict[str, str] = {}
-        self._parse_single_xtgettcap(match, capabilities)
-
-        # Phase 2: Batch-query remaining capabilities.  We use
-        # flushinp() here because multiple DCS responses arrive, then
-        # re-buffer any non-DCS keyboard data via ungetch().
         ctx = None
         try:
             if self._line_buffered:
                 ctx = self.cbreak()
                 ctx.__enter__()
-
-            for capname, _desc in XTGETTCAP_CAPABILITIES[1:]:
+            for capname in caps:
                 self.stream.write(
                     f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\')
+            self.stream.write('\x1b[6n')  # CPR fence
             self.stream.flush()
-
-            raw = self.flushinp(timeout=timeout)
-            if raw:
-                self._parse_xtgettcap_responses(raw, capabilities)
-                # Re-buffer any keyboard input that arrived alongside
-                remaining = _RE_XTGETTCAP_RESPONSE.sub('', raw)
-                if remaining:
-                    self.ungetch(remaining)
-
+            match, data = _read_until(self, _RE_CPR_BOUNDARY.pattern, timeout)
         finally:
             if ctx is not None:
                 ctx.__exit__(None, None, None)
 
-        result = TermcapResponse(supported=True, capabilities=capabilities)
-        self._xtgettcap_cache = result
-        return result
+        if match is None:
+            return TermcapResponse()
 
-    @staticmethod
-    def _parse_single_xtgettcap(match: Match[str], capabilities: Dict[str, str]) -> None:
-        """Parse a single XTGETTCAP DCS +r regex match into *capabilities*."""
-        success = match.group(1) == '1'
-        if success:
-            cap_name = TermcapResponse.hex_decode(match.group(2))
-            val_hex = match.group(3)
-            capabilities[cap_name] = (
-                TermcapResponse.hex_decode(val_hex) if val_hex is not None else '')
+        # Strip the CPR itself from the response data
+        data = data[:match.start()] + data[match.end():]
 
-    @staticmethod
-    def _parse_xtgettcap_responses(raw: str, capabilities: Dict[str, str]) -> None:
-        """Parse DCS +r responses from XTGETTCAP into *capabilities* dict."""
-        for match in _RE_XTGETTCAP_RESPONSE.finditer(raw):
-            Terminal._parse_single_xtgettcap(match, capabilities)
+        capabilities: Dict[str, str] = {}
+        if data:
+            capabilities.update(TermcapResponse.parse_capabilities(data))
+            # pylint: disable=protected-access
+            remaining = TermcapResponse._RE_XTGETTCAP_RESPONSE.sub('', data)
+            if remaining:
+                self.ungetch(remaining)
+
+        # Record None sentinel for any requested cap that wasn't answered.
+        for capname in caps:
+            if capname not in capabilities:
+                capabilities[capname] = None  # type: ignore[assignment]
+
+        supported = any(value is not None for value in capabilities.values())
+        return TermcapResponse(supported=supported, capabilities=capabilities)
 
     def does_xtgettcap(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                        force: bool = False) -> bool:
@@ -1929,7 +1995,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return True
 
         # Strategy 2: XTGETTCAP Ms capability
-        tcap = self.get_xtgettcap(timeout=timeout, force=force)
+        tcap = self.get_xtgettcap(timeout=timeout, force=force, caps=['Ms'])
         if tcap is not None and 'Ms' in tcap.capabilities:
             self._osc52_clipboard_supported = True
             return True
@@ -2057,7 +2123,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :arg bool force: Bypass cached result.
         :rtype: bool
         """
-        result = self.get_xtgettcap(timeout=timeout, force=force)
+        result = self.get_xtgettcap(
+            timeout=timeout, force=force, caps=['kitty-query-name'])
         return result is not None and 'kitty-query-name' in result.capabilities
 
     def get_decrqss(self, setting_id: str = Decrqss.SGR,
@@ -2135,7 +2202,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :arg bool force: Bypass cached result.
         :rtype: bool
         """
-        tc = self.get_xtgettcap(timeout=timeout, force=force)
+        tc = self.get_xtgettcap(timeout=timeout, force=force, caps=['Smulx'])
         return tc is not None and 'Smulx' in tc
 
     def does_colored_underlines(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
@@ -2149,7 +2216,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :arg bool force: Bypass cached result.
         :rtype: bool
         """
-        tc = self.get_xtgettcap(timeout=timeout, force=force)
+        tc = self.get_xtgettcap(timeout=timeout, force=force, caps=['Setulc'])
         return tc is not None and 'Setulc' in tc
 
     def does_text_sizing(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS,
@@ -3121,7 +3188,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         if self._normal:
             return self._normal
-        self._normal = resolve_capability(self, 'normal')  # type: ignore[assignment]
+        self._normal = resolve_capability(self, 'normal')
         return self._normal
 
     def link(self, url: str, text: str, url_id: str = '') -> str:
@@ -3404,6 +3471,18 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             The result is permanently cached and all further calls to these methods return
             immediately without this side effect.
         """
+        def _validate(value: Union[int, str], name: str,
+                      mapping: Dict[str, int]) -> int:
+            """Validate alignment value, raise ValueError on invalid input."""
+            if isinstance(value, int):
+                if not 0 <= value <= 2:
+                    raise ValueError(f"'{name}' out of range (0-2), got {value}")
+                return value
+            if value not in mapping:
+                raise ValueError(f"'{name}' invalid, expected: {', '.join(mapping)}, "
+                                 f"got {value}")
+            return mapping[value]
+
         # validation,
         utf8_len = len(text.encode('utf-8'))
         if utf8_len > 4096:
@@ -3414,29 +3493,17 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             raise ValueError("'text' must not contain control codes or terminal sequences, "
                              f"got ESC (\\x1b) at index {pos_esc}")
 
-        def _validate(name: str, value: Union[int, str],
-                      string_values: Dict[str, int]) -> int:
-            if isinstance(value, int):
-                if not 0 <= value <= 2:
-                    raise ValueError(f"'{name}' out of range (0-2), got {value}")
-                return value
-            if value not in string_values:
-                expected = ', '.join(string_values)
-                raise ValueError(f"'{name}' invalid, expected: {expected}, got {value}")
-            return string_values[value]
-
-        _vert_map = {'top': 0, 'bottom': 1, 'center': 2, 'default': 0}
-        _horz_map = {'left': 0, 'right': 1, 'center': 2, 'default': 0}
-        vertical_align = _validate('vertical_align', vertical_align, _vert_map)
-        horizontal_align = _validate('horizontal_align', horizontal_align, _horz_map)
+        vertical_align = _validate(vertical_align, 'vertical_align',
+                                   {'top': 0, 'bottom': 1, 'center': 2, 'default': 0})
+        horizontal_align = _validate(horizontal_align, 'horizontal_align',
+                                     {'left': 0, 'right': 1, 'center': 2, 'default': 0})
 
         # Kitty text sizing protocol: alignment only applies when fractional
         # scaling is in effect (0 < numerator < denominator).  When there is
         # no fractional scaling, alignment describes how the scaled render area
         # fits inside the cell grid — which has no meaning and can cause
         # flickering/artifacts if passed unconditionally.
-        is_fractional = 0 < numerator < denominator
-        if not is_fractional:
+        if not 0 < numerator < denominator:
             vertical_align = 0
             horizontal_align = 0
 

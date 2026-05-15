@@ -124,6 +124,9 @@ class Terminal(_Terminal):
         self._prev_button_state: int = 0
         self._native_mouse: bool = False
         self._native_resize: bool = False
+        # As of May 2026, the latest Windows Terminal.exe is without XTGETTCAP support,
+        # and so on it is not checked or negotiated for as a side-effect of the class initializer
+        # like the base class, does.
 
     def getch(self, decode_latin1: bool = False) -> str:
         r"""
