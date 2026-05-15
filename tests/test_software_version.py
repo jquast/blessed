@@ -27,7 +27,6 @@ from .conftest import TEST_KEYBOARD, IS_WINDOWS
 from .accessories import (
     TestTerminal,
     pty_test,
-    as_subprocess,
 )
 from blessed.keyboard import SoftwareVersion
 
@@ -204,7 +203,6 @@ def test_get_software_version_raw_stored():
 
 def test_get_software_version_not_a_tty():
     """Test get_software_version() returns None when not a TTY and no env vars."""
-    @as_subprocess
     def child():
         import io
         import os

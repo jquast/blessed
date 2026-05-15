@@ -11,12 +11,12 @@ except ImportError:
     import mock
 
 # local
-from .accessories import TestTerminal, as_subprocess
+from .accessories import TestTerminal
 
 
 def test_string_vertical_align_top():
     """vertical_align='top' produces no v= key (default 0)."""
-    @as_subprocess
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         with mock.patch.object(term, 'does_text_sizing', return_value=True):
@@ -29,66 +29,67 @@ def test_string_vertical_align_top():
 
 def test_string_vertical_align_bottom():
     """vertical_align='bottom' produces v=1."""
-    @as_subprocess
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         with mock.patch.object(term, 'does_text_sizing', return_value=True):
-            result = term.text_sized('Hi', vertical_align='bottom')
+            result = term.text_sized('Hi', numerator=1, denominator=3, vertical_align='bottom')
             assert 'v=1' in result
     child()
 
 
 def test_string_vertical_align_center():
     """vertical_align='center' produces v=2."""
-    @as_subprocess
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         with mock.patch.object(term, 'does_text_sizing', return_value=True):
-            result = term.text_sized('Hi', vertical_align='center')
+            result = term.text_sized('Hi', numerator=1, denominator=3, vertical_align='center')
             assert 'v=2' in result
     child()
 
 
 def test_string_horizontal_align_left():
     """horizontal_align='left' produces no h= key (default 0)."""
-    @as_subprocess
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         with mock.patch.object(term, 'does_text_sizing', return_value=True):
-            result = term.text_sized('Hi', horizontal_align='left')
+            result = term.text_sized('Hi', numerator=1, denominator=3, horizontal_align='left')
             assert 'h=' not in result
     child()
 
 
 def test_string_horizontal_align_right():
     """horizontal_align='right' produces h=1."""
-    @as_subprocess
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         with mock.patch.object(term, 'does_text_sizing', return_value=True):
-            result = term.text_sized('Hi', horizontal_align='right')
+            result = term.text_sized('Hi', numerator=1, denominator=3, horizontal_align='right')
             assert 'h=1' in result
     child()
 
 
 def test_string_horizontal_align_center():
     """horizontal_align='center' produces h=2."""
-    @as_subprocess
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         with mock.patch.object(term, 'does_text_sizing', return_value=True):
-            result = term.text_sized('Hi', horizontal_align='center')
+            result = term.text_sized('Hi', numerator=1, denominator=3, horizontal_align='center')
             assert 'h=2' in result
     child()
 
 
 def test_int_align_still_works():
     """Integer alignment values still work as before."""
-    @as_subprocess
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         with mock.patch.object(term, 'does_text_sizing', return_value=True):
-            result = term.text_sized('Hi', vertical_align=2, horizontal_align=1)
+            result = term.text_sized('Hi', numerator=1, denominator=3,
+                                     vertical_align=2, horizontal_align=1)
             assert 'v=2' in result
             assert 'h=1' in result
     child()
@@ -96,7 +97,7 @@ def test_int_align_still_works():
 
 def test_string_vertical_align_default():
     """vertical_align='default' produces no v= key."""
-    @as_subprocess
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         with mock.patch.object(term, 'does_text_sizing', return_value=True):
@@ -107,13 +108,33 @@ def test_string_vertical_align_default():
 
 def test_string_horizontal_align_default():
     """horizontal_align='default' produces no h= key."""
-    @as_subprocess
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         with mock.patch.object(term, 'does_text_sizing', return_value=True):
             result = term.text_sized('Hi', horizontal_align='default')
             assert 'h=' not in result
     child()
+
+
+def test_alignment_clipped_without_fractional_scaling():
+    """Alignment parameters are excluded when no fractional scaling is active."""
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    with mock.patch.object(term, 'does_text_sizing', return_value=True):
+        # No fractional scaling: numerator=0
+        result = term.text_sized('Hi', numerator=0, denominator=3,
+                                 vertical_align=1, horizontal_align=2)
+        assert 'v=' not in result
+        assert 'h=' not in result
+        # n >= d: integer or upscale
+        result = term.text_sized('Hi', numerator=5, denominator=3,
+                                 vertical_align=1, horizontal_align=2)
+        assert 'v=' not in result
+        assert 'h=' not in result
+        # n=0, d=0: no fractional
+        result = term.text_sized('Hi', vertical_align=2, horizontal_align=1)
+        assert 'v=' not in result
+        assert 'h=' not in result
 
 
 @pytest.mark.parametrize('name,value', [
@@ -126,7 +147,7 @@ def test_string_horizontal_align_default():
 ])
 def test_invalid_string_align_raises_valueerror(name, value):
     """Invalid string alignment values raise ValueError."""
-    @as_subprocess
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         with mock.patch.object(term, 'does_text_sizing', return_value=True):
@@ -137,7 +158,7 @@ def test_invalid_string_align_raises_valueerror(name, value):
 
 def test_graceful_degradation_without_support():
     """text_sized returns plain text when does_text_sizing is False."""
-    @as_subprocess
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         with mock.patch.object(term, 'does_text_sizing', return_value=False):
@@ -148,7 +169,7 @@ def test_graceful_degradation_without_support():
 @pytest.mark.parametrize('value', [3, -1, 999])
 def test_vertical_align_int_out_of_range(value):
     """vertical_align int outside 0--2 raises ValueError."""
-    @as_subprocess
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         with mock.patch.object(term, 'does_text_sizing', return_value=True):
@@ -160,7 +181,7 @@ def test_vertical_align_int_out_of_range(value):
 @pytest.mark.parametrize('value', [3, -1, 999])
 def test_horizontal_align_int_out_of_range(value):
     """horizontal_align int outside 0--2 raises ValueError."""
-    @as_subprocess
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         with mock.patch.object(term, 'does_text_sizing', return_value=True):
@@ -171,7 +192,7 @@ def test_horizontal_align_int_out_of_range(value):
 
 def test_text_with_esc_raises_valueerror():
     """Text containing ESC raises ValueError."""
-    @as_subprocess
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         with mock.patch.object(term, 'does_text_sizing', return_value=True):
@@ -182,7 +203,7 @@ def test_text_with_esc_raises_valueerror():
 
 def test_text_exactly_4096_bytes():
     """Text at exactly 4096 UTF-8 bytes does not raise ValueError."""
-    @as_subprocess
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         with mock.patch.object(term, 'does_text_sizing', return_value=True):

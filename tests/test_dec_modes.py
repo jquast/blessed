@@ -24,7 +24,7 @@ from blessed.keyboard import (
     get_leading_prefixes,
     DeviceAttribute,
 )
-from .accessories import TestTerminal, as_subprocess, make_enabled_dec_cache
+from .accessories import TestTerminal, make_enabled_dec_cache
 from .conftest import IS_WINDOWS
 
 # For backwards compatibility and convenience in tests
@@ -306,7 +306,6 @@ def test_dec_mode_response_description_fallback():
 
 def test_dec_mode_calls_with_no_styling():
     """Test _dec_mode_set_enabled does nothing when does_styling is False."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=False)
@@ -327,7 +326,6 @@ def test_dec_mode_calls_with_no_styling():
 
 def test_get_dec_mode_invalid_mode_type():
     """Test get_dec_mode raises TypeError for invalid mode types."""
-    @as_subprocess
     def child():
         term = TestTerminal()
         with pytest.raises(TypeError):
@@ -337,7 +335,6 @@ def test_get_dec_mode_invalid_mode_type():
 
 def test_get_dec_mode_successful_query():
     """Test successful DEC mode query with mocked response."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -365,7 +362,6 @@ def test_get_dec_mode_successful_query():
 
 def test_get_dec_mode_timeout():
     """Test DEC mode query timeout handling."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -388,7 +384,6 @@ def test_get_dec_mode_timeout():
 
 def test_get_dec_mode_cached_response():
     """Test that cached responses are returned without re-querying."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -409,7 +404,6 @@ def test_get_dec_mode_cached_response():
 
 def test_get_dec_mode_force_bypass_cache():
     """Test force=True bypasses cache and re-queries."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -436,7 +430,6 @@ def test_get_dec_mode_force_bypass_cache():
 
 def test_get_dec_mode_sticky_failure():
     """Test get_dec_mode returns NOT_QUERIED after first query fails."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -465,7 +458,6 @@ def test_get_dec_mode_sticky_failure():
 
 def test_get_dec_mode_no_response_after_success():
     """Test get_dec_mode returns NO_RESPONSE when query fails after previous success."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -502,7 +494,6 @@ def test_get_dec_mode_no_response_after_success():
 
 def test_dec_mode_set_enabled_with_styling():
     """Test _dec_mode_set_enabled writes correct sequence."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -516,7 +507,6 @@ def test_dec_mode_set_enabled_with_styling():
 
 def test_dec_mode_set_disabled_with_styling():
     """Test _dec_mode_set_disabled writes correct sequence."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -530,7 +520,6 @@ def test_dec_mode_set_disabled_with_styling():
 
 def test_dec_mode_set_enabled_invalid_mode_type():
     """Test _dec_mode_set_enabled raises TypeError for invalid mode types."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=False)
@@ -542,7 +531,6 @@ def test_dec_mode_set_enabled_invalid_mode_type():
 
 def test_dec_mode_set_disabled_invalid_mode_type():
     """Test _dec_mode_set_disabled raises TypeError for invalid mode types."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=False)
@@ -558,7 +546,6 @@ def test_dec_mode_set_disabled_invalid_mode_type():
 ])
 def test_dec_mode_set_with_dec_private_mode_enum(method_name, suffix):
     """Test _dec_mode_set_enabled/disabled with DecPrivateMode instance values."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -573,7 +560,6 @@ def test_dec_mode_set_with_dec_private_mode_enum(method_name, suffix):
 
 def test_dec_modes_enabled_with_invalid_type():
     """Test dec_modes_enabled raises TypeError with invalid mode type."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -590,7 +576,6 @@ def test_dec_modes_enabled_with_invalid_type():
 
 def test_dec_modes_disabled_with_invalid_type():
     """Test dec_modes_disabled raises TypeError with invalid mode type."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -609,7 +594,6 @@ def test_dec_modes_disabled_with_invalid_type():
 
 def test_dec_modes_enabled_context_manager():
     """Test dec_modes_enabled context manager behavior."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -632,7 +616,6 @@ def test_dec_modes_enabled_context_manager():
 
 def test_dec_modes_enabled_already_enabled():
     """Test dec_modes_enabled skips already enabled modes."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -655,7 +638,6 @@ def test_dec_modes_enabled_already_enabled():
 
 def test_dec_modes_enabled_unsupported_mode():
     """Test dec_modes_enabled skips unsupported modes."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -677,7 +659,6 @@ def test_dec_modes_enabled_unsupported_mode():
 
 def test_dec_modes_disabled_context_manager():
     """Test dec_modes_disabled context manager behavior."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -700,7 +681,6 @@ def test_dec_modes_disabled_context_manager():
 
 def test_dec_modes_disabled_already_disabled():
     """Test dec_modes_disabled skips already disabled modes."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -744,7 +724,6 @@ def test_context_manager_no_styling_and_invalid_args():
 
 def test_context_manager_exception_handling():
     """Test context managers properly restore state on exception."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -769,7 +748,6 @@ def test_context_manager_exception_handling():
 
 def test_multiple_modes_context_manager():
     """Test context managers work with multiple modes."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -799,7 +777,6 @@ def test_multiple_modes_context_manager():
 ])
 def test_dec_modes_context_with_dec_private_mode_enum(method_name, mock_response):
     """Test dec_modes_enabled/disabled with DecPrivateMode instance values."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -838,7 +815,6 @@ def test_int_mode_parameters():
 ])
 def test_sugary_context_managers(method_name, expected_mode):
     """Test sugary context managers enable correct modes."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -867,7 +843,6 @@ def test_sugary_context_managers(method_name, expected_mode):
 ])
 def test_sugary_context_managers_no_styling(method_name):
     """Test sugary context managers do nothing when does_styling is False."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=False)
@@ -1021,7 +996,6 @@ def test_mouse_event_name_with_non_mouse_mode():
 
 def test_query_response_with_line_buffered_mode():
     """Test _query_response with line buffering disabled."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -1075,7 +1049,6 @@ def test_resize_events(sequence, h_chars, w_chars, h_pix, w_pix):
 
 def test_notify_on_resize_context_manager():
     """Test notify_on_resize enables and disables mode correctly."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -1098,7 +1071,6 @@ def test_notify_on_resize_context_manager():
 
 def test_notify_on_resize_cache_cleared_on_exit():
     """Test preferred size cache is cleared when exiting context."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -1125,7 +1097,6 @@ def test_notify_on_resize_cache_cleared_on_exit():
 
 def test_height_width_use_preferred_cache():
     """Test height and width properties use preferred cache."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -1143,7 +1114,6 @@ def test_height_width_use_preferred_cache():
 
 def test_sixel_uses_preferred_cache():
     """Test get_sixel_height_and_width uses pixel dimensions from cache."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -1160,7 +1130,6 @@ def test_sixel_uses_preferred_cache():
 
 def test_sixel_ignores_zero_pixel_cache():
     """Test get_sixel_height_and_width falls back when pixel dimensions are zero."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -1187,7 +1156,6 @@ def test_sixel_ignores_zero_pixel_cache():
 ])
 def test_does_inband_resize(response_value, expected):
     """Test does_inband_resize returns expected value based on mode support."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -1204,7 +1172,6 @@ def test_does_inband_resize(response_value, expected):
 
 def test_does_inband_resize_not_a_tty():
     """Test does_inband_resize returns False when not a TTY."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True, is_a_tty=False)
 
@@ -1273,7 +1240,6 @@ def test_does_inband_resize_no_styling():
 ])
 def test_does_dec_mode_convenience(method_name, response_value, expected):
     """Boolean DEC mode convenience methods return correct values."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -1295,7 +1261,6 @@ def test_does_dec_mode_convenience(method_name, response_value, expected):
 ])
 def test_does_dec_mode_convenience_not_a_tty(method_name):
     """Boolean DEC mode convenience methods return False when not a TTY."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True, is_a_tty=False)
         result = getattr(term, method_name)(timeout=0.01)

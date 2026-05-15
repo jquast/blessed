@@ -5,4 +5,3 @@ terminal.py
    :members:
    :undoc-members:
    :special-members: __getattr__
-.. autodata:: _CUR_TERM

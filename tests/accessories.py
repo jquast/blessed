@@ -13,33 +13,55 @@ import warnings
 # local
 from blessed import Terminal
 from blessed.dec_modes import DecModeResponse
-# local
+from blessed._capabilities import TermcapResponse
 from .conftest import IS_WINDOWS
 
-if IS_WINDOWS:
-    # 3rd party
-    import jinxed as curses
-else:
+# 3rd party
+import jinxed
+if not IS_WINDOWS:
     # std imports
     import pty
-    import curses
     import termios
 
 MAX_SUBPROC_TIME_SECONDS = 2  # no test should ever take over 2 seconds
 # extra time given for timeout-related tests for CI/slow machines, by percent
-PCT_MAXWAIT_KEYSTROKE = 1.5
+PCT_MAXWAIT_KEYSTROKE = 1.7
+# Short timeout value for tests that only need to verify timeout behavior,
+# not specific timing.  select() on an empty PTY resolves near-instantly.
+TEST_TIMEOUT_SHORT = 0.10
 
-test_kind = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
 
+def assert_timeout_elapsed(elapsed, timeout):
+    """Assert elapsed time is within expected range for a timeout operation.
 
-def TestTerminal(is_a_tty=None, **kwargs):  # type: (...) -> Terminal
+    The floor is timeout * 0.5 (some overhead always exists).  The ceiling is
+    timeout * PCT_MAXWAIT_KEYSTROKE (tolerance for CI/slow machines).
     """
-    Create a Terminal instance with optional is_a_tty override.
+    assert timeout * 0.5 <= elapsed <= timeout * PCT_MAXWAIT_KEYSTROKE, (
+        f'elapsed={elapsed:.4f} not in [{timeout * 0.5:.4f}, '
+        f'{timeout * PCT_MAXWAIT_KEYSTROKE:.4f}]'
+    )
 
-    'is_a_tty' is useful to pass "is a tty" tests without pty_test
-    """
+
+TEST_KIND = 'vtwin10' if IS_WINDOWS else 'xterm-256color'
+
+DEFAULT_TERMCAP_RESPONSE = TermcapResponse(
+    supported=True, capabilities={'TN': TEST_KIND, 'colors': '256', 'RGB': '8'})
+
+# Sentinel to distinguish "use default fake XTGETTCAP" from "force real probe"
+NO_XTGETTCAP_DATA = object()
+
+
+def TestTerminal(is_a_tty=None, _xtgettcap_data=DEFAULT_TERMCAP_RESPONSE,
+                 _xtgettcap_timeout=None, **kwargs) -> Terminal:
+    """Create a Terminal instance with optional is_a_tty override and default _xtgettcap_data."""
     if 'kind' not in kwargs:
-        kwargs['kind'] = test_kind
+        kwargs['kind'] = TEST_KIND
+    if _xtgettcap_data is not NO_XTGETTCAP_DATA:
+        kwargs['_xtgettcap_data'] = _xtgettcap_data
+    if _xtgettcap_timeout is not None:
+        import blessed.terminal
+        blessed.terminal.TERMINAL_QUERY_TIMEOUT_SECONDS = _xtgettcap_timeout
     term = Terminal(**kwargs)
     if is_a_tty is not None:
         term._is_a_tty = is_a_tty
@@ -239,7 +261,6 @@ def read_until_eof(fd, encoding='utf8'):
 def echo_off(fd):
     """Ensure any bytes written to pty fd are not duplicated as output."""
     if not IS_WINDOWS:
-        # pylint: disable=possibly-used-before-assignment
         try:
             attrs = termios.tcgetattr(fd)
             attrs[3] = attrs[3] & ~termios.ECHO
@@ -252,27 +273,17 @@ def echo_off(fd):
         yield
 
 
-def unicode_cap(cap):
+def unicode_cap(cap, term):
     """Return the result of ``tigetstr`` except as Unicode."""
-    try:
-        val = curses.tigetstr(cap)
-    except curses.error:
-        val = None
-
+    val = term._jinxed_term.tigetstr(cap)
     return val.decode('latin1') if val else ''
 
 
-def unicode_parm(cap, *parms):
+def unicode_parm(cap, term, *parms):
     """Return the result of ``tparm(tigetstr())`` except as Unicode."""
-    try:
-        cap = curses.tigetstr(cap)
-    except curses.error:
-        cap = None
-    if cap:
-        try:
-            val = curses.tparm(cap, *parms)
-        except curses.error:
-            val = None
+    cap_str = term._jinxed_term.tigetstr(cap)
+    if cap_str:
+        val = jinxed.tparm(cap_str, *parms)
         if val:
             return val.decode('latin1')
     return ''
@@ -289,7 +300,8 @@ def _setwinsize(fd, rows, cols):
     fcntl.ioctl(fd, TIOCSWINSZ, s)
 
 
-def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
+def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80,
+             _xtgettcap_data=None, _xtgettcap_timeout=None):
     """
     Wrapper for PTY-based tests to reduce boilerplate.
 
@@ -324,9 +336,15 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
     """
     # pylint: disable=too-complex,too-many-branches,too-many-locals
     # pylint: disable=missing-raises-doc,missing-type-doc,too-many-statements
+    # assert False, _xtgettcap_data
+    if _xtgettcap_data is not NO_XTGETTCAP_DATA:
+        _xtgettcap_data = (_xtgettcap_data if _xtgettcap_data is not None
+                           else DEFAULT_TERMCAP_RESPONSE)
     if IS_WINDOWS:
         # On Windows, just run child_func directly without PTY
-        term = TestTerminal()
+        term = TestTerminal(_xtgettcap_data=_xtgettcap_data,
+                            _xtgettcap_timeout=_xtgettcap_timeout,
+                            force_styling=True)
         result = child_func(term)
         return result.decode('utf-8') if isinstance(result, bytes) else (result or '')
 
@@ -353,7 +371,9 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
         read_until_semaphore(sys.__stdin__.fileno(), semaphore=SEMAPHORE)
         cov = init_subproc_coverage(test_name)
         try:
-            term = TestTerminal()
+            term = TestTerminal(_xtgettcap_data=_xtgettcap_data,
+                                _xtgettcap_timeout=_xtgettcap_timeout,
+                                force_styling=True)
             result = child_func(term)
 
             # Write result to stdout if provided
@@ -416,13 +436,13 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80):
 
 class MockTigetstr():
     """
-    Wraps curses.tigetstr() to override specific capnames
+    Wraps jinxed.tigetstr() to override specific capnames
 
     Capnames and return values are provided as keyword arguments
     """
 
     def __init__(self, **kwargs):
-        self.callable = curses.tigetstr
+        self.callable = jinxed.tigetstr
         self.kwargs = kwargs
 
     def __call__(self, capname):

@@ -3,9 +3,6 @@ import os
 import sys
 import runpy
 import datetime
-import functools
-
-# 3rd party
 import sphinx.environment
 from docutils.utils import get_source_line
 
@@ -34,23 +31,6 @@ def _warn_node(self, msg, node):
 sphinx.environment.BuildEnvironment.warn_node = _warn_node
 
 
-def no_op_wraps(func):
-    """Replaces functools.wraps in order to undo wrapping when generating Sphinx documentation."""
-    if func.__module__ is None or 'blessed' not in func.__module__:
-        return functools.orig_wraps(func)
-
-    def wrapper(decorator):
-        sys.stderr.write(f'patched for function signature: {func!r}\n')
-        return func
-    return wrapper
-
-
-# Monkey-patch functools.wraps and contextlib.wraps
-# https://github.com/sphinx-doc/sphinx/issues/1711#issuecomment-93126473
-functools.orig_wraps = functools.wraps
-functools.wraps = no_op_wraps
-import contextlib  # isort:skip # noqa
-contextlib.wraps = no_op_wraps
 from blessed.terminal import *  # isort:skip # noqa
 
 # and finally, don't you just wish readthedocs.org could run tox? :) it can't,

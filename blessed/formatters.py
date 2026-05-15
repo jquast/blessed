@@ -2,22 +2,43 @@
 from __future__ import annotations
 
 # std imports
-import platform
-from typing import TYPE_CHECKING, Set, Dict, List, Tuple, Union, Callable, Optional
+import os
+import pkgutil
+import warnings
+import importlib
+from typing import TYPE_CHECKING, Set, List, Tuple, Union, Callable
 
 # local
 from blessed.colorspace import CGA_COLORS, X11_COLORNAMES_TO_RGB
+from blessed._capabilities import CAPABILITY_DATABASE
 
 if TYPE_CHECKING:  # pragma: no cover
     # local
     from blessed.terminal import Terminal
 
-# isort: off
-# curses
-if platform.system() == 'Windows':
-    import jinxed as curses
-else:
-    import curses
+# 3rd party
+import jinxed
+import jinxed.terminfo
+
+
+def _build_known_capability_names() -> 'frozenset[str]':
+    """Return frozenset of all terminal capability names known to jinxed."""
+    caps: set[str] = set(jinxed.terminfo.BOOL_CAPS)
+    caps.update(jinxed.terminfo.NUM_CAPS)
+    for _, modname, _ in pkgutil.iter_modules(jinxed.terminfo.__path__):
+        if modname.startswith('_'):
+            continue
+        mod = importlib.import_module(f'jinxed.terminfo.{modname}')
+        caps.update(getattr(mod, 'STR_CAPS', {}).keys())
+    # Also include attribute names from blessed's own capability database.
+    for _name, (attr, _) in CAPABILITY_DATABASE.items():
+        caps.add(attr)
+    return frozenset(caps)
+
+
+_KNOWN_CAPABILITY_NAMES = _build_known_capability_names()
+
+_NOWARN_UNKNOWN_CAPS = bool(os.environ.get('BLESSED_NOWARN_UNKNOWN_CAPS'))
 
 
 def _make_colors() -> Set[str]:
@@ -49,7 +70,7 @@ COLORS: Set[str] = _make_colors()
 
 #: Attributes that may be compounded with colors, by underscore, such as
 #: 'reverse_indigo'.
-COMPOUNDABLES: Set[str] = set('bold underline reverse blink italic standout'.split())
+COMPOUNDABLES: Set[str] = set('bold underline reverse blink dim italic standout'.split())
 
 
 class ParameterizingString(str):
@@ -70,7 +91,7 @@ class ParameterizingString(str):
         """
         Class constructor accepting 3 positional arguments.
 
-        :arg str cap: parameterized string suitable for curses.tparm()
+        :arg str cap: parameterized string suitable for jinxed.tparm()
         :arg str normal: terminating sequence for this capability (optional).
         :arg str name: name of this terminal capability (optional).
         """
@@ -88,7 +109,7 @@ class ParameterizingString(str):
         a :class:`FormattingString` capable of being called.
 
         :raises TypeError: Mismatch between capability and arguments
-        :raises curses.error: :func:`curses.tparm` raised an exception
+        :raises jinxed.error: :func:`jinxed.tparm` raised an exception
         :rtype: :class:`FormattingString` or :class:`NullCallableString`
         :returns: Callable string for given parameters
         """
@@ -96,7 +117,7 @@ class ParameterizingString(str):
             # Re-encode the cap, because tparm() takes a bytestring in Python
             # 3. However, appear to be a plain Unicode string otherwise so
             # concats work.
-            attr = curses.tparm(self.encode('latin1'), *args).decode('latin1')
+            attr = jinxed.tparm(self.encode('latin1'), *args).decode('latin1')
             return FormattingString(attr, self._normal)
         except TypeError as err:
             # If the first non-int (i.e. incorrect) arg was a string, suggest
@@ -108,7 +129,7 @@ class ParameterizingString(str):
             # Somebody passed a non-string; I don't feel confident
             # guessing what they were trying to do.
             raise
-        except curses.error as err:
+        except jinxed.error as err:  # pragma: no cover
             # ignore 'tparm() returned NULL', you won't get any styling,
             # even if does_styling is True. This happens on win32 platforms
             # with http://www.lfd.uci.edu/~gohlke/pythonlibs/#curses installed
@@ -121,11 +142,14 @@ class ParameterizingProxyString(str):
     r"""
     A Unicode string which can be called to proxy missing termcap entries.
 
-    This class supports the function :func:`get_proxy_string`, and mirrors
-    the behavior of :class:`ParameterizingString`, except that instead of
-    a capability name, receives a format string, and callable to filter the
-    given positional ``*args`` of :meth:`ParameterizingProxyString.__call__`
-    into a terminal sequence.
+    .. deprecated 1.40::
+
+        All previously-proxied terminfo(5) capabilities are now provided directly by the capability
+        database in jinxed.  This class is unused by blessed but kept for API compatibility.
+
+    This class mirrors the behavior of :class:`ParameterizingString`, except that instead of a
+    capability name, receives a format string, and callable to filter the given positional ``*args``
+    of :meth:`ParameterizingProxyString.__call__` into a terminal sequence.
 
     For example::
 
@@ -311,45 +335,20 @@ class NullCallableString(str):
         return ''.join(args)
 
 
-def get_proxy_string(term: 'Terminal', attr: str) -> Optional[ParameterizingProxyString]:
+def get_proxy_string(  # pylint: disable=unused-argument
+        term: 'Terminal', attr: str) -> None:
     """
     Proxy and return callable string for proxied attributes.
 
-    :arg Terminal term: :class:`~.Terminal` instance.
-    :arg str attr: terminal capability name that may be proxied.
-    :rtype: None or :class:`ParameterizingProxyString`.
-    :returns: :class:`ParameterizingProxyString` for some attributes
-        of some terminal types that support it, where the terminfo(5)
-        database would otherwise come up empty, such as ``move_x``
-        attribute for ``term.kind`` of ``screen``.  Otherwise, None.
+    .. deprecated 1.40::
+
+        All previously-proxied terminfo(5) capabilities are now provided directly by the capability
+        database in jinxed as "patches" in
+        https://github.com/Rockhopper-Technologies/jinxed/blob/main/terminals.toml.
+
+        This function always returns ``None``.
     """
-    # normalize 'screen-256color', or 'ansi.sys' to its basic names
-    term_kind = next(iter(_kind for _kind in ('screen', 'ansi',)
-                          if term.kind.startswith(_kind)), term.kind)
-    _proxy_table: Dict[str, Dict[str, object]] = {  # pragma: no cover
-        'screen': {
-            # proxy move_x/move_y for 'screen' terminal type, used by tmux(1).
-            'hpa': ParameterizingProxyString(
-                ('\x1b[{0}G', lambda *arg: (arg[0] + 1,)), term.normal, attr),
-            'vpa': ParameterizingProxyString(
-                ('\x1b[{0}d', lambda *arg: (arg[0] + 1,)), term.normal, attr),
-        },
-        'ansi': {
-            # proxy show/hide cursor for 'ansi' terminal type.  There is some
-            # demand for a richly working ANSI terminal type for some reason.
-            'civis': ParameterizingProxyString(
-                ('\x1b[?25l', lambda *arg: ()), term.normal, attr),
-            'cnorm': ParameterizingProxyString(
-                ('\x1b[?25h', lambda *arg: ()), term.normal, attr),
-            'hpa': ParameterizingProxyString(
-                ('\x1b[{0}G', lambda *arg: (arg[0] + 1,)), term.normal, attr),
-            'vpa': ParameterizingProxyString(
-                ('\x1b[{0}d', lambda *arg: (arg[0] + 1,)), term.normal, attr),
-            'sc': '\x1b[s',
-            'rc': '\x1b[u',
-        }
-    }
-    return _proxy_table.get(term_kind, {}).get(attr, None)
+    return None
 
 
 def split_compound(compound: str) -> List[str]:
@@ -388,10 +387,18 @@ def resolve_capability(term: 'Terminal', attr: str) -> str:
     """
     if not term.does_styling:
         return ''
-    val = curses.tigetstr(term._sugar.get(attr, attr))  # pylint: disable=protected-access
+    capname = term._sugar.get(attr, attr)  # pylint: disable=protected-access
+    val = term._jinxed_term.tigetstr(capname)  # pylint: disable=protected-access
+    if val is None:
+        if capname not in _KNOWN_CAPABILITY_NAMES and not _NOWARN_UNKNOWN_CAPS:
+            warnings.warn(
+                f"unknown terminal capability: {capname!r}",
+                stacklevel=4,
+            )
+        return ''
     # Decode sequences as latin1, as they are always 8-bit bytes, so when
     # b'\xff' is returned, this is decoded as '\xff'.
-    return '' if val is None else val.decode('latin1')
+    return val.decode('latin1')
 
 
 def resolve_color(term: 'Terminal', color: str) -> Union[NullCallableString, FormattingString]:
@@ -424,7 +431,7 @@ def resolve_color(term: 'Terminal', color: str) -> Union[NullCallableString, For
         # bright colors at 8-15:
         offset = 8 if 'bright_' in color else 0
         base_color = color.rsplit('_', 1)[-1]
-        fmt_attr = vga_color_cap(getattr(curses, f'COLOR_{base_color.upper()}') + offset)
+        fmt_attr = vga_color_cap(getattr(jinxed, f'COLOR_{base_color.upper()}') + offset)
         return FormattingString(fmt_attr, term.normal)
 
     assert base_color in X11_COLORNAMES_TO_RGB, (
@@ -484,13 +491,4 @@ def resolve_attribute(term: 'Terminal', attr: str) -> Union[ParameterizingString
     # that when called, performs and returns the final string after curses
     # capability lookup is performed.
     tparm_capseq = resolve_capability(term, attr)
-    if not tparm_capseq:
-        # and, for special terminals, such as 'screen', provide a Proxy
-        # ParameterizingString for attributes they do not claim to support,
-        # but actually do! (such as 'hpa' and 'vpa').
-        proxy = get_proxy_string(term,
-                                 term._sugar.get(attr, attr))  # pylint: disable=protected-access
-        if proxy is not None:
-            return proxy
-
     return ParameterizingString(tparm_capseq, term.normal, attr)

@@ -9,7 +9,7 @@ import pytest
 from blessed._capabilities import Decrqss
 from blessed._capabilities import TermcapResponse, ITerm2Capabilities
 from .conftest import IS_WINDOWS
-from .accessories import TestTerminal, as_subprocess, pty_test
+from .accessories import TestTerminal, as_subprocess, pty_test, NO_XTGETTCAP_DATA
 
 
 class TestTermcapResponseParsing:
@@ -199,8 +199,7 @@ class TestGetXtgettcap:
             cached = TermcapResponse(supported=True,
                                      capabilities={'TN': 'old'})
             term._xtgettcap_cache = cached
-            term._xtgettcap_first_query_failed = True
-
+            term._is_a_tty = False
             result = term.get_xtgettcap(timeout=0.01, force=True)
             assert result is None
         child()
@@ -288,7 +287,7 @@ class TestStyledUnderlines:
             stream = io.StringIO()
             term = TestTerminal(stream=stream, force_styling=True)
             term._is_a_tty = True
-            term._xtgettcap_first_query_failed = True
+            term._xtgettcap_cache = TermcapResponse(supported=False)
             assert term.does_styled_underlines() is False
         child()
 
@@ -409,7 +408,8 @@ class TestKittyQuery:
             stream = io.StringIO()
             term = TestTerminal(stream=stream, force_styling=True)
             term._is_a_tty = True
-            term._kitty_query_supported = True
+            term._xtgettcap_cache = TermcapResponse(
+                supported=True, capabilities={'kitty-query-name': '1'})
             assert term.does_kitty_query() is True
         child()
 
@@ -420,7 +420,9 @@ class TestKittyQuery:
             stream = io.StringIO()
             term = TestTerminal(stream=stream, force_styling=True)
             term._is_a_tty = True
-            term._kitty_query_supported = True
+            term._xtgettcap_cache = TermcapResponse(
+                supported=True, capabilities={'kitty-query-name': '1'})
+            term._is_a_tty = False
             result = term.does_kitty_query(timeout=0.01, force=True)
             assert result is False
         child()
@@ -508,7 +510,8 @@ def test_get_xtgettcap_full_success():
         return b'OK'
 
     output = pty_test(child, parent_func=None,
-                      test_name='test_get_xtgettcap_full_success')
+                      test_name='test_get_xtgettcap_full_success',
+                      _xtgettcap_data=NO_XTGETTCAP_DATA)
     assert 'OK' in output
 
 
@@ -524,7 +527,8 @@ def test_get_xtgettcap_probe_failure():
         return b'OK'
 
     output = pty_test(child, parent_func=None,
-                      test_name='test_get_xtgettcap_probe_failure')
+                      test_name='test_get_xtgettcap_probe_failure',
+                      _xtgettcap_data=NO_XTGETTCAP_DATA)
     assert 'OK' in output
 
 
@@ -547,7 +551,8 @@ def test_get_xtgettcap_batch_with_remaining_input():
         return b'OK'
 
     output = pty_test(child, parent_func=None,
-                      test_name='test_get_xtgettcap_batch_with_remaining_input')
+                      test_name='test_get_xtgettcap_batch_with_remaining_input',
+                      _xtgettcap_data=NO_XTGETTCAP_DATA)
     assert 'OK' in output
 
 
@@ -566,7 +571,8 @@ def test_get_xtgettcap_batch_empty_flushinp():
         return b'OK'
 
     output = pty_test(child, parent_func=None,
-                      test_name='test_get_xtgettcap_batch_empty_flushinp')
+                      test_name='test_get_xtgettcap_batch_empty_flushinp',
+                      _xtgettcap_data=NO_XTGETTCAP_DATA)
     assert 'OK' in output
 
 
@@ -598,9 +604,10 @@ def test_does_osc52_clipboard_via_xtgettcap():
         # DA1 without extension 52, so DA1 path returns False
         da1_resp = '\x1b[?64;1;4c'
         da1_cpr = '\x1b[10;20R'
-        # XTGETTCAP probe + batch with Ms
+        # XTGETTCAP probe: "TN" capability
         probe_resp = f'\x1bP1+r{hex_tn}=787465726d\x1b\\'
         tcap_cpr = '\x1b[11;21R'
+        # batch query: "Ms" capability
         batch_resp = f'\x1bP1+r{hex_ms}={ms_val}\x1b\\'
         term.ungetch(da1_resp + da1_cpr + probe_resp + tcap_cpr + batch_resp)
         result = term.does_osc52_clipboard(timeout=1)
@@ -609,7 +616,8 @@ def test_does_osc52_clipboard_via_xtgettcap():
         return b'OK'
 
     output = pty_test(child, parent_func=None,
-                      test_name='test_does_osc52_clipboard_via_xtgettcap')
+                      test_name='test_does_osc52_clipboard_via_xtgettcap',
+                      _xtgettcap_data=NO_XTGETTCAP_DATA)
     assert 'OK' in output
 
 
@@ -782,21 +790,20 @@ def test_get_color_scheme_unsupported():
 
 @pytestmark_pty
 def test_does_kitty_query_supported():
-    """Kitty query extensions detected from DCS 1+r response."""
+    """Kitty query detected from DCS 1+r response."""
     def child(term):
         capname = 'kitty-query-name'
         hex_cap = TermcapResponse.hex_encode(capname)
-        hex_val = TermcapResponse.hex_encode('kitty')
-        resp = f'\x1bP1+r{hex_cap}={hex_val}\x1b\\'
+        resp = f'\x1bP1+r{hex_cap}=1\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
         result = term.does_kitty_query(timeout=1)
         assert result is True
-        assert term._kitty_query_supported is True
         return b'OK'
 
     output = pty_test(child, parent_func=None,
-                      test_name='test_does_kitty_query_supported')
+                      test_name='test_does_kitty_query_supported',
+                      _xtgettcap_data=NO_XTGETTCAP_DATA)
     assert 'OK' in output
 
 

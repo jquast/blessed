@@ -14,7 +14,6 @@ from .conftest import TEST_QUICK, IS_WINDOWS
 from .accessories import (
     SEMAPHORE,
     TestTerminal,
-    as_subprocess,
     read_until_semaphore,
     pty_test,
     PCT_MAXWAIT_KEYSTROKE,
@@ -76,7 +75,6 @@ def test_does_sixel_uses_cache():
 
 def test_does_sixel_not_a_tty():
     """Test does_sixel() returns False when not a TTY."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._is_a_tty = False
@@ -634,7 +632,6 @@ def test_window_cache_return_when_cell_query_fails():
 
 def test_preferred_size_cache_path():
     """Test get_sixel_height_and_width falls back to preferred_size_cache as last resort."""
-    @as_subprocess
     def child():
         from blessed.terminal import WINSZ
         term = TestTerminal()
@@ -775,7 +772,6 @@ def test_tiocswinsz_invalid_dimensions():
 
 def test_get_sixel_height_and_width_not_a_tty():
     """Test get_sixel_height_and_width returns (-1, -1) when not a TTY."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._is_a_tty = False

@@ -11,7 +11,7 @@ from blessed import Terminal
 from blessed.keyboard import Keystroke, _match_dec_event
 from blessed.mouse import MouseEvent, MouseSGREvent, MouseLegacyEvent
 from blessed.dec_modes import DecModeResponse
-from .accessories import TestTerminal, as_subprocess, make_enabled_dec_cache
+from .accessories import TestTerminal, make_enabled_dec_cache
 from .conftest import IS_WINDOWS
 
 
@@ -639,7 +639,6 @@ def test_mouse_legacy_encoding_systematic():
 ])
 def test_mouse_enabled_mode_selection(clicks, drag, motion, pixels, expected_modes):
     """Test mouse_enabled selects correct modes based on parameters."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -685,7 +684,6 @@ def test_mouse_enabled_no_styling():
 @pytest.mark.skipif(IS_WINDOWS, reason="Windows uses native console mouse API")
 def test_does_mouse_supported(clicks, drag, motion, pixels, expected_modes):
     """Test does_mouse returns True when all required modes are supported."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -708,7 +706,6 @@ def test_does_mouse_supported(clicks, drag, motion, pixels, expected_modes):
 @pytest.mark.skipif(IS_WINDOWS, reason="Windows uses native console mouse API")
 def test_does_mouse_unsupported():
     """Test does_mouse returns False when any mode is unsupported."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -741,7 +738,6 @@ def test_does_mouse_no_styling():
 @pytest.mark.skipif(IS_WINDOWS, reason="Windows uses native console mouse API")
 def test_does_mouse_default_parameters():
     """Test does_mouse with default parameters checks click tracking."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -761,7 +757,6 @@ def test_does_mouse_default_parameters():
 @pytest.mark.skipif(IS_WINDOWS, reason="Windows uses native console mouse API")
 def test_does_mouse_custom_timeout():
     """Test does_mouse respects custom timeout parameter."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -911,7 +906,6 @@ def test_mouse_sgr_pixels_precedence():
 ])
 def test_mouse_enabled_variations(kwargs, expected_modes):
     """Test mouse_enabled with various parameter combinations and precedence."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -933,7 +927,6 @@ def test_mouse_enabled_variations(kwargs, expected_modes):
 
 def test_does_mouse_default():
     """Test does_mouse with default parameters."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -949,7 +942,6 @@ def test_does_mouse_default():
 
 def test_flushinp_with_unicode_followed_by_legacy_mouse():
     """Test flushinp() decodes legacy mouse sequences with high bytes after unicode text."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO())
         term._dec_mode_cache = make_enabled_dec_cache()
@@ -983,7 +975,6 @@ def test_flushinp_with_unicode_followed_by_legacy_mouse():
 
 def test_inkey_with_cjk_followed_by_legacy_mouse():
     """Test inkey() decodes legacy mouse sequences with high bytes after CJK characters."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO())
         term._dec_mode_cache = make_enabled_dec_cache()

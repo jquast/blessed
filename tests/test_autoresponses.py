@@ -13,7 +13,7 @@ except ImportError:
 # local
 from blessed._capabilities import ITerm2Capabilities, TextSizingResult
 from .conftest import IS_WINDOWS
-from .accessories import TestTerminal, as_subprocess, pty_test
+from .accessories import TestTerminal, pty_test
 
 pytestmark = pytest.mark.skipif(
     IS_WINDOWS, reason="ungetch and PTY testing not supported on Windows")
@@ -31,7 +31,6 @@ pytestmark = pytest.mark.skipif(
 ])
 def test_detection_not_a_tty(method_name, expected):
     """Detection methods return falsy default when not a TTY."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True,
                             is_a_tty=False)
@@ -50,7 +49,6 @@ def test_detection_not_a_tty(method_name, expected):
 ])
 def test_detection_no_styling(method_name, expected):
     """Detection methods return falsy default when does_styling is False."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=False)
         result = getattr(term, method_name)(timeout=0.01)
@@ -68,7 +66,6 @@ def test_detection_no_styling(method_name, expected):
 ])
 def test_detection_cached_bool(method_name, cache_attr, cached_value, expected):
     """Boolean detection methods return cached value."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -80,7 +77,6 @@ def test_detection_cached_bool(method_name, cache_attr, cached_value, expected):
 
 def test_get_iterm2_capabilities_cached():
     """get_iterm2_capabilities returns cached result."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -94,7 +90,6 @@ def test_get_iterm2_capabilities_cached():
 
 def test_does_kitty_pointer_shapes_cached_supported():
     """does_kitty_pointer_shapes returns cached shape string."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -106,7 +101,6 @@ def test_does_kitty_pointer_shapes_cached_supported():
 
 def test_does_kitty_pointer_shapes_cached_unsupported():
     """does_kitty_pointer_shapes returns None when cached unsupported."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -151,7 +145,6 @@ def test_get_iterm2_capabilities_force_bypass():
 
 def test_does_text_sizing_cached():
     """does_text_sizing returns cached result."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -288,7 +281,6 @@ def test_does_kitty_notifications_supported(terminator):
 ])
 def test_does_iterm2_delegates_cached(method_name, cached_supported):
     """does_iterm2 and does_iterm2_graphics return cached result."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -501,7 +493,6 @@ def test_does_text_sizing_scale_location_timeout():
 
 def test_does_text_sizing_cleanup_side_effect():
     """does_text_sizing writes cleanup (backspace+space+backspace) to erase probes."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -516,13 +507,11 @@ def test_does_text_sizing_cleanup_side_effect():
         output = stream.getvalue()
         # cleanup: _movement=4 backspaces, 4 spaces, 4 backspaces
         assert '\b' * 4 + ' ' * 4 + '\b' * 4 in output
-
     child()
 
 
 def test_does_text_sizing_no_cleanup_when_cached():
     """does_text_sizing does not write probes/cleanup when cached result exists."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -533,7 +522,6 @@ def test_does_text_sizing_no_cleanup_when_cached():
         result = term.does_text_sizing()
         assert result == TextSizingResult(width=True, scale=True)
         assert stream.getvalue() == ''
-
     child()
 
 
@@ -562,7 +550,6 @@ def _sizing_term(supported):
 ])
 def test_text_sized(supported, kwargs, expected, measured):
     """text_sized returns OSC 66-wrapped text when supported, as-is otherwise."""
-    @as_subprocess
     def child():
         from wcwidth import width as wcwidth_width
         term = _sizing_term(supported)
@@ -574,10 +561,8 @@ def test_text_sized(supported, kwargs, expected, measured):
 
 def test_text_sized_ValueError():
     """text_sized raises ValueError for text exceeding 4096 length limit."""
-    @as_subprocess
     def child():
         term = _sizing_term(True)
         with pytest.raises(ValueError):
             term.text_sized('X' * 4097, scale=2)
-
     child()

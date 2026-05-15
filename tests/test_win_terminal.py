@@ -22,7 +22,7 @@ if IS_WINDOWS:
     )
     from blessed.dec_modes import DecPrivateMode
     from jinxed import win32
-    from .accessories import TestTerminal, as_subprocess
+    from .accessories import TestTerminal
 
 
 def _mock_mouse_event(x=0, y=0, button_state=0, event_flags=0,
@@ -152,7 +152,6 @@ def test_does_returns_false_without_styling(method):
 @pytest.mark.parametrize("method", ['does_mouse', 'does_inband_resize'])
 def test_does_returns_false_without_tty(method):
     """Test does_mouse/does_inband_resize return False without tty."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True,
                             is_a_tty=False)
@@ -163,7 +162,6 @@ def test_does_returns_false_without_tty(method):
 @pytest.mark.parametrize("method", ['does_mouse', 'does_inband_resize'])
 def test_does_returns_true_with_tty_and_styling(method):
     """Test does_mouse/does_inband_resize return True with tty and styling."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._is_a_tty = True
@@ -173,7 +171,6 @@ def test_does_returns_true_with_tty_and_styling(method):
 
 def test_getch_drains_event_buf():
     """Test getch returns buffered event characters first."""
-    @as_subprocess
     def child():
         seq = '\x1b[<0;1;1M'
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
@@ -184,7 +181,6 @@ def test_getch_drains_event_buf():
 
 def test_kbhit_returns_true_when_buf_has_data():
     """Test kbhit returns True when event buffer is populated."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._keyboard_fd = 0
@@ -195,7 +191,6 @@ def test_kbhit_returns_true_when_buf_has_data():
 
 def test_kbhit_returns_false_with_no_keyboard_fd():
     """Test kbhit returns False when keyboard fd is None."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._keyboard_fd = None
@@ -205,7 +200,6 @@ def test_kbhit_returns_false_with_no_keyboard_fd():
 
 def test_kbhit_timeout_zero_returns_false_on_empty():
     """Test kbhit returns False on empty buffer with zero timeout."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         with mock.patch.object(win32, 'ConsoleInput') as mock_ci:
@@ -219,7 +213,6 @@ def test_kbhit_timeout_zero_returns_false_on_empty():
 
 def test_drain_mouse_event_buffered():
     """Test drain converts mouse events to SGR sequences."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._native_mouse = True
@@ -236,7 +229,6 @@ def test_drain_mouse_event_buffered():
 
 def test_drain_resize_event_buffered():
     """Test drain converts resize events to DEC mode 2048 sequences."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._native_resize = True
@@ -254,7 +246,6 @@ def test_drain_resize_event_buffered():
 
 def test_drain_stops_at_key_down():
     """Test drain stops processing at key-down events."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._native_mouse = True
@@ -270,7 +261,6 @@ def test_drain_stops_at_key_down():
 
 def test_drain_consumes_non_key_down_events():
     """Test drain silently consumes key-up, focus, and menu events."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._native_mouse = True
@@ -289,7 +279,6 @@ def test_drain_consumes_non_key_down_events():
 
 def test_drain_multiple_mouse_events():
     """Test drain processes all pending mouse events eagerly."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._native_mouse = True
@@ -312,7 +301,6 @@ def test_drain_multiple_mouse_events():
 @pytest.mark.parametrize("flag", ['_native_mouse', '_native_resize'])
 def test_drain_ignores_events_when_flag_disabled(flag):
     """Test drain consumes but does not convert events when flag is off."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         setattr(term, flag, False)
@@ -330,7 +318,6 @@ def test_drain_ignores_events_when_flag_disabled(flag):
 
 def test_drain_tracks_button_state():
     """Test drain updates prev_button_state across consecutive events."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._native_mouse = True
@@ -364,7 +351,6 @@ _NATIVE_CTX_PARAMS = pytest.mark.parametrize(
 def test_native_fallback_sets_and_clears(
         ctx_method, probe_method, flag, dec_mode, enable_bit):
     """Test native fallback enables console mode and cleans up on exit."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._keyboard_fd = 0
@@ -394,7 +380,6 @@ def test_native_fallback_sets_and_clears(
 def test_native_fallback_no_keyboard_fd(
         ctx_method, probe_method, flag, dec_mode, enable_bit):
     """Test native fallback yields without action when keyboard fd is None."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._keyboard_fd = None
@@ -408,7 +393,6 @@ def test_native_fallback_no_keyboard_fd(
 
 def test_init_attributes():
     """Test Terminal.__init__ initializes native event attributes."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         assert isinstance(term._event_buf, collections.deque)
