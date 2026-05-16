@@ -975,18 +975,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         if match:
             # return matching sequence response, the cursor location.
-            row, col = (int(val) for val in match.groups())
-
-            # Per https://invisible-island.net/ncurses/terminfo.src.html The cursor position report
-            # (<u6>) string must contain two scanf(3)-style %d format elements.  The first of these
-            # must correspond to the Y coordinate and the second to the %d.  If the string contains
-            # the sequence %i, it is taken as an instruction to decrement each value after reading
-            # it (this is the inverse sense from the cup string).
-            response_str = getattr(self, self.caps['cursor_report'].attribute) or '\x1b[%i%d;%dR'
-            if '%i' in response_str:
-                row -= 1
-                col -= 1
-            return row, col
+            #
+            # CPR always reports 1-based coordinates (row 1, column 1).  All terminals published by
+            # jinxed use %i in their u6 string (the standard behavior), so we unconditionally
+            # convert to 0-based.  A pedantic impl would check for %i in the u6 capability, but no
+            # terminal supoprted by blessed/jinxed uses 0-index, it was an ANSI standard, afterall.
+            return (max(0, int(val) - 1) for val in match.groups())
 
         # Return an illegal value (-1) rather than a custom exception, developers should
         # check or filters, such as if (x, y) != (-1, -1) or max(0, y).
