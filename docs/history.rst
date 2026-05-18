@@ -14,9 +14,8 @@ Version History
     preferred terminal name ``TN``, 24-bit color support ``RGB``, number of colors ``Co``, `italic`,
     and `blink` capabilities.
 
-    This improves detection of ``TERM`` over protocols like serial that cannot forward any
-    environment variables, to determine 24-bit value for :attr:`~.Terminal.number_of_colors` when
-    using protocols like ssh that do not forward ``COLORTERM``.
+    This improves detection of Terminal `kind` and `number_of_colors` over protocols like serial
+    that cannot forward any environment variables or ssh that do not forward ``COLORTERM``.
   * introduced: A :exc:`UserWarning` is emitted when :meth:`~.Terminal.__getattr__` resolves an
     unknown terminal capability name, helping developers catch typos like ``term.bld``
     (missing ``bold``).  The warning can be suppressed by setting the environment variable

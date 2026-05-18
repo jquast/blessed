@@ -487,7 +487,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # - COLORTERM environment value
         # - XTGETTCAP 'RGB' (24-bit), then 'colors'
         # - termcap 'colors' (jinxed)
-        # - Windows native console (vtwin10) gets 24-bit boost
+        # - Windows native console (vtwin10) and Microsoft Terminal (ms-terminal) get
+        #   24-bit boost
         self._color_distance_algorithm = 'cie2000'
         if not self.does_styling:
             return 0
@@ -503,7 +504,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return int(xt_colors)
         _win_build = tuple(int(n) for n in platform.version().split('.')
                            if n.isdigit()) if IS_WINDOWS else 0
-        if IS_WINDOWS and self._kind == 'vtwin10' and _win_build >= (10, 0, 14931):
+        if IS_WINDOWS and self._kind in {'vtwin10', 'ms-terminal'} \
+                and _win_build >= (10, 0, 14931):
             # Windows 10 build 14931+ (2016) supports 24-bit color natively, but they do not set
             # COLORTERM. Older Windows releases and versions of ConHost.exe lack truecolor and fall
             # through to jinxed terminfo (8 or 16 colors).
