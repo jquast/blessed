@@ -2,7 +2,6 @@
 # std imports
 import io
 import os
-import platform
 import sys
 import tempfile
 import collections
@@ -10,23 +9,16 @@ from unittest import mock
 
 # 3rd party
 import pytest
+import jinxed
 
 # local
 from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, as_subprocess
 
-# isort: off
-if platform.system() != 'Windows':
-    import tty  # pylint: disable=unused-import  # NOQA
-    import curses
-else:
-    import jinxed as curses
-
 
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_getch_raises_eoferror_on_eof():
     """getch() raises EOFError when keyboard fd is at EOF."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         read_fd, write_fd = os.pipe()
@@ -43,7 +35,6 @@ def test_getch_raises_eoferror_on_eof():
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_flushinp_handles_eof():
     """flushinp() returns buffered data when keyboard fd reaches EOF."""
-    @as_subprocess
     def child():
         import codecs
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
@@ -64,7 +55,6 @@ def test_flushinp_handles_eof():
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_getch_sets_eof_flag():
     """getch() sets _keyboard_eof flag on EOF."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         read_fd, write_fd = os.pipe()
@@ -83,7 +73,6 @@ def test_getch_sets_eof_flag():
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_kbhit_returns_false_after_eof():
     """kbhit() returns False once _keyboard_eof is set."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         read_fd, write_fd = os.pipe()
@@ -100,7 +89,6 @@ def test_kbhit_returns_false_after_eof():
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_inkey_raises_EOF():
     """inkey() returns empty Keystroke when keyboard fd is at EOF."""
-    @as_subprocess
     def child():
         import codecs
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
@@ -120,7 +108,6 @@ def test_inkey_raises_EOF():
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_break_input_no_kb():
     """cbreak() should not call tty.setcbreak() without keyboard."""
-    @as_subprocess
     def child():
         with tempfile.NamedTemporaryFile() as stream:
             term = TestTerminal(stream=stream)
@@ -134,7 +121,6 @@ def test_break_input_no_kb():
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_raw_input_no_kb():
     """raw should not call tty.setraw() without keyboard."""
-    @as_subprocess
     def child():
         with tempfile.NamedTemporaryFile() as stream:
             term = TestTerminal(stream=stream)
@@ -162,7 +148,6 @@ def test_stdout_notty_kb_is_None():
     """term._keyboard_fd should be None when os.isatty returns False for output."""
     # In this scenario, stream is sys.__stdout__, but os.isatty(1) is False
     # such as when piping output to less(1)
-    @as_subprocess
     def child():
         isatty = os.isatty
         with mock.patch('os.isatty') as mock_isatty:
@@ -178,7 +163,6 @@ def test_stdout_notty_kb_is_None():
 
 def test_stdin_fileno_is_None():
     """term._keyboard_fd should be None when stdin.fileno() raises an exception."""
-    @as_subprocess
     def child():
         with mock.patch.object(sys.__stdin__, 'fileno') as mock_fileno:
             mock_fileno.side_effect = ValueError('fileno is not implemented on this stream')
@@ -194,7 +178,6 @@ def test_stdin_as_bytesio_is_None():
     """term._keyboard_fd should be None when sys.__stdin__.fileno() raises exception."""
     # In this scenario, stream is sys.__stdout__, but sys.__stdin__ is BytesIO
     # This may happen in a test scenario or when the program is wrapped in another interface
-    @as_subprocess
     def child():
         with mock.patch('sys.__stdin__', new=io.BytesIO()):
             term = TestTerminal()
@@ -209,7 +192,6 @@ def test_stdin_notty_kb_is_None():
     """term._keyboard_fd should be None when os.isatty returns False for input."""
     # In this scenario, stream is sys.__stdout__, but os.isatty(0) is False,
     # such as when piping from another program
-    @as_subprocess
     def child():
         isatty = os.isatty
         with mock.patch('os.isatty') as mock_isatty:
@@ -252,7 +234,7 @@ def test_a_keystroke():
 
 
 def test_get_keyboard_codes():
-    """Test all values returned by get_keyboard_codes are from curses."""
+    """Test all values returned by get_keyboard_codes are from curses(jinxed)."""
     import blessed.keyboard
     exemptions = dict(blessed.keyboard.CURSES_KEYCODE_OVERRIDE_MIXIN)
     # Add PUA overrides to exemptions since they intentionally override curses keys
@@ -293,55 +275,16 @@ def test_get_keyboard_codes():
             assert value == exemptions[keycode]
             continue
         if keycode[4:] in homemade_keycodes:
-            assert not hasattr(curses, keycode)
+            assert not hasattr(jinxed, keycode)
             assert hasattr(blessed.keyboard, keycode)
             assert getattr(blessed.keyboard, keycode) == value
         else:
-            assert hasattr(curses, keycode)
-            assert getattr(curses, keycode) == value
-
-
-def test_alternative_left_right():
-    """Test _alternative_left_right behavior for space/backspace."""
-    from blessed.keyboard import _alternative_left_right
-    term = mock.Mock()
-    term._cuf1 = ''
-    term._cub1 = ''
-    assert not bool(_alternative_left_right(term))
-    term._cuf1 = ' '
-    term._cub1 = '\b'
-    assert not bool(_alternative_left_right(term))
-    term._cuf1 = 'seq-right'
-    term._cub1 = 'seq-left'
-    assert (_alternative_left_right(term) == {
-        'seq-right': curses.KEY_RIGHT,
-        'seq-left': curses.KEY_LEFT})
-
-
-def test_cuf1_and_cub1_as_RIGHT_LEFT(all_terms):
-    """Test that cuf1 and cub1 are assigned KEY_RIGHT and KEY_LEFT."""
-    from blessed.keyboard import get_keyboard_sequences
-
-    @as_subprocess
-    def child(kind):
-        term = TestTerminal(kind=kind, force_styling=True)
-        keymap = get_keyboard_sequences(term)
-        if term._cuf1:
-            assert term._cuf1 in keymap
-            assert keymap[term._cuf1] == term.KEY_RIGHT
-        if term._cub1:
-            assert term._cub1 in keymap
-            if term._cub1 == '\b':
-                assert keymap[term._cub1] == term.KEY_BACKSPACE
-            else:
-                assert keymap[term._cub1] == term.KEY_LEFT
-
-    child(all_terms)
+            assert hasattr(jinxed, keycode)
+            assert getattr(jinxed, keycode) == value
 
 
 def test_get_keyboard_sequences_sort_order():
     """ordereddict ensures sequences are ordered longest-first."""
-    @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
         maxlen = None
@@ -360,17 +303,16 @@ def test_get_keyboard_sequence(monkeypatch):
 
     (KEY_SMALL, KEY_LARGE, KEY_MIXIN) = range(3)
     (CAP_SMALL, CAP_LARGE) = 'cap-small cap-large'.split()
-    (SEQ_SMALL, SEQ_LARGE, SEQ_MIXIN, SEQ_ALT_CUF1, SEQ_ALT_CUB1) = (
+    (SEQ_SMALL, SEQ_LARGE, SEQ_MIXIN) = (
         b'seq-small-a',
         b'seq-large-abcdefg',
-        b'seq-mixin',
-        b'seq-alt-cuf1',
-        b'seq-alt-cub1_')
+        b'seq-mixin')
 
-    # patch curses functions
-    monkeypatch.setattr(curses, 'tigetstr',
-                        lambda cap: {CAP_SMALL: SEQ_SMALL,
-                                     CAP_LARGE: SEQ_LARGE}[cap])
+    # patch jinxed functions
+    def tigetstr_func(cap):
+        return {CAP_SMALL: SEQ_SMALL, CAP_LARGE: SEQ_LARGE}[cap]
+
+    monkeypatch.setattr(jinxed, 'tigetstr', tigetstr_func)
 
     monkeypatch.setattr(blessed.keyboard, 'capability_names',
                         dict(((KEY_SMALL, CAP_SMALL,),
@@ -381,16 +323,15 @@ def test_get_keyboard_sequence(monkeypatch):
                         'DEFAULT_SEQUENCE_MIXIN', (
                             (SEQ_MIXIN.decode('latin1'), KEY_MIXIN),))
 
-    # patch for _alternative_left_right
     term = mock.Mock()
-    term._cuf1 = SEQ_ALT_CUF1.decode('latin1')
-    term._cub1 = SEQ_ALT_CUB1.decode('latin1')
+    term.does_styling = True
+    jinxed_mock = mock.Mock()
+    jinxed_mock.tigetstr = tigetstr_func
+    term._jinxed_term = jinxed_mock
     keymap = blessed.keyboard.get_keyboard_sequences(term)
 
     assert list(keymap.items()) == [
         (SEQ_LARGE.decode('latin1'), KEY_LARGE),
-        (SEQ_ALT_CUB1.decode('latin1'), curses.KEY_LEFT),
-        (SEQ_ALT_CUF1.decode('latin1'), curses.KEY_RIGHT),
         (SEQ_SMALL.decode('latin1'), KEY_SMALL),
         (SEQ_MIXIN.decode('latin1'), KEY_MIXIN)]
 
@@ -540,7 +481,6 @@ def test_keypad_mixins_and_aliases():
     # End     ^[[F    ^[OF    ^[[1;mF
     # Home    ^[[H    ^[OH    ^[[1;mH
     # pylint: disable=too-many-statements
-    @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
 
@@ -655,32 +595,31 @@ def test_keypad_mixins_and_aliases():
 @pytest.mark.skipif(IS_WINDOWS, reason="not applicable")
 def test_kp_begin_center_key():
     """Test KP_BEGIN/center key (numpad 5) with modifiers and event types."""
-    @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
 
         term.ungetch('\x1b[E')
         ks = term.inkey(timeout=0)
         assert ks and str(ks) == '\x1b[E'
-        assert ks.code == curses.KEY_B2
+        assert ks.code == jinxed.KEY_B2
         assert ks.name == 'KEY_CENTER'
 
         term.ungetch('\x1b[1;5E')
         ks = term.inkey(timeout=0)
         assert ks and str(ks) == '\x1b[1;5E'
-        assert ks.code == curses.KEY_B2
+        assert ks.code == jinxed.KEY_B2
         assert ks.name == 'KEY_CTRL_CENTER'
 
         term.ungetch('\x1b[1;3E')
         ks = term.inkey(timeout=0)
         assert ks and str(ks) == '\x1b[1;3E'
-        assert ks.code == curses.KEY_B2
+        assert ks.code == jinxed.KEY_B2
         assert ks.name == 'KEY_ALT_CENTER'
 
         term.ungetch('\x1b[1;7E')
         ks = term.inkey(timeout=0)
         assert ks and str(ks) == '\x1b[1;7E'
-        assert ks.code == curses.KEY_B2
+        assert ks.code == jinxed.KEY_B2
         assert ks.name == 'KEY_CTRL_ALT_CENTER'
 
     child('xterm')
@@ -731,7 +670,6 @@ def test_unsupported_high_byte_metasendsescape():
 
 def test_is_incomplete_keystroke():
     """Test _is_incomplete_keystroke private method."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
 
@@ -754,5 +692,4 @@ def test_is_incomplete_keystroke():
         assert not term._is_incomplete_keystroke('')
         assert not term._is_incomplete_keystroke('x')
         assert not term._is_incomplete_keystroke('xyz')
-
     child()

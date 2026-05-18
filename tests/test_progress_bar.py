@@ -3,12 +3,11 @@
 import pytest
 
 # local
-from .accessories import TestTerminal, as_subprocess
+from .accessories import TestTerminal
 
 
 def test_progress_bar_normal():
     """Test progress_bar with state=1 returns OSC 9;4 set sequence."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         assert term.progress_bar(1, 42) == '\x1b]9;4;1;42\x07'
@@ -19,7 +18,6 @@ def test_progress_bar_normal():
 
 def test_progress_bar_states_no_value():
     """Test progress_bar for non-normal states returns correct sequence."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         assert term.progress_bar(0) == '\x1b]9;4;0;\x07'
@@ -35,7 +33,6 @@ def test_progress_bar_states_no_value():
 
 def test_progress_bar_nostyling():
     """Test progress_bar returns empty string when does_styling is False."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=None)
         assert term.progress_bar('normal', 50) == ''
@@ -46,7 +43,6 @@ def test_progress_bar_nostyling():
 @pytest.mark.parametrize("state", [5, 'unknown', -1])
 def test_progress_bar_invalid_state(state):
     """Test progress_bar raises ValueError for invalid state."""
-    @as_subprocess
     def child(state=state):
         term = TestTerminal(force_styling=True)
         with pytest.raises(ValueError):
@@ -64,7 +60,6 @@ def test_progress_bar_invalid_state(state):
 ])
 def test_progress_bar_invalid_value(state, value):
     """Test progress_bar raises ValueError for invalid or missing value."""
-    @as_subprocess
     def child(state=state, value=value):
         term = TestTerminal(force_styling=True)
         with pytest.raises(ValueError):

@@ -67,15 +67,18 @@ _MESSAGE = (
 
 
 def _sized_char(ch, target, term, v_align=0, h_align=0):
+    """Return text-sizing sequence and display width for *ch* at *target* scale."""
     if not term.does_text_sizing().scale:
         return ch, wcswidth(ch)
     s, w, n, d = _scale_params(target)
     if s == 1 and n == 0:
         return ch, wcswidth(ch)
-    params = TextSizingParams(
-        scale=s, width=w, numerator=n, denominator=d,
-        vertical_align=v_align, horizontal_align=h_align)
-    seq = TextSizing(params, ch, '\x07').make_sequence()
+    seq = term.text_sized(ch, scale=s, width=w,
+                          numerator=n, denominator=d,
+                          vertical_align=v_align,
+                          horizontal_align=h_align)
+    params = TextSizingParams(scale=s, width=w, numerator=n, denominator=d,
+                              vertical_align=v_align, horizontal_align=h_align)
     width = TextSizing(params, ch, '\x07').display_width()
     return seq, width
 

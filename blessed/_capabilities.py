@@ -46,7 +46,7 @@ CAPABILITY_DATABASE: \
         ('enter_fullscreen', ('smcup', {})),
         ('enter_standout_mode', ('standout', {})),
         ('enter_superscript_mode', ('superscript', {})),
-        ('enter_susimpleript_mode', ('susimpleript', {})),
+        ('enter_susimpleript_mode', ('ssubm', {})),
         ('enter_underline_mode', ('underline', {})),
         ('erase_chars', ('ech', {'nparams': 1})),
         ('exit_alt_charset_mode', ('rmacs', {})),
@@ -177,23 +177,128 @@ CAPABILITIES_CAUSE_MOVEMENT: typing.Tuple[str, ...] = tuple(CAPABILITIES_HORIZON
     'scroll_forward',
 )
 
+XTGETTCAP_INIT_CAPABILITIES = (
+    # Terminal capabilities requested at Initialization time:
+    # - TN: determines preferred TERM
+    # - colors, RGB: determines Terminal.number_of_colors
+    # - blink, sitm, ritm, cvvis: nice to have as overlays, often omitted
+    #
+    # These were chosen from a May 2026 survey of all popular terminal emulators: what capabilities
+    # and their values are reported by XTGETTCAP that are otherwise not discovered by the latest
+    # ncurses termcap matching their defined TERM?
+    'TN', 'RGB', 'colors', 'blink', 'sitm', 'ritm', 'cvvis', 'Smulx', 'Setulc', 'Ms')
+
+
 XTGETTCAP_CAPABILITIES = (
-    # xterm extensions
+    # Terminal identification and 24-bit color fields, note that the order of the first three
+    # matters for xterm compatibility, described at https://codeberg.org/dnkl/foot#xtgettcap
     ("TN", "Terminal name"),
-    ("Co", "Number of colors"),
-    # Numeric capabilities
-    ("colors", "Max colors"),
+    ("RGB", "Bits per color channel (8 = 24-bit truecolor)"),
+    ("colors", "Number of colors"),
+    # as well as the order of the next section, where xterm supports **only** keyboard capabilities
+    # via XTGETTCAP, and we have to be sensitive to request only supported capabilities, as xterm
+    # stops replying after the first unsupported (non-keyboard) capability after these,
+    # String capabilities -- keypad key sequences
+    ("kcuu1", "Up arrow key"),
+    ("kcud1", "Down arrow key"),
+    ("kcub1", "Left arrow key"),
+    ("kcuf1", "Right arrow key"),
+    ("khome", "Home key"),
+    ("kend", "End key"),
+    ("knp", "Next page key"),
+    ("kpp", "Previous page key"),
+    ("kich1", "Insert character key"),
+    ("kdch1", "Delete character key"),
+    ("kbs", "Backspace key"),
+    ("kcbt", "Back-tab key"),
+    # String capabilities -- keypad application mode keys
+    ("ka1", "Keypad upper left"),
+    ("ka3", "Keypad upper right"),
+    ("kb2", "Keypad center"),
+    ("kc1", "Keypad lower left"),
+    ("kc3", "Keypad lower right"),
+    # String capabilities -- function keys
+    ("kf1", "Function key F1"),
+    ("kf2", "Function key F2"),
+    ("kf3", "Function key F3"),
+    ("kf4", "Function key F4"),
+    ("kf5", "Function key F5"),
+    ("kf6", "Function key F6"),
+    ("kf7", "Function key F7"),
+    ("kf8", "Function key F8"),
+    ("kf9", "Function key F9"),
+    ("kf10", "Function key F10"),
+    ("kf11", "Function key F11"),
+    # Function keys kf1-kf12 only: higher-numbered F-keys (kf13-kf63) do not
+    # meaningfully differ between terminals; they describe F-key-with-modifier support,
+    # and differences across terminal descriptions are limited to kf1-kf5 at most.
+    ("kf12", "Function key F12"),
+    # String capabilities -- modified navigation key sequences
+    ("kDC", "Shifted delete-char key"),
+    ("kEND", "Shifted end key"),
+    ("kHOM", "Shifted home key"),
+    ("kIC", "Shifted insert-char key"),
+    ("kLFT", "Shifted left-arrow key"),
+    ("kRIT", "Shifted right-arrow key"),
+    ("kDN", "Shifted down-arrow key"),
+    ("kUP", "Shifted up-arrow key"),
+    ("kNXT", "Shifted next-page key"),
+    ("kPRV", "Shifted previous-page key"),
+    ("kent", "Enter/send key"),
+    ("kind", "Scroll-down key"),
+    ("kri", "Scroll-up key"),
+    ("kmous", "Mouse key"),
+    # And here is where xterm-supported XTGETTCAP capbilities end.
+    #
+    # We otherwise expect foot and kitty behavior -- if we wanted to, we could go without jinxed's
+    # virtual capability database entirely, after careful audit I find only the following attributes
+    # that may be missing or different from xterm-256color, and can be commonly patched by XTGETTCAP
+    ("blink", "Enter blink mode"),
+    ("sitm", "Enter italics mode"),
+    ("ritm", "Exit italics mode"),
+    ("cvvis", "Very visible cursor"),
+    # And here is where blessed's integration ends. All remaining capabilities, for blessed's
+    # purposes, are informational only. Used by the downstream 'ucs-detect' tool for auditing and
+    # fingerprinting purposes, like "kitty-query-clipboard_control".
+    #
+    # Remaining numeric capabilities
+    ("colors", "Max colors on screen"),
+    ("cols", "Columns"),
+    ("lines", "Lines"),
+    ("it", "Init tabs"),
+    ("pairs", "Max color pairs"),
+    # Boolean capabilities
+    ("am", "Auto right margin"),
+    ("bce", "Background color erase"),
+    ("bw", "Auto left margin"),
+    ("ccc", "Can redefine colors"),
+    ("da", "Memory above"),
+    ("db", "Memory below"),
+    ("eslok", "Status line escape OK"),
+    ("hs", "Has status line"),
+    ("km", "Has meta key"),
+    ("mir", "Move in insert mode"),
+    ("msgr", "Move in standout mode"),
+    ("npc", "No pad character"),
+    ("ul", "Transparent underline"),
+    ("xenl", "Newline glitch"),
+    ("xt", "Destructive tabs"),
+    ("mc5i", "Will not echo input"),
+    ("AX", "Supports default colors"),
+    ("Tc", "Truecolor (24-bit RGB)"),
+    ("Su", "Colored underlines"),
+    ("XT", "Xterm extensions"),
+    ("fullkbd", "Full Kitty keyboard protocol"),
+    ("xvpa", "Extended vertical positioning"),
+    ("XF", "Extended functionality"),
     # String capabilities -- attributes
     ("bold", "Enter bold mode"),
     ("dim", "Enter dim mode"),
-    ("blink", "Enter blink mode"),
     ("rev", "Enter reverse mode"),
     ("smso", "Enter standout mode"),
     ("rmso", "Exit standout mode"),
     ("smul", "Enter underline mode"),
     ("rmul", "Exit underline mode"),
-    ("sitm", "Enter italics mode"),
-    ("ritm", "Exit italics mode"),
     ("sgr0", "Reset attributes"),
     # String capabilities -- colors
     ("setaf", "Set foreground color"),
@@ -204,7 +309,6 @@ XTGETTCAP_CAPABILITIES = (
     ("rc", "Restore cursor"),
     ("civis", "Hide cursor"),
     ("cnorm", "Normal cursor"),
-    ("cvvis", "Very visible cursor"),
     ("cup", "Cursor address"),
     ("home", "Cursor home"),
     ("hpa", "Horizontal position"),
@@ -250,10 +354,137 @@ XTGETTCAP_CAPABILITIES = (
     ("u7", "CPR request"),
     ("u8", "DA response format"),
     ("u9", "DA request"),
-    # Extended capabilities -- modern terminal features
-    ("Ms", "Clipboard via OSC 52"),
-    ("Smulx", "Set extended underline style"),
+    # Terminal-specific queries (kitty and foot extensions)
+    ("query-os-name", "OS name query"),
+    ("kitty-query-name", "terminal name"),
+    ("kitty-query-version", "version"),
+    ("kitty-query-allow_hyperlinks", "hyperlink support"),
+    ("kitty-query-font_family", "font family"),
+    ("kitty-query-bold_font", "bold font"),
+    ("kitty-query-italic_font", "italic font"),
+    ("kitty-query-bold_italic_font", "bold-italic font"),
+    ("kitty-query-font_size", "font size"),
+    ("kitty-query-dpi_x", "DPI X"),
+    ("kitty-query-dpi_y", "DPI Y"),
+    ("kitty-query-foreground", "foreground color"),
+    ("kitty-query-background", "background color"),
+    ("kitty-query-background_opacity", "background opacity"),
+    ("kitty-query-clipboard_control", "clipboard control"),
+    ("kitty-query-os_name", "OS name"),
+    # String capabilities -- extended attributes
+    ("Smulx", "Styled underline"),
     ("Setulc", "Set underline color"),
+    ("Ss", "Set underline style"),
+    ("Se", "Reset underline style"),
+    ("Smol", "Set overline mode"),
+    ("Rmol", "Reset overline mode"),
+    ("Smxx", "Enter extended modes"),
+    ("Rmxx", "Exit extended modes"),
+    ("acsc", "Alternate character set"),
+    ("smacs", "Enter alternate charset mode"),
+    ("rmacs", "Exit alternate charset mode"),
+    # String capabilities -- terminal features
+    ("Ms", "Clipboard set"),
+    ("Sync", "Synchronized output"),
+    ("E3", "Erase scrollback"),
+    ("Cr", "Set cursor color"),
+    ("Cs", "Reset cursor color"),
+    # String capabilities -- editing
+    ("ht", "Horizontal tab"),
+    ("hts", "Set tab stop"),
+    ("tbc", "Clear all tabs"),
+    ("ich1", "Insert character"),
+    ("rep", "Repeat character"),
+    # String capabilities -- cursor
+    ("invis", "Invisible cursor"),
+    ("initc", "Initialize color"),
+    # String capabilities -- screen
+    ("oc", "Original colors"),
+    ("ri", "Reverse index"),
+    ("smir", "Enter insert mode"),
+    ("rmir", "Exit insert mode"),
+    ("rs1", "Reset string 1"),
+    ("rs2", "Reset string 2"),
+    ("dsl", "Disable status line"),
+    ("fsl", "From status line"),
+    ("tsl", "To status line"),
+    # String capabilities -- colors
+    ("setrgbb", "Set RGB background"),
+    ("setrgbf", "Set RGB foreground"),
+    ("sgr", "Set attributes"),
+    # String capabilities -- terminal features (continued)
+    ("Rect", "Rectangle operations"),
+    ("TS", "Terminal state query"),
+    ("nel", "Newline"),
+    ("rmm", "Reset meta mode"),
+    ("setal", "Set ANSI label"),
+    # String capabilities -- kitty extensions
+    ("BD", "Enter bold mode (kitty)"),
+    ("BE", "Exit bold mode (kitty)"),
+    ("PS", "Presentation start (kitty)"),
+    ("PE", "Presentation end (kitty)"),
+    ("XM", "Enter marks mode (kitty)"),
+    ("xm", "Exit marks mode (kitty)"),
+    ("RV", "Enter reverse mode (kitty)"),
+    ("rv", "Exit reverse mode (kitty)"),
+    ("XR", "Enter reset mode (kitty)"),
+    ("xr", "Exit reset mode (kitty)"),
+    ("fe", "Exit font mode (kitty)"),
+    ("fd", "Enter font mode (kitty)"),
+    ("kxIN", "Keyboard in (kitty)"),
+    ("kxOUT", "Keyboard out (kitty)"),
+    ("is2", "Init 2 string"),
+    # String capabilities -- modifier key sequences (kitty keyboard protocol)
+    ("kDC3", "Alt delete-char key"),
+    ("kDC4", "Alt-Shift delete-char key"),
+    ("kDC5", "Ctrl delete-char key"),
+    ("kDC6", "Ctrl-Shift delete-char key"),
+    ("kDC7", "Ctrl-Alt delete-char key"),
+    ("kDN3", "Alt down-arrow key"),
+    ("kDN4", "Alt-Shift down-arrow key"),
+    ("kDN5", "Ctrl down-arrow key"),
+    ("kDN6", "Ctrl-Shift down-arrow key"),
+    ("kDN7", "Ctrl-Alt down-arrow key"),
+    ("kEND3", "Alt end key"),
+    ("kEND4", "Alt-Shift end key"),
+    ("kEND5", "Ctrl end key"),
+    ("kEND6", "Ctrl-Shift end key"),
+    ("kEND7", "Ctrl-Alt end key"),
+    ("kHOM3", "Alt home key"),
+    ("kHOM4", "Alt-Shift home key"),
+    ("kHOM5", "Ctrl home key"),
+    ("kHOM6", "Ctrl-Shift home key"),
+    ("kHOM7", "Ctrl-Alt home key"),
+    ("kIC3", "Alt insert-char key"),
+    ("kIC4", "Alt-Shift insert-char key"),
+    ("kIC5", "Ctrl insert-char key"),
+    ("kIC6", "Ctrl-Shift insert-char key"),
+    ("kIC7", "Ctrl-Alt insert-char key"),
+    ("kLFT3", "Alt left-arrow key"),
+    ("kLFT4", "Alt-Shift left-arrow key"),
+    ("kLFT5", "Ctrl left-arrow key"),
+    ("kLFT6", "Ctrl-Shift left-arrow key"),
+    ("kLFT7", "Ctrl-Alt left-arrow key"),
+    ("kNXT3", "Alt next-page key"),
+    ("kNXT4", "Alt-Shift next-page key"),
+    ("kNXT5", "Ctrl next-page key"),
+    ("kNXT6", "Ctrl-Shift next-page key"),
+    ("kNXT7", "Ctrl-Alt next-page key"),
+    ("kPRV3", "Alt previous-page key"),
+    ("kPRV4", "Alt-Shift previous-page key"),
+    ("kPRV5", "Ctrl previous-page key"),
+    ("kPRV6", "Ctrl-Shift previous-page key"),
+    ("kPRV7", "Ctrl-Alt previous-page key"),
+    ("kRIT3", "Alt right-arrow key"),
+    ("kRIT4", "Alt-Shift right-arrow key"),
+    ("kRIT5", "Ctrl right-arrow key"),
+    ("kRIT6", "Ctrl-Shift right-arrow key"),
+    ("kRIT7", "Ctrl-Alt right-arrow key"),
+    ("kUP3", "Alt up-arrow key"),
+    ("kUP4", "Alt-Shift up-arrow key"),
+    ("kUP5", "Ctrl up-arrow key"),
+    ("kUP6", "Ctrl-Shift up-arrow key"),
+    ("kUP7", "Ctrl-Alt up-arrow key"),
 )
 
 
@@ -320,7 +551,7 @@ class TermcapResponse:
         <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html>`_
     """
 
-    def __init__(self, supported: bool,
+    def __init__(self, supported: bool = False,
                  capabilities: Optional[Dict[str, str]] = None) -> None:
         """Initialize TermcapResponse with support status and capabilities."""
         self.supported = supported
@@ -344,12 +575,20 @@ class TermcapResponse:
 
     @property
     def terminal_name(self) -> Optional[str]:
-        """Terminal name from ``TN`` capability, or ``None``."""
+        """
+        Terminal name from ``TN`` capability, or ``None``.
+
+        .. deprecated:: This alias is not very useful or used by blessed.
+        """
         return self.capabilities.get('TN')
 
     @property
     def num_colors(self) -> Optional[int]:
-        """Number of colors from ``colors`` capability, or ``None``."""
+        """
+        Number of colors from ``colors`` capability, or ``None``.
+
+        .. deprecated:: This value is not very useful or used by blessed.
+        """
         val = self.capabilities.get('colors')
         if val is not None:
             try:
@@ -409,7 +648,7 @@ class ITerm2Capabilities:
         'Sx': ('sixel', 'bool', 0),
     }
 
-    def __init__(self, supported: bool,
+    def __init__(self, supported: bool = False,
                  features: Optional[Dict[str, typing.Any]] = None) -> None:
         """Initialize ITerm2Capabilities with support status and features."""
         self.supported = supported
@@ -428,12 +667,14 @@ class ITerm2Capabilities:
                     name, ftype, bits = ITerm2Capabilities.FEATURE_MAP[code]
                     pos += code_len
                     if ftype == 'int' and bits > 0:
+                        # parse integer value
                         digits = ''
                         while pos < len(feature_str) and feature_str[pos].isdigit():
                             digits += feature_str[pos]
                             pos += 1
                         features[name] = int(digits) if digits else 0
                     else:
+                        # non-ints are bools, when present
                         features[name] = True
                     matched = True
                     break

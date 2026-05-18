@@ -42,7 +42,6 @@ from .conftest import TEST_KEYBOARD, IS_WINDOWS
 from .accessories import (
     TestTerminal,
     pty_test,
-    as_subprocess,
 )
 from blessed.keyboard import DeviceAttribute
 
@@ -255,7 +254,6 @@ def test_device_attribute_raw_stored():
 
 def test_get_kitty_keyboard_state_boundary_no_response():
     """Kitty keyboard query sets sticky failure when no response."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -272,7 +270,6 @@ def test_get_kitty_keyboard_state_boundary_no_response():
 
 def test_get_kitty_keyboard_state_cpr_fast_negative():
     """Kitty keyboard query returns None quickly via CPR boundary."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -287,7 +284,6 @@ def test_get_kitty_keyboard_state_cpr_fast_negative():
 
 def test_enable_kitty_keyboard_after_query_failed():
     """Test enable_kitty_keyboard yields without emitting sequences after query failed."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)

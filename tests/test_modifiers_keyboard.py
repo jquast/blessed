@@ -4,7 +4,7 @@ import platform
 
 import pytest
 
-from .accessories import (TestTerminal, as_subprocess, assert_modifiers,
+from .accessories import (TestTerminal, assert_modifiers,
                           assert_modifiers_value, assert_only_modifiers)
 from blessed.keyboard import Keystroke, LegacyCSIKeyEvent, ModifyOtherKeysEvent, resolve_sequence
 
@@ -82,7 +82,6 @@ def test_legacy_ctrl_alt_exact_matching():
 def test_keystroke_value_comprehensive(sequence, expected_value, needs_terminal):
     """Test keystroke.value property returns correct character for various sequences."""
     if needs_terminal:
-        @as_subprocess
         def child():
             term = TestTerminal(force_styling=True)
             term.ungetch(sequence)
@@ -203,7 +202,6 @@ def test_legacy_ctrl_alt_edge_cases(
 
 def test_terminal_inkey_legacy_ctrl_alt_integration():
     """Test terminal.inkey() correctly detects ctrl+alt modifier sequences."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
 
@@ -313,7 +311,6 @@ def test_keystroke_legacy_ctrl_alt_name_generation():
 def test_match_legacy_csi_modifiers_letter_form(
         sequence, final_char, expected_mod, expected_key_name):
     """Test legacy CSI modifier sequences with letter-form final characters."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         term.ungetch(sequence)
@@ -345,7 +342,6 @@ def test_match_legacy_csi_modifiers_letter_form(
 ])
 def test_match_legacy_csi_modifiers_tilde_form(sequence, key_num, expected_mod, expected_key_name):
     """Test legacy CSI modifier sequences with tilde-form final characters."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         term.ungetch(sequence)
@@ -367,7 +363,6 @@ def test_match_legacy_csi_modifiers_tilde_form(sequence, key_num, expected_mod, 
 
 def test_match_legacy_csi_modifiers_non_matching():
     """Test legacy CSI modifier sequences that don't match."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         resolve = functools.partial(resolve_sequence,
@@ -391,7 +386,6 @@ def test_match_legacy_csi_modifiers_non_matching():
 
 def test_legacy_csi_modifier_properties():
     """Test modifier properties set correctly for legacy CSI sequences."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
 
@@ -413,7 +407,6 @@ def test_legacy_csi_modifier_properties():
 
 def test_terminal_inkey_legacy_csi_modifiers():
     """Test terminal.inkey() correctly handles legacy CSI modifier sequences."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
 
@@ -446,7 +439,6 @@ def test_terminal_inkey_legacy_csi_modifiers():
 ])
 def test_match_modify_other_keys(sequence, expected_key, expected_modifiers):
     """Test ModifyOtherKeys protocol sequences are parsed correctly."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         term.ungetch(sequence)
@@ -464,7 +456,6 @@ def test_match_modify_other_keys(sequence, expected_key, expected_modifiers):
 
 def test_match_modify_other_keys_non_matching():
     """Test Modify OtherKeys sequences that don't match."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         resolve = functools.partial(resolve_sequence,
@@ -487,7 +478,6 @@ def test_match_modify_other_keys_non_matching():
 
 def test_terminal_inkey_modify_other_keys():
     """Test terminal.inkey() correctly handles ModifyOtherKeys sequences."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
 
@@ -590,7 +580,6 @@ def test_keystroke_properties_comprehensive(sequence, property_name, expected_va
 
 def test_keystroke_repr_with_name():
     """Test repr() shows name for sequences, string representation for text."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         term.ungetch('\x1b[A')
@@ -649,7 +638,6 @@ def test_alt_uppercase_sets_shift_modifier_and_name():
 
 def test_legacy_csi_modifiers_with_event_type_letter_form():
     """Test legacy CSI letter-form sequences with event type field."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
 
@@ -677,7 +665,6 @@ def test_legacy_csi_modifiers_with_event_type_letter_form():
 
 def test_legacy_csi_modifiers_with_event_type_tilde_form():
     """Test legacy CSI tilde-form sequences with event type field."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
 
@@ -705,7 +692,6 @@ def test_legacy_csi_modifiers_with_event_type_tilde_form():
 
 def test_terminal_inkey_legacy_csi_with_event_type():
     """Test terminal.inkey() parses event type from legacy CSI sequences."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
 
@@ -730,7 +716,6 @@ def test_terminal_inkey_legacy_csi_with_event_type():
 
 def test_legacy_csi_modifiers_event_type_edge_cases():
     """Test legacy CSI sequences with various event type values and invalid patterns."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
 
@@ -762,7 +747,6 @@ def test_legacy_csi_modifiers_event_type_edge_cases():
 
 def test_build_appkeys_predicate_with_char():
     """Test application key predicates with character argument."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         term.ungetch('\x1b[1;2A')
@@ -776,7 +760,6 @@ def test_build_appkeys_predicate_with_char():
 
 def test_build_appkeys_predicate_keycode_loop():
     """Test application key predicates with invalid key names raise AttributeError."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         term.ungetch('\x1b[1;2A')
@@ -795,7 +778,6 @@ def test_build_appkeys_predicate_keycode_loop():
 
 def test_match_legacy_csi_invalid_letter_final():
     """Test legacy CSI sequences with invalid letter final characters."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         resolve = functools.partial(resolve_sequence,
@@ -811,7 +793,6 @@ def test_match_legacy_csi_invalid_letter_final():
 
 def test_match_legacy_csi_invalid_tilde_number():
     """Test legacy CSI sequences with invalid tilde key numbers."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         resolve = functools.partial(resolve_sequence,
@@ -827,7 +808,6 @@ def test_match_legacy_csi_invalid_tilde_number():
 
 def test_match_ss3_fkey_modifier_zero():
     """Test SS3 F-key sequences with modifier zero are invalid."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         resolve = functools.partial(resolve_sequence,
@@ -843,7 +823,6 @@ def test_match_ss3_fkey_modifier_zero():
 
 def test_match_ss3_fkey_invalid_final():
     """Test SS3 F-key sequences with invalid final characters."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         resolve = functools.partial(resolve_sequence,
@@ -865,7 +844,6 @@ def test_match_ss3_fkey_invalid_final():
 ])
 def test_match_ss3_fkey_valid(sequence, expected_code, expected_mod):
     """Test SS3 F-key sequences with modifiers parse correctly."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         term.ungetch(sequence)
@@ -881,7 +859,6 @@ def test_match_ss3_fkey_valid(sequence, expected_code, expected_mod):
 
 def test_legacy_csi_e_center_key():
     """Test legacy CSI E (center/begin key) sequence with modifiers."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         term.ungetch('\x1b[1;5E')
@@ -910,7 +887,6 @@ def test_ctrl_code_symbols_all(sequence, expected_name):
 
 def test_match_legacy_csi_letter_keycode_none():
     """Test legacy CSI letter-form sequences that don't map to keycodes."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         resolve = functools.partial(resolve_sequence,
@@ -926,7 +902,6 @@ def test_match_legacy_csi_letter_keycode_none():
 
 def test_match_ss3_keycode_none():
     """Test SS3 sequences that don't map to keycodes."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         resolve = functools.partial(resolve_sequence,
@@ -942,7 +917,6 @@ def test_match_ss3_keycode_none():
 
 def test_legacy_csi_modifiers_keycode_none_both_forms():
     """Test legacy CSI sequences in both forms that don't map to keycodes."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         resolve = functools.partial(resolve_sequence,
@@ -962,7 +936,6 @@ def test_legacy_csi_modifiers_keycode_none_both_forms():
 
 def test_ss3_fkey_branches():
     """Test SS3 F-key sequence matching logic."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         resolve = functools.partial(resolve_sequence,
@@ -989,7 +962,6 @@ def test_alphanum_predicate_no_char_non_printable_return():
 
 def test_alphanum_predicate_no_char_application_key():
     """Test alphanumeric predicate without char argument for application keys."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
 
@@ -1065,7 +1037,6 @@ def test_pressed_property_default_return():
 
 def test_pressed_property_with_event_types():
     """Test pressed property returns correct value based on event_type."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
 
@@ -1097,7 +1068,6 @@ def test_getattr_property_getter():
 
 def test_get_modified_keycode_name_no_modifiers():
     """Test modified keycode name resolves for unmodified press events."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         term.ungetch('\x1b[1;1A')
@@ -1146,7 +1116,6 @@ def test_get_meta_escape_name_not_printable_edge_case():
 
 def test_build_appkeys_predicate_expected_code_none():
     """Test application key predicate when expected_code lookup fails."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         term.ungetch('\x1b[1;2A')
@@ -1159,7 +1128,6 @@ def test_build_appkeys_predicate_expected_code_none():
 
 def test_build_appkeys_predicate_code_mismatch():
     """Test application key predicate when keystroke code doesn't match expected."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         term.ungetch('\x1b[1;2A')
@@ -1179,7 +1147,6 @@ def test_alphanum_predicate_exact_matching_non_alpha():
 
 def test_alphanum_predicate_value_empty():
     """Test alphanumeric predicate when keystroke value is empty."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         term.ungetch('\x1b[A')
@@ -1198,7 +1165,6 @@ def test_alphanum_predicate_value_multi_char():
 
 def test_terminal_inkey_csi_sequence():
     """Test term.inkey() returns single CSI keystroke for unmatched sequences."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
 
@@ -1219,7 +1185,6 @@ def test_terminal_inkey_csi_sequence():
 
 def test_legacy_csi_modifiers_no_modifiers_integration():
     """Test legacy CSI sequence with modifier=1 (no actual modifiers)."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         term.ungetch('\x1b[1;1P')
@@ -1306,7 +1271,6 @@ def test_get_meta_escape_name_branch_coverage():
 
 def test_build_appkeys_predicate_modifier_validation():
     """Test application key predicate when modifiers don't match."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         term.ungetch('\x1b[1;2A')

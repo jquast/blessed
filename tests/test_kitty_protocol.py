@@ -13,7 +13,7 @@ from blessed.keyboard import (
     _match_kitty_key, KittyKeyEvent, Keystroke, KittyKeyboardProtocol, resolve_sequence,
     _match_legacy_csi_letter_form,
 )
-from tests.accessories import (as_subprocess, SEMAPHORE, TestTerminal,
+from tests.accessories import (SEMAPHORE, TestTerminal,
                                read_until_semaphore, pty_test)
 from tests.conftest import IS_WINDOWS, TEST_KEYBOARD
 
@@ -108,7 +108,6 @@ def test_kitty_sequence_properties():
 
 def test_terminal_inkey_kitty_protocol():
     """Test Terminal.inkey() with Kitty protocol sequences."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = Terminal(stream=stream, force_styling=True)
@@ -300,7 +299,6 @@ def test_enable_kitty_keyboard_pty_success():
 
 def test_kitty_state_0s_reply_via_ungetch():
     """0-second get_kitty_keyboard_state call with response via ungetch."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._is_a_tty = True  # Force TTY behavior for testing
@@ -321,7 +319,6 @@ def test_kitty_state_0s_reply_via_ungetch():
 
 def test_kitty_state_styling_indifferent():
     """Test get_kitty_keyboard_state with styling enabled and disabled."""
-    @as_subprocess
     def child():
         # Test with styling enabled
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
@@ -354,7 +351,6 @@ def test_kitty_state_styling_indifferent():
 
 def test_kitty_state_timeout_handling():
     """Test get_kitty_keyboard_state timeout and sticky failure behavior."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._is_a_tty = True  # Force TTY behavior for testing
@@ -379,7 +375,6 @@ def test_kitty_state_timeout_handling():
 
 def test_kitty_state_excludes_response_from_buffer():
     """Test get_kitty_keyboard_state buffer management."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._is_a_tty = True  # Force TTY behavior for testing
@@ -404,7 +399,6 @@ def test_kitty_state_excludes_response_from_buffer():
 ])
 def test_get_kitty_keyboard_state_no_tty_or_disabled(force_styling, expected_sticky_flag):
     """Test get_kitty_keyboard_state returns None when unsupported."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = Terminal(stream=stream, force_styling=force_styling)
@@ -443,7 +437,6 @@ def test_get_kitty_keyboard_state_no_tty_or_disabled(force_styling, expected_sti
 ])
 def test_enable_kitty_keyboard(force_styling, force, flags, mode, expected_output):
     """Test enable_kitty_keyboard with various flag combinations and conditions."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = Terminal(stream=stream, force_styling=force_styling)
@@ -456,7 +449,6 @@ def test_enable_kitty_keyboard(force_styling, force, flags, mode, expected_outpu
 
 def test_enable_kitty_keyboard_all_flag_operations():
     """Test all flag bit operations in enable_kitty_keyboard."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -481,7 +473,6 @@ def test_enable_kitty_keyboard_all_flag_operations():
 
 def test_enable_kitty_keyboard_sequence_emission():
     """Test sequence emission and flush in enable_kitty_keyboard."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -500,7 +491,6 @@ def test_enable_kitty_keyboard_sequence_emission():
 
 def test_enable_kitty_keyboard_restoration_with_previous_flags():
     """Test restoration logic when previous flags exist."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -518,7 +508,6 @@ def test_enable_kitty_keyboard_restoration_with_previous_flags():
 
 def test_enable_kitty_keyboard_sticky_failure():
     """Test enable_kitty_keyboard skips when first query failed."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -555,7 +544,6 @@ def test_kitty_keyboard_protocol_setters(flags, expected_value):
 
 def test_get_kitty_state_boundary_no_response():
     """Test CPR boundary approach when no response found."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
@@ -573,7 +561,6 @@ def test_get_kitty_state_boundary_no_response():
 
 def test_get_kitty_keyboard_state_boundary_approach():
     """Test CPR boundary approach for detecting Kitty keyboard support."""
-    @as_subprocess
     def child():
         stream = io.StringIO()
 
@@ -736,7 +723,6 @@ def test_kitty_name_synthesis_custom_name():
 ])
 def test_kitty_letter_name_synthesis_integration(sequence, expected_name):
     """Test letter name synthesis with Terminal.inkey()."""
-    @as_subprocess
     def child():
         term = Terminal(force_styling=True)
         term.ungetch(sequence)
@@ -754,7 +740,6 @@ def test_kitty_letter_name_synthesis_integration(sequence, expected_name):
 ])
 def test_disambiguate_f1_f4_csi_sequences(sequence, expected_name):
     """Test F1-F4 recognition in disambiguate mode."""
-    @as_subprocess
     def child():
         term = Terminal(force_styling=True)
         mapper = term._keymap
@@ -777,7 +762,6 @@ def test_disambiguate_f1_f4_csi_sequences(sequence, expected_name):
 ])
 def test_disambiguate_f1_f4_via_inkey(sequence, expected_name):
     """Test F1-F4 disambiguate sequences with Terminal.inkey()."""
-    @as_subprocess
     def child():
         term = Terminal(stream=io.StringIO(), force_styling=True)
         term.ungetch(sequence)
@@ -790,7 +774,6 @@ def test_disambiguate_f1_f4_via_inkey(sequence, expected_name):
 
 def test_disambiguate_f1_f4_not_confused_with_alt():
     """Test F1-F4 not confused with ALT+[ sequences."""
-    @as_subprocess
     def child():
         term = Terminal(stream=io.StringIO(), force_styling=True)
 
@@ -1096,7 +1079,6 @@ def test_kitty_keypad_inkey_integration(
         # pylint: disable=too-many-positional-arguments
         sequence, expected_code, expected_name, ctrl, alt, released, repeated):
     """Test keypad integration with Terminal.inkey()."""
-    @as_subprocess
     def child():
         term = Terminal(stream=io.StringIO(), force_styling=True)
         term.ungetch(sequence)
@@ -1378,7 +1360,6 @@ def test_kitty_escape_key_integration(
         # pylint: disable=too-many-positional-arguments
         sequence, expected_name, expected_code, ctrl, alt, released, repeated):
     """Test ESC key sequences via Terminal.inkey() integration."""
-    @as_subprocess
     def child():
         term = Terminal(stream=io.StringIO(), force_styling=True)
         term.ungetch(sequence)
@@ -1405,7 +1386,6 @@ def test_kitty_escape_key_integration(
 ])
 def test_kitty_control_key_integration(sequence, expected_name, expected_code, expected_value, alt):
     """Test control key integration with Terminal.inkey()."""
-    @as_subprocess
     def child():
         term = Terminal(stream=io.StringIO(), force_styling=True)
         term.ungetch(sequence)
@@ -1420,7 +1400,6 @@ def test_kitty_control_key_integration(sequence, expected_name, expected_code, e
 @pytest.mark.skipif(not TEST_KEYBOARD, reason="TEST_KEYBOARD not specified")
 def test_kitty_negotiation_timing_cached_failure():
     """Test timing of cached failure returns immediately."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._is_a_tty = True
@@ -1445,7 +1424,6 @@ def test_kitty_negotiation_timing_cached_failure():
 @pytest.mark.skipif(not TEST_KEYBOARD, reason="TEST_KEYBOARD not specified")
 def test_kitty_negotiation_force_True_incurs_second_timeout():
     """Test timing of force=True incurs timeout again."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._is_a_tty = True
@@ -1542,7 +1520,6 @@ def test_kitty_keyboard_protocol_equality_with_other_types():
 ])
 def test_kitty_state_boundary_kitty_only_response(response, expected_flags):
     """Test boundary approach with kitty-only response (no DA1)."""
-    @as_subprocess
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._is_a_tty = True

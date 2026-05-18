@@ -23,7 +23,6 @@ if platform.system() != 'Windows':
 
 def test_length_cjk():
     """Test length of East Asian characters"""
-    @as_subprocess
     def child():
         term = TestTerminal()
 
@@ -39,7 +38,6 @@ def test_length_cjk():
 
 def test_length_with_zwj():
     """Test that ZWJ sequences are measured correctly like wcswidth()."""
-    @as_subprocess
     def child():
         term = TestTerminal()
         # RGI_Emoji_ZWJ_Sequence  ; family: woman, woman, girl, boy
@@ -52,7 +50,6 @@ def test_length_with_zwj():
 
 def test_length_ansiart():
     """Test length of ANSI art"""
-    @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind)
         # this 'ansi' art contributed by xzip!impure for another project,
@@ -71,10 +68,9 @@ def test_length_ansiart():
     child(kind)
 
 
-def test_sequence_length(all_terms):
+def test_sequence_length(any_term):
     """Ensure T.length(string containing sequence) is correct."""
     # pylint: disable=too-complex,too-many-statements
-    @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind, force_styling=True)
 
@@ -319,12 +315,11 @@ def test_sequence_length(all_terms):
             *zip(plain_text, itertools.cycle(['\b_']))))
         assert term.length(text_wseqs) == len(plain_text)
 
-    child(all_terms)
+    child(any_term)
 
 
 def test_env_winsize():
     """Test height and width is appropriately queried in a pty."""
-    @as_subprocess
     def child():
         # set the pty's virtual window size
         os.environ['COLUMNS'] = '99'
@@ -370,9 +365,8 @@ def test_winsize(many_lines, many_columns):
     child(lines=many_lines, cols=many_columns)
 
 
-def test_Sequence_alignment_fixed_width(all_terms):
+def test_Sequence_alignment_fixed_width(any_term):
     """Test alignment methods with width provided"""
-    @as_subprocess
     def child(kind):
         term = TestTerminal(kind=kind)
         pony_msg = 'pony express, all aboard, choo, choo!'
@@ -391,11 +385,11 @@ def test_Sequence_alignment_fixed_width(all_terms):
         assert term.length(radjusted.strip()) == pony_len
         assert term.length(radjusted) == len(pony_msg.rjust(88))
 
-    child(kind=all_terms)
+    child(kind=any_term)
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="requires fcntl")
-def test_Sequence_alignment(all_terms):
+def test_Sequence_alignment(any_term):
     """Tests methods related to Sequence class, namely ljust, rjust, center."""
     @as_subprocess
     def child(kind, lines=25, cols=80):
@@ -421,12 +415,11 @@ def test_Sequence_alignment(all_terms):
         assert term.length(radjusted.strip()) == pony_len
         assert term.length(radjusted) == len(pony_msg.rjust(term.width))
 
-    child(kind=all_terms)
+    child(kind=any_term)
 
 
 def test_hyperlink_nostyling():
     """Test length our of hyperlink URL's."""
-    @as_subprocess
     def child():
         # given,
         term = TestTerminal(force_styling=None)
@@ -439,7 +432,6 @@ def test_hyperlink_nostyling():
 
 def test_basic_hyperlinks():
     """Test length our of hyperlink URL's."""
-    @as_subprocess
     def child():
         # given,
         term = TestTerminal()
@@ -462,7 +454,6 @@ def test_basic_hyperlinks():
 
 def test_hyperlink_with_id():
     """Test length our of hyperlink URL's with ID."""
-    @as_subprocess
     def child():
         # given,
         term = TestTerminal()
@@ -485,7 +476,6 @@ def test_hyperlink_with_id():
 
 def test_set_window_title_nostyling():
     """Test set_window_title returns empty when styling is disabled."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=None)
         result = term.set_window_title('hello')
@@ -496,7 +486,6 @@ def test_set_window_title_nostyling():
 
 def test_set_window_title_default():
     """Test set_window_title returns OSC 0 sequence."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         result = term.set_window_title('My Title')
@@ -512,7 +501,6 @@ def test_set_window_title_default():
 ])
 def test_set_window_title_modes(mode, expected_prefix):
     """Test set_window_title OSC mode parameter."""
-    @as_subprocess
     def child(mode=mode, expected_prefix=expected_prefix):
         term = TestTerminal(force_styling=True)
         result = term.set_window_title('test', mode=mode)
@@ -523,7 +511,6 @@ def test_set_window_title_modes(mode, expected_prefix):
 
 def test_set_window_title_sanitizes():
     """Test set_window_title strips ESC and BEL from title text."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         result = term.set_window_title('bad\x1b[31mtitle\x07end')
@@ -534,7 +521,6 @@ def test_set_window_title_sanitizes():
 
 def test_set_window_title_invalid_mode():
     """Test set_window_title rejects invalid mode values."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         try:
@@ -548,7 +534,6 @@ def test_set_window_title_invalid_mode():
 
 def test_window_title_context_manager():
     """Test title context manager writes push/pop sequences."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True, stream=StringIO())
         with term.window_title('My App'):
@@ -563,7 +548,6 @@ def test_window_title_context_manager():
 
 def test_window_title_context_manager_nostyling():
     """Test title context manager is a no-op without styling."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=None, stream=StringIO())
         with term.window_title('My App'):
@@ -574,9 +558,8 @@ def test_window_title_context_manager_nostyling():
     child()
 
 
-def test_sequence_is_movement_false(all_terms):
+def test_sequence_is_movement_false(any_term):
     """Test parser about sequences that do not move the cursor."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed.sequences import measure_length
@@ -608,12 +591,11 @@ def test_sequence_is_movement_false(all_terms):
         assert (len(term.standout) == measure_length(term.standout, term)
                 ), (term.standout, term._wont_move)
 
-    child(all_terms)
+    child(any_term)
 
 
-def test_termcap_will_move_false(all_terms):  # pylint: disable=too-complex
+def test_termcap_will_move_false(any_term):  # pylint: disable=too-complex
     """Test parser about sequences that do not move the cursor."""
-    @as_subprocess
     def child(kind):  # pylint: disable=too-many-branches
         # local
         from blessed.sequences import iter_parse
@@ -647,12 +629,11 @@ def test_termcap_will_move_false(all_terms):  # pylint: disable=too-complex
         if term.standout:
             assert not next(iter_parse(term, term.standout))[1].will_move
 
-    child(all_terms)
+    child(any_term)
 
 
-def test_sequence_is_movement_true(all_terms):
+def test_sequence_is_movement_true(any_term):
     """Test parsers about sequences that move the cursor."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed.sequences import measure_length
@@ -681,12 +662,11 @@ def test_sequence_is_movement_true(all_terms):
         assert not term.clear or (len(term.clear) ==
                                   measure_length(term.clear, term))
 
-    child(all_terms)
+    child(any_term)
 
 
-def test_termcap_will_move_true(all_terms):
+def test_termcap_will_move_true(any_term):
     """Test parser about sequences that move the cursor."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed.sequences import iter_parse
@@ -706,12 +686,11 @@ def test_termcap_will_move_true(all_terms):
         assert next(iter_parse(term, term.home))[1].will_move
         assert next(iter_parse(term, term.restore))[1].will_move
         assert next(iter_parse(term, term.clear))[1].will_move
-    child(all_terms)
+    child(any_term)
 
 
 def test_foreign_sequences():
     """Test parsers about sequences received from foreign sources."""
-    @as_subprocess
     def child(kind):
         # local
         from blessed.sequences import measure_length

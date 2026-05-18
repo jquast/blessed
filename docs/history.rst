@@ -3,6 +3,22 @@
 Version History
 ===============
 
+1.40
+  * improved: jinxed_ is **now required on all platforms**, providing a curses-free and
+    `singleton-free <https://jinxed.readthedocs.io/en/stable/capabilities.html#singleton-free>`_
+    implementation of the subset of curses_ used by blessed.  The jinxed_ 1.5.0 release provides a
+    terminal `capability database
+    <https://jinxed.readthedocs.io/en/stable/capabilities.html#database>` of 45 terminals and their
+    common aliases.
+  * introduced: A :exc:`UserWarning` is emitted when :meth:`~.Terminal.__getattr__` resolves an
+    unknown terminal capability name, helping developers catch typos like ``term.bld``
+    (missing ``bold``).  The warning can be suppressed by setting the environment variable
+    ``BLESSED_NOWARN_UNKNOWN_CAPS``.
+  * bugfix: Fixed internal typo ``susimpleript`` to the correct terminfo name ``ssubm`` for the
+    ``enter_susimpleript_mode`` capability.  This was previously masked by curses_ returning
+    an empty string for unknown capabilities.
+
+
 1.39
   * introduced: :meth:`~.Terminal.progress_bar` for `OSC 9;4 sequence
     <https://ghostty.org/docs/vt/osc/conemu#change-progress-state-(osc-94)>`_.
@@ -496,4 +512,5 @@ Version History
 .. _FORCE_COLOR: https://force-color.org/
 .. _CLICOLOR_FORCE: https://bixense.com/clicolors/
 .. _NO_COLOR: https://no-color.org/
-
+.. _jinxed: https://jinxed.readthedocs.io/en/stable/
+.. _XTGETTCAP: https://codeberg.org/dnkl/foot#xtgettcap

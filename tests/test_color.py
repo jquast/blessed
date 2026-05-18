@@ -11,7 +11,7 @@ from blessed.color import COLOR_DISTANCE_ALGORITHMS
 from blessed.colorspace import RGBColor
 from blessed.formatters import FormattingString, NullCallableString
 # local
-from .accessories import TestTerminal, as_subprocess
+from .accessories import TestTerminal
 
 
 @pytest.fixture(params=COLOR_DISTANCE_ALGORITHMS.keys())
@@ -45,7 +45,6 @@ def test_different_color(all_algorithms):   # pylint: disable=redefined-outer-na
 
 def test_color_rgb():
     """Ensure expected sequence is returned"""
-    @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
         color_patterns = rf"{t.caps['color'].pattern}|{t.caps['color256'].pattern}"
@@ -58,13 +57,11 @@ def test_color_rgb():
         # This avoids user theme customizations of ANSI colors 0-15
         assert t.color_rgb(0, 0, 0)('smoo') == f'{t.color(16)}smoo{t.normal}'
         assert re.match(color_patterns, t.color_rgb(84, 192, 233))
-
     child()
 
 
 def test_on_color_rgb():
     """Ensure expected sequence is returned"""
-    @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
         color_patterns = rf"{t.caps['color'].pattern}|{t.caps['on_color256'].pattern}"
@@ -75,13 +72,11 @@ def test_on_color_rgb():
         t.number_of_colors = 256
         assert t.on_color_rgb(0, 0, 0)('smoo') == f'{t.on_color(16)}smoo{t.normal}'
         assert re.match(color_patterns, t.on_color_rgb(84, 192, 233))
-
     child()
 
 
 def test_set_number_of_colors():
     """Ensure number of colors is supported and cache is cleared"""
-    @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
         for num in (0, 4, 8, 16, 256, 1 << 24):
@@ -96,13 +91,11 @@ def test_set_number_of_colors():
 
         with pytest.raises(AssertionError):
             t.number_of_colors = 40
-
     child()
 
 
 def test_set_color_distance_algorithm():
     """Ensure algorithm is supported and cache is cleared"""
-    @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
         for algo in COLOR_DISTANCE_ALGORITHMS:
@@ -113,7 +106,6 @@ def test_set_color_distance_algorithm():
             assert 'aqua' not in dir(t)
         with pytest.raises(AssertionError):
             t.color_distance_algorithm = 'EenieMeenieMineyMo'
-
     child()
 
 
@@ -125,7 +117,6 @@ def test_RGBColor():
 
 def test_formatter():
     """Ensure return values match terminal attributes"""
-    @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
         t.number_of_colors = 1 << 24
@@ -153,7 +144,6 @@ def test_formatter():
 
 def test_formatter_invalid():
     """Ensure NullCallableString for invalid formatters"""
-    @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
         assert isinstance(t.formatter('csr'), NullCallableString)
@@ -162,7 +152,6 @@ def test_formatter_invalid():
 
 def test_rgb_to_xterm_cube_index():
     """Test RGB to xterm cube index mapping for 256-color terminals"""
-    @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
         t.number_of_colors = 256
@@ -185,13 +174,11 @@ def test_rgb_to_xterm_cube_index():
         # Test some colors that should prefer cube over grayscale
         cube_orange = t.rgb_downconvert(215, 135, 0)  # Should be in cube range
         assert 16 <= cube_orange <= 231
-
     child()
 
 
 def test_rgb_to_xterm_gray_index():
     """Test RGB to xterm grayscale index mapping for 256-color terminals"""
-    @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
         t.number_of_colors = 256
@@ -211,13 +198,11 @@ def test_rgb_to_xterm_gray_index():
             gray_val = 8 + 10 * i
             result_idx = t.rgb_downconvert(gray_val, gray_val, gray_val)
             assert result_idx == expected_idx
-
     child()
 
 
 def test_256_downconvert_cube_vs_gray_choice():
     """Test 256-color cube vs grayscale selection logic"""
-    @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
         t.number_of_colors = 256
@@ -247,13 +232,11 @@ def test_256_downconvert_cube_vs_gray_choice():
         dark_idx = t.rgb_downconvert(20, 20, 20)
         # Could be either cube (16) or early grayscale (232-235), both are valid
         assert dark_idx == 16 or 232 <= dark_idx <= 235
-
     child()
 
 
 def test_256_downconvert_preserves_distance_algorithm():
     """Test that 256-color fast path uses the selected distance algorithm"""
-    @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
         t.number_of_colors = 256
@@ -271,13 +254,11 @@ def test_256_downconvert_preserves_distance_algorithm():
             gray_idx = t.rgb_downconvert(128, 128, 128)
             # Result depends on algorithm, but should be reasonable
             assert gray_idx in range(256)  # Valid color index
-
     child()
 
 
 def test_256_vs_legacy_downconvert_compatibility():
     """Test that results are compatible between 256 and smaller palettes"""
-    @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
 
@@ -308,13 +289,11 @@ def test_256_vs_legacy_downconvert_compatibility():
         # - 256-color mode: uses cube red (index 196) to avoid theme interference
         assert red_16 == 9
         assert red_256 == 196  # Cube red
-
     child()
 
 
 def test_rgb_downconvert_zero_colors():
     """Test rgb_downconvert when number_of_colors == 0 returns color 7."""
-    @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
         t.number_of_colors = 0
@@ -327,7 +306,6 @@ def test_rgb_downconvert_zero_colors():
         assert t.rgb_downconvert(0, 0, 255) == 7
         assert t.rgb_downconvert(255, 255, 255) == 7
         assert t.rgb_downconvert(128, 64, 192) == 7
-
     child()
 
 
@@ -407,7 +385,6 @@ def test_xparse_color_errors():
 
 def test_color_hex():
     """Test color_hex with 3, 6, and 12 digit formats."""
-    @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
         t.number_of_colors = 1 << 24
@@ -421,7 +398,6 @@ def test_color_hex():
 
 def test_on_color_hex():
     """Test on_color_hex with 3, 6, and 12 digit formats."""
-    @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
         t.number_of_colors = 1 << 24
@@ -437,7 +413,6 @@ def test_get_fgcolor_hex(terminator):
     """Test get_fgcolor_hex returns hex string."""
     from io import StringIO
 
-    @as_subprocess
     def child():
         t = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         t.ungetch('\x1b]10;rgb:ffff/ffff/ffff' + terminator)
@@ -461,7 +436,6 @@ def test_get_fgcolor_hex_timeout():
     """Test get_fgcolor_hex returns empty string on timeout."""
     from io import StringIO
 
-    @as_subprocess
     def child():
         t = TestTerminal(stream=StringIO())
         result = t.get_fgcolor_hex(timeout=0)
@@ -474,7 +448,6 @@ def test_get_bgcolor_hex(terminator):
     """Test get_bgcolor_hex returns hex string."""
     from io import StringIO
 
-    @as_subprocess
     def child():
         t = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
         t.ungetch('\x1b]11;rgb:2828/2c2c/3434' + terminator)
@@ -493,7 +466,6 @@ def test_get_bgcolor_hex_timeout():
     """Test get_bgcolor_hex returns empty string on timeout."""
     from io import StringIO
 
-    @as_subprocess
     def child():
         t = TestTerminal(stream=StringIO())
         result = t.get_bgcolor_hex(timeout=0)

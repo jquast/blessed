@@ -25,7 +25,6 @@ Support for :doc:`colors`:
     256
 
 And create printable strings containing sequences_ for :doc:`colors`:
-
     >>> term.green_reverse('ALL SYSTEMS GO')
     '\x1b[32m\x1b[7mALL SYSTEMS GO\x1b[m'
 
@@ -52,6 +51,23 @@ of these will return an empty string, as they are not supported by your terminal
 used, but have no effect. For example, ``blink`` only works on a few terminals, does yours?
 
     >>> print(term.blink("Insert System disk into drive A:"))
+
+Capability Resolution Order
+---------------------------
+
+At time of :class:`Terminal()` initialization, Blessed tries terminal the terminal kind
+automatically.
+
+1. **'kind'** parameter: an explicit ``kind`` to :class:`~.Terminal` is used first, defaults to
+   None.
+
+2. **XTGETTCAP** The remote terminal's automatic response to ``TN`` (Terminal Name) queried by the
+   ``DCS +q`` protocol, supported by most terminals.
+
+3. **TERM** environment variable, or legacy ConHost.exe windows terminal descriptor.
+
+4. **'kind_fallback'** (defaults to ``'xterm-256color'``).  This terminal capability is used when
+   all other methods are exhausted or not found in the jinxed_ virtual terminal capability database.
 
 Compound Formatting
 -------------------
@@ -402,3 +418,15 @@ from drawing progress bars and other frippery and just stick to content:
         with term.location(x=0, y=term.height - 1):
             print('Progress: [=======>   ]')
     print(term.bold("60%"))
+
+.. _jinxed: https://pypi.org/project/jinxed
+
+Singleton-Free
+--------------
+
+Beginning 1.40, blessed now uses jinxed_ instead of :mod:`curses`, and is no longer subject to the
+per-process terminal-kind restriction that curses imposes, `"Singleton-free"
+<https://jinxed.readthedocs.io/en/stable/capabilities.html#singleton-free>`_.
+
+Multiple :class:`~.Terminal` instances with different ``kind`` values can coexist within the same
+process. This might also be considered asyncio or thread-safe.

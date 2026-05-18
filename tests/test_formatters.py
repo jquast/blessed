@@ -1,14 +1,13 @@
 """Tests string formatting functions."""
 # std imports
 import pickle
-import platform
 import multiprocessing
 
 # 3rd party
 import pytest
 
 # local
-from .accessories import TestTerminal, as_subprocess
+from .accessories import TestTerminal
 
 try:
     # std imports
@@ -17,12 +16,7 @@ except ImportError:
     # 3rd party
     import mock
 
-if platform.system() != 'Windows':
-    # std imports
-    import curses
-else:
-    # 3rd party
-    import jinxed as curses
+import jinxed
 
 
 def fn_tparm(*args):
@@ -39,7 +33,7 @@ def test_parameterizing_string_args_unspecified(monkeypatch):
 
     # first argument to tparm() is the sequence name, returned as-is;
     # subsequent arguments are usually Integers.
-    monkeypatch.setattr(curses, 'tparm', fn_tparm)
+    monkeypatch.setattr(jinxed, 'tparm', fn_tparm)
 
     # given,
     pstr = ParameterizingString('')
@@ -69,7 +63,7 @@ def test_parameterizing_string_args(monkeypatch):
 
     # first argument to tparm() is the sequence name, returned as-is;
     # subsequent arguments are usually Integers.
-    monkeypatch.setattr(curses, 'tparm', fn_tparm)
+    monkeypatch.setattr(jinxed, 'tparm', fn_tparm)
 
     # given,
     pstr = ParameterizingString('cap', 'norm', 'seq-name')
@@ -100,7 +94,7 @@ def test_parameterizing_string_type_error(monkeypatch):
     def tparm_raises_TypeError(*args):
         raise TypeError('custom_err')
 
-    monkeypatch.setattr(curses, 'tparm', tparm_raises_TypeError)
+    monkeypatch.setattr(jinxed, 'tparm', tparm_raises_TypeError)
 
     # given,
     pstr = ParameterizingString('cap', 'norm', 'cap-name')
@@ -211,9 +205,12 @@ def test_resolve_capability(monkeypatch):
     def tigetstr(attr):
         return f'seq-{attr}'.encode('latin1')
 
-    monkeypatch.setattr(curses, 'tigetstr', tigetstr)
+    monkeypatch.setattr(jinxed, 'tigetstr', tigetstr)
     term = mock.Mock()
     term._sugar = {'mnemonic': 'xyz'}
+    jinxed_mock = mock.Mock()
+    jinxed_mock.tigetstr = tigetstr
+    term._jinxed_term = jinxed_mock
 
     # exercise
     assert resolve_capability(term, 'mnemonic') == 'seq-xyz'
@@ -223,20 +220,124 @@ def test_resolve_capability(monkeypatch):
     def tigetstr_none(attr):
         return None
 
-    monkeypatch.setattr(curses, 'tigetstr', tigetstr_none)
+    jinxed_mock.tigetstr = tigetstr_none
 
     # exercise,
-    assert resolve_capability(term, 'natural') == ''
+    assert resolve_capability(term, 'am') == ''
 
     # given, where does_styling is False
     def raises_exception(*args):
         assert False, "Should not be called"
 
     term.does_styling = False
-    monkeypatch.setattr(curses, 'tigetstr', raises_exception)
+    monkeypatch.setattr(jinxed, 'tigetstr', raises_exception)
 
     # exercise,
     assert resolve_capability(term, 'natural') == ''
+
+
+def test_resolve_capability_warns_unknown():
+    """Test resolve_capability warns on unknown capability names."""
+    import warnings
+    from blessed.formatters import resolve_capability, _KNOWN_CAPABILITY_NAMES
+
+    term = mock.Mock()
+    term.does_styling = True
+    term._sugar = {}
+    jinxed_mock = mock.Mock()
+    jinxed_mock.tigetstr = lambda cap: (
+        None if cap not in _KNOWN_CAPABILITY_NAMES
+        else 'seq-known'.encode('latin1')
+    )
+    term._jinxed_term = jinxed_mock
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        result = resolve_capability(term, 'bold')
+        assert 'seq-known' == result
+        assert len(w) == 0
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        result = resolve_capability(term, 'nonexistent_capability_xyz')
+        assert result == ''
+        assert len(w) == 1
+        assert 'nonexistent_capability_xyz' in str(w[0].message)
+
+
+def test_resolve_capability_no_warn_on_absent_known():
+    """Test no warning when a known cap is absent from this terminal."""
+    import warnings
+    from blessed.formatters import resolve_capability, _KNOWN_CAPABILITY_NAMES
+
+    term = mock.Mock()
+    term.does_styling = True
+    term._sugar = {}
+    jinxed_mock = mock.Mock()
+    jinxed_mock.tigetstr = lambda cap: None
+    term._jinxed_term = jinxed_mock
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        result = resolve_capability(term, 'am')
+        assert result == ''
+        warning_texts = [str(x.message) for x in w]
+        assert not any('am' in t for t in warning_texts)
+
+
+def test_resolve_capability_nowarn_env(monkeypatch):
+    """Test BLESSED_NOWARN_UNKNOWN_CAPS suppresses the warning."""
+    import warnings
+    import blessed.formatters
+    resolve_capability = blessed.formatters.resolve_capability
+    monkeypatch.setattr(blessed.formatters, '_NOWARN_UNKNOWN_CAPS', True)
+
+    term = mock.Mock()
+    term.does_styling = True
+    term._sugar = {}
+    jinxed_mock = mock.Mock()
+    jinxed_mock.tigetstr = lambda cap: None
+    term._jinxed_term = jinxed_mock
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        result = resolve_capability(term, 'nonexistent_capability_xyz')
+        assert result == ''
+        assert len(w) == 0
+
+
+def test_resolve_capability_warns_unknown_sugar():
+    """Test warning names the resolved capname, not the sugar key."""
+    import warnings
+    from blessed.formatters import resolve_capability, _KNOWN_CAPABILITY_NAMES
+
+    term = mock.Mock()
+    term.does_styling = True
+    term._sugar = {'mnemonic': 'nonexistent_capability_xyz'}
+    jinxed_mock = mock.Mock()
+    jinxed_mock.tigetstr = lambda cap: None
+    term._jinxed_term = jinxed_mock
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        result = resolve_capability(term, 'mnemonic')
+        assert result == ''
+        assert len(w) == 1
+        assert 'nonexistent_capability_xyz' in str(w[0].message)
+
+
+def test_resolve_capability_empty_bytes_returns_empty():
+    """Test jinxed EMPTY_CAPS returning b'' produces '' with no warning."""
+    import warnings
+    from blessed.formatters import resolve_capability
+
+    term = TestTerminal(force_styling=True)
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        result = resolve_capability(term, 'enacs')
+        assert result == ''
+        assert len(w) == 0
 
 
 def test_resolve_color(monkeypatch):
@@ -247,7 +348,7 @@ def test_resolve_color(monkeypatch):
     def color_cap(digit):
         return f'seq-{digit}'
 
-    monkeypatch.setattr(curses, 'COLOR_RED', 1984)
+    monkeypatch.setattr(jinxed, 'COLOR_RED', 1984)
 
     # given, terminal with color capabilities
     term = mock.Mock()
@@ -343,7 +444,7 @@ def test_resolve_attribute_non_compoundables(monkeypatch):
     monkeypatch.setattr(blessed.formatters,
                         'resolve_capability',
                         resolve_cap)
-    monkeypatch.setattr(curses, 'tparm', fn_tparm)
+    monkeypatch.setattr(jinxed, 'tparm', fn_tparm)
 
     term = mock.Mock()
     term.normal = 'seq-normal'
@@ -371,9 +472,9 @@ def test_resolve_attribute_recursive_compoundables(monkeypatch):
     monkeypatch.setattr(blessed.formatters,
                         'resolve_capability',
                         resolve_cap)
-    monkeypatch.setattr(curses, 'tparm', fn_tparm)
-    monkeypatch.setattr(curses, 'COLOR_RED', 6502)
-    monkeypatch.setattr(curses, 'COLOR_BLUE', 6800)
+    monkeypatch.setattr(jinxed, 'tparm', fn_tparm)
+    monkeypatch.setattr(jinxed, 'COLOR_RED', 6502)
+    monkeypatch.setattr(jinxed, 'COLOR_BLUE', 6800)
 
     def color_cap(digit):
         return f'seq-{digit}'
@@ -394,7 +495,6 @@ def test_resolve_attribute_recursive_compoundables(monkeypatch):
 
 def test_formattingstring_picklability():
     """Test pickle-ability of a FormattingString."""
-    @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
         # basic pickle
@@ -405,13 +505,11 @@ def test_formattingstring_picklability():
         r, w = multiprocessing.Pipe()
         w.send(t.normal)
         assert r.recv() == t.normal
-
     child()
 
 
 def test_formattingotherstring_picklability():
     """Test pickle-ability of a FormattingOtherString."""
-    @as_subprocess
     def child():
         t = TestTerminal(force_styling=True)
         # basic pickle
@@ -425,16 +523,15 @@ def test_formattingotherstring_picklability():
         assert r.recv()(3) == t.move_left(3)
         w.send(t.move_left(3))
         assert r.recv() == t.move_left(3)
-
     child()
 
 
 def test_paramterizingstring_picklability():
     """Test pickle-ability of ParameterizingString."""
-    @as_subprocess
+    # local
+    from blessed.formatters import ParameterizingString
+
     def child():
-        # local
-        from blessed.formatters import ParameterizingString
         t = TestTerminal(force_styling=True)
 
         color = ParameterizingString(t.color, t.normal, 'color')
@@ -450,7 +547,6 @@ def test_paramterizingstring_picklability():
         assert r.recv() == color(3)
         w.send(t.color)
         assert r.recv()(3) == t.color(3)
-
     child()
 
 
@@ -463,7 +559,7 @@ def test_pickled_parameterizing_string(monkeypatch):
     # pickle.loads(dumps(...)) did not reproduce this issue,
     # first argument to tparm() is the sequence name, returned as-is;
     # subsequent arguments are usually Integers.
-    monkeypatch.setattr(curses, 'tparm', fn_tparm)
+    monkeypatch.setattr(jinxed, 'tparm', fn_tparm)
 
     # given,
     pstr = ParameterizingString('seqname', 'norm', 'cap-name')
@@ -486,46 +582,13 @@ def test_pickled_parameterizing_string(monkeypatch):
     assert r.recv() == zero
 
 
-def test_tparm_returns_null(monkeypatch):
-    """Test 'tparm() returned NULL' is caught (win32 PDCurses systems)."""
-    # on win32, any calls to tparm raises curses.error with message,
-    # "tparm() returned NULL", function PyCurses_tparm of _cursesmodule.c
-    # local
-    from blessed.formatters import NullCallableString, ParameterizingString
-
-    def tparm(*args):
-        raise curses.error("tparm() returned NULL")
-
-    monkeypatch.setattr(curses, 'tparm', tparm)
-
-    term = mock.Mock()
-    term.normal = 'seq-normal'
-
-    pstr = ParameterizingString('cap', 'norm', 'seq-name')
-
-    value = pstr(0)
-    assert isinstance(value, NullCallableString)
-
-
-def test_tparm_other_exception(monkeypatch):
-    """Test 'tparm() returned NULL' is caught (win32 PDCurses systems)."""
-    # on win32, any calls to tparm raises curses.error with message,
-    # "tparm() returned NULL", function PyCurses_tparm of _cursesmodule.c
-    # local
-    from blessed.formatters import ParameterizingString
-
-    def tparm(*args):
-        raise curses.error("unexpected error in tparm()")
-
-    monkeypatch.setattr(curses, 'tparm', tparm)
-
-    term = mock.Mock()
-    term.normal = 'seq-normal'
-
-    pstr = ParameterizingString('cap', 'norm', 'seq-name')
-
-    try:
-        pstr('x')
-        assert False, "previous call should have raised curses.error"
-    except curses.error:
-        pass
+def test_parameterizing_proxy_string_legacy():
+    """ParameterizingProxyString.__new__ and __call__ (deprecated but kept for API compat)."""
+    from blessed.formatters import ParameterizingProxyString, FormattingString
+    fmt_pair = ('\x1b[{0}G', lambda *arg: (arg[0] + 1,))
+    proxy = ParameterizingProxyString(fmt_pair, '\x1b[m', 'hpa')
+    assert isinstance(proxy, str)
+    assert proxy == '\x1b[{0}G'
+    result = proxy(9)
+    assert isinstance(result, FormattingString)
+    assert result == '\x1b[10G'

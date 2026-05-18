@@ -9,7 +9,7 @@ import pytest
 
 # local
 from .conftest import TEST_QUICK
-from .accessories import TestTerminal, as_subprocess
+from .accessories import TestTerminal
 
 TEXTWRAP_KEYWORD_COMBINATIONS = [
     {'break_long_words': False, 'drop_whitespace': False, 'subsequent_indent': ''},
@@ -39,7 +39,6 @@ def test_SequenceWrapper_invalid_width():
     """Test exception thrown from invalid width."""
     WIDTH = -3
 
-    @as_subprocess
     def child():
         term = TestTerminal()
         try:
@@ -56,7 +55,6 @@ def test_SequenceWrapper_invalid_width():
 @pytest.mark.parametrize("kwargs", TEXTWRAP_KEYWORD_COMBINATIONS)
 def test_SequenceWrapper(many_columns, kwargs):
     """Test that text wrapping matches internal extra options."""
-    @as_subprocess
     def child(width, pgraph, kwargs):
         # build a test paragraph, along with a very colorful version
         term = TestTerminal()
@@ -115,7 +113,6 @@ def test_SequenceWrapper(many_columns, kwargs):
 def test_multiline():
     """Test that text wrapping matches internal extra options."""
 
-    @as_subprocess
     def child():
         # build a test paragraph, along with a very colorful version
         term = TestTerminal()
@@ -138,7 +135,6 @@ def test_multiline():
 
 def test_east_asian_emojis_width_1():
     """Tests edge-case of east-asian and emoji characters split into single columns."""
-    @as_subprocess
     def child():
         term = TestTerminal()
         # by @grayjk from https://github.com/jquast/blessed/issues/273
@@ -169,7 +165,6 @@ def test_east_asian_emojis_width_1():
 
 def test_emojis_width_2_and_greater():
     """Tests emoji characters split into multiple columns."""
-    @as_subprocess
     def child():
         term = TestTerminal()
         given = '\U0001F469\U0001F467\U0001F466'  # woman, girl, boy
@@ -191,7 +186,6 @@ def test_emojis_width_2_and_greater():
 
 def test_greedy_join_with_cojoining():
     """Test that a word with trailing combining (café) wraps correctly."""
-    @as_subprocess
     def child():
         term = TestTerminal()
         given = 'cafe\u0301-latte'
@@ -211,7 +205,6 @@ def test_greedy_join_with_cojoining():
 def test_placeholder():
     """ENsure placeholder behavior matches stdlib"""
 
-    @as_subprocess
     def child():
         term = TestTerminal()
         text = 'The quick brown fox jumps over the lazy dog'
@@ -248,7 +241,6 @@ def test_placeholder():
 
 def test_break_on_hyphens_in_handle_long_word():
     """Test break_on_hyphens is respected in _handle_long_word()."""
-    @as_subprocess
     def child():
         term = TestTerminal()
 
@@ -268,7 +260,6 @@ def test_break_on_hyphens_in_handle_long_word():
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="break_on_hyphens behavior differs")
 def test_break_on_hyphens():
     """Test break_on_hyphens behavior matches stdlib for hyphenated words."""
-    @as_subprocess
     def child():
         term = TestTerminal()
         attributes = ('bright_red', 'on_bright_blue', 'underline')
@@ -320,7 +311,6 @@ def test_break_on_hyphens():
 
 def test_wrap_leading_sequence_preserved():
     """Leading escape sequence on first word should not be lost."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         # Color the first word - the leading sequence should be preserved
@@ -334,7 +324,6 @@ def test_wrap_leading_sequence_preserved():
 
 def test_wrap_color_preserved_across_boundary():
     """Regression test for #351: wrap drops color escape sequence."""
-    @as_subprocess
     def child():
         term = TestTerminal(force_styling=True)
         text = f"{term.blue('a' * 10)} {term.blue('b' * 10)}"
@@ -353,7 +342,6 @@ def test_wrap_color_preserved_across_boundary():
 ])
 def test_wrap_hyperlink_osc8(link):
     """Test wrap with OSC 8 hyperlinks using ST and BEL terminators."""
-    @as_subprocess
     def child(link):
         term = TestTerminal(force_styling=True)
         result = term.wrap(link, width=10)

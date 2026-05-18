@@ -8,7 +8,7 @@ import pytest
 
 # local
 from blessed.cursor_shape import CursorShape
-from .accessories import TestTerminal, as_subprocess
+from .accessories import TestTerminal
 
 
 def test_constant_values():
@@ -102,9 +102,8 @@ def test_sequence_invalid_string():
         CursorShape.sequence('zigzag')
 
 
-def test_cursor_shape_writes_sequence(all_terms):
+def test_cursor_shape_writes_sequence(any_term):
     """Context manager writes enter and reset sequences."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), force_styling=True)
         with t.cursor_shape(t.CursorShape.BLINKING_BAR):
@@ -112,12 +111,11 @@ def test_cursor_shape_writes_sequence(all_terms):
         output = t.stream.getvalue()
         assert output == '\x1b[5 q' + '\x1b[0 q'
 
-    child(all_terms)
+    child(any_term)
 
 
-def test_cursor_shape_string_name(all_terms):
+def test_cursor_shape_string_name(any_term):
     """Context manager accepts string style names."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), force_styling=True)
         with t.cursor_shape('steady_underline'):
@@ -125,12 +123,11 @@ def test_cursor_shape_string_name(all_terms):
         output = t.stream.getvalue()
         assert output == '\x1b[4 q' + '\x1b[0 q'
 
-    child(all_terms)
+    child(any_term)
 
 
-def test_cursor_shape_default_style(all_terms):
+def test_cursor_shape_default_style(any_term):
     """Context manager with no argument uses DEFAULT_STYLE."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), force_styling=True)
         with t.cursor_shape():
@@ -138,19 +135,18 @@ def test_cursor_shape_default_style(all_terms):
         output = t.stream.getvalue()
         assert output == '\x1b[2 q' + '\x1b[0 q'
 
-    child(all_terms)
+    child(any_term)
 
 
-def test_cursor_shape_no_styling(all_terms):
+def test_cursor_shape_no_styling(any_term):
     """Context manager is a no-op when styling is disabled."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(stream=StringIO(), force_styling=False)
         with t.cursor_shape(t.CursorShape.BLINKING_BAR):
             pass
         assert t.stream.getvalue() == ''
 
-    child(all_terms)
+    child(any_term)
 
 
 def test_cursor_shape_accessible_as_class_attr():
@@ -161,23 +157,21 @@ def test_cursor_shape_accessible_as_class_attr():
 
 
 @pytest.mark.parametrize("style", [0, 1, 2, 3, 4, 5, 6])
-def test_length_strips_decscusr(all_terms, style):
+def test_length_strips_decscusr(any_term, style):
     """Terminal.length() excludes DECSCUSR sequences."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(force_styling=True)
         text = CursorShape.sequence(style) + 'hello'
         assert t.length(text) == 5
 
-    child(all_terms)
+    child(any_term)
 
 
-def test_length_strips_color_reset_osc(all_terms):
+def test_length_strips_color_reset_osc(any_term):
     """Terminal.length() excludes COLOR_RESET_OSC sequence."""
-    @as_subprocess
     def child(kind):
         t = TestTerminal(force_styling=True)
         text = CursorShape.COLOR_RESET_OSC + 'hello'
         assert t.length(text) == 5
 
-    child(all_terms)
+    child(any_term)

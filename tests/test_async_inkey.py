@@ -12,7 +12,7 @@ import pytest
 
 # local
 from .conftest import IS_WINDOWS
-from .accessories import SEMAPHORE, TestTerminal, pty_test, as_subprocess, read_until_semaphore
+from .accessories import SEMAPHORE, TestTerminal, pty_test, read_until_semaphore
 
 pytestmark = pytest.mark.skipif(IS_WINDOWS, reason="no pty on Windows")
 
@@ -106,7 +106,7 @@ def test_async_inkey_mouse_x10():
             loop = asyncio.new_event_loop()
             try:
                 ks = loop.run_until_complete(
-                    term.async_inkey(timeout=2.0))
+                    term.async_inkey(timeout=0.5, esc_delay=0.01))
             finally:
                 loop.close()
             assert ks.is_mouse
@@ -132,7 +132,7 @@ def test_async_inkey_resize_event():
             loop = asyncio.new_event_loop()
             try:
                 ks = loop.run_until_complete(
-                    term.async_inkey(timeout=2.0))
+                    term.async_inkey(timeout=0.5))
             finally:
                 loop.close()
             assert ks.name == 'RESIZE_EVENT'
@@ -151,17 +151,13 @@ def test_async_inkey_resize_event():
 
 def test_async_read_byte_oserror_propagates():
     """OSError from os.read propagates through the future."""
-    @as_subprocess
     def child():
         term = TestTerminal()
         term._keyboard_fd = 0
 
         loop = asyncio.new_event_loop()
         try:
-            original_add_reader = loop.add_reader
-
             def mock_add_reader(fd, callback):
-                original_add_reader(fd, callback)
                 loop.call_soon(callback)
 
             with mock.patch.object(loop, 'add_reader', side_effect=mock_add_reader):
@@ -171,7 +167,6 @@ def test_async_read_byte_oserror_propagates():
                             term._async_read_byte(loop, timeout=1.0))
         finally:
             loop.close()
-
     child()
 
 
@@ -229,7 +224,7 @@ def test_async_inkey_arrow_key():
             loop = asyncio.new_event_loop()
             try:
                 ks = loop.run_until_complete(
-                    term.async_inkey(timeout=2.0))
+                    term.async_inkey(timeout=0.5))
             finally:
                 loop.close()
             assert ks.name == 'KEY_UP'
@@ -252,7 +247,7 @@ def test_async_inkey_buffered_multi_byte():
             loop = asyncio.new_event_loop()
             try:
                 ks = loop.run_until_complete(
-                    term.async_inkey(timeout=2.0))
+                    term.async_inkey(timeout=0.5))
                 assert str(ks) == 'x'
                 ks2 = loop.run_until_complete(
                     term.async_inkey(timeout=0.5))
@@ -322,7 +317,6 @@ def test_async_inkey_escape_then_arrow():
 
 def test_async_inkey_no_keyboard_fd():
     """_async_read_byte raises RuntimeError without keyboard fd."""
-    @as_subprocess
     def child():
         term = TestTerminal()
         term._keyboard_fd = None
@@ -333,5 +327,4 @@ def test_async_inkey_no_keyboard_fd():
                     term._async_read_byte(loop, timeout=1.0))
         finally:
             loop.close()
-
     child()
