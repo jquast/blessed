@@ -1293,7 +1293,8 @@ def get_keyboard_codes() -> Dict[int, str]:
     return dict(zip(keycodes.values(), keycodes.keys()))
 
 
-def get_keyboard_sequences(term: 'Terminal') -> typing.OrderedDict[str, int]:
+def get_keyboard_sequences(  # pylint: disable=protected-access
+        term: 'Terminal') -> typing.OrderedDict[str, int]:
     r"""
     Return mapping of keyboard sequences paired by keycodes.
 
@@ -1312,7 +1313,6 @@ def get_keyboard_sequences(term: 'Terminal') -> typing.OrderedDict[str, int]:
     The return value is an OrderedDict instance, with their keys
     sorted longest-first.
     """
-    # pylint: disable=protected-access
     # A small gem from curses.has_key that makes this all possible,
     # _capability_names: a lookup table of terminal capability names for
     # keyboard sequences (fe. kcub1, key_left), keyed by the values of

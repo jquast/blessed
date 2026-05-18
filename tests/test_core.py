@@ -821,28 +821,14 @@ def test_get_color_scheme_force_bypasses_sticky_failure():
     assert result == 'dark'
 
 
-def test_get_location_percent_i_flag():
-    """get_location applies %i decrement when cursor_report contains %i."""
+def test_get_location_always_decrements():
+    """get_location always converts CPR 1-based coordinates to 0-based."""
     term = TestTerminal(stream=StringIO(), force_styling=True)
     term._is_a_tty = True
     term.ungetch('\x1b[2;6R')
-    term.caps['cursor_report'].attribute = '_mock_never_exists'
-    setattr(term, '_mock_never_exists', '\x1b[%i%d;%dR')
     row, col = term.get_location(timeout=0.01)
     assert row == 1
     assert col == 5
-
-
-def test_get_location_no_percent_i():
-    """get_location does not decrement when cursor_report lacks %i."""
-    term = TestTerminal(stream=StringIO(), force_styling=True)
-    term._is_a_tty = True
-    term.ungetch('\x1b[2;6R')
-    term.caps['cursor_report'].attribute = '_mock_no_i'
-    setattr(term, '_mock_no_i', '\x1b[%d;%dR')
-    row, col = term.get_location(timeout=0.01)
-    assert row == 2
-    assert col == 6
 
 
 def test_split_seqs_maxsplit_with_xterm():

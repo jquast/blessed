@@ -497,25 +497,6 @@ def test_get_location_0s_reply_via_ungetch():
     child()
 
 
-def test_get_location_0s_nonstandard_u6():
-    """u6 without %i should not be decremented."""
-    # local
-    from blessed.formatters import ParameterizingString
-
-    def child():
-        term = TestTerminal(stream=StringIO(), force_styling=True, is_a_tty=True)
-        stime = time.time()
-        # monkey patch in an invalid response !
-        term.ungetch('\x1b[10;10R')
-
-        with mock.patch.object(term, 'u6') as mock_u6:
-            mock_u6.return_value = ParameterizingString('\x1b[%d;%dR', term.normal, 'u6')
-            y, x = term.get_location(timeout=0.01)
-        assert math.floor(time.time() - stime) == 0.0
-        assert (y, x) == (10, 10)
-    child()
-
-
 def test_get_location_styling_indifferent():
     """Ensure get_location() behavior is the same regardless of styling"""
     def child():

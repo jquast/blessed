@@ -117,13 +117,15 @@ class Terminal(_Terminal):
                  _xtgettcap_data: Optional[TermcapResponse] = None
                  ) -> None:
         """Initialize Windows terminal instance."""
+        # Initialize instance attributes needed by kbhit() during
+        # XTGETTCAP probing in the base class __init__.
+        self._event_buf: collections.deque[str] = collections.deque()
+        self._native_mouse: bool = False
+        self._native_resize: bool = False
         super().__init__(kind=kind, stream=stream, force_styling=force_styling,
                          kind_fallback=kind_fallback,
                          _xtgettcap_data=_xtgettcap_data)
-        self._event_buf: collections.deque[str] = collections.deque()
         self._prev_button_state: int = 0
-        self._native_mouse: bool = False
-        self._native_resize: bool = False
 
     def getch(self, decode_latin1: bool = False) -> str:
         r"""

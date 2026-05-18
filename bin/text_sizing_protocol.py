@@ -39,20 +39,74 @@ def _params_for_target(target):
 
 def show_scale_range(term, lo, hi, steps):
     """Display a row of 'X' characters ranging from *lo* to *hi* in *steps*."""
-    label_top = []
-    label_bot = []
-    chars = []
+    targets_params = []
+    max_s = 1
     for i in range(steps + 1):
         target = lo + (hi - lo) * i / steps
         s, n, d = _params_for_target(target)
-        params = TextSizingParams(scale=s, numerator=n, denominator=d,
-                                  vertical_align=1)
+        if s > max_s:
+            max_s = s
+        targets_params.append((target, s, n, d))
+
+    chars = []
+    col_starts = []
+    col = 0
+    for i, (target, s, n, d) in enumerate(targets_params):
+        if i == 0 and n == 0 and d == 0 and s < max_s:
+            s = max_s
+            ratio = target / s
+            n, d = _nearest_fraction(round(ratio * 100), 100, FRACTIONS)
+            if n >= d:
+                n = d - 1
+            if n == 0:
+                n = 1
+        params = TextSizingParams(scale=s, numerator=n, denominator=d)
         chars.append(TextSizing(params, 'X', '\x07').make_sequence())
-        label_top.append(f'{target:.1f}'.center(s * 2))
-        label_bot.append(f's={s}'.center(s * 2))
-    print(''.join(chars))
-    print(''.join(label_top))
-    print(''.join(label_bot))
+        col_starts.append(col)
+        col += s
+
+    total_cols = col
+
+    pcts = {i: int(target * 100) for i, (target, _, _, _) in enumerate(targets_params)}
+    num_labels = 5
+    label_at = {}
+
+    for j in range(num_labels):
+        pct_target = lo * 100 + (hi - lo) * 100 * j / (num_labels - 1)
+        best = min(pcts, key=lambda i: abs(pcts[i] - pct_target))
+        label_text = f'{pcts[best]}%'
+        start_col = col_starts[best]
+        if j > 0:
+            overlaps = False
+            for prev_i, prev_text in label_at.items():
+                prev_start = col_starts[prev_i]
+                if prev_start + len(prev_text) > start_col:
+                    overlaps = True
+                    break
+            if overlaps:
+                continue
+        label_at[best] = label_text
+
+    lbl_top = [' '] * (total_cols + 5)
+    for i, text in sorted(label_at.items()):
+        start = col_starts[i]
+        for c, ch in enumerate(text):
+            pos = start + c
+            if pos < len(lbl_top) and lbl_top[pos] == ' ':
+                lbl_top[pos] = ch
+    lbl_bot = [' '] * (total_cols + 5)
+    for i, text in sorted(label_at.items()):
+        s_val = targets_params[i][1]
+        text_s = f's={s_val}'
+        start = col_starts[i]
+        for c, ch in enumerate(text_s):
+            pos = start + c
+            if pos < len(lbl_bot) and lbl_bot[pos] == ' ':
+                lbl_bot[pos] = ch
+
+    print(''.join(chars), end='\n' * max_s)
+    print(''.join(lbl_top).rstrip())
+    print(''.join(lbl_bot).rstrip())
     print()
 
 
@@ -108,30 +162,27 @@ def show_char_types(term):
     ]
     tl, tr, bl, br, hz, vt = '\u250c\u2510\u2514\u2518\u2500\u2502'
     gap = '    '
-    for _, _, width in types:
-        print(f'{tl}{hz * width}{tr}{gap}', end='')
-    print()
-    for _, ucs, width in types:
-        print(f'{vt}{term.text_sized(ucs, width=width)}{vt}{gap}', end='')
-    print()
-    for _, _, width in types:
-        print(f'{bl}{hz * width}{br}{gap}', end='')
-    print()
-    for label, _, width in types:
-        col_width = width + 2 + len(gap)
-        print(f'{label:<{col_width}}', end='')
+    widths = [w for _, _, w in types]
+    box_parts = [f'{tl}{hz * w}{tr}' for w in widths]
+    print(gap.join(box_parts))
+    mid_parts = [f'{vt}{term.text_sized(ucs, width=w)}{vt}' for _, ucs, w in types]
+    print(gap.join(mid_parts))
+    bot_parts = [f'{bl}{hz * w}{br}' for w in widths]
+    print(gap.join(bot_parts))
+    label_parts = [f'{label:<{w + 2}}' for label, _, w in types]
+    print(gap.join(label_parts))
     print()
 
 
 def show_fractional(term):
     fracs = sorted([(n, d) for d in range(2, 16) for n in range(1, d)
                     if n / d >= 0.25], key=lambda nd: nd[0] / nd[1])
-    budget = 43
+    budget = 42
     step = max(1, (len(fracs) + budget - 2) // (budget - 1))
     sampled = fracs[::step]
     sampled.append((0, 0))
     for n, d in sampled:
-        print(term.text_sized('X', width=1, numerator=n, denominator=d, vertical_align=1), end='')
+        print(term.text_sized('X', width=1, numerator=n, denominator=d, vertical_align=0), end='')
     print()
     pcts = {i: (int(n / d * 100) if d else 100) for i, (n, d) in enumerate(sampled)}
     label_at = {}
@@ -150,7 +201,7 @@ def show_fractional(term):
 def show_alignment(term):
     rows, cols, text = 3, 6, 'Hi'
     text_w = len(text)
-    gap = '  '
+    gap = '   '
     box_w = cols + 2
     gap_w = len(gap)
     common = dict(scale=rows, width=text_w, numerator=1, denominator=2)
@@ -162,9 +213,12 @@ def show_alignment(term):
          ['h=left', 'h=center', 'h=right'], 'v=top'),
     ]:
         boxes = [alignment_box(text, rows, cols, v, h) for v, h in params]
-        for line_parts in zip(*boxes):
-            print(gap.join(line_parts))
-        print(gap.join(f'{label:^{box_w}s}' for label in labels) + f'  ({fixed})')
+        for row_idx, line_parts in enumerate(zip(*boxes)):
+            line = gap.join(line_parts)
+            if row_idx == 3:
+                line += '    ' + fixed
+            print(line)
+        print(gap.join(f'{label:^{box_w}s}' for label in labels))
 
         end_y, _ = term.get_location()
         interior_y = end_y - rows - 3 + 1
@@ -208,10 +262,8 @@ def main():
     show_scale_factors(term)
     show_char_types(term)
     show_fractional(term)
-    print(term.bold('100% -- 200%:'))
-    show_scale_range(term, 1.0, 2.0, 10)
-    print(term.bold('200% -- 300%:'))
-    show_scale_range(term, 2.0, 3.0, 10)
+    show_scale_range(term, 1.0, 2.0, 20)
+    show_scale_range(term, 2.0, 3.0, 13)
     show_alignment(term)
     show_ljust_rjust_center(term, bool(result))
 
