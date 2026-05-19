@@ -46,7 +46,6 @@ Version History
     (backspace/cursor-left with painter's algorithm), introduced by wcwidth_ 0.7.0.
 
 1.38
-
   * introduced: :meth:`~.Terminal.does_osc52_clipboard`, :meth:`~.Terminal.clipboard_copy`, and
     :meth:`~.Terminal.clipboard_paste` to detect, copy, and read from clipboard.
   * introduced: :meth:`~.Terminal.get_color_scheme`.
@@ -69,13 +68,11 @@ Version History
     Kitty notifications, Kitty pointer shapes responses
 
 1.37
-
   * bugfix: legacy CSI letter-form sequences with explicit modifiers and event type (e.g.,
     ``\x1b[1;1:1A`` for arrow key press) were not resolved to key names, this affected only some
     terminals, such as Ghostty. :ghpull:`363`.
 
 1.36
-
   * bugfix: ``[`` key returned :attr:`~.Keystroke.name` of value ``CSI`` in Kitty keyboard protocol
     mode, it now returns ``KEY_LEFT_SQUARE_BRACKET``.
   * improved: Kitty keyboard protocol now synthesizes :attr:`~.Keystroke.name` for all ASCII
@@ -84,7 +81,6 @@ Version History
     keys received synthesized names.
 
 1.35
-
   * introduced: :meth:`~.Terminal.cursor_shape` context manager and
     :class:`~blessed.cursor_shape.CursorShape` constants for DECSCUSR cursor shape control
     (block, underline, bar -- steady or blinking).
