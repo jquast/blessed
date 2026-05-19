@@ -982,7 +982,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             # jinxed use %i in their u6 string (the standard behavior), so we unconditionally
             # convert to 0-based.  A pedantic impl would check for %i in the u6 capability, but no
             # terminal supoprted by blessed/jinxed uses 0-index, it was an ANSI standard, after all.
-            return (max(0, int(val) - 1) for val in match.groups())
+            return tuple(max(0, int(val) - 1) for val in match.groups())
 
         # Return an illegal value (-1) rather than a custom exception, developers should
         # check or filters, such as if (x, y) != (-1, -1) or max(0, y).
