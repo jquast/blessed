@@ -320,7 +320,7 @@ def test_dec_mode_calls_with_no_styling():
         # the lambda definition from test_dec_modes_enabled_with_invalid_type and applies it to
         # all other tests! I really don't know what the trouble with pylint is ...
         #
-        # pylint: disable=no-value-for-parameter
+        # pylint: disable=no-value-for-parameter,useless-suppression
         response = term.get_dec_mode(DecPrivateMode.DECTCEM)
 
         assert response.value == DecModeResponse.NOT_QUERIED
@@ -335,7 +335,7 @@ def test_get_dec_mode_invalid_mode_type():
     def child():
         term = TestTerminal()
         with pytest.raises(TypeError):
-            # pylint: disable=no-value-for-parameter
+            # pylint: disable=no-value-for-parameter,useless-suppression
             term.get_dec_mode("invalid")
     child()
 
@@ -401,7 +401,7 @@ def test_get_dec_mode_cached_response():
                 mock.patch.object(
                     term, '_query_with_boundary'
         ) as mock_query:
-            # pylint: disable=no-value-for-parameter
+            # pylint: disable=no-value-for-parameter,useless-suppression
             response = term.get_dec_mode(DecPrivateMode.DECTCEM)
 
             mock_query.assert_not_called()
@@ -426,7 +426,7 @@ def test_get_dec_mode_force_bypass_cache():
                     term, '_query_with_boundary',
                     return_value=mock_match
         ) as mock_query:
-            # pylint: disable=no-value-for-parameter,unexpected-keyword-arg
+            # pylint: disable=no-value-for-parameter,unexpected-keyword-arg,useless-suppression
             response = term.get_dec_mode(
                 DecPrivateMode.DECTCEM, force=True
             )
@@ -455,7 +455,7 @@ def test_get_dec_mode_sticky_failure():
             assert first_response.value == DecModeResponse.NO_RESPONSE
             assert term._dec_first_query_failed is True
 
-            # pylint: disable=no-value-for-parameter
+            # pylint: disable=no-value-for-parameter,useless-suppression
             second_response = term.get_dec_mode(
                 DecPrivateMode.BRACKETED_PASTE
             )
@@ -809,7 +809,7 @@ def test_int_mode_parameters():
     """Test that integer mode parameters work correctly."""
     stream = io.StringIO()
     term = TestTerminal(stream=stream, force_styling=False)
-    # pylint: disable=no-value-for-parameter
+    # pylint: disable=no-value-for-parameter,useless-suppression
     response = term.get_dec_mode(_DPM.DECTCEM)
     assert response.value == DecModeResponse.NOT_QUERIED
     with term.dec_modes_enabled(_DPM.DECTCEM, _DPM.BRACKETED_PASTE):
