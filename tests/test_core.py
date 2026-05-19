@@ -1078,3 +1078,17 @@ def test_windows_vtwin10_truecolor():
             assert term.number_of_colors == 1 << 24
     finally:
         bt.IS_WINDOWS = original_is_windows
+
+
+def test_windows_ms_terminal_truecolor():
+    """__init__color_capabilities returns 1<<24 for ms-terminal on modern Windows."""
+    import blessed.terminal as bt
+    original_is_windows = bt.IS_WINDOWS
+    try:
+        bt.IS_WINDOWS = True
+        with mock.patch('platform.version', return_value='10.0.19041'), \
+                mock.patch('platform.system', return_value='Windows'):
+            term = TestTerminal(stream=StringIO(), kind='ms-terminal', force_styling=True)
+            assert term.number_of_colors == 1 << 24
+    finally:
+        bt.IS_WINDOWS = original_is_windows
