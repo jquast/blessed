@@ -831,6 +831,17 @@ def test_get_location_always_decrements():
     assert col == 5
 
 
+def test_get_location_returns_tuple():
+    """get_location returns a tuple so callers can subscript it."""
+    term = TestTerminal(stream=StringIO(), force_styling=True)
+    term._is_a_tty = True
+    term.ungetch('\x1b[2;6R')
+    result = term.get_location(timeout=0.01)
+    assert isinstance(result, tuple)
+    assert result[0] == 1
+    assert result[1] == 5
+
+
 def test_split_seqs_maxsplit_with_xterm():
     """split_seqs maxsplit truncates remaining text."""
     term = TestTerminal(kind='xterm-256color', stream=StringIO(), force_styling=True)

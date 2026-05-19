@@ -2,6 +2,9 @@
 
 Version History
 ===============
+1.41
+  * bugfix: :meth:`~.Terminal.get_location` broken in 1.40, returned a generator instead of a tuple.
+    :ghissue:`378`.
 
 1.40
   * improved: jinxed_ is **now required on all platforms**, providing a curses-free and
