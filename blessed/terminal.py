@@ -9,7 +9,6 @@ import base64
 import codecs
 import locale
 import select
-import signal
 import struct
 import asyncio
 import platform
