@@ -2,6 +2,10 @@
 
 Version History
 ===============
+1.42
+  * bugfix: regression in :meth:`~.Terminal.cbreak` and :meth:`~.Terminal.raw` were not thread-safe
+    broken in versions 1.40 and 1.41, remove signal ignore of SIGTTOU :ghissue:`380`.
+
 1.41
   * bugfix: :meth:`~.Terminal.get_location` broken in 1.40, returned a generator instead of a tuple.
     :ghissue:`378`.

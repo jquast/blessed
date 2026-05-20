@@ -9,7 +9,6 @@ import base64
 import codecs
 import locale
 import select
-import signal
 import struct
 import asyncio
 import platform
@@ -3777,22 +3776,18 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     @contextlib.contextmanager
     def _enter_termios_mode(self, setter: Callable[[int, int], None]
                             ) -> Generator[None, None, None]:
-        """Put the keyboard terminal into mode using 'setter', guarding against SIGTTOU."""
-        old_sigttou = signal.signal(signal.SIGTTOU, signal.SIG_IGN)
+        """Put the keyboard terminal into mode using 'setter'."""
+        save_mode = termios.tcgetattr(self._keyboard_fd)
+        save_line_buffered = self._line_buffered
+        setter(self._keyboard_fd, termios.TCSANOW)
         try:
-            save_mode = termios.tcgetattr(self._keyboard_fd)
-            save_line_buffered = self._line_buffered
-            setter(self._keyboard_fd, termios.TCSANOW)
-            try:
-                self._line_buffered = False
-                yield
-            finally:
-                termios.tcsetattr(self._keyboard_fd,
-                                  termios.TCSADRAIN,
-                                  save_mode)
-                self._line_buffered = save_line_buffered
+            self._line_buffered = False
+            yield
         finally:
-            signal.signal(signal.SIGTTOU, old_sigttou)
+            termios.tcsetattr(self._keyboard_fd,
+                              termios.TCSADRAIN,
+                              save_mode)
+            self._line_buffered = save_line_buffered
 
     @contextlib.contextmanager
     def raw(self) -> Generator[None, None, None]:

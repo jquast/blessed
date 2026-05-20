@@ -725,32 +725,6 @@ def test_cbreak_with_has_tty():
     assert 'CBREAK_OK' in output or 'RESTORED' in output
 
 
-@pytest.mark.skipif(not TEST_KEYBOARD or IS_WINDOWS, reason="Requires TTY")
-@pytest.mark.parametrize("mode", ['cbreak', 'raw'])
-def test_termios_mode_ignores_sigttou(mode):
-    """cbreak() and raw() set SIGTTOU to SIG_IGN while termios mode is active.
-
-    When a process in a background process group calls tcgetattr() or
-    tcsetattr() on its controlling terminal, the kernel sends SIGTTOU,
-    whose default action is to stop the process.  _enter_termios_mode
-    guards against this by temporarily ignoring SIGTTOU.
-    """
-    def child(term):
-        ctx = getattr(term, mode)()
-        before = signal.getsignal(signal.SIGTTOU)
-        with ctx:
-            inside = signal.getsignal(signal.SIGTTOU)
-            assert inside == signal.SIG_IGN, (
-                f'SIGTTOU not ignored inside {mode}: {inside}')
-        after = signal.getsignal(signal.SIGTTOU)
-        assert after == before, (
-            f'SIGTTOU not restored after {mode}: before={before} after={after}')
-        return b'SIGTTOU_OK'
-
-    output = pty_test(child, test_name=f'test_{mode}_ignores_sigttou')
-    assert 'SIGTTOU_OK' in output
-
-
 def test_inkey_with_csi_sequence_triggers_latin1_decoding():
     """Test that CSI sequences trigger Latin1 decoding path in inkey()"""
     def child(term):
