@@ -4,7 +4,7 @@ Version History
 ===============
 1.43
   * bugfix: regression of XTGETTCAP responses leaking into first call for empty/non-response
-    terminals (libvte/Gnome Terminal), :ghpull:`383`.
+    terminals (libvte/Gnome Terminal), in versions 1.40 to 1.42 :ghpull:`383`.
 
 1.42
   * bugfix: regression in :meth:`~.Terminal.cbreak` and :meth:`~.Terminal.raw` were not thread-safe
