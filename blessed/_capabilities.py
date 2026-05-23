@@ -563,9 +563,12 @@ class TermcapResponse:
 
     # XTGETTCAP DCS response: DCS <valid>+r<hex-name>[=<hex-value>] ST
     #   valid=1: terminal supports this capability, value follows
-    #   valid=0: terminal does not support this capability (negative acknowledgement)
+    # valid=0: terminal does not support this capability (negative acknowledgement)
+    # The capability name is hex-encoded; VTE-based terminals (GNOME Terminal, et al.) send
+    # malformed ``\\x1bP0+r\\x1b\\\\`` (empty name) for unsupported capabilities, so we accept
+    # zero-or-more hex digits rather than requiring at least one.
     _RE_XTGETTCAP_RESPONSE: typing.ClassVar[typing.Pattern[str]] = re.compile(
-        r'\x1bP([01])\+r([0-9a-fA-F]+)(?:=([0-9a-fA-F]*))?\x1b\\')
+        r'\x1bP([01])\+r([0-9a-fA-F]*)(?:=([0-9a-fA-F]*))?\x1b\\')
 
     def __init__(self, supported: bool = False,
                  capabilities: Optional[Dict[str, str]] = None) -> None:
