@@ -12,7 +12,7 @@ from unittest import mock
 
 # local
 from blessed._capabilities import TermcapResponse, ITerm2Capabilities
-from blessed.terminal import Terminal
+from blessed import Terminal
 from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, pty_test, NO_XTGETTCAP_DATA
 
