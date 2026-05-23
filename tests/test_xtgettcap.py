@@ -1095,6 +1095,33 @@ def test_terminal_init_xtgettcap_unsupported():
     assert 'OK' in output
 
 
+@pytestmark_pty
+def test_terminal_init_xtgettcap_zero_size_pty():
+    """Terminal() init skips XTGETTCAP probe when PTY has (0,0) window size."""
+    def child(term):
+        assert term._xtgettcap_cache is not None
+        assert term._xtgettcap_cache.supported is False
+        assert any('zero-size' in err for err in term.errors)
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_terminal_init_xtgettcap_zero_size_pty',
+                      _xtgettcap_data=NO_XTGETTCAP_DATA,
+                      skip_winsize=True)
+    assert 'OK' in output
+
+
+def test_xtgettcap_probe_winsize_oserror():
+    """XTGETTCAP probe proceeds when self._winsize() raises OSError."""
+    with mock.patch('os.isatty', return_value=True), \
+        mock.patch.object(Terminal, '_winsize', side_effect=OSError('bad fd')), \
+        mock.patch.object(Terminal, '_xtgettcap_batch',
+                          return_value=TermcapResponse(supported=False)):
+        t = Terminal(stream=sys.__stdout__, force_styling=True)
+        assert not any('zero-size' in err for err in t.errors)
+        assert any('no support' in err for err in t.errors)
+
+
 def test_init_cache_populated_from_xtgettcap_data():
     """Injected XTGETTCAP data populates _xtgettcap_cache."""
     xt_data = TermcapResponse(

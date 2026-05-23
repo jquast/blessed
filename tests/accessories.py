@@ -301,7 +301,8 @@ def _setwinsize(fd, rows, cols):
 
 
 def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80,
-             _xtgettcap_data=None, _xtgettcap_timeout=None):
+             _xtgettcap_data=None, _xtgettcap_timeout=None,
+             skip_winsize: bool = False):
     """
     Wrapper for PTY-based tests to reduce boilerplate.
 
@@ -317,6 +318,7 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80,
         test_name: Optional name for coverage tracking. Auto-derived from child_func if None.
         rows: Terminal height in rows (default 24)
         cols: Terminal width in columns (default 80)
+        skip_winsize: When True, do not call TIOCSWINSZ (leaves kernel default of 0,0).
 
     Returns:
         str: Output from child process (everything written to stdout)
@@ -336,7 +338,7 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80,
     """
     # pylint: disable=too-complex,too-many-branches,too-many-locals
     # pylint: disable=missing-raises-doc,missing-type-doc,too-many-statements
-    # assert False, _xtgettcap_data
+    # pylint: disable=too-many-positional-arguments
     if _xtgettcap_data is not NO_XTGETTCAP_DATA:
         _xtgettcap_data = (_xtgettcap_data if _xtgettcap_data is not None
                            else DEFAULT_TERMCAP_RESPONSE)
@@ -361,8 +363,9 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80,
         attrs = termios.tcgetattr(master_fd)
         attrs[3] = attrs[3] & ~termios.ECHO
         termios.tcsetattr(master_fd, termios.TCSANOW, attrs)
-        # Set window size
-        _setwinsize(master_fd, rows, cols)
+        # Set window size (unless testing kernel-default 0,0)
+        if not skip_winsize:
+            _setwinsize(master_fd, rows, cols)
         # Signal child that setup is complete
         os.write(master_fd, SEND_SEMAPHORE)
 

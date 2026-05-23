@@ -303,6 +303,16 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """Probe for core XTGETTCAP capabilities."""
         _xtgettcap_cache = TermcapResponse(supported=False)
         if (self.is_a_tty and self._keyboard_fd is not None):
+            # A default PTY has a window size of (0, 0). If Terminal() is instantiated with a (0, 0)
+            # window size, it is most definitely some automation or dummy script, smart enough for
+            # 'is_a_tty' but very unlikely to answer to XTGETTCAP or CPR queries!
+            try:
+                winsz = self._winsize(self._init_descriptor)
+                if winsz.ws_row == 0 or winsz.ws_col == 0:
+                    self.errors.append('XTGETTCAP probe: skipped, zero-size PTY ')
+                    return _xtgettcap_cache
+            except OSError:
+                pass
             try:
                 _xtgettcap_cache = self._xtgettcap_batch(
                     caps=XTGETTCAP_INIT_CAPABILITIES,
