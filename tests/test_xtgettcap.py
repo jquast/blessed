@@ -338,10 +338,13 @@ def test_parse_xtgettcap_boolean_capability():
 def test_parse_xtgettcap_malformed_empty_name():
     """Parse malformed DCS +r response with empty capability name (VTE/GNOME Terminal)."""
     raw = '\x1bP0+r\x1b\\'
-    capabilities = TermcapResponse.parse_capabilities(raw)
-    assert capabilities == {}
-    remaining = TermcapResponse._RE_XTGETTCAP_RESPONSE.sub('', raw)
-    assert remaining == ''
+    # parse_capabilities skips valid=0 responses.
+    assert not TermcapResponse.parse_capabilities(raw)
+    # The regex must match; sub() must consume the entire string.
+    assert TermcapResponse._RE_XTGETTCAP_RESPONSE.sub('', raw) == ''
+    # The regex must NOT consume unrelated text around the malformed response.
+    mixed = 'abc\x1bP0+r\x1b\\def'
+    assert TermcapResponse._RE_XTGETTCAP_RESPONSE.sub('', mixed) == 'abcdef'
 
 
 def test_does_xtgettcap_with_cached():
