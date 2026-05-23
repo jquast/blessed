@@ -335,6 +335,15 @@ def test_parse_xtgettcap_boolean_capability():
     assert capabilities['bce'] == ''
 
 
+def test_parse_xtgettcap_malformed_empty_name():
+    """Parse malformed DCS +r response with empty capability name (VTE/GNOME Terminal)."""
+    raw = '\x1bP0+r\x1b\\'
+    capabilities = TermcapResponse.parse_capabilities(raw)
+    assert capabilities == {}
+    remaining = TermcapResponse._RE_XTGETTCAP_RESPONSE.sub('', raw)
+    assert remaining == ''
+
+
 def test_does_xtgettcap_with_cached():
     """does_xtgettcap returns True with cached supported result."""
     stream = io.StringIO()
