@@ -136,7 +136,7 @@ def test_init_descriptor_stdout_valueerror():
     with mock.patch.object(sys.__stdout__, 'fileno',
                            side_effect=ValueError('detached stdout')), \
             mock.patch('blessed.terminal.jinxed.Terminal', return_value=mock_term), \
-            mock.patch('blessed.terminal.platform.version', return_value='1.0.0'):
+            mock.patch('blessed.terminal.platform.version', return_value='9.99.9999'):
         t = Terminal(stream=io.StringIO(), force_styling=True)
         assert any('stdout may be detached or closed' in err for err in t.errors)
         assert t.number_of_colors == 0

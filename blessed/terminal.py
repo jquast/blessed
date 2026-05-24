@@ -85,7 +85,8 @@ IS_WINDOWS = platform.system() == 'Windows'
 if IS_WINDOWS:
     # 3rd party
     from jinxed.win32 import get_console_input_encoding
-    HAS_TTY = False  # fcntl/termios/tty are not available on Windows
+    # fcntl/termios/tty are not available on Windows 
+    HAS_TTY = False # pylint: disable=invalid-name
 else:
     try:
         # std imports
