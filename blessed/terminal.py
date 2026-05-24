@@ -302,6 +302,15 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     def __init__xtgettcap(self) -> TermcapResponse:
         """Probe for core XTGETTCAP capabilities."""
         _xtgettcap_cache = TermcapResponse(supported=False)
+        # These prominent terminals "leak" VT100 Mode DCS queries, meaning the hexedecimal ascii
+        # payloads meant for the terminal to process are displayed as visible text to the user.  Try
+        # our best to avoid to query them, but these variables are not forwarded over SSH.
+        if os.environ.get('ANSICON') or os.environ.get('ConEmuANSI'):
+            self.errors.append('XTGETTCAP probe: skipped, ansicon')
+            return _xtgettcap_cache
+        if os.environ.get('TERM_PROGRAM') == 'Apple_Terminal':
+            self.errors.append('XTGETTCAP probe: skipped, Terminal.app')
+            return _xtgettcap_cache
         if (self.is_a_tty and self._keyboard_fd is not None):
             try:
                 _xtgettcap_cache = self._xtgettcap_batch(
@@ -1218,7 +1227,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         # Fallback: use TERM_PROGRAM and TERM_PROGRAM_VERSION environment
         # variables, set by many modern terminal emulators (iTerm2, Apple
-        # Terminal, VS Code, WezTerm, Hyper, mintty, etc.)
+        # Terminal, VS Code, WezTerm, Hyper, mintty, etc.), however, they
+        # are not forwarded over protocols like ssh, less unreliable.
         term_program = os.environ.get('TERM_PROGRAM', '')
         term_version = os.environ.get('TERM_PROGRAM_VERSION', '')
         raw = ' '.join(filter(None, (term_program, term_version)))
