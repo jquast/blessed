@@ -2,6 +2,9 @@
 
 Version History
 ===============
+1.44
+  * improve: reduce errant XTGETTCAP output for Terminal.app and ConEmu.exe :ghpull:`385`.
+
 1.43
   * bugfix: regression of XTGETTCAP responses leaking into first call for empty/non-response
     terminals (libvte/Gnome Terminal), in versions 1.40 to 1.42 :ghpull:`383`.
