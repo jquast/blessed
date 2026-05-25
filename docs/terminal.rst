@@ -329,6 +329,13 @@ You can query the terminal's software version using the
 :class:`~.SoftwareVersion` object with ``name`` and ``version`` attributes, or,
 ``None`` if the terminal fails to respond.
 
+If the XTVERSION query does not receive a response within the timeout,
+the method falls back to the ``TERM_PROGRAM`` and ``TERM_PROGRAM_VERSION``
+environment variables, which are set by many modern terminal emulators
+(iTerm2, Apple Terminal.app, VS Code, WezTerm, Hyper, mintty, and others).
+These variables are not forwarded over protocols like ssh, so they are less
+reliable than XTVERSION.
+
 Example program to display terminal version information:
 
 .. literalinclude:: ../bin/display-version.py
