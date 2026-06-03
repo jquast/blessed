@@ -143,7 +143,7 @@ fractional font scaling, and alignment:
     # fractional scaling is great for superscript and subscript
     print('2' + term.text_sized('128', width=1, numerator=1, denominator=3))
 
-    # text sizing sequences can bookended or wrapped by any other sequence,
+    # text sizing sequences can be bookended or wrapped by any other sequence,
     footnote_txt = term.text_sized('[2]', width=2, numerator=2, denominator=3, vertical_align='top')
     footnote_hlink = term.link('https://sw.kovidgoyal.net/kitty/text-sizing-protocol/', footnote_txt)
     print('Text sizing protocol' + footnote_hlink)
