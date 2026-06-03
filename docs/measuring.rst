@@ -121,14 +121,19 @@ In the following example, :meth:`~Terminal.wrap` word-wraps a short poem contain
 Text Sizing
 -----------
 
-The :meth:`~.Terminal.text_sized` method wraps text in an ``OSC 66`` escape sequence for
-terminals that support the `kitty text sizing protocol`_. This enables per-character control
-over cell footprint, fractional font scaling, and alignment:
+The :meth:`~.Terminal.text_sized` method wraps text in an ``OSC 66`` escape sequence for terminals
+that support the `kitty text sizing protocol`_.  Call :meth:`~.Terminal.does_text_sizing` to
+determine whether it is supported. This enables per-character control over cell footprint,
+fractional font scaling, and alignment:
 
 .. code-block:: python
 
     from blessed import Terminal
     term = Terminal()
+
+    # determine if text sizing protocol is supported
+    if not term.does_text_sizing():
+        exit("No support for text sizing protocl")
 
     # 'scale' is great for printing large headings
     _scale = 3
@@ -148,10 +153,10 @@ over cell footprint, fractional font scaling, and alignment:
 
 .. figure:: https://dxtz6bzwq9sxx.cloudfront.net/blessed_text_sizing_repl_output.png
 
-.. note:: Because the first call to :meth:`Terminal.text_sized` will cause the side effect
-    of writing destructive spaces to the columns and row following the current cursor
-    position as required for detection of `kitty text sizing protocol`_, it is suggested
-    to first call :meth:`Terminal.does_text_sizing` during program initialization.
+.. note:: Because the first call to :meth:`~.Terminal.text_sized` will cause the side effect
+    of writing destructive spaces to the columns and row following the current cursor position as
+    required for detection of `kitty text sizing protocol`_, it is suggested to first call
+    :meth:`~.Terminal.does_text_sizing` during program initialization.
 
 .. seealso::
 
