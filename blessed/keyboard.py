@@ -217,7 +217,6 @@ class Keystroke(str):
     def __new__(cls: typing.Type[_T], ucs: str = '', code: Optional[int] = None,
                 name: Optional[str] = None, mode: Optional[int] = None,
                 match: typing.Any = None) -> _T:
-        # pylint: disable=too-many-positional-arguments
         """Class constructor."""
         new = str.__new__(cls, ucs)
         new._name = name
