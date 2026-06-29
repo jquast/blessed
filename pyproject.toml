@@ -18,7 +18,7 @@ exclude = [
 name = 'blessed'
 description = """\
     Easy, practical library for making terminal apps, by providing an elegant, \
-    well-documented interface to Colors, Keyboard input, and screen Positioning capabilities.\
+    well-documented interface for Terminals.\
 """
 authors = [
     {name = 'Jeff Quast, Erik Rose, Avram Lubkin', email = 'contact@jeffquast.com'},
@@ -46,7 +46,7 @@ classifiers = [
     'Typing :: Typed',
 ]
 dependencies = [
-    'wcwidth>=0.7',
+    'wcwidth>=0.8.1',
     'jinxed>=2.0,<3',
 ]
 dynamic = ['version']

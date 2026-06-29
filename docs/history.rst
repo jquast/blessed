@@ -2,6 +2,9 @@
 
 Version History
 ===============
+1.45
+  * bugfix: name consistency of kitty keyboard modifiers :ghpull:`390`.
+
 1.44
   * improve: reduce errant XTGETTCAP output for Terminal.app and ConEmu.exe :ghpull:`385`.
 

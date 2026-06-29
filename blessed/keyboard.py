@@ -181,6 +181,18 @@ class KittyModifierBits:
     #: Modifiers only, in the generally preferred order in phrasing
     names_modifiers_only = ('ctrl', 'alt', 'shift', 'super', 'hyper', 'meta')
 
+    #: The base_name (KEY_ prefix stripped) of each modifier key. Used to
+    #: prevent the key's own modifier from appearing in its :attr:`Keystroke.name`
+    #: (e.g. LEFT_SHIFT pressed → KEY_LEFT_SHIFT, not KEY_SHIFT_LEFT_SHIFT).
+    modifier_key_base_names = frozenset({
+        'LEFT_SHIFT', 'RIGHT_SHIFT',
+        'LEFT_CONTROL', 'RIGHT_CONTROL',
+        'LEFT_ALT', 'RIGHT_ALT',
+        'LEFT_SUPER', 'RIGHT_SUPER',
+        'LEFT_HYPER', 'RIGHT_HYPER',
+        'LEFT_META', 'RIGHT_META',
+    })
+
 
 class Keystroke(str):
     """
@@ -299,6 +311,10 @@ class Keystroke(str):
         mod_parts = []
         for mod_name in KittyModifierBits.names_modifiers_only:
             if getattr(self, f'_{mod_name}'):        # 'if self._shift'
+                if base_name in KittyModifierBits.modifier_key_base_names:
+                    suffix = 'CONTROL' if mod_name == 'ctrl' else mod_name.upper()
+                    if base_name.endswith(suffix):
+                        continue
                 mod_parts.append(mod_name.upper())   # -> 'SHIFT'
 
         # Build base result with modifiers (if any)
