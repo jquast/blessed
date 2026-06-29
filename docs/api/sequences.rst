@@ -5,3 +5,4 @@ sequences.py
    :members:
    :undoc-members:
    :private-members:
+   :exclude-members: SequenceTextWrapper
