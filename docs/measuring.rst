@@ -133,7 +133,7 @@ fractional font scaling, and alignment:
 
     # determine if text sizing protocol is supported
     if not term.does_text_sizing():
-        exit("No support for text sizing protocl")
+        exit("No support for text sizing protocol")
 
     # 'scale' is great for printing large headings
     _scale = 3

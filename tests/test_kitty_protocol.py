@@ -862,6 +862,31 @@ def test_kitty_pua_modifier_keys(sequence, expected_key, expected_mods):
     assert ks.value == ''
 
 
+@pytest.mark.parametrize("sequence,expected_name,expected_key_name", [
+    ('\x1b[57441;1u', 'KEY_LEFT_SHIFT', 'KEY_LEFT_SHIFT'),
+    ('\x1b[57441;2u', 'KEY_LEFT_SHIFT', 'KEY_LEFT_SHIFT'),
+    ('\x1b[57441;5u', 'KEY_CTRL_LEFT_SHIFT', 'KEY_CTRL_LEFT_SHIFT'),
+    ('\x1b[57441;6u', 'KEY_CTRL_LEFT_SHIFT', 'KEY_CTRL_LEFT_SHIFT'),
+    ('\x1b[57441;1:3u', 'KEY_LEFT_SHIFT_RELEASED', 'KEY_LEFT_SHIFT'),
+    ('\x1b[57442;1u', 'KEY_LEFT_CONTROL', 'KEY_LEFT_CONTROL'),
+    ('\x1b[57442;5u', 'KEY_LEFT_CONTROL', 'KEY_LEFT_CONTROL'),
+    ('\x1b[57449;3u', 'KEY_RIGHT_ALT', 'KEY_RIGHT_ALT'),
+    ('\x1b[57447;1u', 'KEY_RIGHT_SHIFT', 'KEY_RIGHT_SHIFT'),
+    ('\x1b[57444;1u', 'KEY_LEFT_SUPER', 'KEY_LEFT_SUPER'),
+    ('\x1b[57445;1u', 'KEY_LEFT_HYPER', 'KEY_LEFT_HYPER'),
+    ('\x1b[57446;1u', 'KEY_LEFT_META', 'KEY_LEFT_META'),
+    ('\x1b[57448;1u', 'KEY_RIGHT_CONTROL', 'KEY_RIGHT_CONTROL'),
+    ('\x1b[57450;1u', 'KEY_RIGHT_SUPER', 'KEY_RIGHT_SUPER'),
+    ('\x1b[57451;1u', 'KEY_RIGHT_HYPER', 'KEY_RIGHT_HYPER'),
+    ('\x1b[57452;1u', 'KEY_RIGHT_META', 'KEY_RIGHT_META'),
+])
+def test_kitty_modifier_key_names(sequence, expected_name, expected_key_name):
+    """Modifier key names exclude self-referential modifier from name."""
+    ks = _match_kitty_key(sequence)
+    assert ks.name == expected_name
+    assert ks.key_name == expected_key_name
+
+
 @pytest.mark.parametrize("modifier,mod_value,char", [
     ('super', 9, 97),
     ('hyper', 17, 97),
@@ -1189,6 +1214,8 @@ def test_kitty_media_keys(sequence, expected_code, expected_name):
     # ISO level shift keys (57453-57454)
     ('\x1b[57453u', 57453, 'KEY_ISO_LEVEL3_SHIFT'),
     ('\x1b[57454u', 57454, 'KEY_ISO_LEVEL5_SHIFT'),
+    ('\x1b[57453;2u', 57453, 'KEY_SHIFT_ISO_LEVEL3_SHIFT'),
+    ('\x1b[57454;2u', 57454, 'KEY_SHIFT_ISO_LEVEL5_SHIFT'),
 ])
 def test_kitty_iso_level_shift_keys(sequence, expected_code, expected_name):
     """Test ISO level shift keys."""
