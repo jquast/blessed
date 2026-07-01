@@ -349,17 +349,29 @@ can do. These are:
 
 ``bold``
   Turn on 'extra bright' mode.
+``dim``
+  Enable dim (half-bright) mode.
 ``reverse``
   Switch fore and background attributes.
-``normal``
-  Reset attributes to default.
+``strikethrough``
+  Enable strikethrough mode.
+``no_strikethrough``
+  Disable strikethrough mode.
 ``underline``
   Enable underline mode.
 ``no_underline``
   Disable underline mode.
+``normal``
+  Reset attributes to default.
 
 .. note:: While the inverse of *underline* is *no_underline*, the only way to turn off *bold* or
     *reverse* is *normal*, which also cancels any custom colors.
+
+Example program to display supported styles:
+
+.. literalinclude:: ../bin/display-styles.py
+   :language: python
+   :lines 3-:
 
 Full-Screen Mode
 ----------------

@@ -588,6 +588,8 @@ def test_sequence_is_movement_false(any_term):
         assert len(term.hide_cursor) == measure_length(term.hide_cursor, term)
         assert len(term.save) == measure_length(term.save, term)
         assert len(term.italic) == measure_length(term.italic, term)
+        assert len(term.strikethrough) == measure_length(term.strikethrough, term)
+        assert len(term.overline) == measure_length(term.overline, term)
         assert (len(term.standout) == measure_length(term.standout, term)
                 ), (term.standout, term._wont_move)
 
@@ -626,6 +628,10 @@ def test_termcap_will_move_false(any_term):  # pylint: disable=too-complex
             assert not next(iter_parse(term, term.save))[1].will_move
         if term.italic:
             assert not next(iter_parse(term, term.italic))[1].will_move
+        if term.strikethrough:
+            assert not next(iter_parse(term, term.strikethrough))[1].will_move
+        if term.overline:
+            assert not next(iter_parse(term, term.overline))[1].will_move
         if term.standout:
             assert not next(iter_parse(term, term.standout))[1].will_move
 
