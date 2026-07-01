@@ -22,7 +22,7 @@ Stripping Sequences
 The :meth:`~.Terminal.strip_seqs` method removes all escape sequences from a string, leaving only
 the printable text:
 
-    >>> phrase = term.bold_black('coffee')
+    >>> phrase = term.sienna4('coffee')
     >>> phrase
     '\x1b[1m\x1b[30mcoffee\x1b(B\x1b[m'
     >>> term.strip_seqs(phrase)
