@@ -151,6 +151,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         'clear_eol': 'el',
         'clear_bol': 'el1',
         'clear_eos': 'ed',
+        'clear_scrollback': 'E3',
         'enter_fullscreen': 'smcup',
         'exit_fullscreen': 'rmcup',
         'move': 'cup',
