@@ -70,7 +70,8 @@ COLORS: Set[str] = _make_colors()
 
 #: Attributes that may be compounded with colors, by underscore, such as
 #: 'reverse_indigo'.
-COMPOUNDABLES: Set[str] = set('bold underline reverse blink dim italic standout'.split())
+COMPOUNDABLES: Set[str] = {'bold', 'underline', 'reverse', 'blink', 'dim', 'italic',
+                           'standout', 'strikethrough', 'overline'}
 
 
 class ParameterizingString(str):

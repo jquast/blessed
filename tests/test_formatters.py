@@ -340,6 +340,15 @@ def test_resolve_capability_empty_bytes_returns_empty():
         assert len(w) == 0
 
 
+def test_resolve_capability_strikethrough_overline():
+    """Test strikethrough and overline resolve to expected SGR sequences."""
+    from blessed.formatters import resolve_capability
+    term_xterm = TestTerminal(kind='xterm-256color', force_styling=True)
+    assert resolve_capability(term_xterm, 'strikethrough') == '\x1b[9m'
+    term_wez = TestTerminal(kind='wezterm', force_styling=True)
+    assert resolve_capability(term_wez, 'overline') == '\x1b[53m'
+
+
 def test_resolve_color(monkeypatch):
     """Test formatters.resolve_color."""
     # local

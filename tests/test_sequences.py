@@ -354,6 +354,10 @@ def test_formatting_functions(any_term):
         # Test unicode
         expected_output = ''.join((t.underline, 'boö', t.normal)) if t.underline else 'boö'
         assert t.underline('boö') == expected_output
+        expected_output = ''.join((t.strikethrough, 'sx', t.normal)) if t.strikethrough else 'sx'
+        assert t.strikethrough('sx') == expected_output
+        expected_output = ''.join((t.overline, 'ol', t.normal)) if t.overline else 'ol'
+        assert t.overline('ol') == expected_output
 
     child(any_term)
 
@@ -373,6 +377,12 @@ def test_compound_formatting(any_term):
             else 'meh'
         )
         assert t.on_bright_red_bold_bright_green_underline('meh') == expected_output
+
+        expected_output = (
+            ''.join((t.strikethrough, t.bold, 'sx', t.normal))
+            if any((t.strikethrough, t.bold)) else 'sx'
+        )
+        assert t.strikethrough_bold('sx') == expected_output
 
     child(any_term)
 
