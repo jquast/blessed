@@ -1103,3 +1103,37 @@ def test_windows_ms_terminal_truecolor():
             assert term.number_of_colors == 1 << 24
     finally:
         bt.IS_WINDOWS = original_is_windows
+
+
+def test_kind_truecolor():
+    """Known 24-bit TERM types yield 1<<24 colors without COLORTERM or XTGETTCAP."""
+    term = TestTerminal(stream=StringIO(), kind='rio', force_styling=True,
+                        _xtgettcap_data=NO_XTGETTCAP_DATA)
+    assert term.number_of_colors == 1 << 24
+
+
+def test_kind_direct_suffix():
+    """TERM types ending in '-direct' yield 1<<24 colors."""
+    term = TestTerminal(stream=StringIO(), kind='xterm-256color', force_styling=True,
+                        _xtgettcap_data=NO_XTGETTCAP_DATA)
+    term._kind = 'xterm-direct'
+    term.number_of_colors = term._Terminal__init__color_capabilities()
+    assert term.number_of_colors == 1 << 24
+
+
+def test_xterm_kind_not_24bit():
+    """Generic xterm-256color without other signals falls through to jinxed (256)."""
+    term = TestTerminal(stream=StringIO(), kind='xterm-256color', force_styling=True,
+                        _xtgettcap_data=NO_XTGETTCAP_DATA)
+    assert term.number_of_colors == 256
+
+
+def test_kind_beats_xtgettcap_colors():
+    """Known 24-bit TERM beats XTGETTCAP colors=256."""
+    term = TestTerminal(
+        stream=StringIO(), kind='kitty', force_styling=True,
+        _xtgettcap_data=TermcapResponse(
+            supported=True,
+            capabilities={'colors': '256'},
+        ))
+    assert term.number_of_colors == 1 << 24

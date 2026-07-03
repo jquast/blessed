@@ -80,6 +80,13 @@ from ._capabilities import (CAPABILITY_DATABASE,
 
 _ALL_XTGETTCAP_CAPS = frozenset({c[0] for c in XTGETTCAP_CAPABILITIES})
 
+# TERM types that uniquely identify 24-bit color terminals.
+# Used as fallback when COLORTERM is absent (e.g. remote SSH sessions).
+_KIND_24BIT = frozenset({
+    'alacritty', 'contour', 'foot', 'ghostty', 'xterm-ghostty',
+    'kitty', 'xterm-kitty', 'mlterm', 'rio',
+})
+
 HAS_TTY = True  # pylint: disable=invalid-name
 IS_WINDOWS = platform.system() == 'Windows'
 if IS_WINDOWS:
@@ -493,10 +500,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """Initialize color distance algorithm and determine Terminal.number_of_colors."""
         # Resolution order:
         # - COLORTERM environment value
-        # - XTGETTCAP 'RGB' (24-bit), then 'colors'
-        # - termcap 'colors' (jinxed)
+        # - XTGETTCAP 'RGB' (24-bit)
+        # - TERM type heuristic ('-direct' suffix, known 24-bit TERMs)
+        # - XTGETTCAP 'colors' (fallback count)
         # - Windows native console (vtwin10) and Microsoft Terminal (ms-terminal) get
         #   24-bit boost
+        # - termcap 'colors' (jinxed)
         self._color_distance_algorithm = 'cie2000'
         if not self.does_styling:
             return 0
@@ -508,6 +517,10 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                     return 1 << 24
             except ValueError:
                 pass
+        # TERM type heuristic for remote sessions where
+        # COLORTERM is not forwarded and XTGETTCAP may be unavailable.
+        if self._kind.endswith('-direct') or self._kind in _KIND_24BIT:
+            return 1 << 24
         if (xt_colors := self._xtgettcap_cache.capabilities.get('colors')) and xt_colors.isdigit():
             return int(xt_colors)
         _win_build = tuple(int(n) for n in platform.version().split('.')
