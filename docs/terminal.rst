@@ -371,7 +371,7 @@ Example program to display supported styles:
 
 .. literalinclude:: ../bin/display-styles.py
    :language: python
-   :lines 3-:
+   :lines: 3-
 
 Full-Screen Mode
 ----------------
