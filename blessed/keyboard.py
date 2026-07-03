@@ -2206,7 +2206,7 @@ class DeviceAttribute():
     supported extensions/capabilities.
     """
 
-    RE_RESPONSE = re.compile(r'\x1b\[\?([0-9]+)((?:;[0-9]+)*)c')
+    RE_RESPONSE = re.compile(r'\x1b\[\?([0-9]+)((?:;[0-9]+)*);*c')
 
     def __init__(self, raw: str, service_class: int,
                  extensions: typing.Optional[typing.List[int]]) -> None:

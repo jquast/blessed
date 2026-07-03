@@ -55,6 +55,8 @@ pytestmark = pytest.mark.skipif(
     ('\x1b[?64;1;2c', 64, {1, 2}, False),
     ('\x1b[?1c', 1, set(), False),
     ('\x1b[?62;1;4;6c', 62, {1, 4, 6}, True),
+    ('\x1b[?62;52;c', 62, {52}, False),
+    ('\x1b[?62;c', 62, set(), False),
 ])
 def test_device_attribute_from_match(response, service_class, extensions, supports_sixel):
     """Test DeviceAttribute.from_match() with various response formats."""

@@ -2,6 +2,10 @@
 
 Version History
 ===============
+1.46
+  * bugfix: :meth:`~Terminal.does_sixel` failed to detect DA1 and caused the response to "leak" into
+    next call to :meth:`~Terminal.inkey` for some terminals of unmatched patterns (e.g., kitty).
+
 1.45
   * bugfix: name consistency of kitty keyboard modifiers :ghpull:`390`.
 

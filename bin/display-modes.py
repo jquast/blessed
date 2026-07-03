@@ -244,7 +244,10 @@ def main():
     if show_all:
         display_all_dec_modes(term)
     else:
-        print(term.bold_black("Use --all to query all DEC Private Modes"))
+        print(term.lightgray("Use --all to query all DEC Private Modes"))
+
+    remainder = term.flushinp()
+    assert not remainder, ("erroneous input remains!", remainder)
 
 
 if __name__ == '__main__':
