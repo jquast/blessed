@@ -270,6 +270,7 @@ XTGETTCAP_CAPABILITIES = (
     ("lines", "Lines"),
     ("it", "Init tabs"),
     ("pairs", "Max color pairs"),
+    ("U8", "UTF-8 line-drawing"),
     # Boolean capabilities
     ("am", "Auto right margin"),
     ("bce", "Background color erase"),
@@ -418,6 +419,7 @@ XTGETTCAP_CAPABILITIES = (
     # String capabilities -- terminal features (continued)
     ("Rect", "Rectangle operations"),
     ("TS", "Terminal state query"),
+    ("S0", "Output 8-bit controls"),
     ("nel", "Newline"),
     ("rmm", "Reset meta mode"),
     ("setal", "Set ANSI label"),
