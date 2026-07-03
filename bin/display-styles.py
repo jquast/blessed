@@ -24,7 +24,7 @@ styles = [
 
 for name, cap in styles:
     if cap:
-        txt = cap(f'The quick brown fox') + '   ' + repr(str(cap))
+        txt = cap('The quick brown fox') + '   ' + repr(str(cap))
     else:
         txt = term.webgray('(unsupported)')
     print(f'{name:>14s}   {txt}')
