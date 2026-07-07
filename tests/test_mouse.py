@@ -9,7 +9,8 @@ import pytest
 # local
 from blessed import Terminal
 from blessed.keyboard import Keystroke, _match_dec_event
-from blessed.mouse import MouseEvent, MouseSGREvent, MouseLegacyEvent
+from blessed.mouse import (MouseEvent, MouseSGREvent, MouseLegacyEvent,
+                           RE_PATTERN_MOUSE_SGR, RE_PATTERN_MOUSE_LEGACY)
 from blessed.dec_modes import DecModeResponse
 from .accessories import TestTerminal, make_enabled_dec_cache
 from .conftest import IS_WINDOWS
@@ -508,6 +509,42 @@ def test_mouse_motion_event_naming():
     # Motion events should NOT have _RELEASED suffix
     ks_motion_not_released = _match_dec_event('\x1b[<32;10;20m', dec_mode_cache=cache)
     assert not ks_motion_not_released.name.endswith('_RELEASED')
+
+
+@pytest.mark.parametrize("mod_bits,sgr_button,expected_name", [
+    (0, 35, "MOUSE_MOTION"),        # plain no-button motion
+    (16, 51, "MOUSE_CTRL_MOTION"),  # ctrl held
+    (4, 39, "MOUSE_SHIFT_MOTION"),  # shift held
+    (8, 43, "MOUSE_META_MOTION"),   # meta held
+])
+def test_mouse_legacy_no_button_motion_matches_sgr(mod_bits, sgr_button, expected_name):
+    """Legacy no-button motion (mode 1003) must report as MOTION, like SGR.
+
+    Regression: the legacy decoder collapsed the "no button" code (low bits 3)
+    into a release *before* checking the motion bit, so an all-motion (mode
+    1003) move with no button held was mis-decoded as a left-button event
+    ("LEFT_MOTION", released=True) instead of "MOTION". The SGR decoder, on the
+    identical semantic event, keeps button_value 3 and reports "MOTION"; the
+    two sibling decoders must agree.
+    """
+    cb = 3 | 0x20 | mod_bits  # no-button (low bits 3) + motion bit + modifiers
+    legacy_seq = '\x1b[M' + chr(cb + 32) + chr(10 + 32) + chr(20 + 32)
+    sgr_seq = '\x1b[<%d;11;21M' % sgr_button
+
+    legacy = MouseEvent.from_legacy_match(RE_PATTERN_MOUSE_LEGACY.match(legacy_seq))
+    sgr = MouseEvent.from_sgr_match(RE_PATTERN_MOUSE_SGR.match(sgr_seq))
+
+    # Sibling consistency: legacy decoder must agree with the SGR decoder.
+    assert legacy.button == sgr.button
+    assert legacy.button == expected_name[len("MOUSE_"):]
+    assert legacy.button_value == 3
+    assert legacy.is_motion is True
+    assert legacy.released is False
+
+    # Full pipeline via mode 1003: Keystroke.name must not be a click/release.
+    ks = _match_dec_event(legacy_seq, dec_mode_cache={1003: DecModeResponse.SET})
+    assert ks.name == expected_name
+    assert not ks.name.endswith("_RELEASED")
 
 
 def test_mouse_coordinate_properties():
