@@ -4,6 +4,8 @@ Version History
 ===============
 
 1.46
+  * bugfix: legacy mouse decoder reported a no-button motion event (mode 1003) as a phantom
+    ``LEFT_MOTION`` release instead of ``MOTION``, disagreeing with the SGR decoder :ghpull:`396`.
   * bugfix: :meth:`~Terminal.does_sixel` failed to detect DA1 and caused the response to "leak" into
     next call to :meth:`~Terminal.inkey` for some terminals of unmatched patterns (e.g., kitty).
   * improve: add new sugar for extended cap-defined styles, like 'clear_scrollback' (common),
