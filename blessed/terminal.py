@@ -393,7 +393,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._xtsmgraphics_colors_cache: Optional[int] = None
         # Cache for get_cell_height_and_width() - (height, width) or (-1, -1)
         self._xtwinops_cell_cache: Optional[Tuple[int, int]] = None
-
         # Cache for in-band resize notifications (mode 2048)
         # When notify_on_resize() context manager is active, this stores the latest
         # terminal dimensions from resize events
@@ -853,7 +852,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         itself times out, the timeout is the natural fallback.
 
         :arg str query_str: Query string written to output.
-        :arg re.Pattern feature_re: Compiled regex for the feature response.
+        :arg re.Pattern feature_re: Compiled regex for feature response. May also be a tuple of
+            patterns; the first matching pattern is returned.
         :arg float timeout: Timeout in seconds for each sub-query.
         :arg bool requires_styling: When True (default), return None if
             :attr:`does_styling` is False.  Set to False for queries
@@ -864,6 +864,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return None
         if requires_styling and not self.does_styling:
             return None
+
+        patterns = (feature_re if isinstance(feature_re, tuple)
+                    else (feature_re,))
 
         # Send feature query + CPR request. We always wait for the CPR
         # as the boundary marker, then check if the feature also responded.
@@ -884,9 +887,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             if match:
                 data = data[:match.start()] + data[match.end():]
 
-            # Check if the feature response arrived before the CPR
-            if (feature_match := feature_re.search(data)):
-                data = data[:feature_match.start()] + data[feature_match.end():]
+            # Try each pattern against the response data
+            feature_match = None
+            for pattern in patterns:
+                if (feature_match := pattern.search(data)):
+                    data = data[:feature_match.start()] + data[feature_match.end():]
+                    break
 
             # Re-buffer any remaining keyboard input
             self.ungetch(data)
@@ -1183,9 +1189,11 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return self._device_attributes_cache
 
         query = '\x1b[c'
-        match = self._query_with_boundary(query, DeviceAttribute.RE_RESPONSE, timeout)
+        match = self._query_with_boundary(
+            query,
+            (DeviceAttribute.RE_RESPONSE, DeviceAttribute.RE_RESPONSE_CTERM),
+            timeout)
 
-        # invalid or no response (timeout)
         if match is None:
             self._device_attributes_first_query_failed = True
             return None
