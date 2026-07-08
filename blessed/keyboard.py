@@ -2258,8 +2258,8 @@ class DeviceAttribute():
         """
         if match.re is cls.RE_RESPONSE_CTERM:
             # SyncTERM is a client used by retrocomputer BBS enthusiasts. It has an illegal response
-            # pattern, spelling out "CTerm" in ASCII as the numeric values using ASCII digits.  and
-            # so it fails to report support for sixel -- this line of code "corrects" their error.
+            # pattern, spelling out "CTerm" in ASCII as the numeric values using ASCII digits,
+            # causing it to fail to report its support of sixel, corrected here.
             return cls(match.group(0), 0, [4])
         service_class = int(match.group(1))
         extensions_str = match.group(2)
