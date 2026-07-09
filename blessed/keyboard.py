@@ -2208,6 +2208,9 @@ class DeviceAttribute():
 
     RE_RESPONSE = re.compile(r'\x1b\[\?([0-9]+)((?:;[0-9]+)*);*c')
 
+    RE_RESPONSE_CTERM = re.compile(
+        r'\x1b\[=' + ';'.join(map(str, map(ord, 'CTerm'))) + r'(?:;[0-9]+)*;*c')
+
     def __init__(self, raw: str, service_class: int,
                  extensions: typing.Optional[typing.List[int]]) -> None:
         """
@@ -2253,6 +2256,11 @@ class DeviceAttribute():
         :rtype: DeviceAttribute
         :returns: DeviceAttribute instance parsed from match
         """
+        if match.re is cls.RE_RESPONSE_CTERM:
+            # SyncTERM is a client used by retrocomputer BBS enthusiasts. It has an illegal response
+            # pattern, spelling out "CTerm" in ASCII as the numeric values using ASCII digits,
+            # causing it to fail to report its support of sixel, corrected here.
+            return cls(match.group(0), 0, [4])
         service_class = int(match.group(1))
         extensions_str = match.group(2)
         extensions: typing.List[int] = []

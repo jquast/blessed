@@ -2,6 +2,9 @@
 
 Version History
 ===============
+1.47
+  * bugfix: :meth:`~Terminal.does_sixel` now returns ``True`` for SyncTERM using special-case
+    matching of its illegal DA1 response.
 
 1.46
   * bugfix: :meth:`~Terminal.does_sixel` failed to detect DA1 and caused the response to "leak" into
