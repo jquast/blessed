@@ -2,12 +2,13 @@
 
 Version History
 ===============
-
 1.47
-  * bugfix: :meth:`~Terminal.does_sixel` failed to detect DA1 and caused the response to "leak" into
-    next call to :meth:`~Terminal.inkey` for some terminals of unmatched patterns (e.g., kitty).
+  * bugfix: :meth:`~Terminal.does_sixel` now returns ``True`` for SyncTERM using special-case
+    matching of its illegal DA1 response.
 
 1.46
+  * bugfix: :meth:`~Terminal.does_sixel` failed to detect DA1 and caused the response to "leak" into
+    next call to :meth:`~Terminal.inkey` for some terminals of unmatched patterns (e.g., kitty).
   * improve: add new sugar for extended cap-defined styles, like 'clear_scrollback' (common),
     'strikethrough', and 'overline' (not common).
   * improve: Truecolor support by unique TERM, improves remote sessions like SSH that do not forward
