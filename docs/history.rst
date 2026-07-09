@@ -4,8 +4,8 @@ Version History
 ===============
 
 1.47
-  * bugfix: legacy mouse decoder reported a no-button motion event (mode 1003) as a phantom
-    ``LEFT_MOTION`` release instead of ``MOTION``, disagreeing with the SGR decoder :ghpull:`396`.
+  * bugfix: legacy SGR mouse decoder reported no-button motion event (mode 1003) as ``LEFT_MOTION``
+    instead of ``MOTION``, :ghpull:`398`.
 
 1.46
   * bugfix: :meth:`~Terminal.does_sixel` failed to detect DA1 and caused the response to "leak" into
