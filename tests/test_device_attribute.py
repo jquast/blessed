@@ -86,6 +86,34 @@ def test_device_attribute_repr():
     assert 'supports_sixel=True' in repr_str
 
 
+CTERM_DA1 = '\x1b[=' + ';'.join(map(str, map(ord, 'CTermVERSION'))) + 'c'
+
+
+def test_device_attribute_from_cterm_match():
+    """Test DeviceAttribute.from_match() with CTerm/SyncTERM DA1."""
+    match = DeviceAttribute.RE_RESPONSE_CTERM.match(CTERM_DA1)
+    assert match is not None
+    da = DeviceAttribute.from_match(match)
+    assert da.supports_sixel is True
+    assert da.service_class == 0
+    assert 4 in da.extensions
+    assert da.raw == CTERM_DA1
+
+
+def test_get_device_attributes_cterm_format():
+    """Test get_device_attributes() with CTerm/SyncTERM DA1 response."""
+    def child(term):
+        term.ungetch(CTERM_DA1)
+        da = term.get_device_attributes(timeout=0.01)
+        assert da is not None
+        assert da.supports_sixel is True
+        return b'CTERM_OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_get_device_attributes_cterm_format')
+    assert output == '\x1b[c\x1b[6nCTERM_OK'
+
+
 def test_get_device_attributes_via_ungetch():
     """Test get_device_attributes() with response via ungetch."""
     def child(term):

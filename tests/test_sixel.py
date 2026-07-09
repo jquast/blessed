@@ -84,6 +84,37 @@ def test_does_sixel_not_a_tty():
     child()
 
 
+CTERM_DA1 = '\x1b[=' + ';'.join(map(str, map(ord, 'CTermVERSION'))) + 'c'
+
+
+def test_does_sixel_cterm_format():
+    """Test does_sixel() returns True with CTerm/SyncTERM DA1."""
+    def child(term):
+        term.ungetch(CTERM_DA1)
+        result = term.does_sixel(timeout=0.01)
+        assert result is True
+        return b'CTERM_SIXEL_YES'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_sixel_cterm_format')
+    assert output == '\x1b[c\x1b[6nCTERM_SIXEL_YES'
+
+
+def test_does_sixel_cterm_format_uses_cache():
+    """Test does_sixel() caches the CTerm DA1 result."""
+    def child(term):
+        term.ungetch(CTERM_DA1)
+        result1 = term.does_sixel(timeout=0.01)
+        result2 = term.does_sixel(timeout=0.01)
+        assert result1 is True
+        assert result2 is True
+        return b'CTERM_CACHE'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_sixel_cterm_format_uses_cache')
+    assert output == '\x1b[c\x1b[6nCTERM_CACHE'
+
+
 def test_get_cell_height_and_width_success():
     """get_cell_height_and_width returns expected tuple with valid response."""
     def child(term):
