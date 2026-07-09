@@ -7,6 +7,7 @@ Version History
     matching of its illegal DA1 response.
   * bugfix: legacy SGR mouse decoder reported no-button motion event (mode 1003) as ``LEFT_MOTION``
     instead of ``MOTION``, :ghpull:`398`.
+  * bugfix: match keyboard input ``\x1b\n`` as ``KEY_ALT_ENTER`` instead of ``KEY_CTRL_ALT_J``.
 
 1.46
   * bugfix: :meth:`~Terminal.does_sixel` failed to detect DA1 and caused the response to "leak" into

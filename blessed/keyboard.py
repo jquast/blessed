@@ -117,9 +117,10 @@ _PUA_KEYPAD_NAMES = {
 
 # Alt-only control character name mappings
 ALT_CONTROL_NAMES = {
+    0x0d: 'KEY_ALT_ENTER',      # CR
+    0x0a: 'KEY_ALT_ENTER',      # LF
     0x1b: 'KEY_ALT_ESCAPE',     # ESC
     0x7f: 'KEY_ALT_BACKSPACE',  # DEL
-    0x0d: 'KEY_ALT_ENTER',      # CR
     0x09: 'KEY_ALT_TAB',        # TAB
 }
 
@@ -243,8 +244,8 @@ class Keystroke(str):
 
             # Special C0 controls that should be Alt-only per legacy spec
             # These represent common Alt+key combinations that are unambiguous
-            # (Enter, Escape, DEL, Tab)
-            if char_code in {0x0d, 0x1b, 0x7f, 0x09}:
+            # (Enter (CR/LF), Escape, DEL, Tab)
+            if char_code in {0x0a, 0x0d, 0x1b, 0x7f, 0x09}:
                 return 1 + KittyModifierBits.alt  # 1 + alt flag = 3
 
             # Other control characters represent Ctrl+Alt combinations
