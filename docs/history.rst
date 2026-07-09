@@ -5,8 +5,6 @@ Version History
 1.47
   * bugfix: :meth:`~Terminal.does_sixel` now returns ``True`` for SyncTERM using special-case
     matching of its illegal DA1 response.
-
-1.47
   * bugfix: legacy SGR mouse decoder reported no-button motion event (mode 1003) as ``LEFT_MOTION``
     instead of ``MOTION``, :ghpull:`398`.
 
