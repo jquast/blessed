@@ -199,9 +199,17 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
         cx = ord(match.group('cx')) - 32 - 1  # Convert from 1-indexed to 0-indexed
         cy = ord(match.group('cy')) - 32 - 1  # Convert from 1-indexed to 0-indexed
 
+        # Extract motion/drag flags
+        is_motion = bool(cb & 32)
+
         # Extract button and modifiers from cb
         button = cb & 3
-        released = button == 3
+        # A low-bits value of 3 means "no button". When stationary this is a
+        # button release; with the motion bit set (mode 1003 all-motion
+        # tracking) it is a no-button motion event, which must keep button_value
+        # 3 so it reports as "MOTION" rather than "LEFT_MOTION", matching the
+        # SGR decoder.
+        released = button == 3 and not is_motion
         if released:
             button = 0  # Release doesn't specify which button
 
@@ -209,9 +217,6 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
         shift = bool(cb & 4)
         meta = bool(cb & 8)
         ctrl = bool(cb & 16)
-
-        # Extract motion/drag flags
-        is_motion = bool(cb & 32)
 
         # Wheel events
         is_wheel = cb >= 64

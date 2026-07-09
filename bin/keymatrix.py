@@ -1,13 +1,15 @@
 #!/usr/bin/env python
 """
-Advanced keyboard and special modes interaction example.
+Advanced keyboard and special modes interaction and testing tool.
 
 Usage:
-- F1-F11: Toggle DEC private modes (bracketed paste, mouse, etc.)
-- Shift+F1-F5: Toggle Kitty keyboard protocol flags
-- 'q': Exit
-
-All modes that elicit responses are activated for demonstration.
+- F1-F7:    Toggle DEC private modes
+- F8:       Toggle SGR mouse mode (1006). Turn OFF for legacy ``ESC [ M`` format
+- F9:       Toggle drag tracking (1002)
+- F10:      Toggle all-motion tracking (1003)
+- F11:      Toggle pixel coordinates (1016)
+- Shift+F1-F5:  Toggle Kitty keyboard protocol flags
+- 'q'/^C:   Exit
 """
 # std imports
 import sys
@@ -91,7 +93,7 @@ class DecModeManager:
 
     def toggle_keynames(self) -> List[str]:
         """Return list of key names that toggle DEC modes."""
-        return [f'KEY_F{i}' for i in range(1, 12)]
+        return [f'KEY_F{i}' for i in range(1, 1 + len(self.test_modes))]
 
     def get_index_by_key(self, key_name: str) -> int:
         """Convert key name to toggle index."""
@@ -174,16 +176,15 @@ class KittyKeyboardManager:
 
 
 class MouseModeManager:
-    """Manages mouse mode probing and toggling."""
-
     def __init__(self, term: Terminal):
         self.term = term
         self.supported: bool = False
         self.active_context: Optional[Any] = None
+        self.report_sgr: bool = True
         self.report_drag: bool = False
         self.report_motion: bool = False
         self.report_pixels: bool = False
-        self.mode_names = ['drag', 'motion', 'pixels']
+        self.mode_names = ['sgr', 'drag', 'motion', 'pixels']
 
     def probe(self) -> List[str]:
         """Probe terminal for mouse support and return log messages."""
@@ -191,6 +192,14 @@ class MouseModeManager:
         if self.supported:
             return ["Mouse support detected!"]
         return ["Mouse support not available!"]
+
+    def _pick_tracking_mode(self) -> Optional[DecPrivateMode]:
+        """Return the highest-priority tracking DEC mode, or None."""
+        if self.report_motion:
+            return DecPrivateMode.MOUSE_ALL_MOTION
+        if self.report_drag:
+            return DecPrivateMode.MOUSE_REPORT_DRAG
+        return None
 
     def toggle_by_index(self, f_idx: int) -> str:
         """Toggle mouse mode by F-key index and return log message."""
@@ -200,10 +209,16 @@ class MouseModeManager:
         mode_name = self.mode_names[f_idx]
 
         # Toggle the flag
-        if mode_name == 'drag':
+        if mode_name == 'sgr':
+            self.report_sgr = not self.report_sgr
+        elif mode_name == 'drag':
             self.report_drag = not self.report_drag
+            if self.report_drag:
+                self.report_motion = False
         elif mode_name == 'motion':
             self.report_motion = not self.report_motion
+            if self.report_motion:
+                self.report_drag = False
         elif mode_name == 'pixels':
             self.report_pixels = not self.report_pixels
 
@@ -212,18 +227,25 @@ class MouseModeManager:
             self.active_context.__exit__(None, None, None)
             self.active_context = None
 
-        # Create new context if any mode is enabled
-        if self.report_drag or self.report_motion or self.report_pixels:
-            self.active_context = self.term.mouse_enabled(
-                report_drag=self.report_drag,
-                report_motion=self.report_motion,
-                report_pixels=self.report_pixels
-            )
-            self.active_context.__enter__()  # pylint: disable=unnecessary-dunder-call
+        # Build modes list — include SGR (1006) only when report_sgr is ON
+        modes = []
+        if self.report_sgr:
+            modes.append(DecPrivateMode.MOUSE_EXTENDED_SGR)
+        tracking_mode = self._pick_tracking_mode()
+        if tracking_mode is not None:
+            modes.append(tracking_mode)
+        if self.report_pixels:
+            modes.append(DecPrivateMode.MOUSE_SGR_PIXELS)
+
+        if modes:
+            self.active_context = self.term.dec_modes_enabled(*modes)
+            self.active_context.__enter__()
 
         return (
-            f'Mouse: drag={self.report_drag} '
-            f'motion={self.report_motion} pixels={self.report_pixels}'
+            f'Mouse: sgr={self.report_sgr} '
+            f'drag={self.report_drag} '
+            f'motion={self.report_motion} '
+            f'pixels={self.report_pixels}'
         )
 
     def header_msg(self) -> str:
@@ -231,6 +253,8 @@ class MouseModeManager:
         if not self.supported:
             return "Mouse: not supported"
         status = []
+        if self.report_sgr:
+            status.append("SGR")
         if self.report_drag:
             status.append("drag")
         if self.report_motion:
@@ -238,16 +262,16 @@ class MouseModeManager:
         if self.report_pixels:
             status.append("pixels")
         status_str = "+".join(status) if status else "disabled"
-        return f"Mouse: {status_str} [F9=drag F10=motion F11=pixels]"
+        return f"Mouse: {status_str} [F8=SGR F9=drag F10=motion F11=pixels]"
 
     def toggle_keynames(self) -> List[str]:
         """Return list of key names that toggle mouse modes."""
-        return ['KEY_F9', 'KEY_F10', 'KEY_F11']
+        return ['KEY_F8', 'KEY_F9', 'KEY_F10', 'KEY_F11']
 
     def get_index_by_key(self, key_name: str) -> int:
         """Convert key name to toggle index."""
         f_num = int(key_name.split('_')[-1][1:])
-        return f_num - 9  # F9 -> index 0, F10 -> index 1, F11 -> index 2
+        return f_num - 8  # F8 -> index 0, F9 -> index 1, F10 -> index 2, F11 -> index 3
 
     def cleanup(self) -> None:
         """Clean up active context manager."""

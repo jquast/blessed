@@ -9,7 +9,7 @@ import pytest
 # local
 from blessed import Terminal
 from blessed.keyboard import Keystroke, _match_dec_event
-from blessed.mouse import MouseEvent, MouseSGREvent, MouseLegacyEvent
+from blessed.mouse import (MouseEvent, MouseSGREvent, MouseLegacyEvent)
 from blessed.dec_modes import DecModeResponse
 from .accessories import TestTerminal, make_enabled_dec_cache
 from .conftest import IS_WINDOWS
@@ -575,6 +575,11 @@ def test_mouse_legacy_encoding_systematic():
         (0, 200, 190, False, False, False, False, False),
         (1, 210, 200, False, True, False, False, False),
         (2, 220, 210, False, False, True, False, False),
+        # no-button motion: low bits 3 + motion bit (mode 1003 all-motion).
+        # before commit 37128c5 the legacy decoder collapsed cb&3==3 into a
+        # release before checking the motion bit, misreporting this as a
+        # left-button event (released=True) instead of no-button MOTION.
+        (3, 100, 150, False, False, False, False, True),
     ]
 
     def child(term):
