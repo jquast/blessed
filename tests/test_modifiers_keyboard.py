@@ -143,6 +143,7 @@ def test_keystroke_value_by_keycode(code, expected_value):
     ('\x1b\x1f', 'KEY_CTRL_ALT__', 7),
     ('\x1b\x1b', 'KEY_ALT_ESCAPE', 3),
     ('\x1b\x7f', 'KEY_ALT_BACKSPACE', 3),
+    ('\x1b\x0a', 'KEY_ALT_ENTER', 3),
     ('\x1b\x0d', 'KEY_ALT_ENTER', 3),
     ('\x1b\x09', 'KEY_ALT_TAB', 3),
     ('\x1b[', 'CSI', 3),
@@ -1244,7 +1245,6 @@ def test_get_meta_escape_name_branch_coverage():
         ('\x1b\x03', 7, 'KEY_CTRL_ALT_C'),
         ('\x1b\x04', 7, 'KEY_CTRL_ALT_D'),
         ('\x1b\x07', 7, 'KEY_CTRL_ALT_G'),
-        ('\x1b\x0a', 7, 'KEY_CTRL_ALT_J'),
         ('\x1b\x0b', 7, 'KEY_CTRL_ALT_K'),
         ('\x1b\x0c', 7, 'KEY_CTRL_ALT_L'),
         ('\x1b\x0e', 7, 'KEY_CTRL_ALT_N'),
@@ -1259,6 +1259,7 @@ def test_get_meta_escape_name_branch_coverage():
         ('\x1b\x18', 7, 'KEY_CTRL_ALT_X'),
         ('\x1b\x19', 7, 'KEY_CTRL_ALT_Y'),
         ('\x1b\x0d', 3, 'KEY_ALT_ENTER'),
+        ('\x1b\x0a', 3, 'KEY_ALT_ENTER'),
         ('\x1b\x09', 3, 'KEY_ALT_TAB'),
     ]
 
