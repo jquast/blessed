@@ -12,6 +12,7 @@ import select
 import struct
 import asyncio
 import platform
+import unicodedata
 import warnings
 import contextlib
 import collections
@@ -1873,7 +1874,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
     def does_font_have_codepoints(self, codepoints: str,
                                   timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
-                                  force: bool = False) -> Optional[Tuple[bool, ...]]:
+                                  force: bool = False) -> Optional[str]:
+        # XXX cite both in documentation
+        # XXX describe combining caveats, to call unicodedata.normalize first
+        # XXX looks like rio has a bug .. report it ..
+        # that the string is returned as-is, up to the same length, with
+        # unsupported codepoints omitted .. 
         """
         Query whether each codepoint is supported by the terminal font.
 
@@ -1888,11 +1894,17 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return None
         if not codepoints:
             return ()
-        # check for protocol support
-        if (result := self._query_font_mintty_protocol('blessed')):
-            self._does_mintty_font_protocol = bool(result)
-        elif self._does_glyph_protocol is None:
-            self._does_glyph_protocol = self._probe_glyph_protocol(timeout)
+        if unicodedata.normalize('NFC', codepoints) != codepoints:
+            raise TypeError(
+                'codepoints argument must be NFC-normalized; '
+                'use unicodedata.normalize("NFC", ...) on the input first')
+        # check for protocol support, first mintty's
+        self._does_mintty_font_protocol = (
+                self._query_font_mintty_protocol('blessed') == 'blessed')
+        if not self._does_mintty_font_protocol:
+            # then, rio's
+            kv = self._probe_glyph_protocol(timeout)
+            self._does_glyph_protocol = 'glyf' in kv.get('fmt', '')
         # conditionally return results, may be None (no support)
         return (
             self._query_font_mintty_protocol(codepoints, timeout)
@@ -1903,11 +1915,11 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
     def _probe_glyph_protocol(self, timeout: Optional[float]) -> Dict[str, str]:
         """
-        Probe for Glyph Protocol support using the 's' verb.
+        Probe for Glyph Protocol support using the ``'s'`` verb.
 
         :arg float timeout: Timeout in seconds.
-        :returns: Dict of CSV key=value pairs (e.g. ``{'fmt': 'glyf,colrv0,colrv1'}``), or empty
-            dict if unsupported.
+        :returns: Dict of pairs, e.g. ``{'fmt': 'glyf,colrv0,colrv1'}``),
+            empty dict when unsupported or timeout.
         :rtype: Dict[str, str]
         """
         if (match := self._query_with_boundary('\x1b_25a1;s\x1b\\',
@@ -1926,15 +1938,17 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             self,
             codepoints: str,
             timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Optional[str]:
-        int_codepoints = tuple(ord(cp) for cp in codepoints)
-        qsubstr = ';'.join(str(int_cp) for int_cp in int_codepoints)
+        int_codepoints = set(map(ord, codepoints))
+        qsubstr = ';'.join(map(str, int_codepoints))
         query = f'\x1b]7771;?;{qsubstr}\x07'
         if (match := self._query_with_boundary(
                 query, _RE_MINTTY_FONT_RESPONSE, timeout)) is None:
             return None
 
-        supported = set(int(str_val) for str_val in match.group(1).split(';') if str_val)
-        return ''.join(chr(int_val) for int_val in int_codepoints if int_val in supported)
+        supported = set(int(str_val)
+                        for str_val in match.group(1).split(';')
+                        if str_val)
+        return ''.join(cp for cp in codepoints if ord(cp) in supported)
 
     def _query_font_glyph_protocol(self, codepoints: str,
                                    timeout: Optional[float]) -> Optional[str]:
@@ -1944,11 +1958,10 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         if (matches := self._query_boundary_multiple(
                 queries, _RE_GLYPH_PROTOCOL_Q_RESPONSE, timeout)) is None:
             return None
-        supported = set()
-        for match in matches:
-            if match.group(2):
-                supported.add(int(match.group(1), 16))
-        return ''.join(chr(cp) for cp in int_codepoints if cp in supported)
+        supported = set(int(match.group(1), 16)
+                        for match in matches
+                        if match.group(2))
+        return ''.join(cp for cp in codepoints if ord(cp) in supported)
 
     def does_kitty_graphics(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                             force: bool = False) -> bool:
