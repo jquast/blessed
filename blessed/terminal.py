@@ -128,6 +128,14 @@ _RE_ITERM2_CAPABILITIES_RESPONSE = re.compile(
     r'\x1b\]1337;Capabilities=([^\x07\x1b]+)(?:\x07|\x1b\\)')
 _RE_KITTY_NOTIFICATIONS_RESPONSE = re.compile(
     r'\x1b\]99;([^\x07\x1b]*?)(?:\x07|\x1b\\)')
+# Mintty font glyph coverage: ESC ] 7771 ; ! ; cp1 ; cp2 ; ... BEL/ST
+_RE_MINTTY_FONT_RESPONSE = re.compile(
+    r'\x1b\]7771;!((?:;\d+)*)(?:\x07|\x1b\\)')
+# Glyph Protocol codepoint query response: ESC _ 25a1 ; q ; cp=HEX ; status=VALUE ST
+_RE_GLYPH_PROTOCOL_Q_RESPONSE = re.compile(
+    r'\x1b_25a1;q;cp=([0-9a-fA-F]+);status=([^\x1b\\]*)')
+# Glyph Protocol support probe response: ESC _ 25a1 ; s ; key=val... ST
+_RE_GLYPH_PROTOCOL_S_RESPONSE = re.compile(r'\x1b_25a1;s(;[^\x1b\\]*)')
 _RE_CPR_BOUNDARY = re.compile(r'\x1b\[[0-9]+;[0-9]+R')
 _RE_KITTY_CLIPBOARD = re.compile(r'\x1b\[\?5522;(\d+)\$y')
 _RE_KITTY_POINTER = re.compile(r'\x1b\]22;([^\x07\x1b]+)(?:\x07|\x1b\\)')
@@ -416,6 +424,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._color_scheme_supported: Optional[bool] = None
         # DECRQSS detection cache
         self._decrqss_supported: Optional[bool] = None
+        # Glyph Protocol probe result -- whether supported at all
+        self._does_mintty_font_protocol: Optional[bool] = None
+        self._does_glyph_protocol: Optional[Dict[str, str]] = None
 
     def __init_set_styling(self, force_styling: bool) -> None:
         self._does_styling = False
@@ -877,7 +888,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 ctx = self.cbreak()
                 ctx.__enter__()
 
-            self.stream.write(query_str + '\x1b[6n')
+            self.stream.write(query_str + (self.u7 or '\x1b[6n'))
             self.stream.flush()
 
             # Wait for CPR boundary -- this is always the last response
@@ -902,6 +913,58 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 ctx.__exit__(None, None, None)
 
         return feature_match
+
+    def _query_boundary_multiple(self, query_str: str,
+                                 feature_re: "re.Pattern[str]",
+                                 timeout: Optional[float],
+                                 requires_styling: bool = True
+                                 ) -> Optional[List[Match[str]]]:
+        """
+        Like :meth:`_query_with_boundary` but returns all regex matches.
+
+        Sends *query_str* + CPR, reads until the CPR boundary, then returns
+        every match of *feature_re* found in the response data.  Returns an
+        empty list when the terminal does not respond or the stream is not a
+        TTY.
+
+        :arg str query_str: Query string written to output.
+        :arg re.Pattern feature_re: Compiled regex for feature responses.
+        :arg float timeout: Timeout in seconds.
+        :arg bool requires_styling: When True (default), return empty list if
+            :attr:`does_styling` is False.
+        :rtype: List[re.Match]
+        """
+        if not self.is_a_tty:
+            return None
+        if requires_styling and not self.does_styling:
+            return None
+
+        ctx = None
+        try:
+            if self._line_buffered:
+                ctx = self.cbreak()
+                ctx.__enter__()
+
+            self.stream.write(query_str + '\x1b[6n')
+            self.stream.flush()
+
+            cpr_match, data = _read_until(
+                self, _RE_CPR_BOUNDARY.pattern, timeout)
+
+            if cpr_match is None:
+                return None
+
+            data = data[:cpr_match.start()] + data[cpr_match.end():]
+            results = list(feature_re.finditer(data))
+            data = feature_re.sub('', data)
+
+            self.ungetch(data)
+
+        finally:
+            if ctx is not None:
+                ctx.__exit__(None, None, None)
+
+        return results
 
     @contextlib.contextmanager
     def location(self, x: Optional[int] = None, y: Optional[int]
@@ -1188,9 +1251,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         if self._device_attributes_cache is not None and not force:
             return self._device_attributes_cache
 
-        query = '\x1b[c'
         match = self._query_with_boundary(
-            query,
+            self.u9 or '\x1b[c',
             (DeviceAttribute.RE_RESPONSE, DeviceAttribute.RE_RESPONSE_CTERM),
             timeout)
 
@@ -1214,9 +1276,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         ``TERM_PROGRAM_VERSION`` environment variables. Returns ``None``
         only if both methods fail.
 
-        **Successful responses are cached indefinitely** unless ``force=True`` is
-        specified. Unlike other query methods, there is no sticky failure mechanism -
-        each failed query can be retried.
+        **Only Successful responses are cached indefinitely** unless ``force=True`` is specified.
+        Unlike other query methods, there is no "sticky failure", failed queries are not cached and
+        are retried.
 
         .. note:: A ``timeout`` value should be set to avoid blocking when the
             terminal does not respond to XTVERSION queries, which may happen with
@@ -1775,36 +1837,21 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         if not caps:
             return None
 
-        ctx = None
-        try:
-            if self._line_buffered:
-                ctx = self.cbreak()
-                ctx.__enter__()
-            for capname in caps:
-                self.stream.write(
-                    f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\')
-            self.stream.write('\x1b[6n')  # CPR fence
-            self.stream.flush()
-            match, data = _read_until(self, _RE_CPR_BOUNDARY.pattern, timeout)
-        finally:
-            if ctx is not None:
-                ctx.__exit__(None, None, None)
-
-        if match is None:
+        query_str = ''.join(
+            f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\'
+            for capname in caps)
+        # pylint: disable=protected-access
+        if (matches := self._query_boundary_multiple(
+                query_str, TermcapResponse._RE_XTGETTCAP_RESPONSE, timeout,
+                requires_styling=False)) is None:
             return TermcapResponse()
 
-        # Strip the CPR itself from the response data
-        data = data[:match.start()] + data[match.end():]
-
         capabilities: Dict[str, str] = {}
-        if data:
-            capabilities.update(TermcapResponse.parse_capabilities(data))
-            # pylint: disable=protected-access
-            remaining = TermcapResponse._RE_XTGETTCAP_RESPONSE.sub('', data)
-            if remaining:
-                self.ungetch(remaining)
+        for match in matches:
+            if match.group(1) == '1':
+                name, value = TermcapResponse.from_match(match)
+                capabilities[name] = value
 
-        # Record None sentinel for any requested cap that wasn't answered.
         for capname in caps:
             if capname not in capabilities:
                 capabilities[capname] = None  # type: ignore[assignment]
@@ -1823,6 +1870,85 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         result = self.get_xtgettcap(timeout=timeout, force=force)
         return result is not None
+
+    def does_font_have_codepoints(self, codepoints: str,
+                                  timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
+                                  force: bool = False) -> Optional[Tuple[bool, ...]]:
+        """
+        Query whether each codepoint is supported by the terminal font.
+
+        :arg str codepoints: String whose characters to query.
+        :arg float timeout: Seconds to wait.
+        :arg bool force: Bypass cache.
+        :rtype: Optional[str]
+        """
+        if not self.is_a_tty and not force:
+            return None
+        if not self.does_styling and not force:
+            return None
+        if not codepoints:
+            return ()
+        # check for protocol support
+        if (result := self._query_font_mintty_protocol('blessed')):
+            self._does_mintty_font_protocol = bool(result)
+        elif self._does_glyph_protocol is None:
+            self._does_glyph_protocol = self._probe_glyph_protocol(timeout)
+        # conditionally return results, may be None (no support)
+        return (
+            self._query_font_mintty_protocol(codepoints, timeout)
+            if self._does_mintty_font_protocol else
+            self._query_font_glyph_protocol(codepoints, timeout)
+            if self._does_glyph_protocol else
+            None)
+
+    def _probe_glyph_protocol(self, timeout: Optional[float]) -> Dict[str, str]:
+        """
+        Probe for Glyph Protocol support using the 's' verb.
+
+        :arg float timeout: Timeout in seconds.
+        :returns: Dict of CSV key=value pairs (e.g. ``{'fmt': 'glyf,colrv0,colrv1'}``), or empty
+            dict if unsupported.
+        :rtype: Dict[str, str]
+        """
+        if (match := self._query_with_boundary('\x1b_25a1;s\x1b\\',
+                                               _RE_GLYPH_PROTOCOL_S_RESPONSE,
+                                               timeout)) is None:
+            return {}
+        raw = match.group(1)  # ';fmt=glyf,colrv0,colrv1'
+        result: Dict[str, str] = {}
+        for item in raw.split(';'):
+            if '=' in item:
+                key, val = item.split('=', 1)
+                result[key] = val
+        return result
+
+    def _query_font_mintty_protocol(
+            self,
+            codepoints: str,
+            timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> Optional[str]:
+        int_codepoints = tuple(ord(cp) for cp in codepoints)
+        qsubstr = ';'.join(str(int_cp) for int_cp in int_codepoints)
+        query = f'\x1b]7771;?;{qsubstr}\x07'
+        if (match := self._query_with_boundary(
+                query, _RE_MINTTY_FONT_RESPONSE, timeout)) is None:
+            return None
+
+        supported = set(int(str_val) for str_val in match.group(1).split(';') if str_val)
+        return ''.join(chr(int_val) for int_val in int_codepoints if int_val in supported)
+
+    def _query_font_glyph_protocol(self, codepoints: str,
+                                   timeout: Optional[float]) -> Optional[str]:
+        int_codepoints = set(map(ord, codepoints))
+        queries = ''.join(
+            f'\x1b_25a1;q;cp={cp:x}\x1b\\' for cp in int_codepoints)
+        if (matches := self._query_boundary_multiple(
+                queries, _RE_GLYPH_PROTOCOL_Q_RESPONSE, timeout)) is None:
+            return None
+        supported = set()
+        for match in matches:
+            if match.group(2):
+                supported.add(int(match.group(1), 16))
+        return ''.join(chr(cp) for cp in int_codepoints if cp in supported)
 
     def does_kitty_graphics(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                             force: bool = False) -> bool:
