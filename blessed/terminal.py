@@ -4159,6 +4159,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             raise RuntimeError(
                 "async_inkey requires a keyboard file descriptor")
         fut: asyncio.Future[bytes] = loop.create_future()
+        timed_out = False
 
         def _on_readable() -> None:
             if not fut.done():
@@ -4168,16 +4169,23 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 except OSError as exc:
                     fut.set_exception(exc)
 
+        def _on_timeout() -> None:
+            nonlocal timed_out
+            if not fut.done():
+                timed_out = True
+                fut.set_result(b"")
+
         loop.add_reader(self._keyboard_fd, _on_readable)
+        handle = loop.call_later(timeout, _on_timeout) if timeout is not None else None
         try:
-            if timeout is not None:
-                try:
-                    return await asyncio.wait_for(fut, timeout=timeout)
-                except asyncio.TimeoutError:
-                    return None
-            return await fut
+            data = await fut
         finally:
+            if handle is not None:
+                handle.cancel()
             loop.remove_reader(self._keyboard_fd)
+        if timed_out:
+            return None
+        return data
 
 
 class WINSZ(collections.namedtuple('WINSZ', (

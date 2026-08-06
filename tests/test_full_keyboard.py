@@ -881,7 +881,7 @@ def test_esc_delay_while_loop_with_continued_input():
     def child(term):
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
-            ks = term.inkey(timeout=1.0, esc_delay=TEST_TIMEOUT_SHORT)
+            ks = term.inkey(timeout=1.0, esc_delay=0.3)
             return ks.name.encode('ascii')
 
     def parent(master_fd):
