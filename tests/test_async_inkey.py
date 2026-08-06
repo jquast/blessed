@@ -328,3 +328,55 @@ def test_async_inkey_no_keyboard_fd():
         finally:
             loop.close()
     child()
+
+
+def test_async_read_byte_deadline_same_iteration_no_loss():
+    """A byte arriving while the loop is busy past the deadline is not lost."""
+    def child(term):
+        with term.cbreak():
+            loop = asyncio.new_event_loop()
+            try:
+                def busy():
+                    os.write(sys.__stdout__.fileno(), SEMAPHORE)
+                    time.sleep(1.0)
+
+                loop.call_later(0.05, busy)
+                result = loop.run_until_complete(
+                    term._async_read_byte(loop, timeout=0.1))
+            finally:
+                loop.close()
+            assert result == b'x', f'byte lost: _async_read_byte returned {result!r}'
+            return b'OK'
+
+    def parent(master_fd):
+        read_until_semaphore(master_fd)
+        os.write(master_fd, b'x')
+
+    output = pty_test(child, parent, 'test_async_read_byte_deadline_same_iteration_no_loss')
+    assert output == 'OK'
+
+
+def test_async_read_byte_deadline_wins_byte_stays():
+    """A byte arriving after a deadline win is read by the next call."""
+    def child(term):
+        os.write(sys.__stdout__.fileno(), SEMAPHORE)
+        with term.cbreak():
+            loop = asyncio.new_event_loop()
+            try:
+                result = loop.run_until_complete(
+                    term._async_read_byte(loop, timeout=0.05))
+                assert result is None
+                result2 = loop.run_until_complete(
+                    term._async_read_byte(loop, timeout=1.0))
+                assert result2 == b'x'
+            finally:
+                loop.close()
+            return b'OK'
+
+    def parent(master_fd):
+        read_until_semaphore(master_fd)
+        time.sleep(0.1)
+        os.write(master_fd, b'x')
+
+    output = pty_test(child, parent, 'test_async_read_byte_deadline_wins_byte_stays')
+    assert output == 'OK'
