@@ -2,6 +2,9 @@
 
 Version History
 ===============
+1.48
+  * bugfix: :meth:`~Terminal.async_inkey` dropped keystrokes while another task is busy.
+
 1.47
   * bugfix: :meth:`~Terminal.does_sixel` now returns ``True`` for SyncTERM using special-case
     matching of its illegal DA1 response.
