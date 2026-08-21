@@ -2,8 +2,18 @@
 """Demoscene sine-wave scroller with per-character text sizing."""
 import math
 import time
+from functools import lru_cache
 import blessed
 from wcwidth import TextSizing, TextSizingParams, iter_graphemes, wcswidth
+
+# Animation rates, in real units. The previous values were per-iteration,
+# so there is no exact conversion -- these are picked to look about right
+# and are meant to be tuned.
+TARGET_FPS = 60.0
+SCROLL_RATE = 4.0        # graphemes per second
+SWEEP_PERIOD = 16.0      # seconds per spatial-frequency sweep
+BOUNCE_RATE = 0.6        # radians per second
+SHIMMER_PERIOD = 18.0    # seconds per colour shimmer cycle
 
 FRACTIONS = [(n, d) for d in range(1, 16) for n in range(0, d)]
 
@@ -99,13 +109,24 @@ def main():
     graphemes = list(iter_graphemes(_MESSAGE))
     graph_len = len(graphemes)
 
+    # We ask blessed for a cursor move once per character per frame, and
+    # it rebuilds that string every time.  Same positions over and over,
+    # so cache them.
+    move = lru_cache(maxsize=None)(term.move_yx)
+    frame_budget = 1.0 / TARGET_FPS
+    sweep_w = 2 * math.pi / SWEEP_PERIOD
+    shimmer_w = 2 * math.pi / SHIMMER_PERIOD
+
     with term.cbreak(), term.hidden_cursor():
-        t = 0.0
-        scroll_pos = 0.0
-        bounce_phase = 0.0
+        anim = 0.0
+        prev = time.monotonic()
         paused = False
 
         while True:
+            now = time.monotonic()
+            delta = now - prev
+            prev = now
+
             if term.kbhit(timeout=0):
                 key = term.inkey(timeout=0)
                 if key == 'q' or key == '\x03':
@@ -117,14 +138,14 @@ def main():
                 time.sleep(0.042)
                 continue
 
-            t += 1.0
-            scroll_pos += 0.003
-            bounce_phase += 0.0006
+            anim += delta
+            scroll_pos = anim * SCROLL_RATE
+            bounce_phase = anim * BOUNCE_RATE
 
             graph_offset = int(scroll_pos) % graph_len
 
             base_freq = 2 * math.pi / screen_w
-            spatial_freq = base_freq * (0.2 + 1.8 * (math.sin(t * 0.0004) + 1.0) / 2.0)
+            spatial_freq = base_freq * (0.2 + 1.8 * (math.sin(anim * sweep_w) + 1.0) / 2.0)
 
             col_scales = []
             for col in range(screen_w):
@@ -158,15 +179,18 @@ def main():
                     break
 
                 lerp_t = (y - (screen_h // 2 - vert_amp)) / max(1, vert_amp * 2)
-                lerp_t += 0.15 * math.sin(t * 0.00035)
+                lerp_t += 0.15 * math.sin(anim * shimmer_w)
                 lerp_t = max(0.0, min(1.0, lerp_t))
                 fg = _fire_color(lerp_t)
 
-                buf += term.move_yx(y, col) + fg + seq
+                buf += move(y, col) + fg + seq
                 col += cw
 
             with term.dec_modes_enabled(term.DecPrivateMode.SYNCHRONIZED_OUTPUT):
                 print(buf, end='', flush=True)
+            slack = frame_budget - (time.monotonic() - now)
+            if (slack > 0):
+                time.sleep(slack)
 
 
 if __name__ == '__main__':
