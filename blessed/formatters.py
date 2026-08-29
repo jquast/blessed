@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import pkgutil
 import warnings
+import functools
 import importlib
 from typing import TYPE_CHECKING, Set, List, Tuple, Union, Callable
 
@@ -74,6 +75,41 @@ COMPOUNDABLES: Set[str] = {'bold', 'underline', 'reverse', 'blink', 'dim', 'ital
                            'standout', 'strikethrough', 'overline'}
 
 
+@functools.lru_cache(maxsize=16384)
+def _tparm_cached(cap: str, args: Tuple[object, ...]) -> str:
+    """Memoized call to :func:`jinxed.tparm`."""
+    return jinxed.tparm(cap.encode('latin1'), *args).decode('latin1')
+
+
+def _tparm(cap: str, args: Tuple[object, ...]) -> str:
+    r"""
+    Return evaluated capability ``cap`` for ``args``, memoized where safe.
+
+    :func:`jinxed.tparm` is a pure-python reimplementation of ``tparm(3)``,
+    but a bit slow. tparm() is pure function, and so results are cached.
+
+    :arg str cap: parameterized capability string.
+    :arg tuple args: arguments for ``cap``.
+    :rtype: str
+    :returns: evaluated capability.
+    """
+    # '%PA'-'%PZ' pop the stack into a terminfo static variable, read back by '%gA'-'%gZ'.  jinxed
+    # holds these on a single module-level tparm instance, where they outlive the call that set
+    # them, so such a capability is *not* a pure function of (cap, args) and must never be cached.
+    # (lowercase '%Pa'-'%Pz' are reset each call, but this cheap test does not distinguish case)
+    if '%P' in cap or '%g' in cap:
+        return jinxed.tparm(cap.encode('latin1'), *args).decode('latin1')
+    try:
+        # Hashability tested up front, rather than by catching TypeError from lru_cache, so that a
+        # TypeError raised by tparm() itself does not get retried.
+        hash(args)
+    except TypeError:
+        # an unhashable argument cannot be cached (and is surely an error), call through tparm() to
+        # allow it to (probably) raise on its own.
+        return jinxed.tparm(cap.encode('latin1'), *args).decode('latin1')
+    return _tparm_cached(cap, args)
+
+
 class ParameterizingString(str):
     r"""
     A Unicode string which can be called as a parameterizing termcap.
@@ -115,14 +151,10 @@ class ParameterizingString(str):
         :returns: Callable string for given parameters
         """
         try:
-            # Re-encode the cap, because tparm() takes a bytestring in Python
-            # 3. However, appear to be a plain Unicode string otherwise so
-            # concats work.
-            attr = jinxed.tparm(self.encode('latin1'), *args).decode('latin1')
+            attr = _tparm(self, args)
             return FormattingString(attr, self._normal)
         except TypeError as err:
-            # If the first non-int (i.e. incorrect) arg was a string, suggest
-            # something intelligent:
+            # If the first non-int arg was a string, suggest something helpful:
             if args and isinstance(args[0], str):
                 raise TypeError(
                     f"Unknown terminal capability, {self._name!r}, or, TypeError "

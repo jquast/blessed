@@ -9,8 +9,8 @@ import pytest
 
 # local
 from .conftest import IS_WINDOWS
-from .accessories import (
-    TestTerminal, unicode_cap, unicode_parm, pty_test)
+from blessed.sequences import Termcap
+from .accessories import (TestTerminal, unicode_cap, unicode_parm, pty_test)
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="requires real tty")
@@ -616,9 +616,6 @@ def test_formatting_other_string(any_term):
 def test_termcap_match_optional():
     """When match_optional is given, numeric matches are optional"""
     def child():
-        # local
-        from blessed.sequences import Termcap
-
         t = TestTerminal(force_styling=True)
         cap = Termcap.build('move_right', t.cuf, 'cuf', nparams=1,
                             match_grouped=True, match_optional=True)
@@ -638,27 +635,52 @@ def test_termcap_match_optional():
     child()
 
 
-def test_truncate(any_term):
+def test_truncate():
     """Test terminal.truncate and make sure it agrees with terminal.length"""
-    def child(kind):
-        # local
-
-        term = TestTerminal(kind=kind)
-
+    def child():
+        term = TestTerminal(kind='xterm', force_styling=True)
         test_string = (
-            f'{term.red("Testing")} {term.yellow("makes")} {term.green("me")} '
-            f'{term.blue("feel")} {term.indigo("good")}{term.normal}'
+            f'{term.red("Testing")} {term.yellow("yellow")} {term.green("peppers")} '
+            f'{term.blue("and blue")} {term.indigo("berries")}{term.normal}'
         )
         stripped_string = term.strip_seqs(test_string)
         for i in range(len(stripped_string)):
             test_l = term.length(term.truncate(test_string, i))
             assert test_l == len(stripped_string[:i])
 
-        # Verify truncating removes "good" - check length and visible content
-        target_width = term.length(test_string) - len("good")
-        trunc = term.truncate(test_string, target_width)
-        assert term.length(trunc) == target_width
-        assert term.strip_seqs(trunc) == "Testing makes me feel "
+        truncate_width = term.length(test_string) - len(" and blue berries")
+        result = term.truncate(test_string, truncate_width)
+        assert term.length(result) == truncate_width
+        assert term.strip_seqs(result) == "Testing yellow peppers"
+        assert result == '\x1b[31mTesting\x1b[m \x1b[33myellow\x1b[m \x1b[32mpeppers\x1b[0m'
+
+        # leading sequence is preserved, and, a reset sequence is appended.
+        result = term.truncate(test_string, 7)
+        assert result == '\x1b[31mTesting\x1b[0m'
+
+    child()
+
+
+def test_truncate_inner_sequences(any_term):
+    """Sequences within the truncated region remain at their original position, #402."""
+    def child(kind):
+        # local
+        term = TestTerminal(kind=kind, force_styling=True)
+
+        # a string that fits entirely is returned unmodified, except that a
+        # trailing reset may be appended when styling is still active.
+        given = f'{term.bold("bold")} normal'
+        assert term.truncate(given, term.length(given)).startswith(given)
+
+        # (the trailing reset may be re-spelled as the canonical '\x1b[0m')
+        given = f'{term.red("red")}{term.green("green")}'
+        trunc = term.truncate(given, term.length(given))
+        assert trunc.startswith(f'{term.red("red")}{term.green}green')
+        assert term.strip_seqs(trunc) == 'redgreen'
+
+        # and when the tail is truncated away, the sequences of the remaining
+        # region are still emitted in place.
+        assert term.truncate(given, 4).startswith(f'{term.red("red")}{term.green}g')
 
     child(any_term)
 
@@ -682,7 +704,7 @@ def test_truncate_wcwidth_clipping(any_term):
     def child(kind):
         # local
 
-        term = TestTerminal(kind=kind)
+        term = TestTerminal(kind=kind, force_styling=True)
         assert term.truncate("", 4) == ""
         # Control character \x01 has zero width
         test_string = term.blue("one\x01two")
@@ -698,7 +720,7 @@ def test_truncate_padding(any_term):
     def child(kind):
         # local
 
-        term = TestTerminal(kind=kind)
+        term = TestTerminal(kind=kind, force_styling=True)
 
         if term.move_right(5):
             test_right_string = term.blue(f"one{term.move_right(5)}two")

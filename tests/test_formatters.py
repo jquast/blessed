@@ -26,6 +26,19 @@ def fn_tparm(*args):
     ).encode('latin1')
 
 
+@pytest.fixture
+def tparm_calls(monkeypatch):
+    """Patch jinxed.tparm() by :func:`fn_tparm`, returning a list of its calls."""
+    calls = []
+
+    def fn_tparm_counted(*args):
+        calls.append(args)
+        return fn_tparm(*args)
+
+    monkeypatch.setattr(jinxed, 'tparm', fn_tparm_counted)
+    return calls
+
+
 def test_parameterizing_string_args_unspecified(monkeypatch):
     """Test default args of formatters.ParameterizingString."""
     # local
@@ -86,12 +99,81 @@ def test_parameterizing_string_args(monkeypatch):
     assert onetwo('text') == 'cap~1~2textnorm'
 
 
+def test_parameterizing_string_memoized(tparm_calls):
+    """Test formatters.ParameterizingString memoizes tparm() results."""
+    # pylint: disable=redefined-outer-name
+    # local
+    from blessed.formatters import ParameterizingString
+
+    pstr = ParameterizingString('cap', 'norm', 'seq-name')
+
+    assert pstr(0) == 'cap~0'
+    assert pstr(0) == 'cap~0'
+    assert len(tparm_calls) == 1
+
+    # a distinct instance of the same capability shares the cache, and
+    # differing arguments are cached separately.
+    assert ParameterizingString('cap', 'norm', 'seq-name')(0) == 'cap~0'
+    assert len(tparm_calls) == 1
+    assert pstr(1) == 'cap~1'
+    assert len(tparm_calls) == 2
+
+    # the terminating sequence is not part of the cache key: this instance
+    # differs from ``pstr`` only by its ``normal``, so it hits the entry
+    # memoized above for ('cap', (0,)) without calling tparm() again,
+    other = ParameterizingString('cap', 'other-norm', 'seq-name')(0)
+    assert len(tparm_calls) == 2
+
+    # ... and yet the sequence it terminates with is its own 'other-norm',
+    # rather than the 'norm' of the instance that populated that entry.
+    assert other('text') == 'cap~0textother-norm'
+
+    # an unhashable argument is never cached: hashability is tested before
+    # the cache is consulted, so each call reaches tparm() exactly once.
+    assert pstr(['unhashable']) == "cap~['unhashable']"
+    assert pstr(['unhashable']) == "cap~['unhashable']"
+    assert len(tparm_calls) == 4
+
+
+def test_parameterizing_string_static_vars_not_memoized(tparm_calls):
+    """Test capabilities using terminfo static variables are never memoized."""
+    # pylint: disable=redefined-outer-name
+    # local
+    from blessed.formatters import ParameterizingString
+
+    # '%PA' pops the stack into terminfo static variable 'A', pushed back by '%gA'.  Unlike
+    # parameters, such variables outlive the call that set them, so a capability using them
+    # reads or writes state, is not a pure function of (cap, args), and is never memoized.
+    for cap in ('cap%PA', 'cap%gA'):
+        del tparm_calls[:]
+        pstr = ParameterizingString(cap, 'norm', 'seq-name')
+        pstr(0)
+        pstr(0)
+        assert len(tparm_calls) == 2, cap
+
+
+def test_parameterizing_string_unhashable_arg():
+    """Test formatters.ParameterizingString with an argument that cannot be cached."""
+    # local
+    from blessed.formatters import ParameterizingString
+
+    pstr = ParameterizingString('\x1b[%i%p1%d;%p2%dH', 'norm', 'cup')
+
+    # an unhashable argument cannot be memoized, tparm() still raises on its
+    # own terms rather than 'unhashable type' from the cache.
+    with pytest.raises(TypeError, match='Parameters must be integers or bytes'):
+        pstr(['not', 'hashable'], 2)
+
+
 def test_parameterizing_string_type_error(monkeypatch):
     """Test formatters.ParameterizingString raising TypeError."""
     # local
     from blessed.formatters import ParameterizingString
 
+    calls = []
+
     def tparm_raises_TypeError(*args):
+        calls.append(args)
         raise TypeError('custom_err')
 
     monkeypatch.setattr(jinxed, 'tparm', tparm_raises_TypeError)
@@ -115,6 +197,9 @@ def test_parameterizing_string_type_error(monkeypatch):
         assert False, "previous call should have raised TypeError"
     except TypeError as err:
         assert err.args[0] == "custom_err"
+
+    # a TypeError raised by tparm() itself is not retried by the cache.
+    assert len(calls) == 2
 
 
 def test_formattingstring(monkeypatch):

@@ -8,6 +8,9 @@ import platform
 # 3rd party
 import pytest
 
+# local
+from blessed.formatters import _tparm_cached
+
 
 def pytest_configure(config: pytest.Config) -> None:
     """Normalize environment for consistent test results outside of tox."""
@@ -28,6 +31,15 @@ except ImportError:
         return _passthrough
 
 IS_WINDOWS = platform.system() == 'Windows'
+
+
+@pytest.fixture(autouse=True)
+def clear_tparm_cache():
+    """Discard memoized tparm() results between tests."""
+    _tparm_cached.cache_clear()
+    yield
+    _tparm_cached.cache_clear()
+
 
 many_lines_params = [40, 80]
 # we must test a '1' column for conditional in _handle_long_word

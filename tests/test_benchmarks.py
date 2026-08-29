@@ -204,3 +204,19 @@ def test_wrap_emoji_zwj(benchmark):
     """Benchmark wrap() with ZWJ emoji sequences."""
     term = TestTerminal(force_styling=True)
     benchmark(term.wrap, TEXT_EMOJI_ZWJ, 40)
+
+
+def test_move_yx_full_screen(benchmark):
+    """Benchmark move_yx() once per cell of a full screen."""
+    def _full_screen_moves(term):
+        return ''.join(term.move_yx(y, x) for y in range(24) for x in range(80))
+    term = TestTerminal(force_styling=True)
+    benchmark(_full_screen_moves, term)
+
+
+def test_color_256(benchmark):
+    """Benchmark color() across all indexes of a 256-color terminal."""
+    def _all_256_colors(term):
+        return ''.join(term.color(idx) for idx in range(256))
+    term = TestTerminal(force_styling=True)
+    benchmark(_all_256_colors, term)
