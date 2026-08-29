@@ -303,8 +303,8 @@ def test_keystroke_0s_cbreak_sequence():
     assert math.floor(time.time() - stime) == 0.0
 
 
-def test_keystroke_20ms_cbreak_with_input():
-    """1-second keystroke w/multibyte sequence; should return after ~1 second."""
+def test_keystroke_15ms_cbreak_with_input():
+    """Multibyte sequence arriving after 15ms returns then, not at inkey()'s 5 second timeout."""
     def child(term):
         os.write(sys.__stdout__.fileno(), SEMAPHORE)
         with term.cbreak():
@@ -317,9 +317,9 @@ def test_keystroke_20ms_cbreak_with_input():
         os.write(master_fd, '\x1b[C'.encode('ascii'))
 
     stime = time.time()
-    output = pty_test(child, parent, 'test_keystroke_20ms_cbreak_with_input')
+    output = pty_test(child, parent, 'test_keystroke_15ms_cbreak_with_input')
     assert output == 'KEY_RIGHT'
-    assert_elapsed_range_ms(stime, 5, 25)
+    assert_elapsed_range_ms(stime, 1, 25)
 
 
 def test_esc_delay_cbreak():
