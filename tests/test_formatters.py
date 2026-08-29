@@ -101,6 +101,7 @@ def test_parameterizing_string_args(monkeypatch):
 
 def test_parameterizing_string_memoized(tparm_calls):
     """Test formatters.ParameterizingString memoizes tparm() results."""
+    # pylint: disable=redefined-outer-name
     # local
     from blessed.formatters import ParameterizingString
 
@@ -136,6 +137,7 @@ def test_parameterizing_string_memoized(tparm_calls):
 
 def test_parameterizing_string_static_vars_not_memoized(tparm_calls):
     """Test capabilities using terminfo static variables are never memoized."""
+    # pylint: disable=redefined-outer-name
     # local
     from blessed.formatters import ParameterizingString
 
