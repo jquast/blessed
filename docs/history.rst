@@ -3,6 +3,7 @@
 Version History
 ===============
 1.48
+  * improve: performance of automatic terminal query replies, :ghpull:`405`.
   * improve: all parameterized capabilities are now memorized, about 50x faster, :ghpull:`404`.  *
     bugfix: :meth:`~Terminal.truncate` by bump of dependency ``wcwidth>=0.8.3``, :ghissue:`402`.  *
     bugfix: :meth:`~Terminal.async_inkey` dropped keystrokes while another task is busy,

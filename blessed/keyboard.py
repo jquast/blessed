@@ -1504,39 +1504,38 @@ def _read_until(term: 'Terminal',
     must ensure any such keyboard data is well-received by the next call to
     term.inkey() without delay.
     """
-    # Maximum buffer size to prevent runaway condition -- one such example is automatic terminal
-    # responses that get echoed back indefinitely in an accidental LINEMODE telnet server. 64KB is
-    # far more than any legitimate automatic terminal response could be.
+    # Maximum buffer size to prevent runaway condition. 64KB is more than any query blessed makes
+    # for automatic terminal response. This prevents "loops" by misbehaving protocols and clients.
     max_buffer_size = 65536
 
+    # pylint: disable=protected-access
     stime = time.time()
     match, buf = None, ''
     while True:  # pragma: no branch
-        # block as long as necessary to ensure at least one character is
-        # received on input or remaining timeout has elapsed.
-        ucs = term.inkey(timeout=_time_left(stime, timeout), esc_delay=0)
-        # while the keyboard buffer is "hot" (has input), we continue to
-        # aggregate all awaiting data.  We do this to ensure slow I/O
-        # calls do not unnecessarily give up within the first 'while' loop
-        # for short timeout periods.
-        while ucs:
-            buf += ucs
-            # Check buffer size limit to catch echo loops early
-            if len(buf) > max_buffer_size:
-                break
-            ucs = term.inkey(timeout=0, esc_delay=0)
+        # Take whatever a previous query left in buffer.
+        while term._keyboard_buf:
+            buf += term._keyboard_buf.pop()
+
+        # and then all data immediately available on input, if any
+        buf += term._read_available()
 
         match = re.search(pattern=pattern, string=buf)
         if match is not None:
             # match
             break
 
+        if len(buf) > max_buffer_size:
+            # buffer overflow - likely an echo loop or misbehaving terminal
+            break
+
         if timeout is not None and not _time_left(stime, timeout):
             # timeout
             break
 
-        if len(buf) > max_buffer_size:
-            # buffer overflow - likely an echo loop or misbehaving terminal
+        # block as long as necessary to ensure at least one character is received on
+        # input, or the remaining timeout has elapsed.
+        if not term.kbhit(timeout=_time_left(stime, timeout)):
+            # timeout
             break
 
     return match, buf

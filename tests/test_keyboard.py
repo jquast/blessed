@@ -3,6 +3,7 @@
 import io
 import os
 import sys
+import codecs
 import tempfile
 import collections
 from unittest import mock
@@ -12,6 +13,8 @@ import pytest
 import jinxed
 
 # local
+from blessed.keyboard import _read_until
+from blessed.terminal import _KEYBOARD_READ_SIZE
 from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, as_subprocess
 
@@ -36,7 +39,6 @@ def test_getch_raises_eoferror_on_eof():
 def test_flushinp_handles_eof():
     """flushinp() returns buffered data when keyboard fd reaches EOF."""
     def child():
-        import codecs
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         read_fd, write_fd = os.pipe()
         os.write(write_fd, b'xy')
@@ -90,7 +92,6 @@ def test_kbhit_returns_false_after_eof():
 def test_inkey_raises_EOF():
     """inkey() returns empty Keystroke when keyboard fd is at EOF."""
     def child():
-        import codecs
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         read_fd, write_fd = os.pipe()
         os.close(write_fd)
@@ -692,4 +693,85 @@ def test_is_incomplete_keystroke():
         assert not term._is_incomplete_keystroke('')
         assert not term._is_incomplete_keystroke('x')
         assert not term._is_incomplete_keystroke('xyz')
+    child()
+
+
+# a legacy mouse report is ESC[M followed by three 8-bit values, 32 + value, so any
+# coordinate beyond 95 is a byte that is not valid UTF-8: only those three are decoded
+# as latin-1, wherever in a bulk read they land.
+@pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
+@pytest.mark.parametrize('exchanges', [
+    # a mouse report and a query reply in one read
+    [(b'\x1b[M\x20\xe8\x52\x1b[10;20R', '\x1b[M \xe8\x52\x1b[10;20R')],
+    # decoding returns to the keyboard encoding after the coordinates
+    [(b'\x1b[M\x20\xe8\x52' + 'é中'.encode('utf-8'), '\x1b[M \xe8\x52é中')],
+    # a report divided across two calls, continued by _mouse_latin1_pending
+    [(b'\x1b[M\x20', '\x1b[M '), (b'\xe8\x52', '\xe8\x52')],
+    # a report divided by the block read, at either half of the '\x1b[' prefix
+    [(b'x' * (_KEYBOARD_READ_SIZE - 2) + b'\x1b[M\x20\xe8\x52',
+      'x' * (_KEYBOARD_READ_SIZE - 2) + '\x1b[M \xe8\x52')],
+    [(b'x' * (_KEYBOARD_READ_SIZE - 1) + b'\x1b[M\x20\xe8\x52',
+      'x' * (_KEYBOARD_READ_SIZE - 1) + '\x1b[M \xe8\x52')],
+    # a trailing ESC is held back as a possible '\x1b[M', then returned as itself
+    [(b'x\x1b', 'x\x1b')],
+    # undecodable input is replaced, never raised
+    [(b'\xe8x', '�x')],
+])
+def test_read_available_decoding(exchanges):
+    """_read_available() decodes only legacy mouse coordinates as latin-1."""
+    def child():
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        read_fd, write_fd = os.pipe()
+        term._keyboard_fd = read_fd
+        term._keyboard_decoder = codecs.getincrementaldecoder('utf-8')()
+        try:
+            for data, expected in exchanges:
+                os.write(write_fd, data)
+                assert term._read_available() == expected
+            assert term._mouse_latin1_pending == 0
+        finally:
+            os.close(write_fd)
+            os.close(read_fd)
+    child()
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
+def test_read_available_read_failures():
+    """_read_available() returns empty on read error, and flags end-of-file."""
+    def child():
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        read_fd, write_fd = os.pipe()
+        term._keyboard_fd = read_fd
+        term._keyboard_decoder = codecs.getincrementaldecoder('utf-8')()
+        try:
+            os.write(write_fd, b'xyz')
+            with mock.patch('os.read', side_effect=OSError):
+                assert term._read_available() == ''
+            assert term._keyboard_eof is False
+            os.close(write_fd)
+            os.read(read_fd, _KEYBOARD_READ_SIZE)
+            assert term._read_available() == ''
+            assert term._keyboard_eof is True
+        finally:
+            os.close(read_fd)
+    child()
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
+def test_read_until_with_legacy_mouse():
+    """_read_until() matches a query reply received alongside a legacy mouse report."""
+    def child():
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        term._line_buffered = False
+        read_fd, write_fd = os.pipe()
+        term._keyboard_fd = read_fd
+        term._keyboard_decoder = codecs.getincrementaldecoder('utf-8')()
+        try:
+            os.write(write_fd, b'\x1b[M\x20\xe8\x52\x1b[10;20R')
+            match, buf = _read_until(term, r'\x1b\[(\d+);(\d+)R', timeout=1)
+            assert match.groups() == ('10', '20')
+            assert buf == '\x1b[M \xe8\x52\x1b[10;20R'
+        finally:
+            os.close(write_fd)
+            os.close(read_fd)
     child()

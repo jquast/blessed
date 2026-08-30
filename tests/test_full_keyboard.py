@@ -863,13 +863,14 @@ def test_read_until_max_buffer_size():
     chunks = (['x' * 7000] * 9) + ['x' * 2536, 'x']
     chars = iter(chunks)
 
-    def mock_inkey(timeout=None, esc_delay=None):
+    def mock_read_available():
         try:
             return next(chars)
         except StopIteration:
             return ''
 
-    with mock.patch.object(term, 'inkey', side_effect=mock_inkey):
+    with mock.patch.object(term, '_read_available', side_effect=mock_read_available), \
+            mock.patch.object(term, 'kbhit', return_value=True):
         match, buf = _read_until(term, r'NEVER_MATCH', timeout=1.0)
 
     assert match is None
