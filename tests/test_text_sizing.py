@@ -168,7 +168,7 @@ def test_graceful_degradation_without_support():
 
 @pytest.mark.parametrize('value', [3, -1, 999])
 def test_vertical_align_int_out_of_range(value):
-    """vertical_align int outside 0--2 raises ValueError."""
+    """vertical_align int outside of range 0-2 raises ValueError."""
 
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
@@ -180,7 +180,7 @@ def test_vertical_align_int_out_of_range(value):
 
 @pytest.mark.parametrize('value', [3, -1, 999])
 def test_horizontal_align_int_out_of_range(value):
-    """horizontal_align int outside 0--2 raises ValueError."""
+    """horizontal_align int outside of range 0-2 raises ValueError."""
 
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)

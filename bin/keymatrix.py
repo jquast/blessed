@@ -234,7 +234,7 @@ class MouseModeManager:
             self.active_context.__exit__(None, None, None)
             self.active_context = None
 
-        # Build modes list — include SGR (1006) only when report_sgr is ON, so that
+        # Build modes list, include SGR (1006) only when report_sgr is ON, so that
         # switching it off activates the legacy 'ESC [ M' report format.
         modes = [self._pick_tracking_mode()]
         if self.report_sgr:

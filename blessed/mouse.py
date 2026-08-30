@@ -3,6 +3,11 @@
 import re
 from typing import Match
 
+BUTTON_LEGACY_UNKNOWN = 3
+
+# shift (4), meta (8), ctrl (16) and motion (32) share the button byte
+BUTTON_MODIFIER_MASK = 4 | 8 | 16 | 32
+
 
 class MouseEvent:  # pylint: disable=too-many-instance-attributes
     """
@@ -12,8 +17,8 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
     dynamic button property that returns human-readable button names like "LEFT", "SCROLL_UP",
     "CTRL_LEFT", etc.
 
-    :ivar int button_value: Raw button number (0=left, 1=middle, 2=right, 64=scroll up, 65=scroll
-        down, or higher for extended buttons).
+    :ivar int button_value: Raw button number with modifiers stripped (0=left, 1=middle, 2=right,
+        3=none, 64=scroll up, 65=scroll down, 66-67 for buttons 6-7, and 128-131 for buttons 8-11).
     :ivar int x: Horizontal position (0-indexed, in cells or pixels depending on mode).
     :ivar int y: Vertical position (0-indexed, in cells or pixels depending on mode).
     :ivar bool released: True if this is a button release event.
@@ -57,14 +62,15 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
         :rtype: str
         :returns: Base button name like "LEFT", "MIDDLE", "RIGHT", or "BUTTON_6".
         """
-        if self.button_value < 66:
+        if self.button_value < 64:
             return {
                 0: "LEFT",
                 1: "MIDDLE",
                 2: "RIGHT",
             }.get(self.button_value, '')
-        # Extended buttons (button_value >= 66)
-        return f"BUTTON_{self.button_value - 60}"
+        # Extended buttons, bit 6 (64) selects buttons 4-7, bit 7 (128) selects buttons 8-11
+        first_of_bank = 8 if self.button_value & 128 else 4
+        return f"BUTTON_{first_of_bank + (self.button_value & 3)}"
 
     @property
     def button(self) -> str:
@@ -72,13 +78,15 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
         Return human-readable button name.
 
         Generates button names that include modifiers, button type, motion/release state:
+
         - "LEFT", "MIDDLE", "RIGHT" for standard mouse buttons
         - "LEFT_RELEASED", "MIDDLE_RELEASED", "RIGHT_RELEASED" for button releases
+        - "RELEASED" for a legacy release, which does not report which button was released
         - "SCROLL_UP", "SCROLL_DOWN" for wheel events
         - "MOTION" for mouse movement with no button pressed
         - "LEFT_MOTION", "MIDDLE_MOTION", "RIGHT_MOTION" for drag events
         - "CTRL_LEFT", "SHIFT_SCROLL_UP", "CTRL_SHIFT_META_MOTION" with modifiers
-        - "BUTTON_6", "BUTTON_7", etc. for extended mouse buttons
+        - "BUTTON_6" through "BUTTON_11" for extended mouse buttons
 
         :rtype: str
         :returns: Button name with modifiers, button type, and motion/release state.
@@ -90,25 +98,27 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
             if getattr(self, modifier):
                 button_name += f'{modifier.upper()}_'
 
-        # Handle wheel events first (legacy uses button_value 0/1, SGR uses 64/65)
+        # Handle wheel events first, buttons 4 (64) and 5 (65)
         if self.is_wheel:
-            # Legacy wheel: button_value 0=up, 1=down
-            # SGR wheel: button_value 64=up, 65=down
-            if self.button_value in {0, 64}:
+            if self.button_value == 64:
                 button_name += "SCROLL_UP"
-            elif self.button_value in {1, 65}:
+            elif self.button_value == 65:
                 button_name += "SCROLL_DOWN"
             # Wheel events don't have motion or release variants in typical usage
             return button_name
 
         # Handle motion events specially
         if self.is_motion:
-            # Motion with no button pressed (button_value=3 means no button in SGR motion)
-            if self.button_value == 3:
+            # Motion with no button pressed
+            if self.button_value == BUTTON_LEGACY_UNKNOWN:
                 button_name += "MOTION"
             else:
                 # Dragging with a specific button
                 button_name += f"{self._get_base_button_name()}_MOTION"
+        elif self.released and self.button_value == BUTTON_LEGACY_UNKNOWN:
+            # Legacy protocols (modes 1000, 1002, 1003) do not report which
+            # button was released, so it is named without one.
+            button_name += "RELEASED"
         else:
             # Regular click or release events
             button_name += self._get_base_button_name()
@@ -137,8 +147,10 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
 
         Handles both SGR (mode 1006) and SGR-Pixels (mode 1016) since they
         use identical wire formats: CSI < b;x;y m/M. The difference is semantic:
+
         - Mode 1006: coordinates represent character cell positions
         - Mode 1016: coordinates represent pixel positions
+
         Applications must interpret x,y coordinates based on which mode was enabled.
 
         The protocol sends 1-indexed coordinates (top-left is 1,1), but we convert
@@ -163,13 +175,10 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
         # Extract motion/drag flags
         is_motion = bool(b & 32)
 
-        # Check for wheel events (button 64-65) by masking modifiers
-        # Wheel events: button & ~(shift|meta|ctrl|motion) gives base button
-        base_button = b & ~(4 | 8 | 16 | 32)
-        is_wheel = base_button in {64, 65}  # wheel up/down
-
-        # Get base button (0-2 for left/middle/right, or 64-65 for wheel)
-        button = b & 3 if not is_wheel else base_button
+        # Strip modifiers to get the button, 0-2 for left/middle/right, 3 for none, and
+        # 64-67 or 128-131 for the extended buttons 4-7 and 8-11
+        button = b & ~BUTTON_MODIFIER_MASK
+        is_wheel = button in {64, 65}  # buttons 4 and 5 are wheel up/down
 
         return cls(
             button_value=button,
@@ -191,6 +200,12 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
         The protocol sends 1-indexed coordinates (top-left is 1,1), but we convert to 0-indexed
         (top-left is 0,0) to match blessed's terminal movement functions.
 
+        Each coordinate is transmitted as a single byte of ``value + 32``, so no position beyond
+        223 can be expressed.  Windows Terminal and the console host (``conhost.exe``) share a VT
+        input layer that *discards* any legacy mouse event where either coordinate exceeds 95,
+        rather than transmit a byte above 127.  Both are limitations of the terminal without
+        workaround, the SGR protocol is the only remedy.
+
         :param Match match: Regex match object with groups 'cb', 'cx', 'cy'.
         :rtype: MouseEvent
         :returns: Parsed MouseEvent instance.
@@ -202,26 +217,20 @@ class MouseEvent:  # pylint: disable=too-many-instance-attributes
         # Extract motion/drag flags
         is_motion = bool(cb & 32)
 
-        # Extract button and modifiers from cb
-        button = cb & 3
+        # Strip modifiers to get the button, matching the SGR decoder
+        button = cb & ~BUTTON_MODIFIER_MASK
+        is_wheel = button in {64, 65}  # buttons 4 and 5 are wheel up/down
         # A low-bits value of 3 means "no button". When stationary this is a
         # button release; with the motion bit set (mode 1003 all-motion
         # tracking) it is a no-button motion event, which must keep button_value
         # 3 so it reports as "MOTION" rather than "LEFT_MOTION", matching the
         # SGR decoder.
-        released = button == 3 and not is_motion
-        if released:
-            button = 0  # Release doesn't specify which button
+        released = button == BUTTON_LEGACY_UNKNOWN and not is_motion
 
         # Extract modifier flags
         shift = bool(cb & 4)
         meta = bool(cb & 8)
         ctrl = bool(cb & 16)
-
-        # Wheel events
-        is_wheel = cb >= 64
-        if is_wheel:
-            button = cb - 64  # 0=wheel up, 1=wheel down
 
         return cls(
             button_value=button,
@@ -250,4 +259,5 @@ RE_PATTERN_MOUSE_LEGACY = re.compile(r'\x1b\[M(?P<cb>.)(?P<cx>.)(?P<cy>.)')
 
 
 __all__ = ('MouseEvent', 'MouseSGREvent', 'MouseLegacyEvent',
-           'RE_PATTERN_MOUSE_SGR', 'RE_PATTERN_MOUSE_LEGACY')
+           'RE_PATTERN_MOUSE_SGR', 'RE_PATTERN_MOUSE_LEGACY',
+           'BUTTON_LEGACY_UNKNOWN', 'BUTTON_MODIFIER_MASK')
