@@ -74,9 +74,12 @@ following the pattern ``MOUSE_[MODIFIERS_]BUTTON[_RELEASED]``:
 - Basic events: ``MOUSE_LEFT``, ``MOUSE_MIDDLE``, ``MOUSE_RIGHT``, ``MOUSE_SCROLL_UP``,
   ``MOUSE_SCROLL_DOWN``
 - Release events: ``MOUSE_LEFT_RELEASED``, ``MOUSE_MIDDLE_RELEASED``,
-  ``MOUSE_RIGHT_RELEASED``
+  ``MOUSE_RIGHT_RELEASED``, or plain ``MOUSE_RELEASED`` when the terminal does
+  not say which button was released, see :ref:`legacy mouse`
 - With modifiers: ``MOUSE_CTRL_LEFT``, ``MOUSE_SHIFT_SCROLL_UP``, ``MOUSE_META_RIGHT``,
   ``MOUSE_CTRL_SHIFT_META_MIDDLE``
+- Extended buttons: ``MOUSE_BUTTON_6`` through ``MOUSE_BUTTON_11``, reported by mice with
+  thumb or tilt buttons
 
 Modifiers are included in order ``CTRL``, ``SHIFT``, and ``META``
 
@@ -213,3 +216,19 @@ pattern (e.g., ``'MOUSE_LEFT'``) and magic method predicates (e.g.,
 ``inp.is_mouse_left()``). The :attr:`~.Keystroke.x` and :attr:`~.Keystroke.y`
 properties represent pixels instead of character cells.
 
+.. _`legacy mouse`:
+
+Legacy Mouse Protocols
+----------------------
+
+Blessed always prefers the SGR protocol (:ref:`dec private modes` 1006 and 1016), and
+:meth:`~.Terminal.mouse_enabled` negotiates it for you.  However, a legacy terminal
+supporting the X10-era protocol of modes 1000, 1002, and 1003 is decoded when it arrives, but is
+reached only by historical terminals that dot support SGR.
+
+Legacy mouse protocols have one major difference, that a button release does not report *which*
+button was released.  Blessed names this ``MOUSE_RELEASED`` (or, with modifiers,
+``MOUSE_CTRL_RELEASED``).
+
+Legacy mouse protocols also have coordinate limitations, values above 223 cannot be encoded, and,
+some terminals like ``conhost.exe`` are even further limited to 95.

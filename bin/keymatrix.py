@@ -227,7 +227,7 @@ class MouseModeManager:
             self.active_context.__exit__(None, None, None)
             self.active_context = None
 
-        # Build modes list — include SGR (1006) only when report_sgr is ON
+        # Build modes list, include SGR (1006) only when report_sgr is ON
         modes = []
         if self.report_sgr:
             modes.append(DecPrivateMode.MOUSE_EXTENDED_SGR)

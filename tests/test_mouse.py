@@ -52,11 +52,11 @@ class TestMouseEventMatching:
 
     @pytest.mark.parametrize("mode,sequence,expected_release,expected_button", [
         (1000, '\x1b[M   ', False, 0),  # MOUSE_REPORT_CLICK - Press event
-        (1000, '\x1b[M#@@', True, 0),   # MOUSE_REPORT_CLICK - Release
+        (1000, '\x1b[M#@@', True, 3),   # MOUSE_REPORT_CLICK - Release
         (1002, '\x1b[M   ', False, 0),  # MOUSE_REPORT_DRAG - Press event
-        (1002, '\x1b[M#@@', True, 0),   # MOUSE_REPORT_DRAG - Release
+        (1002, '\x1b[M#@@', True, 3),   # MOUSE_REPORT_DRAG - Release
         (1003, '\x1b[M   ', False, 0),  # MOUSE_ALL_MOTION - Press event
-        (1003, '\x1b[M#@@', True, 0),   # MOUSE_ALL_MOTION - Release
+        (1003, '\x1b[M#@@', True, 3),   # MOUSE_ALL_MOTION - Release
     ])
     def test_mouse_legacy_events(self, mode, sequence, expected_release, expected_button):
         """Test legacy mouse events work with all three legacy mouse modes."""
@@ -400,6 +400,15 @@ def test_mouse_event_keystroke_name():  # pylint: disable=too-many-locals
     ks_legacy_left = _match_dec_event('\x1b[M   ', dec_mode_cache=cache)
     assert ks_legacy_left.name == "MOUSE_LEFT"
 
+    # A legacy release does not report which button was released
+    ks_legacy_rel = _match_dec_event('\x1b[M#  ', dec_mode_cache=cache)
+    assert ks_legacy_rel.name == "MOUSE_RELEASED"
+    assert ks_legacy_rel._mode_values.button_value == 3
+
+    # ... but modifiers are still reported, ctrl (16) + no-button (3) = 19, '3'
+    ks_legacy_ctrl_rel = _match_dec_event('\x1b[M3  ', dec_mode_cache=cache)
+    assert ks_legacy_ctrl_rel.name == "MOUSE_CTRL_RELEASED"
+
     # Test that regular keystrokes don't have MOUSE_ names
     ks_regular = Keystroke('a')
     assert ks_regular.name is None or not ks_regular.name.startswith('MOUSE_')
@@ -620,7 +629,8 @@ def test_mouse_legacy_encoding_systematic():
             continue
         button, x, y, shift, meta, ctrl, released, is_motion = test_cases[idx]
         parts = result.split(',')
-        assert int(parts[0]) == button
+        # a legacy release reports no button, decoded as button_value 3
+        assert int(parts[0]) == (3 if released else button)
         assert int(parts[1]) == x
         assert int(parts[2]) == y
         assert bool(int(parts[3])) == shift
@@ -807,7 +817,7 @@ def test_mouse_legacy_wheel_events():
 
     values = ks_wheel_up._mode_values
     assert values.is_wheel
-    assert values.button_value == 0
+    assert values.button_value == 64
     assert ks_wheel_up.name == 'MOUSE_SCROLL_UP'
 
     # Wheel down: cb=65 → chr(65+32)='a'
@@ -816,7 +826,7 @@ def test_mouse_legacy_wheel_events():
 
     values_down = ks_wheel_down._mode_values
     assert values_down.is_wheel
-    assert values_down.button_value == 1
+    assert values_down.button_value == 65
     assert ks_wheel_down.name == 'MOUSE_SCROLL_DOWN'
 
 
@@ -1003,3 +1013,65 @@ def test_inkey_with_cjk_followed_by_legacy_mouse():
             assert evt.x == 150
             assert evt.y == 145
     child()
+
+
+def test_mouse_sgr_extended_buttons():
+    """Test SGR buttons 6-11 decode as BUTTON_n instead of collapsing onto left/middle/right."""
+    cache = make_enabled_dec_cache()
+
+    # bit 6 (64) selects buttons 4-7, bit 7 (128) selects buttons 8-11
+    for cb, expected in ((66, "BUTTON_6"), (67, "BUTTON_7"), (128, "BUTTON_8"),
+                         (129, "BUTTON_9"), (130, "BUTTON_10"), (131, "BUTTON_11")):
+        ks = _match_dec_event(f'\x1b[<{cb};10;20M', dec_mode_cache=cache)
+        values = ks._mode_values
+        assert values.button == expected
+        assert values.button_value == cb
+        assert not values.is_wheel
+
+    # modifiers, motion and release decode alongside the extended button
+    ks_shift = _match_dec_event('\x1b[<70;10;20M', dec_mode_cache=cache)
+    assert ks_shift._mode_values.button == "SHIFT_BUTTON_6"
+
+    ks_ctrl = _match_dec_event('\x1b[<144;10;20M', dec_mode_cache=cache)
+    assert ks_ctrl._mode_values.button == "CTRL_BUTTON_8"
+
+    ks_motion = _match_dec_event('\x1b[<98;10;20M', dec_mode_cache=cache)
+    assert ks_motion._mode_values.button == "BUTTON_6_MOTION"
+
+    ks_released = _match_dec_event('\x1b[<128;10;20m', dec_mode_cache=cache)
+    assert ks_released._mode_values.button == "BUTTON_8_RELEASED"
+
+    # the motion bit does not disturb a wheel event
+    ks_wheel_motion = _match_dec_event('\x1b[<96;10;20M', dec_mode_cache=cache)
+    assert ks_wheel_motion._mode_values.button == "SCROLL_UP"
+
+
+def test_mouse_legacy_extended_buttons():
+    """Test legacy buttons 6-11 decode as BUTTON_n."""
+    cache = make_enabled_dec_cache()
+
+    for cb, expected in ((66, "BUTTON_6"), (67, "BUTTON_7"), (128, "BUTTON_8"),
+                         (129, "BUTTON_9"), (130, "BUTTON_10"), (131, "BUTTON_11")):
+        ks = _match_dec_event(f'\x1b[M{chr(cb + 32)}@@', dec_mode_cache=cache)
+        values = ks._mode_values
+        assert values.button == expected
+        assert values.button_value == cb
+        assert not values.is_wheel
+
+
+def test_mouse_legacy_wheel_with_modifiers():
+    """Test legacy wheel events keep their name when a modifier is held."""
+    cache = make_enabled_dec_cache()
+
+    # shift (4) and ctrl (16) are packed into the same byte as the wheel button
+    for cb, expected in ((68, "SHIFT_SCROLL_UP"), (69, "SHIFT_SCROLL_DOWN"),
+                         (80, "CTRL_SCROLL_UP"), (81, "CTRL_SCROLL_DOWN"),
+                         (72, "META_SCROLL_UP")):
+        ks = _match_dec_event(f'\x1b[M{chr(cb + 32)}@@', dec_mode_cache=cache)
+        values = ks._mode_values
+        assert values.is_wheel
+        assert values.button == expected
+
+    # the motion bit does not disturb a wheel event
+    ks_wheel_motion = _match_dec_event(f'\x1b[M{chr(96 + 32)}@@', dec_mode_cache=cache)
+    assert ks_wheel_motion._mode_values.button == "SCROLL_UP"
