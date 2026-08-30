@@ -137,6 +137,9 @@ _RE_COLOR_SCHEME_MODE_RESPONSE = re.compile(r'\x1b\[\?997;([12])n')
 # DECRQSS: DCS Ps $ r Pt ST (Ps=1 means valid)
 _RE_DECRQSS_RESPONSE = re.compile(r'\x1bP([01])\$r([^\x1b]*)\x1b\\')
 
+# Number of bytes read by a single system call of Terminal._read_available()
+_KEYBOARD_READ_SIZE = 4096
+
 
 class Terminal():  # pylint: disable=attribute-defined-outside-init
     """
@@ -270,6 +273,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._init_descriptor = None
         self._is_a_tty = False
         self._keyboard_buf: 'collections.deque[str]' = collections.deque()
+        self._mouse_latin1_pending = 0
         self._dec_mode_cache: Dict[int, int] = {}
         self.__init__streams()
         self.__init_set_styling(force_styling)
@@ -902,6 +906,49 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 ctx.__exit__(None, None, None)
 
         return feature_match
+
+    def _query_boundary_multiple(self, query_str: str,
+                                 feature_re: "re.Pattern[str]",
+                                 timeout: Optional[float],
+                                 requires_styling: bool = True
+                                 ) -> Optional[List[Match[str]]]:
+        """Like _query_with_boundary(), but for a query with many replies."""
+        # Returns every match of *feature_re* in the data read, an empty list when the
+        # CPR boundary arrived without any, or None when the stream is not a TTY, or
+        # *requires_styling* is unmet, or the CPR boundary itself never arrived.  Data
+        # that is not a match is pushed back for inkey().
+        if not self.is_a_tty:
+            return None
+        if requires_styling and not self.does_styling:
+            return None
+
+        ctx = None
+        try:
+            if self._line_buffered:
+                ctx = self.cbreak()
+                ctx.__enter__()
+
+            # note: a literal CPR, not self.u7, because this runs during
+            # Terminal.__init__, before any terminfo capability may be resolved.
+            self.stream.write(query_str + '\x1b[6n')
+            self.stream.flush()
+
+            cpr_match, data = _read_until(
+                self, _RE_CPR_BOUNDARY.pattern, timeout)
+
+            if cpr_match is None:
+                return None
+
+            data = data[:cpr_match.start()] + data[cpr_match.end():]
+            results = list(feature_re.finditer(data))
+
+            self.ungetch(feature_re.sub('', data))
+
+        finally:
+            if ctx is not None:
+                ctx.__exit__(None, None, None)
+
+        return results
 
     @contextlib.contextmanager
     def location(self, x: Optional[int] = None, y: Optional[int]
@@ -1775,36 +1822,21 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         if not caps:
             return None
 
-        ctx = None
-        try:
-            if self._line_buffered:
-                ctx = self.cbreak()
-                ctx.__enter__()
-            for capname in caps:
-                self.stream.write(
-                    f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\')
-            self.stream.write('\x1b[6n')  # CPR fence
-            self.stream.flush()
-            match, data = _read_until(self, _RE_CPR_BOUNDARY.pattern, timeout)
-        finally:
-            if ctx is not None:
-                ctx.__exit__(None, None, None)
-
-        if match is None:
+        query_str = ''.join(
+            f'\x1bP+q{TermcapResponse.hex_encode(capname)}\x1b\\'
+            for capname in caps)
+        # pylint: disable=protected-access
+        if (matches := self._query_boundary_multiple(
+                query_str, TermcapResponse._RE_XTGETTCAP_RESPONSE, timeout,
+                requires_styling=False)) is None:
             return TermcapResponse()
 
-        # Strip the CPR itself from the response data
-        data = data[:match.start()] + data[match.end():]
-
         capabilities: Dict[str, str] = {}
-        if data:
-            capabilities.update(TermcapResponse.parse_capabilities(data))
-            # pylint: disable=protected-access
-            remaining = TermcapResponse._RE_XTGETTCAP_RESPONSE.sub('', data)
-            if remaining:
-                self.ungetch(remaining)
+        for match in matches:
+            if match.group(1) == '1':
+                name, value = TermcapResponse.from_match(match)
+                capabilities[name] = value
 
-        # Record None sentinel for any requested cap that wasn't answered.
         for capname in caps:
             if capname not in capabilities:
                 capabilities[capname] = None  # type: ignore[assignment]
@@ -3876,6 +3908,77 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         finally:
             self.stream.write(self.rmkx)
             self.stream.flush()
+
+    def _decode_bytes(self, data: bytes) -> str:
+        """Decode input bytes by the keyboard encoding, never raising."""
+        # Undecodable input is not worth interrupting a keyboard read for: a single byte
+        # of line noise would otherwise raise UnicodeDecodeError from any read that
+        # received it.  Decode such bytes as U+FFFD, and reset the incremental decoder,
+        # which may be left holding the bytes it could not decode.
+        try:
+            return self._keyboard_decoder.decode(data, final=False)
+        except UnicodeDecodeError:
+            self._keyboard_decoder.reset()
+            return data.decode(self._encoding, errors='replace')
+
+    def _decode_keyboard(self, data: bytes) -> str:
+        """Decode input bytes, decoding legacy mouse coordinates as latin-1."""
+        # The three bytes following legacy mouse sequence '\x1b[M' are 8-bit values,
+        # 32 + value, so any coordinate beyond 95 is a byte outside of ASCII, rarely
+        # valid in the keyboard encoding.  Decode just those as latin-1, a 1:1 mapping
+        # of byte to codepoint, and all surrounding input normally: a single read may
+        # contain both a mouse report and UTF-8 keystrokes.  A report divided across
+        # reads is continued by self._mouse_latin1_pending, the number of coordinate
+        # bytes still owed.
+        ucs = ''
+        pos = 0
+        while pos < len(data):
+            if self._mouse_latin1_pending:
+                n_bytes = min(self._mouse_latin1_pending, len(data) - pos)
+                ucs += data[pos:pos + n_bytes].decode('latin1')
+                self._mouse_latin1_pending -= n_bytes
+                pos += n_bytes
+                continue
+            idx = data.find(b'\x1b[M', pos)
+            if idx == -1:
+                break
+            ucs += self._decode_bytes(data[pos:idx + 3])
+            self._mouse_latin1_pending = 3
+            pos = idx + 3
+        return ucs + self._decode_bytes(data[pos:])
+
+    def _read_available(self) -> str:
+        """Read and decode all input immediately available, without blocking."""
+        # Unlike a loop of getch(), input is read in blocks, one system call for many
+        # bytes rather than one for each.  This supports keyboard._read_until(), where
+        # the reply to a terminal query may run to many kilobytes.  Legacy mouse
+        # sequences are decoded by _decode_keyboard(), wherever they occur in the input.
+        if self._keyboard_fd is None:
+            return ''
+        ucs = ''
+        # Any trailing bytes held back as a partial '\x1b[M' prefix: a mouse report may
+        # be divided by the block boundary, and the coordinate bytes that follow must
+        # still be decoded as latin-1.
+        carry = b''
+        while self.kbhit(timeout=0):
+            try:
+                data = os.read(self._keyboard_fd, _KEYBOARD_READ_SIZE)
+            except OSError:
+                break
+            if not data:
+                self._keyboard_eof = True
+                break
+            data = carry + data
+            carry = b''
+            if not self._mouse_latin1_pending:
+                for prefix in (b'\x1b[', b'\x1b'):
+                    if data.endswith(prefix):
+                        data, carry = data[:-len(prefix)], prefix
+                        break
+            ucs += self._decode_keyboard(data)
+        # no more input is immediately available, so anything held back is not the
+        # beginning of a mouse report after all, but input in its own right.
+        return ucs + self._decode_keyboard(carry)
 
     def flushinp(self, timeout: float = 0) -> str:
         r"""

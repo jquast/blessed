@@ -1209,3 +1209,13 @@ def test_xtgettcap_skip_Terminal_app():
         mock_batch.assert_not_called()
         assert any('Terminal.app' in err for err in t.errors)
         assert t._xtgettcap_cache.supported is False
+
+
+def test_query_boundary_multiple_unqueryable():
+    """_query_boundary_multiple() returns None without a tty, or without styling."""
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    query = ('', TermcapResponse._RE_XTGETTCAP_RESPONSE, 0)
+    assert term._query_boundary_multiple(*query) is None, 'not a tty'
+    term._is_a_tty = True
+    term._does_styling = False
+    assert term._query_boundary_multiple(*query) is None, 'no styling'

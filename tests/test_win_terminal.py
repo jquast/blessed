@@ -407,3 +407,27 @@ def test_poll_kbhit_period():
     """Test POLL_KBHIT_PERIOD is a reasonable positive value."""
     assert isinstance(POLL_KBHIT_PERIOD, float)
     assert 0 < POLL_KBHIT_PERIOD < 2.0
+
+
+def test_read_available_legacy_mouse():
+    """_read_available() decodes only legacy mouse coordinates as latin-1."""
+    def child():
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        term._keyboard_fd = 0
+        term._event_buf.extend('\x1b[M \xe8\x52')
+        with mock.patch.object(term, 'kbhit',
+                               side_effect=lambda timeout=None: bool(term._event_buf)):
+            assert term._read_available() == '\x1b[M \xe8\x52'
+        assert term._mouse_latin1_pending == 0
+    child()
+
+
+def test_read_available_eof():
+    """_read_available() stops at end-of-file."""
+    def child():
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        term._keyboard_fd = 0
+        with mock.patch.object(term, 'kbhit', return_value=True), \
+                mock.patch.object(term, 'getch', side_effect=EOFError):
+            assert term._read_available() == ''
+    child()
