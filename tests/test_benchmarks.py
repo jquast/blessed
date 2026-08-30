@@ -2,6 +2,7 @@
 # local
 from blessed.keyboard import _read_until
 from .accessories import TestTerminal
+from blessed.keyboard import _read_until
 
 
 # Test data (raw strings, no Terminal dependency at module level)
