@@ -1,5 +1,6 @@
 """Performance benchmarks for blessed Sequence methods."""
 # local
+from blessed.keyboard import _read_until
 from .accessories import TestTerminal
 
 
@@ -220,3 +221,20 @@ def test_color_256(benchmark):
         return ''.join(term.color(idx) for idx in range(256))
     term = TestTerminal(force_styling=True)
     benchmark(_all_256_colors, term)
+
+
+# _read_until() benchmarks
+
+
+def test_read_until_long_reply(benchmark):
+    """Benchmark _read_until() digesting a multi-kilobyte query reply."""
+    long_query_reply = (
+        ''.join(f'\x1bP1+r{idx:04x}=31\x1b\\' for idx in range(1024)) +
+        '\x1b[10;20R')
+
+    def _read_buffered(term, reply):
+        term.ungetch(reply)
+        return _read_until(term, r'\d+;\d+R', timeout=1.0)
+
+    term = TestTerminal(force_styling=True)
+    benchmark(_read_buffered, term, long_query_reply)

@@ -159,6 +159,27 @@ class Terminal(_Terminal):
             rtn += msvcrt.getwch()
         return rtn
 
+    def _read_available(self) -> str:
+        """Read and decode all input immediately available, without blocking."""
+        # The bulk read of the base implementation cannot be used here: console events
+        # are synthesized into escape sequences by getch(), and older versions of Windows
+        # read through msvcrt rather than from a file descriptor.  Only the three
+        # coordinate bytes that follow legacy mouse sequence '\x1b[M' are decoded as
+        # latin-1, matching Terminal._decode_keyboard() of the base implementation.
+        ucs = ''
+        pending = self._mouse_latin1_pending
+        while self.kbhit(timeout=0):
+            try:
+                ucs += self.getch(decode_latin1=pending > 0)
+            except EOFError:
+                break
+            if pending:
+                pending -= 1
+            elif ucs.endswith('\x1b[M'):
+                pending = 3
+        self._mouse_latin1_pending = pending
+        return ucs
+
     def kbhit(self, timeout: Optional[float] = None) -> bool:
         """
         Return whether a keypress has been detected on the keyboard.

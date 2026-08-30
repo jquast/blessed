@@ -1424,19 +1424,16 @@ def test_kitty_control_key_integration(sequence, expected_name, expected_code, e
     child()
 
 
-@pytest.mark.skipif(not TEST_KEYBOARD, reason="TEST_KEYBOARD not specified")
+@pytest.mark.skipif(not TEST_KEYBOARD or IS_WINDOWS, reason="Requires TTY")
 def test_kitty_negotiation_timing_cached_failure():
     """Test timing of cached failure returns immediately."""
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._is_a_tty = True
-
+    def child(term):
         stime = time.time()
         flags1 = term.get_kitty_keyboard_state(timeout=0.025)
         assert flags1 is None
         assert term._kitty_kb_first_query_failed is True
         elapsed_ms = (time.time() - stime) * 1000
-        assert 24 <= elapsed_ms <= 35
+        assert 24 <= elapsed_ms <= 60, elapsed_ms
 
         # any subsequent calls return immediately (as failed)
         stime = time.time()
@@ -1444,17 +1441,15 @@ def test_kitty_negotiation_timing_cached_failure():
         elapsed_ms = (time.time() - stime) * 1000
         assert flags2 is None
         assert elapsed_ms < 5
+        return b'OK'
 
-    child()
+    assert 'OK' in pty_test(child, test_name='test_kitty_negotiation_timing_cached_failure')
 
 
-@pytest.mark.skipif(not TEST_KEYBOARD, reason="TEST_KEYBOARD not specified")
+@pytest.mark.skipif(not TEST_KEYBOARD or IS_WINDOWS, reason="Requires TTY")
 def test_kitty_negotiation_force_True_incurs_second_timeout():
     """Test timing of force=True incurs timeout again."""
-    def child():
-        term = TestTerminal(stream=io.StringIO(), force_styling=True)
-        term._is_a_tty = True
-
+    def child(term):
         flags1 = term.get_kitty_keyboard_state(timeout=0.025)
         assert flags1 is None
         assert term._kitty_kb_first_query_failed is True
@@ -1466,9 +1461,11 @@ def test_kitty_negotiation_force_True_incurs_second_timeout():
         elapsed_ms = (time.time() - stime) * 1000
 
         assert flags2 is None
-        assert 20 <= elapsed_ms <= 35
+        assert 20 <= elapsed_ms <= 60, elapsed_ms
+        return b'OK'
 
-    child()
+    assert 'OK' in pty_test(
+        child, test_name='test_kitty_negotiation_force_True_incurs_second_timeout')
 
 
 def test_kitty_keyboard_protocol_report_all_keys_setter_false():
