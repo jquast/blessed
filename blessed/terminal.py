@@ -129,9 +129,10 @@ _RE_ITERM2_CAPABILITIES_RESPONSE = re.compile(
     r'\x1b\]1337;Capabilities=([^\x07\x1b]+)(?:\x07|\x1b\\)')
 _RE_KITTY_NOTIFICATIONS_RESPONSE = re.compile(
     r'\x1b\]99;([^\x07\x1b]*?)(?:\x07|\x1b\\)')
-# Mintty font glyph coverage: ESC ] 7771 ; ! ; cp1 ; cp2 ; ... BEL/ST
+# Mintty font glyph coverage: ESC ] 7771 ; ! ; cp1 ; ; cp3 ; ... BEL/ST, holding one
+# ';' prefixed field for each codepoint queried, empty where the font has no glyph.
 _RE_MINTTY_FONT_RESPONSE = re.compile(
-    r'\x1b\]7771;!((?:;\d+)*)(?:\x07|\x1b\\)')
+    r'\x1b\]7771;!([;0-9]*)(?:\x07|\x1b\\)')
 # Glyph Protocol codepoint query response: ESC _ 25a1 ; q ; cp=HEX ; status=VALUE ST
 _RE_GLYPH_PROTOCOL_Q_RESPONSE = re.compile(
     r'\x1b_25a1;q;cp=([0-9a-fA-F]+);status=([^;\x1b\\]*)'
@@ -2027,17 +2028,37 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :rtype: Optional[Dict[int, str]]
         :returns: Each of *codepoints* mapped to its covering sources, empty when
             uncovered.  This protocol names no sources, so ``'system'`` stands for the
-            font it answers about.  None when unanswered.
+            font it answers about.  A codepoint answered about only in truncated form
+            is absent, and is reported through :attr:`~.FontCoverage.unknown` instead.
+            None when unanswered.
         """
         decimals = ';'.join(map(str, codepoints))
         query = f'\x1b]7771;?;{decimals}\x07'
         if (match := self._query_with_boundary(
                 query, _RE_MINTTY_FONT_RESPONSE, timeout)) is None:
             return None
-        # the reply lists the covered codepoints, omitting the rest
-        covered = {int(value) for value in match.group(1).split(';') if value}
-        return {codepoint: 'system' if codepoint in covered else ''
-                for codepoint in codepoints}
+        # the reply is positional: it repeats the query field for field, in the order
+        # asked, naming the codepoint where the font has a glyph for it and standing
+        # empty where it does not.  Only the separators mark the uncovered ones, so
+        # the fields must be read by position and not as the set of names in them.
+        fields = match.group(1).split(';')[1:]
+        if len(fields) != len(codepoints):
+            # not the field-for-field reply of the protocol: all that can be trusted
+            # of it is the set of codepoints it does name.
+            named = {int(field) for field in fields if field}
+            return {codepoint: 'system' if codepoint in named else ''
+                    for codepoint in codepoints}
+
+        answered: Dict[int, str] = {}
+        for codepoint, field in zip(codepoints, fields):
+            if field and int(field) != codepoint:
+                # mintty before 3.8.3 truncates each codepoint to 16 bits before
+                # looking it up, and has answered about some other character: the
+                # font's coverage of this one is not knowable from this reply.
+                self._font_coverage_unknown[codepoint] = 'truncated reply'
+            else:
+                answered[codepoint] = 'system' if field else ''
+        return answered
 
     def _query_font_glyph_protocol(self, codepoints: List[int],
                                    timeout: Optional[float]) -> Optional[Dict[int, str]]:

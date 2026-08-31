@@ -37,10 +37,12 @@ SAMPLE = FontCoverage(sources={0x41: 'system', 0x42: '', 0x43: 'system,glossary'
                       unknown={0x44: 'no reply'}, protocol='glyph')
 
 
-def mintty(*codepoints):
-    """Build a mintty OSC 7771 reply naming *codepoints* as covered."""
-    covered = ''.join(f';{cp}' for cp in codepoints)
-    return f'\x1b]7771;!{covered}\x07{CPR}'
+def mintty(*codepoints, missing=()):
+    """Build a mintty OSC 7771 reply for *codepoints*, those in *missing* uncovered."""
+    # the reply is positional, repeating the query field for field: every codepoint
+    # queried gets a ';', and only a covered one is named after it
+    fields = ''.join(';' if cp in missing else f';{cp}' for cp in codepoints)
+    return f'\x1b]7771;!{fields}\x07{CPR}'
 
 
 def glyph(*pairs):
@@ -105,8 +107,8 @@ def test_probes_are_not_repeated():
     # mintty names the covered codepoints, omitting the rest, and names no source of
     # its own, so 'system' stands for the font it answers about
     (mintty(65, 66, 67), 'ABC', {65: 'system', 66: 'system', 67: 'system'}),
-    (mintty(65, 67), 'ABC', {65: 'system', 66: '', 67: 'system'}),
-    (mintty(), 'AB', {65: '', 66: ''}),
+    (mintty(65, 66, 67, missing=(66,)), 'ABC', {65: 'system', 66: '', 67: 'system'}),
+    (mintty(65, 66, missing=(65, 66)), 'AB', {65: '', 66: ''}),
     (mintty(0x1f600), '\U0001f600', {0x1f600: 'system'}),
     # the Glyph Protocol names which sources cover each codepoint
     (NO_REPLY + PROBE + glyph((65, 'system'), (66, ''), (67, 'system,glossary')),
@@ -122,6 +124,26 @@ def test_sources(replies, text, sources):
     assert coverage.sources == sources
     assert coverage.unknown == {}
     assert coverage.protocol == ('mintty' if replies.startswith('\x1b]') else 'glyph')
+
+
+def test_mintty_covering_nothing_still_supports():
+    """A reply of separators alone names no codepoint, yet proves the protocol."""
+    # mintty answers field for field, so a font covering none of what was asked
+    # replies with the separators and nothing else, ';' for a single codepoint
+    (coverage,), _ = run(mintty(0x25a1, missing=(0x25a1,)), '\u25a1',
+                         name='test_mintty_covering_nothing_still_supports')
+    assert coverage.protocol == 'mintty' and coverage.supported
+    assert coverage.uncovered == {0x25a1} and coverage.unknown == {}
+
+
+def test_mintty_truncated_reply_is_unknown():
+    """A codepoint answered about in truncated form is not answered about at all."""
+    # mintty before 3.8.3 looks up only the low 16 bits, so what it says of U+1F600 is
+    # really said of U+F600, a private use codepoint whose glyph proves nothing here
+    (coverage,), _ = run(f'\x1b]7771;!;{0x1f600 & 0xffff}\x07{CPR}', '\U0001f600',
+                         name='test_mintty_truncated_reply_is_unknown')
+    assert coverage.protocol == 'mintty' and coverage.sources == {}
+    assert coverage.unknown == {0x1f600: 'truncated reply'}
 
 
 @pytest.mark.parametrize('probe', [
@@ -202,7 +224,8 @@ def test_only_new_codepoints_are_queried():
 
 def test_uncovered_is_cached_too():
     """A negative answer is remembered, and not asked for twice."""
-    coverages, written = run(mintty(65), 'AB', 'BB', name='test_uncovered_is_cached_too')
+    coverages, written = run(mintty(65, 66, missing=(66,)), 'AB', 'BB',
+                             name='test_uncovered_is_cached_too')
     assert all(coverage.uncovered == {66} for coverage in coverages)
     assert written.count('\x1b]7771;?') == 1
 
@@ -217,7 +240,7 @@ def test_result_is_scoped_to_the_text_asked_about():
 def test_force_discards_cache():
     """force=True re-probes the protocol and re-asks every codepoint."""
     def child(term):
-        term.ungetch(mintty(65) + mintty(65, 66))
+        term.ungetch(mintty(65, 66, missing=(66,)) + mintty(65, 66))
         assert term.get_font_coverage('AB', timeout=0.01).uncovered == {66}
         assert term.get_font_coverage(
             'AB', timeout=0.01, force=True).covered == {65, 66}
@@ -333,7 +356,9 @@ def test_coverage_equality_returns_notimplemented():
 
 @pytest.mark.parametrize('text, expected', [
     ('\x1b]7771;!;65;66;67\x07', ';65;66;67'),
-    ('\x1b]7771;!\x07', ''),                    # nothing covered
+    ('\x1b]7771;!;65;;67\x07', ';65;;67'),      # the middle one uncovered
+    ('\x1b]7771;!;;;\x07', ';;;'),              # three queried, none covered
+    ('\x1b]7771;!\x07', ''),                    # nothing was asked about
     ('\x1b]7771;!;128512\x1b\\', ';128512'),    # ST terminates, and past the BMP
     ('\x1b]7771;?;65\x07', None),               # a query, not a reply
 ])

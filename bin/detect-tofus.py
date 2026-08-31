@@ -45,8 +45,11 @@ def is_drawn(char):
 
 def missing_codepoints(coverage, grapheme):
     """Return the drawn codepoints of *grapheme* the font has no glyph for."""
+    # a codepoint the terminal would not answer for is not a codepoint it called
+    # uncovered, and is assumed renderable, as reported by main() below
     return {char for char in unicodedata.normalize('NFC', grapheme)
-            if is_drawn(char) and char not in coverage}
+            if is_drawn(char) and char not in coverage
+            and ord(char) not in coverage.unknown}
 
 
 def describe(char):
