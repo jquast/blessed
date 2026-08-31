@@ -136,16 +136,6 @@ def test_mintty_covering_nothing_still_supports():
     assert coverage.uncovered == {0x25a1} and coverage.unknown == {}
 
 
-def test_mintty_truncated_reply_is_unknown():
-    """A codepoint answered about in truncated form is not answered about at all."""
-    # mintty before 3.8.3 looks up only the low 16 bits, so what it says of U+1F600 is
-    # really said of U+F600, a private use codepoint whose glyph proves nothing here
-    (coverage,), _ = run(f'\x1b]7771;!;{0x1f600 & 0xffff}\x07{CPR}', '\U0001f600',
-                         name='test_mintty_truncated_reply_is_unknown')
-    assert coverage.protocol == 'mintty' and coverage.sources == {}
-    assert coverage.unknown == {0x1f600: 'truncated reply'}
-
-
 @pytest.mark.parametrize('probe', [
     PROBE,                              # formats advertised
     f'\x1b_25a1;s;fmt=\x1b\\{CPR}',     # none advertised

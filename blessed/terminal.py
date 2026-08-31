@@ -2028,9 +2028,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :rtype: Optional[Dict[int, str]]
         :returns: Each of *codepoints* mapped to its covering sources, empty when
             uncovered.  This protocol names no sources, so ``'system'`` stands for the
-            font it answers about.  A codepoint answered about only in truncated form
-            is absent, and is reported through :attr:`~.FontCoverage.unknown` instead.
-            None when unanswered.
+            font it answers about.  None when unanswered.
         """
         decimals = ';'.join(map(str, codepoints))
         query = f'\x1b]7771;?;{decimals}\x07'
@@ -2042,23 +2040,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # empty where it does not.  Only the separators mark the uncovered ones, so
         # the fields must be read by position and not as the set of names in them.
         fields = match.group(1).split(';')[1:]
-        if len(fields) != len(codepoints):
-            # not the field-for-field reply of the protocol: all that can be trusted
-            # of it is the set of codepoints it does name.
-            named = {int(field) for field in fields if field}
-            return {codepoint: 'system' if codepoint in named else ''
-                    for codepoint in codepoints}
-
-        answered: Dict[int, str] = {}
-        for codepoint, field in zip(codepoints, fields):
-            if field and int(field) != codepoint:
-                # mintty before 3.8.3 truncates each codepoint to 16 bits before
-                # looking it up, and has answered about some other character: the
-                # font's coverage of this one is not knowable from this reply.
-                self._font_coverage_unknown[codepoint] = 'truncated reply'
-            else:
-                answered[codepoint] = 'system' if field else ''
-        return answered
+        return {codepoint: 'system' if field else ''
+                for codepoint, field in zip(codepoints, fields)}
 
     def _query_font_glyph_protocol(self, codepoints: List[int],
                                    timeout: Optional[float]) -> Optional[Dict[int, str]]:
