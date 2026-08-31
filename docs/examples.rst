@@ -231,6 +231,17 @@ This program demonstrates the various uses of :meth:`~.Terminal.text_sized`, the
 
 .. figure:: https://dxtz6bzwq9sxx.cloudfront.net/blessed_text_sizing_demo.png
 
+.. _detect-tofus.py:
+
+detect-tofus.py
+---------------
+https://github.com/jquast/blessed/blob/master/bin/detect-tofus.py
+
+This program demonstrates :meth:`~.Terminal.get_font_coverage`, which reports only per-codepoint
+coverage.  Given text files as arguments, reports any "tofus" that might result when rendering them
+to terminal. A "tofu" is drawn for characters the terminal font cannot render.  Requires a terminal
+implementing one of the font glyph coverage protocols.
+
 .. _scroller.py:
 
 scroller.py

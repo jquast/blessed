@@ -2,7 +2,7 @@
 # std imports
 import re
 import typing
-from typing import Set, Dict, Optional
+from typing import Set, Dict, Union, Optional
 from collections import OrderedDict
 
 # 3rd party
@@ -18,6 +18,7 @@ __all__ = (
     'Decrqss',
     'TermcapResponse',
     'ITerm2Capabilities',
+    'FontCoverage',
 )
 
 CAPABILITY_DATABASE: \
@@ -824,3 +825,79 @@ class TextSizingResult:
 
     def __repr__(self) -> str:
         return f"TextSizingResult(width={self.width}, scale={self.scale})"
+
+
+class FontCoverage:
+    r"""
+    Which codepoints the terminal reports its font has a glyph for, "tofu detection result".
+
+    :param dict sources: Mapping of codepoints to sources, such as ``'system'`` or
+        ``'system,glossary'``.
+    :param dict unknown: Mapping of codepoints to the reason it went unanswered.
+    :param str protocol: Name of the protocol that answered, ``'mintty'``, ``'glyph'``, or None for
+        no protocol support.
+    """
+
+    def __init__(self,
+                 sources: Optional[Dict[int, str]] = None,
+                 unknown: Optional[Dict[int, str]] = None,
+                 protocol: Optional[str] = None) -> None:
+        """Class initializer."""
+        self.sources: Dict[int, str] = sources or {}
+        self.unknown: Dict[int, str] = unknown or {}
+        self.protocol = protocol
+
+    @property
+    def supported(self) -> bool:
+        """Whether any font coverage protocol answered at all."""
+        return self.protocol is not None
+
+    @property
+    def covered(self) -> Set[int]:
+        """Codepoints the font has a glyph for."""
+        return {codepoint for codepoint, source in self.sources.items() if source}
+
+    @property
+    def uncovered(self) -> Set[int]:
+        """Codepoints the font has no glyph for."""
+        return {codepoint for codepoint, source in self.sources.items() if not source}
+
+    def covers(self, text: str) -> bool:
+        """Whether the font has a glyph for *every* codepoint of *text*."""
+        return all(self.sources.get(ord(char)) for char in text)
+
+    def __contains__(self, codepoint: Union[str, int]) -> bool:
+        """
+        Whether *codepoint*, an integer or a single character, is covered.
+
+        :arg codepoint: A codepoint, as an integer or as a string of length 1.
+        :raises TypeError: *codepoint* is neither, and so cannot be a codepoint at all.
+        :rtype: bool
+        """
+        if isinstance(codepoint, str):
+            if len(codepoint) != 1:
+                raise TypeError('codepoint must be an integer or a string of length 1, '
+                                f'got a string of length {len(codepoint)}')
+            codepoint = ord(codepoint)
+        elif not isinstance(codepoint, int):
+            raise TypeError('codepoint must be an integer or a string of length 1, '
+                            f'not {type(codepoint).__name__}')
+        return bool(self.sources.get(codepoint))
+
+    def __bool__(self) -> bool:
+        """Whether any font coverage protocol answered at all."""
+        return self.supported
+
+    def __eq__(self, other: object) -> bool:
+        """Compare equality with another :class:`FontCoverage`."""
+        if isinstance(other, FontCoverage):
+            return (self.sources == other.sources
+                    and self.unknown == other.unknown
+                    and self.protocol == other.protocol)
+        return NotImplemented
+
+    def __repr__(self) -> str:
+        """Programmer readable representation."""
+        return (f'FontCoverage(protocol={self.protocol!r}, '
+                f'covered={len(self.covered)}, uncovered={len(self.uncovered)}, '
+                f'unknown={len(self.unknown)})')

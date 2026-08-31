@@ -2,15 +2,22 @@
 
 Version History
 ===============
-1.48
+
+1.49
+  * introduce: :meth:`~Terminal.get_font_coverage` reports codepoints the terminal font has a glyph
+    for, by mintty's ``OSC 7771`` Font Glyph Coverage Enquiry or the ``APC 25a1`` Glyph Protocol,
+    :ghpull:`407`.
   * bugfix: :ref:`legacy mouse` event names and button values, mouse release events returned by
     :meth:`~Terminal.inkey` were always ``MOUSE_LEFT_RELEASED`` for all buttons, they now report
     ``MOUSE_RELEASED``, :ghpull:`406`.
   * bugfix: Mouse buttons 6 through 11 were erroneously decoded as left, middle, or right instead of
     ``MOUSE_BUTTON_6`` through ``MOUSE_BUTTON_11``, :ghpull:`406`.
   * improve: performance of automatic terminal query replies, :ghpull:`405`.
-  * improve: all parameterized capabilities are now memorized, about 50x faster, :ghpull:`404`.  *
-    bugfix: :meth:`~Terminal.truncate` by bump of dependency ``wcwidth>=0.8.3``, :ghissue:`402`.  *
+  * improve: all parameterized capabilities are now memorized, about 50x faster, :ghpull:`404`.
+  * bugfix: :meth:`~Terminal.truncate` by bump of dependency ``wcwidth>=0.8.3``, :ghissue:`402`.
+
+1.48
+  *
     bugfix: :meth:`~Terminal.async_inkey` dropped keystrokes while another task is busy,
     :ghissue:`401`.
 

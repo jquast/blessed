@@ -182,13 +182,79 @@ applications to display inline images directly in the terminal.
 You can check whether your terminal supports sixel graphics using the
 :meth:`~.Terminal.does_sixel` method:
 
-    >>> if term.does_sixel():
-    ...     display_sixel_image()
-    ... else:
-    ...     display_text_fallback()
+.. code-block:: python
+
+    if term.does_sixel():
+        display_sixel_image()
+    else:
+        display_text_fallback()
 
 Default ``timeout`` argument of 1 second is used to avoid blocking indefinitely
 when the terminal fails to respond to DA1 queries.
+
+Font Glyph Coverage
+-------------------
+
+When a terminal is asked to draw a character its font has no glyph for, it draws a placeholder in
+its place. These are called "tofu", after U+25A1 WHITE SQUARE (``□``) and its resemblance to the
+grocery food. It may also contain a large 'X', or the hexadecimal value of the codepoint.
+
+The :meth:`~.Terminal.get_font_coverage` method queries the terminal support for font glyphs,
+returning :class:`~.FontCoverage` that reports on each codepoint of the given text, and whether the
+font has a glyph for it.
+
+In this example, the terminal's font is tested for an Octant character, new in Unicode 16 (2024):
+
+.. code-block:: python
+
+    octant = '\U0001CDE4' # '𜷤'
+    font_result = term.get_font_coverage(octant)
+    if not font_result.supported:
+        print('This terminal cannot report about tofus, status of octants is unknown.')
+    elif not font_result.covers(octant):
+        print(f'This terminal does not support octants ({octant}).')
+    else:
+        print(f'This terminal does support octants ({octant}).')
+
+Two protocols are supported and tested in this order: mintty's `Font Glyph Coverage Enquiry
+<https://github.com/mintty/mintty/wiki/CtrlSeqs#font-glyph-coverage-enquiry>`_ (``OSC 7771``), and
+the `Glyph Protocol <https://rapha.land/introducing-glyph-protocol-for-terminals/>`_ from Rio
+terminal.
+
+Answers are cached, so repeated calls do not incur further delay. Very long strings are broken down
+and queried in batches.  Use argument ``force=True`` to forcefully re-query terminal for new result,
+such as if a font change is detected.  A codepoint the terminal declines to answer for, whether by
+an error reply or timeout, is reported through :attr:`~.FontCoverage.unknown` together with the
+reason.
+
+.. warning::
+
+   Coverage is reported by each individual codepoint, no protocol allows for query of a *sequence*
+   of codepoints, `grahemes <https://mitchellh.com/writing/grapheme-clusters-in-terminals>`_ are not
+   supported, meaning a great many kinds of font glyphs that may "tofu" cannot be queried about,
+   which is a limitation of both terminal protocols.
+
+   A grapheme cluster may render correctly even though the protocol may report no support of its
+   individual codepoints. For example, U+231A WATCH followed by U+FE0E VARIATION SELECTOR-15, as no
+   font holds a glyph for a variation selector 15, the terminal truthfully reports it as "uncovered"
+   or "tofu", while otherwise drawing the cluster perfectly fine:
+
+    .. code-block:: python
+
+        >>> watch = '\u231a\ufe0e'  # '⌚︎'
+        >>> font_result = term.get_font_coverage(watch)
+        >>> font_result
+        FontCoverage(protocol='glyph', covered=1, uncovered=1, unknown=0)
+        >>> font_result.covers(watch)
+        False
+        >>> list(map(hex, font_result.covered))
+        ['0x231a']
+        >>> list(map(hex, font_result.uncovered))
+        ['0xfe0e']
+
+See example program, :ref:`detect-tofus.py`, which detects and reports "tofus" for the attached
+terminal, and performs NFC normalization and discards "default ignorable codepoints" from reporting,
+such as the variation selector, above.
 
 OSC 52 Clipboard
 -----------------
