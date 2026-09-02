@@ -3,6 +3,11 @@
 Version History
 ===============
 
+1.50
+  * bugfix: do not query XTGETTCAP at class initialization for Windows Server 2022, :ghpull:`409`.
+  * improve: :meth:`~Terminal.inkey` no longer captures latent XTGETTCAP responses as keystrokes,
+    and increase global ``TERMINAL_QUERY_TIMEOUT_SECONDS`` from 1 to 2 seconds, :ghpull:`409`.
+
 1.49
   * introduce: :meth:`~Terminal.get_font_coverage` reports codepoints the terminal font has a glyph
     for, by mintty's ``OSC 7771`` Font Glyph Coverage Enquiry or the ``APC 25a1`` Glyph Protocol,

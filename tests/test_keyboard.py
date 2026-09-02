@@ -157,8 +157,7 @@ def test_stdout_notty_kb_is_None():
             term = TestTerminal()
             assert term._keyboard_fd is None
             # pylint: disable=use-a-generator
-            assert any(['stream not a TTY' in err
-                        for err in term.errors]), term.errors
+            assert any(['stream not a TTY' in err for err in term.errors])
     child()
 
 
@@ -440,6 +439,34 @@ def test_cpr_response(seq, capture_cpr, expected_name, expected_yx):
     assert ks.cpr_xy == (expected_yx[1], expected_yx[0])
     assert ks.is_sequence
     assert ks.uses_keyboard_protocol == expected_kb_proto
+
+
+@pytest.mark.parametrize("seq,expected_caps", [
+    # supported reply, 'TN' (terminal name) = 'xterm'
+    ('\x1bP1+r544e=787465726d\x1b\\', {'TN': 'xterm'}),
+    # supported reply, 'RGB' = '8/8/8'
+    ('\x1bP1+r524742=382f382f38\x1b\\', {'RGB': '8/8/8'}),
+    # unsupported reply (leading '0') reports no capabilities
+    ('\x1bP0+r544e\x1b\\', {}),
+    # VTE-style malformed empty reply
+    ('\x1bP0+r\x1b\\', {}),
+])
+def test_xtgettcap_response(seq, expected_caps):
+    """XTGETTCAP response matched as single XTGETTCAP_RESPONSE keystroke."""
+    from blessed.keyboard import resolve_sequence
+    ks = resolve_sequence(seq, collections.OrderedDict(), {})
+    assert str(ks) == seq
+    assert ks.name == 'XTGETTCAP_RESPONSE'
+    assert ks.xtgettcap == expected_caps
+    assert ks.is_sequence
+
+
+def test_xtgettcap_not_a_response():
+    """Keystroke.xtgettcap is empty for any non-XTGETTCAP keystroke."""
+    from blessed.keyboard import resolve_sequence
+    ks = resolve_sequence('\x1b[3;4R', collections.OrderedDict(), {})
+    assert ks.name == 'CPR_RESPONSE'
+    assert ks.xtgettcap == {}
 
 
 @pytest.mark.parametrize("sequence,expected_name", [

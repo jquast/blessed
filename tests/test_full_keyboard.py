@@ -386,7 +386,7 @@ def test_esc_delay_cbreak_nonprefix_sequence():
 
     assert key_name == 'KEY_ALT_A'
     assert math.floor(time.time() - stime) == 0.0
-    assert 0 <= int(duration_ms) <= 10, duration_ms
+    assert 0 <= int(duration_ms) <= 10
 
 
 def test_flushinp_timeout_with_continuous_input():
@@ -934,12 +934,12 @@ def test_esc_delay_long_sequence_prefix_slow_complete():
             os.write(master_fd, bytes([byte]))
 
     output = pty_test(child, parent, 'test_esc_delay_long_sequence_prefix_slow_complete')
-    key_name, key_code, remaining, duration_ms = output.split('|')
+    key_name, _key_code, remaining, duration_ms = output.split('|')
 
     # Even though sent 1 byte at-a-time, our resolver should notice the
     # prefix chain (\x1b -> \x1b[ -> \x1b[1 -> \x1b[15) and wait for completion
     # so long as each byte arrives before esc_delay has elapsed
-    assert key_name == 'KEY_F5', (key_name, key_code, remaining, duration_ms)
+    assert key_name == 'KEY_F5', (key_name, _key_code, remaining, duration_ms)
     assert remaining == "''"
     # Duration should be at least the time to receive all bytes, but faster than full esc_delay
     # (since we recognize the complete pattern before the delay expires)

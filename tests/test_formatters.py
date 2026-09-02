@@ -184,7 +184,7 @@ def test_parameterizing_string_type_error(monkeypatch):
     # ensure TypeError when given a string raises custom exception
     try:
         pstr('XYZ')
-        assert False, "previous call should have raised TypeError"
+        assert False
     except TypeError as err:
         assert err.args[0] == (
             "Unknown terminal capability, 'cap-name', or, TypeError "
@@ -194,7 +194,7 @@ def test_parameterizing_string_type_error(monkeypatch):
     # ensure TypeError when given an integer raises its natural exception
     try:
         pstr(0)
-        assert False, "previous call should have raised TypeError"
+        assert False
     except TypeError as err:
         assert err.args[0] == "custom_err"
 
@@ -312,7 +312,7 @@ def test_resolve_capability(monkeypatch):
 
     # given, where does_styling is False
     def raises_exception(*args):
-        assert False, "Should not be called"
+        assert False
 
     term.does_styling = False
     monkeypatch.setattr(jinxed, 'tigetstr', raises_exception)

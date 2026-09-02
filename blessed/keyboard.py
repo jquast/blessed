@@ -24,12 +24,24 @@ from blessed.mouse import (RE_PATTERN_MOUSE_SGR,
                            MouseSGREvent,
                            MouseLegacyEvent)
 from blessed.dec_modes import DecPrivateMode
+from blessed._capabilities import TermcapResponse
 
 _T = TypeVar('_T', bound='Keystroke')
 
-TERMINAL_QUERY_TIMEOUT_SECONDS = 1.0
-"""Default timeout in seconds for terminal query operations (XTGETTCAP, OSC, DCS, etc.)."""
-
+# All of our queries should be replied to, even ones that are not supported, thanks to our "query
+# with CPR boundary" pattern, which all VT100 terminals perform automatic reply for.  And so we
+# should be able to await a response indefinitely.
+#
+# However, automatic scripts can report to be a terminal through their protocol, like 'ssh -t', or
+# by using a pty(7), but lack the terminal code to detect and respond to CPR. Common examples are
+# tcl expect(1) scripts, or python pexpect.  Their use will always incur artificial delays here for
+# that reason, and it's a pitfall for many in QA automation, and a common "are you human?" check
+# used by public telnet servers. Use this environment value for any such special condition, either
+# 'inf' for high-latency networks, or '0' for automation.
+TERMINAL_QUERY_TIMEOUT_SECONDS = float(
+    os.environ.get(
+        'BLESSED_QUERY_TIMEOUT_SECONDS',
+        '5.0') or '5.0')
 
 # DEC event namedtuples
 BracketedPasteEvent = namedtuple('BracketedPasteEvent', 'text')
@@ -37,7 +49,6 @@ BracketedPasteEvent = namedtuple('BracketedPasteEvent', 'text')
 FocusEvent = namedtuple('FocusEvent', 'gained')
 SyncEvent = namedtuple('SyncEvent', 'begin')
 ResizeEvent = namedtuple('ResizeEvent', 'height_chars width_chars height_pixels width_pixels')
-
 
 # Keyboard protocol namedtuples
 KittyKeyEvent = namedtuple('KittyKeyEvent',
@@ -57,6 +68,7 @@ RE_PATTERN_KITTY_KB_PROTOCOL = re.compile(
     r'(?::(?P<event_type>\d+))?'
     r'(?:;(?P<text_codepoints>[\d:]+))?'
     r'u')
+
 # Legacy CSI modifiers: ESC [ 1 ; modifiers [ABCDEFHPQRS]
 RE_PATTERN_LEGACY_CSI_MODIFIERS = re.compile(
     r'\x1b\[1;(?P<mod>\d+)(?::(?P<event>\d+))?(?P<final>[ABCDEFHPQRS])')
@@ -1174,6 +1186,16 @@ class Keystroke(str):
         return (-1, -1)
 
     @property
+    def xtgettcap(self) -> Dict[str, str]:
+        """
+        Capabilities reported by an XTGETTCAP response.
+
+        :rtype: dict
+        :returns: mapping of terminal capability name to value.
+        """
+        return TermcapResponse.parse_capabilities(self)
+
+    @property
     def text(self) -> Optional[str]:
         """
         Pasted text for bracketed paste events.
@@ -1425,6 +1447,7 @@ def resolve_sequence(text: str,
         _match_legacy_csi_letter_form,
         _match_legacy_csi_tilde_form,
         _match_legacy_ss3_fkey_form,
+        _match_xtgettcap_response,
         _match_cpr_response]
     if capture_cpr:
         # prioritize capturing CPR_RESPONSE over legacy CSI Modifiers
@@ -1570,6 +1593,21 @@ def _match_dec_event(text: str,
         match = pattern.match(text)
         if match:
             return Keystroke(ucs=match.group(0), mode=mode, match=match)
+    return None
+
+
+def _match_xtgettcap_response(text: str) -> Optional[Keystroke]:
+    """
+    Match XTGETTCAP reply: ESC P 1 + r <hex> = <hex> ESC backslash.
+
+    A terminal could answer an XTGETTCAP query long after it has timed out, on a high latency link.
+    Matching it here allows late replies in response to xtgettcap at class initialization to be
+    processed, and are not returned by any later call inkey().
+    """
+    # pylint: disable=protected-access
+    match = TermcapResponse._RE_XTGETTCAP_RESPONSE.match(text)
+    if match:
+        return Keystroke(ucs=match.group(0), name='XTGETTCAP_RESPONSE')
     return None
 
 

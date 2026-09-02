@@ -46,7 +46,7 @@ def test_SequenceWrapper_invalid_width():
         except ValueError as err:
             assert err.args[0] == f"invalid width {WIDTH}({type(WIDTH)}) (must be integer > 0)"
         else:
-            assert False, 'Previous stmt should have raised exception.'
+            assert False
             del my_wrapped  # assigned but never used
 
     child()
@@ -295,16 +295,10 @@ def test_break_on_hyphens():
                 result_stripped = [term.strip_seqs(line) for line in result_colored]
 
                 # Plain text should match stdlib exactly
-                assert result_plain == expected, (
-                    f"Plain text mismatch for {text!r} at width={width}, "
-                    f"break_on_hyphens={break_hyphens}: {result_plain} != {expected}"
-                )
+                assert result_plain == expected
 
                 # Colored text should match when sequences are stripped
-                assert result_stripped == expected, (
-                    f"Colored text mismatch for {text!r} at width={width}, "
-                    f"break_on_hyphens={break_hyphens}: {result_stripped} != {expected}"
-                )
+                assert result_stripped == expected
 
     child()
 
