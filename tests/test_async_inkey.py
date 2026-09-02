@@ -345,7 +345,7 @@ def test_async_read_byte_deadline_same_iteration_no_loss():
                     term._async_read_byte(loop, timeout=0.1))
             finally:
                 loop.close()
-            assert result == b'x', f'byte lost: _async_read_byte returned {result!r}'
+            assert result == b'x'
             return b'OK'
 
     def parent(master_fd):
@@ -380,3 +380,42 @@ def test_async_read_byte_deadline_wins_byte_stays():
 
     output = pty_test(child, parent, 'test_async_read_byte_deadline_wins_byte_stays')
     assert output == 'OK'
+
+
+def test_async_inkey_consumes_late_xtgettcap_response():
+    """async_inkey() consumes a late XTGETTCAP reply, returning the keystroke behind it."""
+    def child(term):
+        term.ungetch('\x1bP1+r524742=382f382f38\x1b\\n')
+        loop = asyncio.new_event_loop()
+        try:
+            ks = loop.run_until_complete(term.async_inkey(timeout=0))
+        finally:
+            loop.close()
+        assert str(ks) == 'n'
+        assert term._xtgettcap_cache.capabilities['RGB'] == '8/8/8'
+        assert term.errors[-1] == (
+            r"errant/delayed XTGETTCAP_RESPONSE '\x1bP1+r524742=382f382f38\x1b\\'")
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_async_inkey_consumes_late_xtgettcap_response')
+    assert 'OK' in output
+
+
+def test_async_inkey_late_xtgettcap_response_without_styling():
+    """async_inkey() decodes a late XTGETTCAP reply when styling is disabled."""
+    def child(term):
+        term._does_styling = False
+        term.ungetch('\x1bP1+r524742=382f382f38\x1b\\')
+        loop = asyncio.new_event_loop()
+        try:
+            assert loop.run_until_complete(term.async_inkey(timeout=0)) == ''
+        finally:
+            loop.close()
+        assert term.errors[-1] == (
+            r"errant/delayed XTGETTCAP_RESPONSE '\x1bP1+r524742=382f382f38\x1b\\'")
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_async_inkey_late_xtgettcap_response_without_styling')
+    assert 'OK' in output

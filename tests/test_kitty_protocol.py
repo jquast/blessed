@@ -1433,7 +1433,7 @@ def test_kitty_negotiation_timing_cached_failure():
         assert flags1 is None
         assert term._kitty_kb_first_query_failed is True
         elapsed_ms = (time.time() - stime) * 1000
-        assert 24 <= elapsed_ms <= 60, elapsed_ms
+        assert 24 <= elapsed_ms <= 60
 
         # any subsequent calls return immediately (as failed)
         stime = time.time()
@@ -1461,7 +1461,7 @@ def test_kitty_negotiation_force_True_incurs_second_timeout():
         elapsed_ms = (time.time() - stime) * 1000
 
         assert flags2 is None
-        assert 20 <= elapsed_ms <= 60, elapsed_ms
+        assert 20 <= elapsed_ms <= 60
         return b'OK'
 
     assert 'OK' in pty_test(

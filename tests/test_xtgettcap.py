@@ -971,8 +971,7 @@ def test_does_kitty_query_supported():
         resp = f'\x1bP1+r{hex_cap}={hex_val}\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.does_kitty_query(timeout=0.1)
-        assert result is True, (term._xtgettcap_cache, term.does_styling)
+        assert term.does_kitty_query(timeout=0.1)
         assert term._xtgettcap_cache is not None
         assert term._xtgettcap_cache.capabilities.get('kitty-query-name') == 'kitty'
         return b'OK'
@@ -1215,7 +1214,116 @@ def test_query_boundary_multiple_unqueryable():
     """_query_boundary_multiple() returns None without a tty, or without styling."""
     term = TestTerminal(stream=io.StringIO(), force_styling=True)
     query = ('', TermcapResponse._RE_XTGETTCAP_RESPONSE, 0)
-    assert term._query_boundary_multiple(*query) is None, 'not a tty'
+    assert term._query_boundary_multiple(*query) is None
     term._is_a_tty = True
     term._does_styling = False
-    assert term._query_boundary_multiple(*query) is None, 'no styling'
+    assert term._query_boundary_multiple(*query) is None
+
+
+def test_query_boundary_multiple_timeout_rebuffers_input():
+    """_query_boundary_multiple() re-buffers input when CPR boundary never arrives."""
+    def child(term):
+        term.ungetch('KEYS')
+        assert term._query_boundary_multiple(
+            '', TermcapResponse._RE_XTGETTCAP_RESPONSE, timeout=0.01) is None
+        assert term.flushinp() == 'KEYS'
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_query_boundary_multiple_timeout_rebuffers_input')
+    assert 'OK' in output
+
+
+@pytest.mark.parametrize('env,build,skipped', [
+    ({}, 20348, True),
+    ({}, 26100, False),
+    ({'WT_SESSION': 'e6c4c1a9'}, 20348, False),
+    ({'TERM': 'xterm-256color'}, 20348, False),
+])
+def test_xtgettcap_skip_early_conhost(env, build, skipped):
+    """XTGETTCAP init probe skipped only for Windows console builds that leak DCS."""
+    with mock.patch.dict(os.environ, env, clear=True), \
+            mock.patch('blessed.terminal.IS_WINDOWS', True), \
+            mock.patch('blessed.terminal.get_console_input_encoding', create=True,
+                       return_value='UTF-8'), \
+            mock.patch.object(sys, 'getwindowsversion', create=True,
+                              return_value=mock.Mock(build=build)), \
+            mock.patch('os.isatty', return_value=True), \
+            mock.patch.object(Terminal, '_xtgettcap_batch',
+                              return_value=TermcapResponse(supported=False)) as mock_batch:
+        t = Terminal(stream=sys.__stdout__, force_styling=True)
+        assert any('conhost' in err for err in t.errors) is skipped
+        assert mock_batch.called is not skipped
+
+
+def test_xtgettcap_partial_response_defers():
+    """A partial XTGETTCAP reply resolves as bare KEY_ESCAPE, so inkey() awaits the rest."""
+    from blessed.keyboard import resolve_sequence
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    ks = resolve_sequence('\x1bP1+r524742', term._keymap, term._keycodes,
+                          term._keymap_prefixes, final=False)
+    assert (ks.name, len(ks)) == ('KEY_ESCAPE', 1)
+
+
+def test_xtgettcap_late_response_updates_cache():
+    """XTGETTCAP response arriving after probe timeout populates the capability cache."""
+    def child(term):
+        tn_before = term._xtgettcap_cache.capabilities['TN']
+        term.ungetch('\x1bP1+r524742=382f382f38\x1b\\')
+        assert term.inkey(timeout=0) == ''
+        assert term._xtgettcap_cache.capabilities['RGB'] == '8/8/8'
+        assert term._xtgettcap_cache.capabilities['TN'] == tn_before
+        assert term.errors[-1] == (
+            r"errant/delayed XTGETTCAP_RESPONSE '\x1bP1+r524742=382f382f38\x1b\\'")
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_xtgettcap_late_response_updates_cache')
+    assert 'OK' in output
+
+
+def test_xtgettcap_late_response_precedes_keystroke():
+    """A late XTGETTCAP response is consumed silently, yielding the keystroke behind it."""
+    def child(term):
+        term.ungetch('\x1bP1+r524742=382f382f38\x1b\\n')
+        assert term.inkey(timeout=0) == 'n'
+        assert term._xtgettcap_cache.capabilities['RGB'] == '8/8/8'
+        assert term.errors[-1] == (
+            r"errant/delayed XTGETTCAP_RESPONSE '\x1bP1+r524742=382f382f38\x1b\\'")
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_xtgettcap_late_response_precedes_keystroke')
+    assert 'OK' in output
+
+
+def test_xtgettcap_late_response_without_styling():
+    """XTGETTCAP response is decoded without error when styling is disabled."""
+    def child(term):
+        term._does_styling = False
+        term.ungetch('\x1bP1+r524742=382f382f38\x1b\\')
+        assert term.inkey(timeout=0) == ''
+        assert term.errors[-1] == (
+            r"errant/delayed XTGETTCAP_RESPONSE '\x1bP1+r524742=382f382f38\x1b\\'")
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_xtgettcap_late_response_without_styling')
+    assert 'OK' in output
+
+
+def test_xtgettcap_late_failure_response_does_not_set_supported():
+    """A late 'ESC P 0 + r' failure reply reports no capabilities and no support."""
+    def child(term):
+        term._xtgettcap_cache = TermcapResponse(supported=False)
+        term.ungetch('\x1bP0+r524742\x1b\\')
+        assert term.inkey(timeout=0) == ''
+        assert term._xtgettcap_cache.supported is False
+        assert term._xtgettcap_cache.capabilities == {}
+        assert term.errors[-1] == (
+            r"errant/delayed XTGETTCAP_RESPONSE '\x1bP0+r524742\x1b\\'")
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_xtgettcap_late_failure_response_does_not_set_supported')
+    assert 'OK' in output

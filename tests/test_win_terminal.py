@@ -336,21 +336,24 @@ def test_drain_tracks_button_state():
     child()
 
 
+# Console mode 0x0201 is ENABLE_PROCESSED_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT, as set by
+# cbreak().  mouse_enabled() adds ENABLE_MOUSE_INPUT (0x0010) and ENABLE_EXTENDED_FLAGS (0x0080)
+# while clearing ENABLE_QUICK_EDIT_MODE (0x0040), which is restored on exit.
 _NATIVE_CTX_PARAMS = pytest.mark.parametrize(
-    "ctx_method,probe_method,flag,dec_mode,enable_bit", [
+    "ctx_method,probe_method,flag,dec_mode,expected_modes", [
         ('mouse_enabled', 'does_mouse', '_native_mouse',
-         DecPrivateMode.MOUSE_EXTENDED_SGR if IS_WINDOWS else 0,
-         win32.ENABLE_MOUSE_INPUT if IS_WINDOWS else 0),
+         DecPrivateMode.MOUSE_EXTENDED_SGR if IS_WINDOWS else 0, (0x0291, 0x02c1)),
         ('notify_on_resize', 'does_inband_resize', '_native_resize',
-         DecPrivateMode.IN_BAND_WINDOW_RESIZE if IS_WINDOWS else 0,
-         win32.ENABLE_WINDOW_INPUT if IS_WINDOWS else 0),
+         DecPrivateMode.IN_BAND_WINDOW_RESIZE if IS_WINDOWS else 0, (0x0209, 0x0201)),
     ])
 
 
 @_NATIVE_CTX_PARAMS
 def test_native_fallback_sets_and_clears(
-        ctx_method, probe_method, flag, dec_mode, enable_bit):
+        ctx_method, probe_method, flag, dec_mode, expected_modes):
     """Test native fallback enables console mode and cleans up on exit."""
+    expected_set, expected_restore = expected_modes
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._keyboard_fd = 0
@@ -367,18 +370,39 @@ def test_native_fallback_sets_and_clears(
             with getattr(term, ctx_method)():
                 assert getattr(term, flag) is True
                 assert cache_key in term._dec_mode_cache
-                mock_set.assert_called_with(42, 0x0201 | enable_bit)
+                mock_set.assert_called_with(42, expected_set)
 
             assert getattr(term, flag) is False
             assert len(term._event_buf) == 0
             assert cache_key not in term._dec_mode_cache
-            assert mock_set.call_args_list[-1] == mock.call(42, 0x0201)
+            assert mock_set.call_args_list[-1] == mock.call(42, expected_restore)
+    child()
+
+
+def test_mouse_enabled_preserves_disabled_quick_edit():
+    """Test mouse_enabled() does not re-enable QuickEdit mode that was already disabled."""
+    def child():
+        term = TestTerminal(stream=io.StringIO(), force_styling=True)
+        term._keyboard_fd = 0
+
+        with mock.patch.object(type(term), 'does_mouse',
+                               return_value=False, create=True), \
+                mock.patch('blessed.win_terminal.msvcrt.get_osfhandle',
+                           return_value=42), \
+                mock.patch.object(
+                win32, 'get_console_mode',
+                return_value=0x0281), \
+                mock.patch.object(win32, 'set_console_mode') as mock_set:
+            with term.mouse_enabled():
+                mock_set.assert_called_with(42, 0x0291)
+
+            assert mock_set.call_args_list[-1] == mock.call(42, 0x0281)
     child()
 
 
 @_NATIVE_CTX_PARAMS
 def test_native_fallback_no_keyboard_fd(
-        ctx_method, probe_method, flag, dec_mode, enable_bit):
+        ctx_method, probe_method, flag, dec_mode, expected_modes):
     """Test native fallback yields without action when keyboard fd is None."""
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)

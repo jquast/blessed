@@ -332,16 +332,26 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
     def __init__xtgettcap(self) -> TermcapResponse:
         """Probe for core XTGETTCAP capabilities."""
+        # XTGETTCAP provides excellent communication of the terminal's self-reported 'TERM' (TN),
+        # and so it is done at class initialization.  However, some prominent terminals by Microsoft
+        # and Apple erroneously "leak" VT100 Mode DCS queries in error, meaning the hexadecimal
+        # ASCII payloads meant for the terminal to process are displayed as visible text to the
+        # user. And so an XTGETTCAP query is avoided for those terminals when identifiable.
         _xtgettcap_cache = TermcapResponse(supported=False)
-        # These prominent terminals "leak" VT100 Mode DCS queries, meaning the hexedecimal ascii
-        # payloads meant for the terminal to process are displayed as visible text to the user.  Try
-        # our best to avoid to query them, but these variables are not forwarded over SSH.
         if os.environ.get('ANSICON') or os.environ.get('ConEmuANSI'):
             self.errors.append('XTGETTCAP probe: skipped, ansicon')
             return _xtgettcap_cache
         if os.environ.get('TERM_PROGRAM') == 'Apple_Terminal':
             self.errors.append('XTGETTCAP probe: skipped, Terminal.app')
             return _xtgettcap_cache
+        if IS_WINDOWS and not (os.environ.get('TERM') or os.environ.get('WT_SESSION')):
+            if sys.getwindowsversion().build < 22000:  # pylint: disable=no-member
+                # early "modern" conhost.exe (cmd.exe) parses VT100 sequences but not DCS.  fixed by
+                # https://github.com/microsoft/terminal/pull/6328 and never backported.  Build
+                # number is approximate.
+                self.errors.append('XTGETTCAP probe: skipped, bad conhost.exe')
+                return _xtgettcap_cache
+
         if (self.is_a_tty and self._keyboard_fd is not None):
             try:
                 _xtgettcap_cache = self._xtgettcap_batch(
@@ -358,10 +368,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """Determine terminal 'kind' jinxed.setupterm() capability database."""
         # Previous to 1.40, blessed could fallback to 'dumb' when it could not find a meaningful
         # type, but now kind_fallback='xterm-256color' is always guaranteed available and used
-        # instead of 'dumb'.
-        #
-        # I believe now xterm-256 sequences are safe as unknown fallback for the year 2026. If dumb
-        # *is*, use NO_COLOR or force_styling=False which has the same general result.
+        # instead of 'dumb'.  I believe now xterm-256 sequences are safe as unknown fallback for the
+        # year 2026. Use NO_COLOR or force_styling=False to force the same result.
         tn_kind = self._xtgettcap_cache.capabilities.get('TN')
         term_kind = (jinxed.get_term(self._init_descriptor)
                      if IS_WINDOWS and self._init_descriptor is not None
@@ -640,10 +648,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # Add DEC event prefixes (mouse, bracketed paste, focus tracking) These
         # are not in the keymap but need to be recognized as valid "prefixes",
         # so that they are *not* detected as a 'metaSendsEscape' sequence until
-        # after esc_delay has elapsed.
+        # after esc_delay has elapsed -- like Alt+M (\x1b[M), Alt+2 ('\x1b[2')
+        # and Alt+Shift+P ('\x1bP') ! Use kitty keyboard protocol if it matters.
         self._keymap_prefixes.update([
             '\x1b[M',     # Legacy mouse (needs 3 more bytes)
             '\x1b[<',     # SGR mouse (variable length)
+            '\x1bP',      # DCS, an XTGETTCAP reply arriving after its query timed out
             '\x1b[200',   # Bracketed paste start and its starting prefixes,
             '\x1b[20',
             '\x1b[2'])
@@ -960,6 +970,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 self, _RE_CPR_BOUNDARY.pattern, timeout)
 
             if cpr_match is None:
+                # re-buffer keyboard data, if any
+                self.ungetch(data)
                 return None
 
             data = data[:cpr_match.start()] + data[cpr_match.end():]
@@ -4334,6 +4346,17 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # buffer any remaining text received
         self.ungetch(ucs[len(ks):])
 
+        # Detect very late capability replies arrived after TERMINAL_QUERY_TIMEOUT_SECONDS elapsed.
+        # Do not return as keystroke, Fold into the cache and continue waiting for real input using
+        # recursion.
+        if ks.name == 'XTGETTCAP_RESPONSE':
+            self.errors.append(f'errant/delayed XTGETTCAP_RESPONSE {str(ks)!r}')
+            if self.does_styling and (late_caps := ks.xtgettcap):
+                self._update_xtgettcap_cache(
+                    TermcapResponse(supported=True, capabilities=late_caps))
+            return self.inkey(timeout=_time_left(stime, timeout),
+                              esc_delay=esc_delay, capture_cpr=capture_cpr)
+
         # Update preferred size cache if this is a resize event
         if ks._mode == _DecPrivateMode.IN_BAND_WINDOW_RESIZE:  # pylint: disable=protected-access
             event_vals = ks._mode_values  # pylint: disable=protected-access
@@ -4390,6 +4413,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         # pylint: disable=too-complex,too-many-branches
         loop = asyncio.get_running_loop()
+        stime = time.time()
 
         # drain keyboard buffer (non-blocking)
         ucs = self.flushinp()
@@ -4453,6 +4477,18 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         # buffer any remaining text
         self.ungetch(ucs[len(ks):])
+
+        # What if an XTGETTCAP reply from get_xtgettcap(), or, made at class-initialization arrives
+        # after timeout? Fold it into the response cache and continue awaiting *user* input.
+        # Conservatively chose not re-initialize self._jinxed_term on latent 'TN' or
+        # self._number_of_colors on 'RGB' responses, though.
+        if ks.name == 'XTGETTCAP_RESPONSE':
+            self.errors.append(f'errant/delayed XTGETTCAP_RESPONSE {str(ks)!r}')
+            if self.does_styling and (late_caps := ks.xtgettcap):
+                self._update_xtgettcap_cache(
+                    TermcapResponse(supported=True, capabilities=late_caps))
+            return await self.async_inkey(timeout=_time_left(stime, timeout),
+                                          esc_delay=esc_delay, capture_cpr=capture_cpr)
 
         # update preferred size cache if this is a resize event
         if ks._mode == _DecPrivateMode.IN_BAND_WINDOW_RESIZE:  # pylint: disable=protected-access
