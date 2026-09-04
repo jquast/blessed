@@ -3,6 +3,10 @@
 Version History
 ===============
 
+1.50
+  * bugfix: Do not automatic query `XTGETTCAP`_ for older CONPTY builds (WIndows Server 2022), which
+    displays control codes as visible text :ghpull:`409`.
+
 1.49
   * introduce: :meth:`~Terminal.get_font_coverage` reports codepoints the terminal font has a glyph
     for, by mintty's ``OSC 7771`` Font Glyph Coverage Enquiry or the ``APC 25a1`` Glyph Protocol,

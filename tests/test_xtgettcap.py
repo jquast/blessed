@@ -1219,3 +1219,25 @@ def test_query_boundary_multiple_unqueryable():
     term._is_a_tty = True
     term._does_styling = False
     assert term._query_boundary_multiple(*query) is None, 'no styling'
+
+
+@pytest.mark.parametrize('env,build,skipped', [
+    ({}, 20348, True),
+    ({}, 26100, False),
+    ({'WT_SESSION': 'e6c4c1a9'}, 20348, False),
+    ({'TERM': 'xterm-256color'}, 20348, False),
+])
+def test_xtgettcap_skip_early_conhost(env, build, skipped):
+    """XTGETTCAP init probe skipped only for Windows console builds that leak DCS."""
+    with mock.patch.dict(os.environ, env, clear=True), \
+            mock.patch('blessed.terminal.IS_WINDOWS', True), \
+            mock.patch('blessed.terminal.get_console_input_encoding', create=True,
+                       return_value='UTF-8'), \
+            mock.patch.object(sys, 'getwindowsversion', create=True,
+                              return_value=mock.Mock(build=build)), \
+            mock.patch('os.isatty', return_value=True), \
+            mock.patch.object(Terminal, '_xtgettcap_batch',
+                              return_value=TermcapResponse(supported=False)) as mock_batch:
+        t = Terminal(stream=sys.__stdout__, force_styling=True)
+        assert any('conhost' in err for err in t.errors) is skipped
+        assert mock_batch.called is not skipped
