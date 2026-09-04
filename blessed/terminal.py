@@ -332,16 +332,26 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
     def __init__xtgettcap(self) -> TermcapResponse:
         """Probe for core XTGETTCAP capabilities."""
-        _xtgettcap_cache = TermcapResponse(supported=False)
-        # These prominent terminals "leak" VT100 Mode DCS queries, meaning the hexedecimal ascii
+        # XTGETTCAP provides excellent communication of the terminal's self-reported 'TERM' (TN),
+        # and so it is done at class initialization.  However, some prominent terminals by Microsoft
+        # and Apple erroneously "leak" VT100 Mode DCS queries, meaning the hexadecimal ascii
         # payloads meant for the terminal to process are displayed as visible text to the user.  Try
         # our best to avoid to query them, but these variables are not forwarded over SSH.
+        _xtgettcap_cache = TermcapResponse(supported=False)
         if os.environ.get('ANSICON') or os.environ.get('ConEmuANSI'):
             self.errors.append('XTGETTCAP probe: skipped, ansicon')
             return _xtgettcap_cache
         if os.environ.get('TERM_PROGRAM') == 'Apple_Terminal':
             self.errors.append('XTGETTCAP probe: skipped, Terminal.app')
             return _xtgettcap_cache
+        if IS_WINDOWS and not (os.environ.get('TERM') or os.environ.get('WT_SESSION')):
+            if sys.getwindowsversion().build < 22000:  # pylint: disable=no-member
+                # early "modern" conhost.exe (cmd.exe) parses VT100 sequences but not DCS.  fixed by
+                # https://github.com/microsoft/terminal/pull/6328 and never backported.  Build
+                # number is approximate.
+                self.errors.append('XTGETTCAP probe: skipped, bad conhost.exe')
+                return _xtgettcap_cache
+
         if (self.is_a_tty and self._keyboard_fd is not None):
             try:
                 _xtgettcap_cache = self._xtgettcap_batch(
