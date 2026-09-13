@@ -140,7 +140,6 @@ _RE_GLYPH_PROTOCOL_Q_RESPONSE = re.compile(
 # Glyph Protocol support probe response: ESC _ 25a1 ; s ; key=val... ST
 _RE_GLYPH_PROTOCOL_S_RESPONSE = re.compile(r'\x1b_25a1;s(;[^\x1b\\]*)\x1b\\')
 _RE_CPR_BOUNDARY = re.compile(r'\x1b\[[0-9]+;[0-9]+R')
-_RE_KITTY_CLIPBOARD = re.compile(r'\x1b\[\?5522;(\d+)\$y')
 _RE_KITTY_POINTER = re.compile(r'\x1b\]22;([^\x07\x1b]+)(?:\x07|\x1b\\)')
 _FONT_QUERY_CHUNK_SIZE = 256
 
@@ -443,6 +442,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._color_scheme_supported: Optional[bool] = None
         # DECRQSS detection cache
         self._decrqss_supported: Optional[bool] = None
+        # Whether the terminal is Terminal.app, which displays rather than parses the
+        # '$' intermediate byte of a DECRQM or DECRQSS query; None until determined
+        self._is_apple_terminal: Optional[bool] = None
         # Font glyph coverage: mintty OSC 7771 probe result
         self._does_mintty_font_protocol: Optional[bool] = None
         # Font glyph coverage: Glyph Protocol probe result, by advertised key=value
@@ -1459,7 +1461,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         In some cases a ``timeout`` value should be set, as it is possible for a
         terminal that succeeds :attr:`is_a_tty` to fail to respond to DEC Private
         Modes, such as in a CI Build Service or other "dumb" terminal, even a few
-        popular modern ones such as Konsole.
+        popular modern ones such as Konsole.  The first query may also make an XTVERSION
+        query, :meth:`get_software_version`, to avoid a DECRQM query to terminals with
+        leaky output (Terminal.app), so the total elapsed time may exceed *timeout*.
 
         If a DEC Private mode query fails to respond within the ``timeout``
         specified, the :class:`DecModeResponse` value returned is
@@ -1505,6 +1509,19 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         if int(mode) in self._dec_mode_cache and not force:
             cached_value = self._dec_mode_cache[int(mode)]
             return DecModeResponse(mode, cached_value)
+
+        # Avoid Terminal.app, which displays rather than parses the "intermediate byte" ($), leaking
+        # a stray 'p' (DECRQM) or '$q' and the setting identifier (DECRQSS).
+        if self._is_apple_terminal is None:
+            self._is_apple_terminal = os.environ.get('TERM_PROGRAM') == 'Apple_Terminal'
+            if not self._is_apple_terminal:
+                software_version = self.get_software_version(timeout=timeout)
+                self._is_apple_terminal = (software_version is not None
+                                           and software_version.name == 'Apple_Terminal')
+            if self._is_apple_terminal:
+                self.errors.append('DECRQM and DECRQSS queries: skipped, Terminal.app')
+        if self._is_apple_terminal:
+            return DecModeResponse(mode, DecModeResponse.NOT_QUERIED)
 
         # Build and send query sequence and expected response pattern
         query = f'\x1b[?{int(mode):d}$p'
@@ -2222,8 +2239,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         Check if the terminal supports the Kitty clipboard protocol (mode 5522).
 
-        Sends a DECRQM query for DEC private mode 5522 (Bracketed Paste MIME) with a CPR boundary
-        guard for fast negative detection on terminals that do not recognize the mode.
+        Queries DEC private mode 5522 (Bracketed Paste MIME) by :meth:`get_dec_mode`.
 
         :arg float timeout: Timeout in seconds.
         :arg bool force: Bypass cached result.
@@ -2232,13 +2248,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         if self._kitty_clipboard_supported is not None and not force:
             return self._kitty_clipboard_supported
 
-        match = self._query_with_boundary(
-            '\x1b[?5522$p', _RE_KITTY_CLIPBOARD, timeout)
-        supported = False
-        if match:
-            ps = int(match.group(1))
-            if ps not in (0, 4):
-                supported = True
+        supported = self.get_dec_mode(_DecPrivateMode.BRACKETED_PASTE_MIME, timeout=timeout,
+                                      force=force).supported
         self._kitty_clipboard_supported = supported
         return supported
 
@@ -2452,10 +2463,26 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             `DECRQSS specification
             <https://vt100.net/docs/vt510-rm/DECRQSS.html>`_
 
+        The first query may also make an XTVERSION query, :meth:`get_software_version`,
+        to avoid a DECRQSS query to terminals with leaky output (Terminal.app).
+
         :arg str setting_id: Setting identifier to query (default: SGR).
         :arg float timeout: Timeout in seconds.
         :rtype: str or None
         """
+        if self._is_apple_terminal is None:
+            # Terminal.app displays rather than parses the '$' intermediate byte, leaking a stray
+            # 'p' (DECRQM) or '$q' and the setting identifier (DECRQSS), and is never sent either.
+            self._is_apple_terminal = os.environ.get('TERM_PROGRAM') == 'Apple_Terminal'
+            if not self._is_apple_terminal:
+                software_version = self.get_software_version(timeout=timeout)
+                self._is_apple_terminal = (software_version is not None
+                                           and software_version.name == 'Apple_Terminal')
+            if self._is_apple_terminal:
+                self.errors.append('DECRQM and DECRQSS queries: skipped, Terminal.app')
+        if self._is_apple_terminal:
+            return None
+
         query = f'\x1bP$q{setting_id}\x1b\\'
         match = self._query_with_boundary(query, _RE_DECRQSS_RESPONSE, timeout)
         if match is not None and match.group(1) == '1':
