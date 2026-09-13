@@ -971,8 +971,7 @@ def test_does_kitty_query_supported():
         resp = f'\x1bP1+r{hex_cap}={hex_val}\x1b\\'
         cpr = '\x1b[10;20R'
         term.ungetch(resp + cpr)
-        result = term.does_kitty_query(timeout=0.1)
-        assert result is True, (term._xtgettcap_cache, term.does_styling)
+        assert term.does_kitty_query(timeout=0.1)
         assert term._xtgettcap_cache is not None
         assert term._xtgettcap_cache.capabilities.get('kitty-query-name') == 'kitty'
         return b'OK'
@@ -1215,10 +1214,10 @@ def test_query_boundary_multiple_unqueryable():
     """_query_boundary_multiple() returns None without a tty, or without styling."""
     term = TestTerminal(stream=io.StringIO(), force_styling=True)
     query = ('', TermcapResponse._RE_XTGETTCAP_RESPONSE, 0)
-    assert term._query_boundary_multiple(*query) is None, 'not a tty'
+    assert term._query_boundary_multiple(*query) is None
     term._is_a_tty = True
     term._does_styling = False
-    assert term._query_boundary_multiple(*query) is None, 'no styling'
+    assert term._query_boundary_multiple(*query) is None
 
 
 @pytest.mark.parametrize('env,build,skipped', [

@@ -345,7 +345,7 @@ def test_async_read_byte_deadline_same_iteration_no_loss():
                     term._async_read_byte(loop, timeout=0.1))
             finally:
                 loop.close()
-            assert result == b'x', f'byte lost: _async_read_byte returned {result!r}'
+            assert result == b'x'
             return b'OK'
 
     def parent(master_fd):

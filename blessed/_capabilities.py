@@ -263,7 +263,8 @@ XTGETTCAP_CAPABILITIES = (
     ("cvvis", "Very visible cursor"),
     # And here is where blessed's integration ends. All remaining capabilities, for blessed's
     # purposes, are informational only. Used by the downstream 'ucs-detect' tool for auditing and
-    # fingerprinting purposes, like "kitty-query-clipboard_control".
+    # fingerprinting purposes, like "kitty-query-clipboard_control" but not used by blessed
+    # directly.
     #
     # Remaining numeric capabilities
     ("colors", "Max colors on screen"),

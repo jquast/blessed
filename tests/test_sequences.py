@@ -153,8 +153,7 @@ def test_horizontal_location(any_term):
             (unicode_cap('sc', t) or '\x1b[s',
              _hpa,
              unicode_cap('rc', t) or '\x1b[u'))
-        assert (t.stream.getvalue() == expected_output), (
-            repr(t.stream.getvalue()), repr(expected_output))
+        assert t.stream.getvalue() == expected_output
 
     child(any_term)
 
@@ -449,18 +448,18 @@ def test_nice_formatting_errors(any_term):
         t = TestTerminal(kind=kind)
         try:
             t.bold_misspelled('hey')
-            assert not t.is_a_tty, 'Should have thrown exception'
+            assert not t.is_a_tty
         except TypeError as e:
             assert 'Unknown terminal capability,' in e.args[0]
         try:
             t.bold_misspelled('hey')  # unicode
-            assert not t.is_a_tty, 'Should have thrown exception'
+            assert not t.is_a_tty
         except TypeError as e:
             assert 'Unknown terminal capability,' in e.args[0]
 
         try:
             t.bold_misspelled(None)  # an arbitrary non-string
-            assert not t.is_a_tty, 'Should have thrown exception'
+            assert not t.is_a_tty
         except TypeError as e:
             assert 'Unknown terminal capability,' not in e.args[0]
 
@@ -468,9 +467,9 @@ def test_nice_formatting_errors(any_term):
             # PyPy fails to toss an exception, Why?!
             try:
                 t.bold_misspelled('a', 'b')  # >1 string arg
-                assert not t.is_a_tty, 'Should have thrown exception'
+                assert not t.is_a_tty
             except TypeError as e:
-                assert 'Unknown terminal capability,' in e.args[0], e.args
+                assert 'Unknown terminal capability,' in e.args[0]
 
     child(any_term)
 
