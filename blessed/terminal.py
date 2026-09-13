@@ -1879,14 +1879,21 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     def does_xtgettcap(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                        force: bool = False) -> bool:
         """
-        Check if the terminal supports XTGETTCAP (DCS +q) queries.
+        Whether the terminal supports XTGETTCAP (DCS +q) queries.
+
+        Support is determined at class initialization and so this call is always non-blocking unless
+        the *force* argument is used.
 
         :arg float timeout: Timeout in seconds.
         :arg bool force: Bypass cached result.
         :rtype: bool
         """
-        result = self.get_xtgettcap(timeout=timeout, force=force)
-        return result is not None
+        if not force:
+            return self.is_a_tty and self._xtgettcap_cache.supported
+        # Only 'colors' field is checked, it is already answered by the query made at class
+        # initialization, and data gathered by ucs-detect survey shows this is the most common field
+        # supported by all terminals implementing XTGETTCAP.
+        return self.get_xtgettcap(timeout=timeout, force=True, caps=('colors',)) is not None
 
     def get_font_coverage(self, text: str,
                           timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
