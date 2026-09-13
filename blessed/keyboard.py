@@ -24,6 +24,7 @@ from blessed.mouse import (RE_PATTERN_MOUSE_SGR,
                            MouseSGREvent,
                            MouseLegacyEvent)
 from blessed.dec_modes import DecPrivateMode
+from blessed._capabilities import TermcapResponse
 
 _T = TypeVar('_T', bound='Keystroke')
 
@@ -1174,6 +1175,16 @@ class Keystroke(str):
         return (-1, -1)
 
     @property
+    def xtgettcap(self) -> Dict[str, str]:
+        """
+        Capabilities reported by an XTGETTCAP response.
+
+        :rtype: dict
+        :returns: mapping of terminal capability name to value.
+        """
+        return TermcapResponse.parse_capabilities(self)
+
+    @property
     def text(self) -> Optional[str]:
         """
         Pasted text for bracketed paste events.
@@ -1425,6 +1436,7 @@ def resolve_sequence(text: str,
         _match_legacy_csi_letter_form,
         _match_legacy_csi_tilde_form,
         _match_legacy_ss3_fkey_form,
+        _match_xtgettcap_response,
         _match_cpr_response]
     if capture_cpr:
         # prioritize capturing CPR_RESPONSE over legacy CSI Modifiers
@@ -1545,15 +1557,10 @@ def _match_dec_event(text: str,
                      dec_mode_cache: Optional[Dict[int,
                                                    int]] = None) -> Optional[Keystroke]:
     """
-    Attempt to match text against DEC event patterns.
+    Match text against DEC event patterns.
 
-    Only matches patterns whose corresponding DEC modes are enabled in the cache.
-    This prevents false positives like matching focus events when focus tracking is disabled.
-
-    :arg str text: Input text to match against DEC patterns
-    :arg dict dec_mode_cache: Dictionary of DEC private mode states (mode number -> state value)
-    :rtype: Keystroke or None
-    :returns: :class:`Keystroke` with DEC event data if matched, ``None`` otherwise
+    Only matches patterns whose corresponding DEC modes are enabled in the cache. This prevents
+    false positives like matching focus events when focus tracking is disabled.
     """
     # local
     from blessed.dec_modes import DecModeResponse  # pylint: disable=import-outside-toplevel
@@ -1573,18 +1580,20 @@ def _match_dec_event(text: str,
     return None
 
 
+def _match_xtgettcap_response(text: str) -> Optional[Keystroke]:
+    """Match XTGETTCAP reply: ESC P 1 + r <hex> = <hex> ESC backslash."""
+    # pylint: disable=protected-access
+    match = TermcapResponse._RE_XTGETTCAP_RESPONSE.match(text)
+    if match:
+        return Keystroke(ucs=match.group(0), name='XTGETTCAP_RESPONSE')
+    return None
+
+
 def _match_cpr_response(text: str) -> Optional[Keystroke]:
-    """
-    Match CPR (Cursor Position Report): ESC [ row ; column R.
-
-    :arg str text: Input text to match against CPR pattern.
-    :rtype: Keystroke or None
-    :returns: :class:`Keystroke` if matched, ``None`` otherwise.
-
-    Matches terminal CPR responses where row >= 2. Row 1 is not
-    matched on input, preferring to match F3 + Modifier in the
-    legacy CSI letter form.
-    """
+    """Match CPR (Cursor Position Report): ESC [ row ; column R."""
+    # Matches terminal CPR responses where row >= 2. Row 1 is not
+    # matched on input, preferring to match F3 + Modifier in the
+    # legacy CSI letter form.
     match = RE_PATTERN_CPR.match(text)
     if match:
         return Keystroke(ucs=match.group(0), name='CPR_RESPONSE')
@@ -1592,20 +1601,13 @@ def _match_cpr_response(text: str) -> Optional[Keystroke]:
 
 
 def _match_kitty_key(text: str) -> Optional[Keystroke]:
-    """
-    Attempt to match text against Kitty keyboard protocol patterns.
-
-    :arg str text: Input text to match against Kitty patterns
-    :rtype: Keystroke or None
-    :returns: :class:`Keystroke` with Kitty key data if matched, ``None`` otherwise
-
-    Supports Kitty keyboard protocol sequences of the form:
-    CSI unicode-key-code u                                            # Basic form
-    CSI unicode-key-code ; modifiers u                                # With modifiers
-    CSI unicode-key-code : shifted-key : base-key ; modifiers u       # With alternate keys
-    CSI unicode-key-code ; modifiers : event-type u                   # With event type
-    CSI unicode-key-code ; modifiers : event-type ; text-codepoints u # Full form
-    """
+    """Match text against Kitty keyboard protocol patterns."""
+    # Supports Kitty keyboard protocol sequences of the form:
+    # CSI unicode-key-code u                                            # Basic form
+    # CSI unicode-key-code ; modifiers u                                # With modifiers
+    # CSI unicode-key-code : shifted-key : base-key ; modifiers u       # With alternate keys
+    # CSI unicode-key-code ; modifiers : event-type u                   # With event type
+    # CSI unicode-key-code ; modifiers : event-type ; text-codepoints u # Full form
     match = RE_PATTERN_KITTY_KB_PROTOCOL.match(text)
 
     def int_when_non_empty(_m: Match[str], _key: str) -> Optional[int]:
@@ -1646,17 +1648,10 @@ def _match_kitty_key(text: str) -> Optional[Keystroke]:
 
 
 def _match_modify_other_keys(text: str) -> Optional['Keystroke']:
-    """
-    Attempt to match text against xterm ModifyOtherKeys patterns.
-
-    :arg str text: Input text to match against ModifyOtherKeys patterns
-    :rtype: Keystroke or None
-    :returns: :class:`Keystroke` when matched, otherwise ``None``.
-
-    Supports xterm ModifyOtherKeys sequences of the form:
-    ESC [ 27 ; modifiers ; key ~     # Standard form
-    ESC [ 27 ; modifiers ; key       # Alternative form without trailing ~
-    """
+    """Match text against xterm ModifyOtherKeys patterns."""
+    # Supports xterm ModifyOtherKeys sequences of the form:
+    # ESC [ 27 ; modifiers ; key ~     # Standard form
+    # ESC [ 27 ; modifiers ; key       # Alternative form without trailing ~
     match = RE_PATTERN_MODIFY_OTHER.match(text)
     if match:
         # Create ModifyOtherKeysEvent namedtuple
@@ -1672,15 +1667,8 @@ def _match_modify_other_keys(text: str) -> Optional['Keystroke']:
 
 
 def _match_legacy_csi_letter_form(text: str) -> Optional[Keystroke]:
-    """
-    Match legacy CSI letter form: ESC [ 1 ; modifiers [ABCDEFHPQRS].
-
-    :arg str text: Input text to match
-    :rtype: Keystroke or None
-    :returns: :class:`Keystroke` if matched, ``None`` otherwise
-
-    Handles arrow keys, Home/End, F1-F4 with modifiers.
-    """
+    """Match legacy CSI letter form: ESC [ 1 ; modifiers [ABCDEFHPQRS]."""
+    # Handles arrow keys, Home/End, F1-F4 with modifiers.
     match = RE_PATTERN_LEGACY_CSI_MODIFIERS.match(text)
     if not match:
         return None
@@ -1703,17 +1691,10 @@ def _match_legacy_csi_letter_form(text: str) -> Optional[Keystroke]:
 
 
 def _match_legacy_csi_tilde_form(text: str) -> Optional[Keystroke]:
-    """
-    Match legacy CSI tilde form: ESC [ number ; modifiers ~.
-
-    :arg str text: Input text to match
-    :rtype: Keystroke or None
-    :returns: :class:`Keystroke` if matched, ``None`` otherwise
-
-    Handles function keys and navigation keys (Insert, Delete, Page Up/Down, etc.)
-    with modifiers. See https://tomscii.sig7.se/zutty/doc/KEYS.html and
-    https://invisible-island.net/xterm/xterm-function-keys.html for reference.
-    """
+    """Match legacy CSI tilde form: ESC [ number ; modifiers ~."""
+    # Handles function keys and navigation keys (Insert, Delete, Page Up/Down, etc.)
+    # with modifiers. See https://tomscii.sig7.se/zutty/doc/KEYS.html and
+    # https://invisible-island.net/xterm/xterm-function-keys.html for reference.
     match = RE_PATTERN_LEGACY_CSI_TILDE.match(text)
     if not match:
         return None
@@ -1737,15 +1718,8 @@ def _match_legacy_csi_tilde_form(text: str) -> Optional[Keystroke]:
 
 
 def _match_legacy_ss3_fkey_form(text: str) -> Optional[Keystroke]:
-    """
-    Match legacy SS3 F-key form: ESC O modifier [PQRS].
-
-    :arg str text: Input text to match
-    :rtype: Keystroke or None
-    :returns: :class:`Keystroke` if matched, ``None`` otherwise
-
-    Handles F1-F4 with modifiers in SS3 format (used by Konsole and others).
-    """
+    """Match legacy SS3 F-key form: ESC O modifier [PQRS]."""
+    # Handles F1-F4 with modifiers in SS3 format (used by Konsole and others).
     match = RE_PATTERN_LEGACY_SS3_FKEYS.match(text)
     if not match:
         return None
