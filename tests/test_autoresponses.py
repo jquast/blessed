@@ -41,6 +41,7 @@ def test_detection_not_a_tty(method_name, expected):
 
 @pytest.mark.parametrize('method_name,expected', [
     ('does_kitty_graphics', False),
+    ('does_iterm2_graphics', False),
     ('does_kitty_notifications', False),
     ('does_kitty_clipboard', False),
     ('does_kitty_pointer_shapes', None),
@@ -63,6 +64,8 @@ def test_detection_no_styling(method_name, expected):
     ('does_kitty_notifications', '_kitty_notifications_supported', False, False),
     ('does_kitty_clipboard', '_kitty_clipboard_supported', True, True),
     ('does_kitty_clipboard', '_kitty_clipboard_supported', False, False),
+    ('does_iterm2_graphics', '_iterm2_graphics_supported', True, True),
+    ('does_iterm2_graphics', '_iterm2_graphics_supported', False, False),
 ])
 def test_detection_cached_bool(method_name, cache_attr, cached_value, expected):
     """Boolean detection methods return cached value."""
@@ -114,6 +117,7 @@ def test_does_kitty_pointer_shapes_cached_unsupported():
     ('does_kitty_graphics', '_kitty_graphics_supported', True),
     ('does_kitty_notifications', '_kitty_notifications_supported', True),
     ('does_kitty_clipboard', '_kitty_clipboard_supported', True),
+    ('does_iterm2_graphics', '_iterm2_graphics_supported', True),
 ])
 def test_detection_force_bypass(method_name, cache_attr, cached_value):
     """force=True bypasses detection cache."""
@@ -211,6 +215,7 @@ def test_does_kitty_graphics_error_response():
 
 @pytest.mark.parametrize('method_name,expected', [
     ('does_kitty_graphics', False),
+    ('does_iterm2_graphics', False),
     ('does_kitty_notifications', False),
     ('does_kitty_clipboard', False),
     ('does_kitty_pointer_shapes', None),
@@ -273,22 +278,135 @@ def test_does_kitty_notifications_supported(terminator):
     assert 'OK' in output
 
 
-@pytest.mark.parametrize('method_name,cached_supported', [
-    ('does_iterm2', True),
-    ('does_iterm2', False),
-    ('does_iterm2_graphics', True),
-    ('does_iterm2_graphics', False),
-])
-def test_does_iterm2_delegates_cached(method_name, cached_supported):
-    """does_iterm2 and does_iterm2_graphics return cached result."""
+@pytest.mark.parametrize('cached_supported', [True, False])
+def test_does_iterm2_cached(cached_supported):
+    """does_iterm2 returns cached capabilities result."""
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
         term._iterm2_capabilities_cache = ITerm2Capabilities(
             supported=cached_supported)
-        assert getattr(term, method_name)() is cached_supported
+        assert term.does_iterm2() is cached_supported
     child()
+
+
+def test_does_iterm2_graphics_advances_column():
+    """does_iterm2_graphics is True when the image advances the cursor one column."""
+    def child(term):
+        term.ungetch('\x1b[5;10R\x1b[5;11R')
+        assert term.does_iterm2_graphics(timeout=0.01) is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_iterm2_graphics_advances_column')
+    assert 'OK' in output
+    # the image was drawn, then the single cell it occupied erased and the cursor
+    # returned to where it began, by absolute address (0-based 4, 9 -> CSI 5;10H)
+    assert '\x1b]1337;File=inline=1;' in output
+    assert '\x1b[5;10H \x1b[5;10H' in output
+
+
+def test_does_iterm2_graphics_advances_row():
+    """does_iterm2_graphics is True when the image advances the cursor one row."""
+    def child(term):
+        # a terminal that moves down past the image it drew, rather than right
+        term.ungetch('\x1b[5;10R\x1b[6;1R')
+        assert term.does_iterm2_graphics(timeout=0.01) is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_iterm2_graphics_advances_row')
+    assert 'OK' in output
+
+
+def test_does_iterm2_graphics_no_cursor_movement():
+    """does_iterm2_graphics is False when the cursor does not move."""
+    def child(term):
+        term.ungetch('\x1b[5;10R\x1b[5;10R')
+        assert term.does_iterm2_graphics(timeout=0.01) is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_iterm2_graphics_no_cursor_movement')
+    assert 'OK' in output
+    # the probed cell is erased even though nothing was drawn into it
+    assert '\x1b[5;10H \x1b[5;10H' in output
+
+
+def test_does_iterm2_graphics_displayed_as_text():
+    """does_iterm2_graphics is False when the sequence is echoed as text."""
+    def child(term):
+        # a terminal that does not parse OSC 1337 and wrote our payload to the
+        # display moves the cursor much further than a single cell
+        term.ungetch('\x1b[5;10R\x1b[6;40R')
+        assert term.does_iterm2_graphics(timeout=0.01) is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_iterm2_graphics_displayed_as_text')
+    assert 'OK' in output
+
+
+def test_does_iterm2_graphics_at_bottom_row():
+    """does_iterm2_graphics probes the row above the cursor in the final row."""
+    def child(term):
+        # cursor reported in the final row of a 24-row terminal: the probe steps up
+        # to row 23, where a row advance is a cursor movement and not a scroll
+        term.ungetch('\x1b[24;10R\x1b[23;11R')
+        assert term.does_iterm2_graphics(timeout=0.01) is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None, rows=24,
+                      test_name='test_does_iterm2_graphics_at_bottom_row')
+    assert 'OK' in output
+    # drawn on row 23, erased there, cursor returned to row 24
+    assert '\x1b[23;10H\x1b]1337;' in output
+    assert '\x1b[23;10H \x1b[24;10H' in output
+
+
+def test_does_iterm2_graphics_bottom_row_scroll_not_mistaken():
+    """A scroll in the final row is never measured, the probe steps off it first."""
+    def child(term):
+        # a terminal that drew and scrolled reports the row it began on.  Because the
+        # probe stepped up a row, that same reply is an unmoved cursor: unsupported.
+        term.ungetch('\x1b[24;10R\x1b[24;10R')
+        assert term.does_iterm2_graphics(timeout=0.01) is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None, rows=24,
+                      test_name='test_does_iterm2_graphics_bottom_row_scroll')
+    assert 'OK' in output
+
+
+def test_does_iterm2_graphics_no_reply_to_second_query():
+    """does_iterm2_graphics is False when the second CPR goes unanswered."""
+    def child(term):
+        term.ungetch('\x1b[5;10R')
+        assert term.does_iterm2_graphics(timeout=0.01) is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_iterm2_graphics_no_reply_to_second_query')
+    assert 'OK' in output
+    assert '\x1b[5;10H \x1b[5;10H' in output
+
+
+def test_does_iterm2_graphics_at_right_margin():
+    """does_iterm2_graphics probes the cell left of the cursor in the final column."""
+    def child(term):
+        # cursor reported in the final column of an 80-column terminal: the probe
+        # steps left to column 79 and the image advances it back to column 80
+        term.ungetch('\x1b[5;80R\x1b[5;80R')
+        assert term.does_iterm2_graphics(timeout=0.01) is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None, cols=80,
+                      test_name='test_does_iterm2_graphics_at_right_margin')
+    assert 'OK' in output
+    # drawn at column 79, erased there, cursor returned to column 80
+    assert '\x1b[5;79H\x1b]1337;' in output
+    assert '\x1b[5;79H \x1b[5;80H' in output
 
 
 @pytest.mark.parametrize('ps,expected', [

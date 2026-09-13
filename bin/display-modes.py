@@ -122,10 +122,13 @@ def display_sugar_methods(term):
     has_iterm2 = iterm2 is not None and iterm2.supported
     print(f"  {_yn(term, has_iterm2)}  iTerm2 capabilities (OSC 1337)" + term.clear_eol)
     if has_iterm2:
-        print(f"       Detection: {iterm2.detection}")
         if iterm2.features:
             feats = ', '.join(f'{k}={v}' for k, v in sorted(iterm2.features.items()))
             print(f"       Features: {feats}")
+
+    print('  Testing iTerm2 graphics...' + term.clear_eol, end='\r', flush=True)
+    print(f"  {_yn(term, term.does_iterm2_graphics())}  "
+          f"iTerm2 inline images (OSC 1337 File=)" + term.clear_eol)
 
     print('  Testing Kitty notifications...' + term.clear_eol, end='\r', flush=True)
     print(f"  {_yn(term, term.does_kitty_notifications())}  "
