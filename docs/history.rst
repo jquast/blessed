@@ -9,6 +9,8 @@ Version History
   * bugfix: :meth:`~Terminal.mouse_enabled` failed to yield ``MOUSE_*`` keystrokes on older CONPTY
     builds (Windows Server 2022), where the console's "QuickEdit mode" blocks transmission,
     :ghpull:`412`.
+  * bugfix: an `XTGETTCAP`_ received after query time out was returned by :meth:`~Terminal.inkey` as
+    errant keystrokes.  It is no longer yielded by :meth:`~Terminal.inkey`, :ghpull:`413`.
 
 1.49
   * introduce: :meth:`~Terminal.get_font_coverage` reports codepoints the terminal font has a glyph

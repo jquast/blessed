@@ -1241,3 +1241,37 @@ def test_xtgettcap_skip_early_conhost(env, build, skipped):
         t = Terminal(stream=sys.__stdout__, force_styling=True)
         assert any('conhost' in err for err in t.errors) is skipped
         assert mock_batch.called is not skipped
+
+
+def test_xtgettcap_partial_response_defers():
+    """A partial XTGETTCAP reply resolves as bare KEY_ESCAPE, so inkey() awaits the rest."""
+    from blessed.keyboard import resolve_sequence
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    ks = resolve_sequence('\x1bP1+r524742', term._keymap, term._keycodes,
+                          term._keymap_prefixes, final=False)
+    assert (ks.name, len(ks)) == ('KEY_ESCAPE', 1)
+
+
+@pytest.mark.parametrize('reply,trailing,styling,expected_rgb', [
+    # success RGB replies,
+    ('\x1bP1+r524742=382f382f38\x1b\\', '', True, '8/8/8'),
+    ('\x1bP1+r524742=382f382f38\x1b\\', 'n', True, '8/8/8'),
+    ('\x1bP1+r524742=382f382f38\x1b\\', '', False, '8'),
+    # RGB non-reply,
+    ('\x1bP0+r524742\x1b\\', '', True, '8'),
+], ids=('updates-cache', 'precedes-keystroke', 'without-styling', 'failure-reply'))
+def test_xtgettcap_late_response(reply, trailing, styling, expected_rgb):
+    """A late XTGETTCAP reply is consumed by inkey() and folded into the capability cache."""
+    # The pty test terminal begins with 'RGB' of '8', which a late reply may replace.
+    def child(term):
+        term._does_styling = styling
+        tn_before = term._xtgettcap_cache.capabilities['TN']
+        term.ungetch(reply + trailing)
+        assert term.inkey(timeout=0) == trailing
+        # RGB value is updated, but note at this time we do not adjust number_of_colors
+        assert term._xtgettcap_cache.capabilities.get('RGB') == expected_rgb
+        assert term._xtgettcap_cache.capabilities['TN'] == tn_before
+        assert term.errors[-1] == f'errant/delayed XTGETTCAP_RESPONSE {reply!r}'
+        return b'OK'
+
+    assert 'OK' in pty_test(child)

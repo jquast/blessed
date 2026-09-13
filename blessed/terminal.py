@@ -649,10 +649,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # Add DEC event prefixes (mouse, bracketed paste, focus tracking) These
         # are not in the keymap but need to be recognized as valid "prefixes",
         # so that they are *not* detected as a 'metaSendsEscape' sequence until
-        # after esc_delay has elapsed.
+        # after esc_delay has elapsed -- like Alt+M (\x1b[M), Alt+2 ('\x1b[2')
+        # and Alt+Shift+P ('\x1bP') ! Use kitty keyboard protocol if it matters.
         self._keymap_prefixes.update([
             '\x1b[M',     # Legacy mouse (needs 3 more bytes)
             '\x1b[<',     # SGR mouse (variable length)
+            '\x1bP',      # DCS, an XTGETTCAP reply arriving after its query timed out
             '\x1b[200',   # Bracketed paste start and its starting prefixes,
             '\x1b[20',
             '\x1b[2'])
@@ -4343,6 +4345,19 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # buffer any remaining text received
         self.ungetch(ucs[len(ks):])
 
+        # An XTGETTCAP reply may arrive long after its query has timed out: fold it into the
+        # response cache and continue awaiting user input.  It is never returned as a keystroke.
+        # Conservatively, although it may be possible to re-initialize self._jinxed_term and
+        # self._number_of_colors by any given response, it is not done to ensure consistency of
+        # API behavior after class initialization.
+        if ks.name == 'XTGETTCAP_RESPONSE':
+            self.errors.append(f'errant/delayed XTGETTCAP_RESPONSE {str(ks)!r}')
+            if self.does_styling and (late_caps := ks.xtgettcap):
+                self._update_xtgettcap_cache(
+                    TermcapResponse(supported=True, capabilities=late_caps))
+            return self.inkey(timeout=_time_left(stime, timeout),
+                              esc_delay=esc_delay, capture_cpr=capture_cpr)
+
         # Update preferred size cache if this is a resize event
         if ks._mode == _DecPrivateMode.IN_BAND_WINDOW_RESIZE:  # pylint: disable=protected-access
             event_vals = ks._mode_values  # pylint: disable=protected-access
@@ -4399,6 +4414,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         # pylint: disable=too-complex,too-many-branches
         loop = asyncio.get_running_loop()
+        stime = time.time()
 
         # drain keyboard buffer (non-blocking)
         ucs = self.flushinp()
@@ -4462,6 +4478,15 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         # buffer any remaining text
         self.ungetch(ucs[len(ks):])
+
+        # squelch late-arriving XTGETTCAP replies.
+        if ks.name == 'XTGETTCAP_RESPONSE':
+            self.errors.append(f'errant/delayed XTGETTCAP_RESPONSE {str(ks)!r}')
+            if self.does_styling and (late_caps := ks.xtgettcap):
+                self._update_xtgettcap_cache(
+                    TermcapResponse(supported=True, capabilities=late_caps))
+            return await self.async_inkey(timeout=_time_left(stime, timeout),
+                                          esc_delay=esc_delay, capture_cpr=capture_cpr)
 
         # update preferred size cache if this is a resize event
         if ks._mode == _DecPrivateMode.IN_BAND_WINDOW_RESIZE:  # pylint: disable=protected-access
