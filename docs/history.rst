@@ -4,8 +4,11 @@ Version History
 ===============
 
 1.50
-  * bugfix: Do not automatic query `XTGETTCAP`_ for older CONPTY builds (WIndows Server 2022), which
+  * bugfix: Do not automatic query `XTGETTCAP`_ for older CONPTY builds (Windows Server 2022), which
     displays control codes as visible text :ghpull:`411`.
+  * bugfix: :meth:`~Terminal.mouse_enabled` failed to yield ``MOUSE_*`` keystrokes on older CONPTY
+    builds (Windows Server 2022), where the console's "QuickEdit mode" blocks transmission,
+    :ghpull:`412`.
 
 1.49
   * introduce: :meth:`~Terminal.get_font_coverage` reports codepoints the terminal font has a glyph
