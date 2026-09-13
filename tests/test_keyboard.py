@@ -13,7 +13,6 @@ import pytest
 import jinxed
 
 # local
-from blessed.keyboard import _read_until
 from blessed.terminal import _KEYBOARD_READ_SIZE
 from .conftest import IS_WINDOWS
 from .accessories import TestTerminal, as_subprocess
@@ -157,8 +156,7 @@ def test_stdout_notty_kb_is_None():
             term = TestTerminal()
             assert term._keyboard_fd is None
             # pylint: disable=use-a-generator
-            assert any(['stream not a TTY' in err
-                        for err in term.errors]), term.errors
+            assert any(['stream not a TTY' in err for err in term.errors])
     child()
 
 
@@ -442,6 +440,27 @@ def test_cpr_response(seq, capture_cpr, expected_name, expected_yx):
     assert ks.uses_keyboard_protocol == expected_kb_proto
 
 
+@pytest.mark.parametrize("seq,expected_caps", [
+    # supported reply, 'TN' (terminal name) = 'xterm'
+    ('\x1bP1+r544e=787465726d\x1b\\', {'TN': 'xterm'}),
+    # supported reply, 'RGB' = '8/8/8'
+    ('\x1bP1+r524742=382f382f38\x1b\\', {'RGB': '8/8/8'}),
+    # unsupported reply (leading '0') reports no capabilities
+    ('\x1bP0+r544e\x1b\\', {}),
+    # VTE-style malformed empty reply
+    ('\x1bP0+r\x1b\\', {}),
+    # any non-XTGETTCAP keystroke reports no capabilities
+    ('\x1b[3;4R', {}),
+])
+def test_keystroke_xtgettcap(seq, expected_caps):
+    """Keystroke.xtgettcap decodes an XTGETTCAP reply, and is empty for anything else."""
+    from blessed.keyboard import resolve_sequence
+    ks = resolve_sequence(seq, collections.OrderedDict(), {})
+    assert str(ks) == seq
+    assert ks.is_sequence
+    assert ks.xtgettcap == expected_caps
+
+
 @pytest.mark.parametrize("sequence,expected_name", [
     ('\x1b[1;2R', 'KEY_SHIFT_F3'),
     ('\x1b[0;5R', 'CSI'),
@@ -626,33 +645,28 @@ def test_kp_begin_center_key():
     child('xterm')
 
 
-def test_ESCDELAY_unset_unchanged():
-    """Unset ESCDELAY leaves DEFAULT_ESCDELAY unchanged in _reinit_escdelay()."""
-    if 'ESCDELAY' in os.environ:
-        del os.environ['ESCDELAY']
-    import blessed.keyboard
-    prev_value = blessed.keyboard.DEFAULT_ESCDELAY
-    blessed.keyboard._reinit_escdelay()
-    assert blessed.keyboard.DEFAULT_ESCDELAY == prev_value
+@pytest.mark.parametrize('value,expected', [
+    (None, 0.35), ('', 0.35), ('XYZ123!', 0.35), ('1234', 1.234)])
+def test_ESCDELAY(monkeypatch, value, expected):
+    """env $ESCDELAY, in milliseconds, defines DEFAULT_ESCDELAY."""
+    from blessed.keyboard import DEFAULT_ESCDELAY, _seconds_from_env
+    if value is None:
+        assert DEFAULT_ESCDELAY == expected
+    else:
+        monkeypatch.setenv('ESCDELAY', value)
+    assert _seconds_from_env('ESCDELAY', 0.35, divisor=1000) == expected
 
 
-def test_ESCDELAY_bad_value_unchanged():
-    """Invalid ESCDELAY leaves DEFAULT_ESCDELAY unchanged in _reinit_escdelay()."""
-    os.environ['ESCDELAY'] = 'XYZ123!'
-    import blessed.keyboard
-    prev_value = blessed.keyboard.DEFAULT_ESCDELAY
-    blessed.keyboard._reinit_escdelay()
-    assert blessed.keyboard.DEFAULT_ESCDELAY == prev_value
-    del os.environ['ESCDELAY']
-
-
-def test_ESCDELAY_10ms():
-    """Verify ESCDELAY modifies DEFAULT_ESCDELAY in _reinit_escdelay()."""
-    os.environ['ESCDELAY'] = '1234'
-    import blessed.keyboard
-    blessed.keyboard._reinit_escdelay()
-    assert blessed.keyboard.DEFAULT_ESCDELAY == 1.234
-    del os.environ['ESCDELAY']
+@pytest.mark.parametrize('value,expected', [
+    (None, 5.0), ('', 5.0), ('XYZ123!', 5.0), ('0', 0.0), ('300', 300.0)])
+def test_BLESSED_QUERY_TIMEOUT_SECONDS(monkeypatch, value, expected):
+    """env $BLESSED_QUERY_TIMEOUT_SECONDS defines TERMINAL_QUERY_TIMEOUT_SECONDS."""
+    from blessed.keyboard import TERMINAL_QUERY_TIMEOUT_SECONDS, _seconds_from_env
+    if value is None:
+        assert TERMINAL_QUERY_TIMEOUT_SECONDS == expected
+    else:
+        monkeypatch.setenv('BLESSED_QUERY_TIMEOUT_SECONDS', value)
+    assert _seconds_from_env('BLESSED_QUERY_TIMEOUT_SECONDS', 5.0) == expected
 
 
 def test_unsupported_high_byte_metasendsescape():
@@ -760,6 +774,8 @@ def test_read_available_read_failures():
 @pytest.mark.skipif(IS_WINDOWS, reason="no tty module")
 def test_read_until_with_legacy_mouse():
     """_read_until() matches a query reply received alongside a legacy mouse report."""
+    from blessed.keyboard import _read_until
+
     def child():
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._line_buffered = False

@@ -590,8 +590,7 @@ def test_sequence_is_movement_false(any_term):
         assert len(term.italic) == measure_length(term.italic, term)
         assert len(term.strikethrough) == measure_length(term.strikethrough, term)
         assert len(term.overline) == measure_length(term.overline, term)
-        assert (len(term.standout) == measure_length(term.standout, term)
-                ), (term.standout, term._wont_move)
+        assert len(term.standout) == measure_length(term.standout, term)
 
     child(any_term)
 
