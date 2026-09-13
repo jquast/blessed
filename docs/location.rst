@@ -125,8 +125,8 @@ responses asynchronously as keyboard input events.
 
 Although :meth:`~Terminal.inkey` is capable of receiving *most* Cursor Position Report (CPR)
 sequences as Keystroke of name ``CPR_RESPONSE``, Some coordinate responses are in conflict with
-the "F3" key of the DEC vt220, but few very terminals transmit them in this conflicting form. If not
-bound or legacy vt220 key compatibility is not required, but asynchronous receipt of CPR Responses
+the "F3" key of the DEC vt220, but few very terminals transmit them in this conflicting form. If
+legacy vt220 key compatibility is not required, but asynchronous receipt of CPR Responses
 with correct coordinates are, use :meth:`~Terminal.inkey` argument ``capture_cpr=True``.
 
 In the following example, keyboard input is rapidly polled for and displayed,

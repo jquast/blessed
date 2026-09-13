@@ -28,8 +28,36 @@ from blessed._capabilities import TermcapResponse
 
 _T = TypeVar('_T', bound='Keystroke')
 
-TERMINAL_QUERY_TIMEOUT_SECONDS = 1.0
-"""Default timeout in seconds for terminal query operations (XTGETTCAP, OSC, DCS, etc.)."""
+
+def _seconds_from_env(name: str, default: float, divisor: float = 1.0) -> float:
+    """Return env value ``name`` as seconds, or ``default`` when unset or non-numeric."""
+    try:
+        return float(os.environ[name]) / divisor
+    except (KeyError, ValueError):
+        return default
+
+
+#: Default delay, in seconds, to await automatic terminal replies, including the `XTGETTCAP`
+#: query performed at class initialization. All of our queries should be replied to, even ones
+#: that are unsupported, thanks to the "query with CPR boundary" pattern that all VT100 terminals
+#: reply to, and so we should be able to await a response indefinitely.
+#:
+#: However, automation can claim to be a terminal through its protocol, like ``ssh -t``, or by
+#: using a pty(7), while lacking the VT100 emulation functions to detect and respond to CPR.
+#: Common examples are tcl expect(1) or python 'pexpect' scripts. Their use always incurs
+#: artificial delays here for that reason, a pitfall for many in QA automation and a common
+#: "are you human?" check used by public telnet servers. Use environment variable
+#: ``BLESSED_QUERY_TIMEOUT_SECONDS`` for any such special condition, like ``'300'`` for very
+#: high-latency networks, or ``'0'`` for automation.
+TERMINAL_QUERY_TIMEOUT_SECONDS = _seconds_from_env('BLESSED_QUERY_TIMEOUT_SECONDS', 5.0)
+
+#: Default delay, in seconds, of Escape key detection in :meth:`Terminal.inkey`. curses has a
+#: default delay of 1000ms (1 second) for escape sequences. This is too long for modern networks,
+#: so we set it to 350ms, or 0.35 seconds, by environment variable ``ESCDELAY``, in milliseconds.
+#: It is still a bit conservative for remote telnet or ssh servers, for example. A worst case is a
+#: very high-latency network (cellular, satellite) with a flood of input events (mouse reporting),
+#: where an escape sequence is cut into two packets and the second packet is delayed over 350ms.
+DEFAULT_ESCDELAY = _seconds_from_env('ESCDELAY', 0.35, divisor=1000)
 
 
 # DEC event namedtuples
@@ -2142,29 +2170,6 @@ KITTY_PUA_KEYCODE_OVERRIDE_MIXIN = (
     ('KEY_ISO_LEVEL3_SHIFT', KEY_ISO_LEVEL3_SHIFT_PUA),
     ('KEY_ISO_LEVEL5_SHIFT', KEY_ISO_LEVEL5_SHIFT_PUA),
 )
-
-#: Default delay, in seconds, of Escape key detection in
-#: :meth:`Terminal.inkey`.` curses has a default delay of 1000ms (1 second) for
-#: escape sequences.  This is too long for modern applications, so we set it to
-#: 350ms, or 0.35 seconds. It is still a bit conservative, for remote telnet or
-#: ssh servers, for example.
-DEFAULT_ESCDELAY = 0.35
-
-
-def _reinit_escdelay() -> None:
-    # pylint: disable=global-statement
-    # Using the global statement: this is necessary to
-    # allow test coverage without complex module reload
-    global DEFAULT_ESCDELAY
-    if os.environ.get('ESCDELAY'):
-        try:
-            DEFAULT_ESCDELAY = int(os.environ['ESCDELAY']) / 1000.0
-        except ValueError:
-            # invalid values of 'ESCDELAY' are ignored
-            pass
-
-
-_reinit_escdelay()
 
 
 class DeviceAttribute():

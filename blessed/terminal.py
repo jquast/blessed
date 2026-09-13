@@ -334,8 +334,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """Probe for core XTGETTCAP capabilities."""
         # XTGETTCAP provides excellent communication of the terminal's self-reported 'TERM' (TN),
         # and so it is done at class initialization.  However, some prominent terminals by Microsoft
-        # and Apple erroneously "leak" VT100 Mode DCS queries, meaning the hexadecimal ASCII
-        # payloads meant for the terminal to process are displayed as visible text on the screen.
+        # and Apple erroneously "leak" VT100 Mode DCS queries in error, meaning the hexadecimal
+        # ASCII payloads meant for the terminal to process are displayed as visible text to the
+        # user. And so an XTGETTCAP query is avoided for those terminals when identifiable.
         _xtgettcap_cache = TermcapResponse(supported=False)
         if os.environ.get('ANSICON') or os.environ.get('ConEmuANSI'):
             self.errors.append('XTGETTCAP probe: skipped, ansicon')
@@ -367,10 +368,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """Determine terminal 'kind' jinxed.setupterm() capability database."""
         # Previous to 1.40, blessed could fallback to 'dumb' when it could not find a meaningful
         # type, but now kind_fallback='xterm-256color' is always guaranteed available and used
-        # instead of 'dumb'.
-        #
-        # I believe now xterm-256 sequences are safe as unknown fallback for the year 2026. If dumb
-        # *is*, use NO_COLOR or force_styling=False which has the same general result.
+        # instead of 'dumb'.  I believe now xterm-256 sequences are safe as unknown fallback for
+        # the year 2026. Use NO_COLOR or force_styling=False to force the same result.
         tn_kind = self._xtgettcap_cache.capabilities.get('TN')
         term_kind = (jinxed.get_term(self._init_descriptor)
                      if IS_WINDOWS and self._init_descriptor is not None

@@ -14,10 +14,13 @@ from blessed.formatters import _tparm_cached
 
 def pytest_configure(config: pytest.Config) -> None:
     """Normalize environment for consistent test results outside of tox."""
+    # the second argument of environ.pop() avoids raising KeyError
     os.environ.pop('TERM', None)
     os.environ.pop('COLORTERM', None)
     os.environ.pop('TERM_PROGRAM', None)
     os.environ.pop('TERM_PROGRAM_VERSION', None)
+    os.environ.pop('ESCDELAY', None)
+    os.environ.pop('BLESSED_QUERY_TIMEOUT_SECONDS', None)
 
 
 try:
