@@ -376,13 +376,22 @@ class Terminal(_Terminal):
             return
 
         if self._keyboard_fd is None:
+            # dummy hook, for systems without mouse support
             yield
             return
 
         filehandle = msvcrt.get_osfhandle(self._keyboard_fd)
         save_mode = win32.get_console_mode(filehandle)
+        if not save_mode & win32.ENABLE_EXTENDED_FLAGS:
+            # cbreak() and raw() set a console mode without any of the "private" flags, after
+            # which QuickEdit is no longer reported by get_console_mode(), restore its default.
+            save_mode |= win32.ENABLE_EXTENDED_FLAGS | win32.ENABLE_QUICK_EDIT_MODE
+        # The console host consumes mouse events for text selection while "QuickEdit mode" is
+        # enabled, it must be disabled for mouse events to be received.  ENABLE_EXTENDED_FLAGS
+        # must be set in the same call, or the QuickEdit bit is otherwise ignored.
         win32.set_console_mode(
-            filehandle, save_mode | win32.ENABLE_MOUSE_INPUT)
+            filehandle,
+            (save_mode | win32.ENABLE_MOUSE_INPUT) & ~win32.ENABLE_QUICK_EDIT_MODE)
         self._native_mouse = True
         self._prev_button_state = 0
         self._dec_mode_cache[
