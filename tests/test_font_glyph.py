@@ -6,6 +6,8 @@ import json
 import time
 import select
 
+from unittest import mock
+
 # 3rd party
 import pytest
 
@@ -59,9 +61,12 @@ def run(replies, *texts, name='run', parent=None, **kwargs):
     def child(term):
         results = []
         term.ungetch(replies)
-        for text in texts:
-            coverage = term.get_font_coverage(text, **dict({'timeout': 0.01}, **kwargs))
-            results.append([coverage.protocol, coverage.sources, coverage.unknown])
+        # the Glyph Protocol probe identifies Terminal.app first, which leaks the payload
+        # of an APC sequence: that round-trip is not part of the replies scripted here
+        with mock.patch.object(term, '_is_apple_terminal', return_value=False):
+            for text in texts:
+                coverage = term.get_font_coverage(text, **dict({'timeout': 0.01}, **kwargs))
+                results.append([coverage.protocol, coverage.sources, coverage.unknown])
         return (SENTINEL + json.dumps(results)).encode()
 
     written, _, payload = pty_test(child, parent, test_name=name).partition(SENTINEL)
@@ -247,8 +252,9 @@ def test_force_discards_unknown():
         # swallow the second call's replies
         term.ungetch(NO_REPLY + PROBE +
                      '\x1b_25a1;q;cp=41;status=1;reason=malformed\x1b\\' + CPR)
-        assert term.get_font_coverage('A', timeout=0.01).unknown == {65: 'malformed'}
-        coverage = term.get_font_coverage('A', timeout=1.0, force=True)
+        with mock.patch.object(term, '_is_apple_terminal', return_value=False):
+            assert term.get_font_coverage('A', timeout=0.01).unknown == {65: 'malformed'}
+            coverage = term.get_font_coverage('A', timeout=1.0, force=True)
         assert coverage.unknown == {} and coverage.covered == {65}
         return b'OK'
 
@@ -420,3 +426,23 @@ def test_query_boundary_multiple_without_replies():
 
     assert 'OK' in pty_test(
         child, test_name='test_query_boundary_multiple_without_replies')
+
+
+def test_glyph_protocol_probe_apple_terminal():
+    """Terminal.app erroneously displays APC sequences, so it is never probed with one."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+
+    # mintty's OSC 7771 is harmless to Terminal.app: only the Glyph Protocol probe
+    # that follows it is withheld, so begin as though OSC 7771 went unanswered.
+    term._does_mintty_font_protocol = False
+
+    with mock.patch.dict(os.environ, {'TERM_PROGRAM': 'Apple_Terminal'}), \
+            mock.patch.object(term, '_is_a_tty', True), \
+            mock.patch.object(term, '_query_with_boundary') as mock_query:
+        coverage = term.get_font_coverage('A', timeout=0.01)
+        mock_query.assert_not_called()
+
+    assert not coverage
+    assert term._does_glyph_protocol == {}
+    assert stream.getvalue() == ''

@@ -349,7 +349,8 @@ def test_get_dec_mode_successful_query():
         mock_match = mock.Mock()
         mock_match.group.return_value = '1'
 
-        with mock.patch.object(term, '_is_a_tty', True), \
+        with mock.patch.object(term, '_is_apple_terminal', return_value=False), \
+                mock.patch.object(term, '_is_a_tty', True), \
                 mock.patch.object(
                     term, '_query_with_boundary',
                     return_value=mock_match
@@ -421,7 +422,8 @@ def test_get_dec_mode_force_bypass_cache():
         mock_match = mock.Mock()
         mock_match.group.return_value = '2'
 
-        with mock.patch.object(term, '_is_a_tty', True), \
+        with mock.patch.object(term, '_is_apple_terminal', return_value=False), \
+                mock.patch.object(term, '_is_a_tty', True), \
                 mock.patch.object(
                     term, '_query_with_boundary',
                     return_value=mock_match
@@ -1277,3 +1279,75 @@ def test_does_dec_mode_convenience_not_a_tty(method_name):
         result = getattr(term, method_name)(timeout=0.01)
         assert result is False
     child()
+
+
+def test_apple_terminal_skipped_by_term_program():
+    """DECRQM and DECRQSS are not transmitted to Terminal.app, identified by TERM_PROGRAM."""
+    def child():
+        import os
+        stream = io.StringIO()
+        term = TestTerminal(stream=stream, force_styling=True)
+
+        with mock.patch.dict(os.environ, {'TERM_PROGRAM': 'Apple_Terminal'}), \
+                mock.patch.object(term, '_is_a_tty', True), \
+                mock.patch.object(term, '_query_with_boundary') as mock_query:
+            response = term.get_dec_mode(_DPM.DECTCEM, timeout=0.01)
+            assert response.value == DecModeResponse.NOT_QUERIED
+            assert not response.supported
+
+            assert term.get_decrqss(timeout=0.01) is None
+            assert term.does_decrqss(timeout=0.01) is False
+            assert term.does_kitty_clipboard(timeout=0.01) is False
+
+            # neither the XTVERSION query nor any '$'-intermediate query was made
+            mock_query.assert_not_called()
+        assert stream.getvalue() == ''
+    child()
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="PTY tests not supported on Windows")
+@pytest.mark.parametrize('name,expected_skip', [
+    ('Apple_Terminal', True),
+    ('iTerm2', False),
+])
+def test_apple_terminal_by_xtversion(name, expected_skip):
+    """Terminal.app is identified by XTVERSION when TERM_PROGRAM is not forwarded."""
+    from .accessories import pty_test
+
+    def child(term):
+        # Terminal.app reports its name without a version, exactly 'Apple_Terminal'
+        term.ungetch(f'\x1bP>|{name}\x1b\\\x1b[1;1R\x1b[?25;1$y\x1b[1;1R')
+        response = term.get_dec_mode(_DPM.DECTCEM, timeout=0.01)
+        if expected_skip:
+            assert response.value == DecModeResponse.NOT_QUERIED
+        else:
+            assert response.value == DecModeResponse.SET
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name=f'test_apple_terminal_by_xtversion_{name}')
+    assert 'OK' in output
+    assert '\x1b[>q' in output
+    assert ('\x1b[?25$p' in output) is not expected_skip
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="PTY tests not supported on Windows")
+@pytest.mark.parametrize('reply,expected', [
+    ('\x1bP1$r0;1m\x1b\\', '0;1'),   # valid: the echoed setting identifier is stripped
+    ('\x1bP1$r0;1\x1b\\', '0;1'),    # valid, but the setting identifier is not echoed
+    ('\x1bP0$r\x1b\\', None),        # invalid setting
+], ids=['valid', 'valid-no-echo', 'invalid'])
+def test_get_decrqss_reply(reply, expected):
+    """get_decrqss returns the parameter value of a valid reply, and None otherwise."""
+    from .accessories import pty_test
+
+    def child(term):
+        # the first CPR answers the XTVERSION query made to identify Terminal.app
+        term.ungetch(f'\x1b[1;1R{reply}\x1b[1;1R')
+        assert term.get_decrqss(timeout=0.01) == expected
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name=f'test_get_decrqss_{len(reply)}_{expected}')
+    assert 'OK' in output
+    assert '\x1bP$qm\x1b\\' in output
