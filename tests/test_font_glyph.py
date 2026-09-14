@@ -426,3 +426,23 @@ def test_query_boundary_multiple_without_replies():
 
     assert 'OK' in pty_test(
         child, test_name='test_query_boundary_multiple_without_replies')
+
+
+def test_glyph_protocol_probe_apple_terminal():
+    """Terminal.app erroneously displays APC sequences, so it is never probed with one."""
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+
+    # mintty's OSC 7771 is harmless to Terminal.app: only the Glyph Protocol probe
+    # that follows it is withheld, so begin as though OSC 7771 went unanswered.
+    term._does_mintty_font_protocol = False
+
+    with mock.patch.dict(os.environ, {'TERM_PROGRAM': 'Apple_Terminal'}), \
+            mock.patch.object(term, '_is_a_tty', True), \
+            mock.patch.object(term, '_query_with_boundary') as mock_query:
+        coverage = term.get_font_coverage('A', timeout=0.01)
+        mock_query.assert_not_called()
+
+    assert not coverage
+    assert term._does_glyph_protocol == {}
+    assert stream.getvalue() == ''

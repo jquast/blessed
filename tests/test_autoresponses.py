@@ -566,3 +566,17 @@ def test_text_sized_ValueError():
         with pytest.raises(ValueError):
             term.text_sized('X' * 4097, scale=2)
     child()
+
+
+def test_does_kitty_graphics_apple_terminal():
+    """Terminal.app erroneously displays APC sequences, so it is never sent one."""
+    import os
+    stream = io.StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+
+    with mock.patch.dict(os.environ, {'TERM_PROGRAM': 'Apple_Terminal'}), \
+            mock.patch.object(term, '_is_a_tty', True), \
+            mock.patch.object(term, '_query_with_boundary') as mock_query:
+        assert term.does_kitty_graphics(timeout=0.01) is False
+        mock_query.assert_not_called()
+    assert stream.getvalue() == ''

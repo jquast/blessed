@@ -1334,8 +1334,9 @@ def test_apple_terminal_by_xtversion(name, expected_skip):
 @pytest.mark.skipif(IS_WINDOWS, reason="PTY tests not supported on Windows")
 @pytest.mark.parametrize('reply,expected', [
     ('\x1bP1$r0;1m\x1b\\', '0;1'),   # valid: the echoed setting identifier is stripped
+    ('\x1bP1$r0;1\x1b\\', '0;1'),    # valid, but the setting identifier is not echoed
     ('\x1bP0$r\x1b\\', None),        # invalid setting
-], ids=['valid', 'invalid'])
+], ids=['valid', 'valid-no-echo', 'invalid'])
 def test_get_decrqss_reply(reply, expected):
     """get_decrqss returns the parameter value of a valid reply, and None otherwise."""
     from .accessories import pty_test
@@ -1346,6 +1347,7 @@ def test_get_decrqss_reply(reply, expected):
         assert term.get_decrqss(timeout=0.01) == expected
         return b'OK'
 
-    output = pty_test(child, parent_func=None, test_name=f'test_get_decrqss_{expected}')
+    output = pty_test(child, parent_func=None,
+                      test_name=f'test_get_decrqss_{len(reply)}_{expected}')
     assert 'OK' in output
     assert '\x1bP$qm\x1b\\' in output
