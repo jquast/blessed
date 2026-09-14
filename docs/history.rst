@@ -12,6 +12,8 @@ Version History
   * bugfix: an `XTGETTCAP`_ received after query time out was returned by :meth:`~Terminal.inkey` as
     errant keystrokes.  It is no longer yielded by :meth:`~Terminal.inkey`, :ghpull:`413`.
   * improve: performance of :meth:`~Terminal.does_xtgettcap`, :ghpull:`415`.
+  * improve: skip some automatic queries for Apple's Terminal.app that leak VT100 codes as output
+    :ghpull:`417`.
   * change: default timeout of automatic terminal queries from 1 to 5 seconds with environment
     variable ``BLESSED_QUERY_TIMEOUT_SECONDS`` override, :ghpull:`414`.
 
