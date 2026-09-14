@@ -1305,6 +1305,7 @@ def test_apple_terminal_skipped_by_term_program():
     child()
 
 
+@pytest.mark.skipif(IS_WINDOWS, reason="PTY tests not supported on Windows")
 @pytest.mark.parametrize('name,expected_skip', [
     ('Apple_Terminal', True),
     ('iTerm2', False),
@@ -1330,6 +1331,7 @@ def test_apple_terminal_by_xtversion(name, expected_skip):
     assert ('\x1b[?25$p' in output) is not expected_skip
 
 
+@pytest.mark.skipif(IS_WINDOWS, reason="PTY tests not supported on Windows")
 @pytest.mark.parametrize('reply,expected', [
     ('\x1bP1$r0;1m\x1b\\', '0;1'),   # valid: the echoed setting identifier is stripped
     ('\x1bP0$r\x1b\\', None),        # invalid setting
