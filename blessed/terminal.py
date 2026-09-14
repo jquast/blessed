@@ -143,6 +143,12 @@ _RE_CPR_BOUNDARY = re.compile(r'\x1b\[[0-9]+;[0-9]+R')
 _RE_KITTY_POINTER = re.compile(r'\x1b\]22;([^\x07\x1b]+)(?:\x07|\x1b\\)')
 _FONT_QUERY_CHUNK_SIZE = 256
 
+# Small transparent PNG used by does_iterm2_graphics() (base64-encoded).
+_ITERM2_PROBE_IMAGE = (
+    '\x1b]1337;File=inline=1;size=68;width=1;height=1:'
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNgAAIAAAUAAen63NgAAAAA'
+    'SUVORK5CYII=\x07')
+
 _RE_OSC52_RESPONSE = re.compile(r'\x1b\]52;[a-z]*;([^\x07\x1b]*)(?:\x07|\x1b\\)')
 # Color scheme (dark/light mode): CSI ? 997 ; Ps n
 _RE_COLOR_SCHEME_MODE_RESPONSE = re.compile(r'\x1b\[\?997;([12])n')
@@ -428,6 +434,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._kitty_graphics_supported: Optional[bool] = None
         # iTerm2 capabilities cache
         self._iterm2_capabilities_cache: Optional["ITerm2Capabilities"] = None
+        # iTerm2 inline image (graphics) detection cache
+        self._iterm2_graphics_supported: Optional[bool] = None
         # Kitty notifications (OSC 99) detection cache
         self._kitty_notifications_supported: Optional[bool] = None
         # Kitty clipboard protocol (DECRQM 5522) detection cache
@@ -1366,8 +1374,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :rtype: bool
         :returns: ``True`` if terminal supports sixel graphics, ``False`` otherwise
         """
-        # Although there are additional checks that could be done, such as
-        # get_iterm2_capabilities().features.get('Sx'), it is superfluous to DA1.
         if not self.does_styling:
             return False
         da = self.get_device_attributes(timeout=timeout, force=force)
@@ -2186,7 +2192,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     def does_iterm2(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                     force: bool = False) -> bool:
         """
-        Check if the terminal supports any iTerm2 protocols.
+        Check if the terminal answers the ``OSC 1337`` capabilities report.
 
         :arg float timeout: Timeout in seconds.
         :arg bool force: Bypass cached result.
@@ -2198,18 +2204,68 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     def does_iterm2_graphics(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                              force: bool = False) -> bool:
         """
-        Check if the terminal supports iTerm2 inline image protocol.
+        Check if the terminal supports the iTerm2 inline image protocol.
 
-        This is equivalent to :meth:`does_iterm2` and exists to pair
-        with :meth:`does_kitty_graphics` for graphics capability checks.
+        Draws a transparent image using iTerm2 protocol and detects for expected cursor position
+        advance.  Uses two CPR requests, before and after, for fast negative detection.
 
         .. seealso:: https://iterm2.com/documentation-images.html
 
-        :arg float timeout: Timeout in seconds.
+        :arg float timeout: Timeout in seconds for each cursor position query.
         :arg bool force: Bypass cached result.
         :rtype: bool
+        :returns: True when the cursor advanced a single column, False when the terminal is
+            1-column width or did not answer a cursor position report within timeout.
         """
-        return self.does_iterm2(timeout=timeout, force=force)
+        if not self.is_a_tty or not self.does_styling:
+            return False
+        if self._iterm2_graphics_supported is not None and not force:
+            return self._iterm2_graphics_supported
+        supported = self._probe_iterm2_graphics(timeout)
+        if supported is None:
+            # not measurable, do not cache
+            return False
+        self._iterm2_graphics_supported = supported
+        return supported
+
+    def _probe_iterm2_graphics(self, timeout: Optional[float]) -> Optional[bool]:
+        """
+        Draw a single-cell iTerm2 inline image and measure the cursor movement.
+
+        :arg float timeout: Timeout in seconds for each cursor position query.
+        :rtype: Optional[bool]
+        :returns: True when the cursor advanced a single column, None when the terminal is 1-column
+            width or did not answer a cursor position report.
+        """
+        stime = time.time()
+        row0, col0 = self.get_location(timeout=_time_left(stime, timeout))
+
+        maybe_backspace = ''
+        if col0 >= self.width - 1:
+            col0 -= 1
+            maybe_backspace = '\b'
+
+        if -1 in (row0, col0):
+            return None  # timeout or 1-column terminal
+
+        self.stream.write(maybe_backspace + _ITERM2_PROBE_IMAGE)
+        self.stream.flush()
+        row1, col1 = self.get_location(timeout=_time_left(stime, timeout))
+
+        # 'erase' the probed cell and return the cursor where it began: the space leaves
+        # us one column right of it, which is already where we began when we stepped
+        # back off the final column.
+        self.stream.write('\b' * max(0, col1 - col0) + ' '
+                          + ('' if maybe_backspace else '\b'))
+        self.stream.flush()
+
+        if -1 in (row1, col1):
+            # unusual timeout in second CPR
+            return None
+
+        # All known iTerm2 inline graphics protocol implementations of year 2026: iTerm2, Konsole,
+        # and WezTerm, advance the cursor a single column.
+        return (row1, col1) == (row0, col0 + 1)
 
     def does_kitty_notifications(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                                  force: bool = False) -> bool:

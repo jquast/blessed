@@ -41,6 +41,7 @@ def test_detection_not_a_tty(method_name, expected):
 
 @pytest.mark.parametrize('method_name,expected', [
     ('does_kitty_graphics', False),
+    ('does_iterm2_graphics', False),
     ('does_kitty_notifications', False),
     ('does_kitty_clipboard', False),
     ('does_kitty_pointer_shapes', None),
@@ -63,6 +64,8 @@ def test_detection_no_styling(method_name, expected):
     ('does_kitty_notifications', '_kitty_notifications_supported', False, False),
     ('does_kitty_clipboard', '_kitty_clipboard_supported', True, True),
     ('does_kitty_clipboard', '_kitty_clipboard_supported', False, False),
+    ('does_iterm2_graphics', '_iterm2_graphics_supported', True, True),
+    ('does_iterm2_graphics', '_iterm2_graphics_supported', False, False),
 ])
 def test_detection_cached_bool(method_name, cache_attr, cached_value, expected):
     """Boolean detection methods return cached value."""
@@ -114,6 +117,7 @@ def test_does_kitty_pointer_shapes_cached_unsupported():
     ('does_kitty_graphics', '_kitty_graphics_supported', True),
     ('does_kitty_notifications', '_kitty_notifications_supported', True),
     ('does_kitty_clipboard', '_kitty_clipboard_supported', True),
+    ('does_iterm2_graphics', '_iterm2_graphics_supported', True),
 ])
 def test_detection_force_bypass(method_name, cache_attr, cached_value):
     """force=True bypasses detection cache."""
@@ -211,6 +215,7 @@ def test_does_kitty_graphics_error_response():
 
 @pytest.mark.parametrize('method_name,expected', [
     ('does_kitty_graphics', False),
+    ('does_iterm2_graphics', False),
     ('does_kitty_notifications', False),
     ('does_kitty_clipboard', False),
     ('does_kitty_pointer_shapes', None),
@@ -273,22 +278,77 @@ def test_does_kitty_notifications_supported(terminator):
     assert 'OK' in output
 
 
-@pytest.mark.parametrize('method_name,cached_supported', [
-    ('does_iterm2', True),
-    ('does_iterm2', False),
-    ('does_iterm2_graphics', True),
-    ('does_iterm2_graphics', False),
-])
-def test_does_iterm2_delegates_cached(method_name, cached_supported):
-    """does_iterm2 and does_iterm2_graphics return cached result."""
+@pytest.mark.parametrize('cached_supported', [True, False])
+def test_does_iterm2_cached(cached_supported):
+    """does_iterm2 returns cached capabilities result."""
     def child():
         stream = io.StringIO()
         term = TestTerminal(stream=stream, force_styling=True)
         term._is_a_tty = True
         term._iterm2_capabilities_cache = ITerm2Capabilities(
             supported=cached_supported)
-        assert getattr(term, method_name)() is cached_supported
+        assert term.does_iterm2() is cached_supported
     child()
+
+
+@pytest.mark.parametrize('label,cols,replies,expected', [
+    ('advanced one column', 80, '\x1b[5;10R\x1b[5;11R', True),
+    ('cursor never moved', 80, '\x1b[5;10R\x1b[5;10R', False),
+    ('payload displayed as text', 80, '\x1b[5;10R\x1b[6;40R', False),
+    ('final column, nothing drawn', 80, '\x1b[5;80R\x1b[5;79R', False),
+])
+def test_does_iterm2_graphics_cursor_advance(label, cols, replies, expected):
+    """does_iterm2_graphics is True only for an advance of a single column."""
+    def child(term):
+        term.ungetch(replies)
+        assert term.does_iterm2_graphics(timeout=0.01) is expected
+        return b'OK'
+
+    output = pty_test(child, parent_func=None, cols=cols,
+                      test_name=f'test_does_iterm2_graphics_advance_{label}')
+    assert 'OK' in output
+
+
+def test_does_iterm2_graphics_erases_when_unanswered():
+    """erase over presumed cell output on timeout."""
+    def child(term):
+        term.ungetch('\x1b[5;10R')
+        assert term.does_iterm2_graphics(timeout=0.01) is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_does_iterm2_graphics_erases_when_unanswered')
+    assert 'OK' in output
+    assert output.index('\x1b]1337;') < output.index(' \b')
+
+
+def test_does_iterm2_graphics_at_right_margin():
+    """Filling the final column, the probe steps back one to make room."""
+    def child(term):
+        # the cursor reports the final column of an 80 column terminal
+        term.ungetch('\x1b[5;80R\x1b[5;80R')
+        assert term.does_iterm2_graphics(timeout=0.01) is True
+        return b'OK'
+
+    output = pty_test(child, parent_func=None, cols=80,
+                      test_name='test_does_iterm2_graphics_at_right_margin')
+    assert 'OK' in output
+    assert '\b\x1b]1337;' in output
+    assert output.endswith('\b OK')
+
+
+def test_does_iterm2_graphics_single_column_terminal():
+    """A one column terminal is automatically False (edge case)."""
+    def child(term):
+        term.ungetch('\x1b[5;1R')
+        assert term.does_iterm2_graphics(timeout=0.01) is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None, cols=1,
+                      test_name='test_does_iterm2_graphics_single_column')
+    assert 'OK' in output
+    assert '\x1b]1337;' not in output
+    assert '\b' not in output
 
 
 @pytest.mark.parametrize('ps,expected', [
