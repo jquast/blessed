@@ -146,7 +146,7 @@ _FONT_QUERY_CHUNK_SIZE = 256
 
 # Small transparent PNG used by does_iterm2_graphics() (base64-encoded).
 _ITERM2_PROBE_IMAGE = (
-    '\x1b]1337;File=inline=1;size=68;width=1;height=1;preserveAspectRatio=0:'
+    '\x1b]1337;File=inline=1;size=68;width=1;height=1:'
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNgAAIAAAUAAen63NgAAAAA'
     'SUVORK5CYII=\x07')
 
@@ -2170,7 +2170,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     def does_iterm2(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                     force: bool = False) -> bool:
         """
-        Check if the terminal supports any iTerm2 protocols.
+        Check if the terminal answers the ``OSC 1337`` capabilities report.
 
         :arg float timeout: Timeout in seconds.
         :arg bool force: Bypass cached result.
@@ -2192,47 +2192,58 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :arg float timeout: Timeout in seconds for each cursor position query.
         :arg bool force: Bypass cached result.
         :rtype: bool
+        :returns: True when the cursor advanced a single column, False when the terminal is
+            1-column width or did not answer a cursor position report within timeout.
         """
         if not self.is_a_tty or not self.does_styling:
             return False
         if self._iterm2_graphics_supported is not None and not force:
             return self._iterm2_graphics_supported
         supported = self._probe_iterm2_graphics(timeout)
+        if supported is None:
+            # not measurable, do not cache
+            return False
         self._iterm2_graphics_supported = supported
         return supported
 
-    def _probe_iterm2_graphics(self, timeout: Optional[float]) -> bool:
+    def _probe_iterm2_graphics(self, timeout: Optional[float]) -> Optional[bool]:
         """
         Draw a single-cell iTerm2 inline image and measure the cursor movement.
 
         :arg float timeout: Timeout in seconds for each cursor position query.
-        :rtype: bool
-        :returns: True when the cursor moved as a one-cell image would move it.
+        :rtype: Optional[bool]
+        :returns: True when the cursor advanced a single column, None when the terminal is 1-column
+            width or did not answer a cursor position report.
         """
         stime = time.time()
         row0, col0 = self.get_location(timeout=_time_left(stime, timeout))
-        if col0 == -1:
-            return False
 
-        # an image in the final column wraps, and in the final row it scrolls, which
-        # cannot be undone, nor even measured: the cursor reports the row it began on
-        # whether the terminal drew and scrolled, or drew nothing.  Probe the neighbor.
-        probe_col = col0 - 1 if col0 > 0 and col0 >= self.width - 1 else col0
-        probe_row = row0 - 1 if row0 > 0 and row0 >= self.height - 1 else row0
-        self.stream.write(self.move_yx(probe_row, probe_col))
-        self.stream.write(_ITERM2_PROBE_IMAGE)
+        maybe_backspace = ''
+        if col0 >= self.width - 1:
+            col0 -= 1
+            maybe_backspace = '\b'
+
+        if -1 in (row0, col0):
+            return None  # timeout or 1-column terminal
+
+        self.stream.write(maybe_backspace + _ITERM2_PROBE_IMAGE)
         self.stream.flush()
         row1, col1 = self.get_location(timeout=_time_left(stime, timeout))
 
-        # erase the probed cell and return the cursor where it began
-        self.stream.write(self.move_yx(probe_row, probe_col) + ' '
-                          + self.move_yx(row0, col0))
+        # 'erase' the probed cell and return the cursor where it began: the space leaves
+        # us one column right of it, which is already where we began when we stepped
+        # back off the final column.
+        self.stream.write('\b' * max(0, col1 - col0) + ' '
+                          + ('' if maybe_backspace else '\b'))
         self.stream.flush()
 
-        # iTerm2 does not document its cursor behavior, and implementations differ, so
-        # both shapes a single-cell image can plausibly leave behind are accepted: one
-        # column to the right, or start of the next.
-        return (row1, col1) in ((probe_row, probe_col + 1), (probe_row + 1, 0))
+        if -1 in (row1, col1):
+            # unusual timeout in second CPR
+            return None
+
+        # All known iTerm2 inline graphics protocol implementations of year 2026: iTerm2, Konsole,
+        # and WezTerm, advance the cursor a single column.
+        return (row1, col1) == (row0, col0 + 1)
 
     def does_kitty_notifications(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                                  force: bool = False) -> bool:

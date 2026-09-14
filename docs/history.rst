@@ -13,9 +13,9 @@ Version History
     :ghpull:`412`.
   * bugfix: an `XTGETTCAP`_ received after query time out was returned by :meth:`~Terminal.inkey` as
     errant keystrokes.  It is no longer yielded by :meth:`~Terminal.inkey`, :ghpull:`413`.
+  * bugfix: :meth:`~Terminal.does_iterm2_graphics` results are now more accurate, by drawing a
+    transparent pixel, :ghpull:`416`.
   * improve: performance of :meth:`~Terminal.does_xtgettcap`, :ghpull:`415`.
-  * bugfix: :meth:`~Terminal.does_iterm2_graphics` now destructively draws a small image to test for
-    iTerm2 image support for more accurate image detection support, :ghissue:`416`.
 
 1.49
   * introduce: :meth:`~Terminal.get_font_coverage` reports codepoints the terminal font has a glyph

@@ -291,112 +291,41 @@ def test_does_iterm2_cached(cached_supported):
     child()
 
 
-def test_does_iterm2_graphics_advances_column():
-    """does_iterm2_graphics is True when the image advances the cursor one column."""
+@pytest.mark.parametrize('label,cols,replies,expected', [
+    ('advanced one column', 80, '\x1b[5;10R\x1b[5;11R', True),
+    ('cursor never moved', 80, '\x1b[5;10R\x1b[5;10R', False),
+    ('payload displayed as text', 80, '\x1b[5;10R\x1b[6;40R', False),
+    ('final column, nothing drawn', 80, '\x1b[5;80R\x1b[5;79R', False),
+])
+def test_does_iterm2_graphics_cursor_advance(label, cols, replies, expected):
+    """does_iterm2_graphics is True only for an advance of a single column."""
     def child(term):
-        term.ungetch('\x1b[5;10R\x1b[5;11R')
-        assert term.does_iterm2_graphics(timeout=0.01) is True
+        term.ungetch(replies)
+        assert term.does_iterm2_graphics(timeout=0.01) is expected
         return b'OK'
 
-    output = pty_test(child, parent_func=None,
-                      test_name='test_does_iterm2_graphics_advances_column')
-    assert 'OK' in output
-    # the image was drawn, then the single cell it occupied erased and the cursor
-    # returned to where it began, by absolute address (0-based 4, 9 -> CSI 5;10H)
-    assert '\x1b]1337;File=inline=1;' in output
-    assert '\x1b[5;10H \x1b[5;10H' in output
-
-
-def test_does_iterm2_graphics_advances_row():
-    """does_iterm2_graphics is True when the image advances the cursor one row."""
-    def child(term):
-        # a terminal that moves down past the image it drew, rather than right
-        term.ungetch('\x1b[5;10R\x1b[6;1R')
-        assert term.does_iterm2_graphics(timeout=0.01) is True
-        return b'OK'
-
-    output = pty_test(child, parent_func=None,
-                      test_name='test_does_iterm2_graphics_advances_row')
+    output = pty_test(child, parent_func=None, cols=cols,
+                      test_name=f'test_does_iterm2_graphics_advance_{label}')
     assert 'OK' in output
 
 
-def test_does_iterm2_graphics_no_cursor_movement():
-    """does_iterm2_graphics is False when the cursor does not move."""
-    def child(term):
-        term.ungetch('\x1b[5;10R\x1b[5;10R')
-        assert term.does_iterm2_graphics(timeout=0.01) is False
-        return b'OK'
-
-    output = pty_test(child, parent_func=None,
-                      test_name='test_does_iterm2_graphics_no_cursor_movement')
-    assert 'OK' in output
-    # the probed cell is erased even though nothing was drawn into it
-    assert '\x1b[5;10H \x1b[5;10H' in output
-
-
-def test_does_iterm2_graphics_displayed_as_text():
-    """does_iterm2_graphics is False when the sequence is echoed as text."""
-    def child(term):
-        # a terminal that does not parse OSC 1337 and wrote our payload to the
-        # display moves the cursor much further than a single cell
-        term.ungetch('\x1b[5;10R\x1b[6;40R')
-        assert term.does_iterm2_graphics(timeout=0.01) is False
-        return b'OK'
-
-    output = pty_test(child, parent_func=None,
-                      test_name='test_does_iterm2_graphics_displayed_as_text')
-    assert 'OK' in output
-
-
-def test_does_iterm2_graphics_at_bottom_row():
-    """does_iterm2_graphics probes the row above the cursor in the final row."""
-    def child(term):
-        # cursor reported in the final row of a 24-row terminal: the probe steps up
-        # to row 23, where a row advance is a cursor movement and not a scroll
-        term.ungetch('\x1b[24;10R\x1b[23;11R')
-        assert term.does_iterm2_graphics(timeout=0.01) is True
-        return b'OK'
-
-    output = pty_test(child, parent_func=None, rows=24,
-                      test_name='test_does_iterm2_graphics_at_bottom_row')
-    assert 'OK' in output
-    # drawn on row 23, erased there, cursor returned to row 24
-    assert '\x1b[23;10H\x1b]1337;' in output
-    assert '\x1b[23;10H \x1b[24;10H' in output
-
-
-def test_does_iterm2_graphics_bottom_row_scroll_not_mistaken():
-    """A scroll in the final row is never measured, the probe steps off it first."""
-    def child(term):
-        # a terminal that drew and scrolled reports the row it began on.  Because the
-        # probe stepped up a row, that same reply is an unmoved cursor: unsupported.
-        term.ungetch('\x1b[24;10R\x1b[24;10R')
-        assert term.does_iterm2_graphics(timeout=0.01) is False
-        return b'OK'
-
-    output = pty_test(child, parent_func=None, rows=24,
-                      test_name='test_does_iterm2_graphics_bottom_row_scroll')
-    assert 'OK' in output
-
-
-def test_does_iterm2_graphics_no_reply_to_second_query():
-    """does_iterm2_graphics is False when the second CPR goes unanswered."""
+def test_does_iterm2_graphics_erases_when_unanswered():
+    """erase over presumed cell output on timeout."""
     def child(term):
         term.ungetch('\x1b[5;10R')
         assert term.does_iterm2_graphics(timeout=0.01) is False
         return b'OK'
 
     output = pty_test(child, parent_func=None,
-                      test_name='test_does_iterm2_graphics_no_reply_to_second_query')
+                      test_name='test_does_iterm2_graphics_erases_when_unanswered')
     assert 'OK' in output
-    assert '\x1b[5;10H \x1b[5;10H' in output
+    assert output.index('\x1b]1337;') < output.index(' \b')
 
 
 def test_does_iterm2_graphics_at_right_margin():
-    """does_iterm2_graphics probes the cell left of the cursor in the final column."""
+    """Filling the final column, the probe steps back one to make room."""
     def child(term):
-        # cursor reported in the final column of an 80-column terminal: the probe
-        # steps left to column 79 and the image advances it back to column 80
+        # the cursor reports the final column of an 80 column terminal
         term.ungetch('\x1b[5;80R\x1b[5;80R')
         assert term.does_iterm2_graphics(timeout=0.01) is True
         return b'OK'
@@ -404,9 +333,22 @@ def test_does_iterm2_graphics_at_right_margin():
     output = pty_test(child, parent_func=None, cols=80,
                       test_name='test_does_iterm2_graphics_at_right_margin')
     assert 'OK' in output
-    # drawn at column 79, erased there, cursor returned to column 80
-    assert '\x1b[5;79H\x1b]1337;' in output
-    assert '\x1b[5;79H \x1b[5;80H' in output
+    assert '\b\x1b]1337;' in output
+    assert output.endswith('\b OK')
+
+
+def test_does_iterm2_graphics_single_column_terminal():
+    """A one column terminal is automatically False (edge case)."""
+    def child(term):
+        term.ungetch('\x1b[5;1R')
+        assert term.does_iterm2_graphics(timeout=0.01) is False
+        return b'OK'
+
+    output = pty_test(child, parent_func=None, cols=1,
+                      test_name='test_does_iterm2_graphics_single_column')
+    assert 'OK' in output
+    assert '\x1b]1337;' not in output
+    assert '\b' not in output
 
 
 @pytest.mark.parametrize('ps,expected', [
