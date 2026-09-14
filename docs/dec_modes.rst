@@ -49,6 +49,11 @@ You can verify mode support quickly using :meth:`~blessed.Terminal.get_dec_mode`
 (see :ref:`querying mode support` below), which also benefits from caching after
 the first query.
 
+Terminals with leaky output, such as Terminal.app, display a DECRQM query as a stray
+``p`` instead of parsing it.  They are identified by an XTVERSION query made by the
+first mode query, and are never sent a DECRQM query, reporting every mode as
+:attr:`~blessed.dec_modes.DecModeResponse.NOT_QUERIED`.
+
 Getting Started
 ---------------
 

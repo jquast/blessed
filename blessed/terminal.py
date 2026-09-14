@@ -442,9 +442,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._color_scheme_supported: Optional[bool] = None
         # DECRQSS detection cache
         self._decrqss_supported: Optional[bool] = None
-        # Whether the terminal is Terminal.app, which displays rather than parses the
-        # '$' intermediate byte of a DECRQM or DECRQSS query; None until determined
-        self._is_apple_terminal: Optional[bool] = None
         # Font glyph coverage: mintty OSC 7771 probe result
         self._does_mintty_font_protocol: Optional[bool] = None
         # Font glyph coverage: Glyph Protocol probe result, by advertised key=value
@@ -1441,6 +1438,13 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         width = new_col - initial_col
         return width if width in {1, 2} else fallback
 
+    def _is_apple_terminal(self, timeout: Optional[float]) -> bool:
+        """Whether the terminal is Apple's Terminal.app."""
+        if os.environ.get('TERM_PROGRAM') == 'Apple_Terminal':
+            return True
+        swv = self.get_software_version(timeout=timeout)
+        return swv is not None and swv.name == 'Apple_Terminal'
+
     def get_dec_mode(self,
                      mode: Union[int,
                                  _DecPrivateMode],
@@ -1510,17 +1514,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             cached_value = self._dec_mode_cache[int(mode)]
             return DecModeResponse(mode, cached_value)
 
-        # Avoid Terminal.app, which displays rather than parses the "intermediate byte" ($), leaking
-        # a stray 'p' (DECRQM) or '$q' and the setting identifier (DECRQSS).
-        if self._is_apple_terminal is None:
-            self._is_apple_terminal = os.environ.get('TERM_PROGRAM') == 'Apple_Terminal'
-            if not self._is_apple_terminal:
-                software_version = self.get_software_version(timeout=timeout)
-                self._is_apple_terminal = (software_version is not None
-                                           and software_version.name == 'Apple_Terminal')
-            if self._is_apple_terminal:
-                self.errors.append('DECRQM and DECRQSS queries: skipped, Terminal.app')
-        if self._is_apple_terminal:
+        # Avoid Terminal.app, which displays rather than parses the '$' intermediate byte,
+        # leaking a stray 'p' (DECRQM) or '$q' and the setting identifier (DECRQSS).
+        if self._is_apple_terminal(timeout):
             return DecModeResponse(mode, DecModeResponse.NOT_QUERIED)
 
         # Build and send query sequence and expected response pattern
@@ -2038,6 +2034,10 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             nothing still yields a non-empty dict, so that the result is falsey *only* for
             "unsupported".
         """
+        if self._is_apple_terminal(timeout):
+            # Apple's Terminal.app erroneously displays APC sequences
+            return {}
+
         if (match := self._query_with_boundary('\x1b_25a1;s\x1b\\',
                                                _RE_GLYPH_PROTOCOL_S_RESPONSE,
                                                timeout)) is None:
@@ -2128,6 +2128,11 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return False
         if self._kitty_graphics_supported is not None and not force:
             return self._kitty_graphics_supported
+
+        if self._is_apple_terminal(timeout):
+            # Apple's Terminal.app erroneously displays APC sequences
+            self._kitty_graphics_supported = False
+            return False
 
         match = self._query_with_boundary(
             '\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\',
@@ -2470,17 +2475,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         :arg float timeout: Timeout in seconds.
         :rtype: str or None
         """
-        if self._is_apple_terminal is None:
-            # Terminal.app displays rather than parses the '$' intermediate byte, leaking a stray
-            # 'p' (DECRQM) or '$q' and the setting identifier (DECRQSS), and is never sent either.
-            self._is_apple_terminal = os.environ.get('TERM_PROGRAM') == 'Apple_Terminal'
-            if not self._is_apple_terminal:
-                software_version = self.get_software_version(timeout=timeout)
-                self._is_apple_terminal = (software_version is not None
-                                           and software_version.name == 'Apple_Terminal')
-            if self._is_apple_terminal:
-                self.errors.append('DECRQM and DECRQSS queries: skipped, Terminal.app')
-        if self._is_apple_terminal:
+        if self._is_apple_terminal(timeout):
+            # Apple's Terminal.app leaks '$q' and setting identifier
             return None
 
         query = f'\x1bP$q{setting_id}\x1b\\'

@@ -349,11 +349,8 @@ def test_get_dec_mode_successful_query():
         mock_match = mock.Mock()
         mock_match.group.return_value = '1'
 
-        # the terminal is already known not to be Terminal.app, so no
-        # XTVERSION query is made by this DECRQM query
-        term._is_apple_terminal = False
-
-        with mock.patch.object(term, '_is_a_tty', True), \
+        with mock.patch.object(term, '_is_apple_terminal', return_value=False), \
+                mock.patch.object(term, '_is_a_tty', True), \
                 mock.patch.object(
                     term, '_query_with_boundary',
                     return_value=mock_match
@@ -425,9 +422,8 @@ def test_get_dec_mode_force_bypass_cache():
         mock_match = mock.Mock()
         mock_match.group.return_value = '2'
 
-        term._is_apple_terminal = False
-
-        with mock.patch.object(term, '_is_a_tty', True), \
+        with mock.patch.object(term, '_is_apple_terminal', return_value=False), \
+                mock.patch.object(term, '_is_a_tty', True), \
                 mock.patch.object(
                     term, '_query_with_boundary',
                     return_value=mock_match
@@ -1306,7 +1302,6 @@ def test_apple_terminal_skipped_by_term_program():
             # neither the XTVERSION query nor any '$'-intermediate query was made
             mock_query.assert_not_called()
         assert stream.getvalue() == ''
-        assert 'DECRQM and DECRQSS queries: skipped, Terminal.app' in term.errors
     child()
 
 
@@ -1333,3 +1328,22 @@ def test_apple_terminal_by_xtversion(name, expected_skip):
     assert 'OK' in output
     assert '\x1b[>q' in output
     assert ('\x1b[?25$p' in output) is not expected_skip
+
+
+@pytest.mark.parametrize('reply,expected', [
+    ('\x1bP1$r0;1m\x1b\\', '0;1'),   # valid: the echoed setting identifier is stripped
+    ('\x1bP0$r\x1b\\', None),        # invalid setting
+], ids=['valid', 'invalid'])
+def test_get_decrqss_reply(reply, expected):
+    """get_decrqss returns the parameter value of a valid reply, and None otherwise."""
+    from .accessories import pty_test
+
+    def child(term):
+        # the first CPR answers the XTVERSION query made to identify Terminal.app
+        term.ungetch(f'\x1b[1;1R{reply}\x1b[1;1R')
+        assert term.get_decrqss(timeout=0.01) == expected
+        return b'OK'
+
+    output = pty_test(child, parent_func=None, test_name=f'test_get_decrqss_{expected}')
+    assert 'OK' in output
+    assert '\x1bP$qm\x1b\\' in output

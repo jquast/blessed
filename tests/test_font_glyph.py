@@ -6,6 +6,8 @@ import json
 import time
 import select
 
+from unittest import mock
+
 # 3rd party
 import pytest
 
@@ -59,9 +61,12 @@ def run(replies, *texts, name='run', parent=None, **kwargs):
     def child(term):
         results = []
         term.ungetch(replies)
-        for text in texts:
-            coverage = term.get_font_coverage(text, **dict({'timeout': 0.01}, **kwargs))
-            results.append([coverage.protocol, coverage.sources, coverage.unknown])
+        # the Glyph Protocol probe identifies Terminal.app first, which leaks the payload
+        # of an APC sequence: that round-trip is not part of the replies scripted here
+        with mock.patch.object(term, '_is_apple_terminal', return_value=False):
+            for text in texts:
+                coverage = term.get_font_coverage(text, **dict({'timeout': 0.01}, **kwargs))
+                results.append([coverage.protocol, coverage.sources, coverage.unknown])
         return (SENTINEL + json.dumps(results)).encode()
 
     written, _, payload = pty_test(child, parent, test_name=name).partition(SENTINEL)
@@ -247,8 +252,9 @@ def test_force_discards_unknown():
         # swallow the second call's replies
         term.ungetch(NO_REPLY + PROBE +
                      '\x1b_25a1;q;cp=41;status=1;reason=malformed\x1b\\' + CPR)
-        assert term.get_font_coverage('A', timeout=0.01).unknown == {65: 'malformed'}
-        coverage = term.get_font_coverage('A', timeout=1.0, force=True)
+        with mock.patch.object(term, '_is_apple_terminal', return_value=False):
+            assert term.get_font_coverage('A', timeout=0.01).unknown == {65: 'malformed'}
+            coverage = term.get_font_coverage('A', timeout=1.0, force=True)
         assert coverage.unknown == {} and coverage.covered == {65}
         return b'OK'
 
