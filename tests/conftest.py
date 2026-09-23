@@ -20,6 +20,7 @@ def pytest_configure(config: pytest.Config) -> None:
     os.environ.pop('TERM_PROGRAM', None)
     os.environ.pop('TERM_PROGRAM_VERSION', None)
     os.environ.pop('ESCDELAY', None)
+    os.environ.pop('AMBIGUOUS_WIDE', None)
     os.environ.pop('BLESSED_QUERY_TIMEOUT_SECONDS', None)
 
 

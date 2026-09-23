@@ -840,7 +840,6 @@ def test_clip_sequence_method(any_term):
     child(any_term)
 
 
-@pytest.mark.skipif(sys.version_info[:2] < (3, 8), reason="Only supported on Python >= 3.8")
 def test_supports_index(any_term):
     """Ensure sequence formatting methods support objects with __index__()"""
 
