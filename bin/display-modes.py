@@ -134,6 +134,11 @@ def display_sugar_methods(term):
     print(f"  {_yn(term, term.does_kitty_notifications())}  "
           f"Kitty desktop notifications (OSC 99)" + term.clear_eol)
 
+    print('  Testing Kitty Text Sizing...' + term.clear_eol, end='\r', flush=True)
+    print(f"  {_yn(term, term.does_text_sizing())}  "
+          f"Kitty text sizing (OSC 66)" + term.clear_eol)
+
+
 
 def display_decrqss(term):
     """Query and display terminal state via DECRQSS."""
