@@ -4,14 +4,13 @@ Version History
 ===============
 
 1.51
-  * introduced: :meth:`~Terminal.clip` to extract a window of display columns from a string,
-    retaining terminal sequences.
+  * introduced: :meth:`~Terminal.clip` to extract a "window" of displayed columns from a string, a
+    more precise version of :meth:`~Terminal.truncate`, retaining terminal sequences, :ghpull:`420`.
   * improved: :meth:`~Terminal.length`, :meth:`~Terminal.ljust`, :meth:`~Terminal.rjust`,
-    :meth:`~Terminal.center`, :meth:`~Terminal.truncate`, and :meth:`~Terminal.wrap` now apply
-    wcwidth_ correction tables by detecting the terminal software name and East Asian ambiguous
-    character width at class-initialization.  The environment variable ``AMBIGUOUS_WIDE`` of ``1``
-    or ``2`` skips interactive detection, :ghissue:`418`.
-  * dropped: Python 3.8 support, wcwidth 0.9.0 requires Python 3.9 or newer.
+    :meth:`~Terminal.center`, :meth:`~Terminal.truncate`, and :meth:`~Terminal.wrap` with
+    terminal-specific Corrections_ by detecting the terminal software name and East Asian ambiguous
+    modes at class-initialization, :ghissue:`420`.
+  * deprecated: Python 3.8 and earlier no longer supported. :ghpull:`420`.
 
 1.50
   * change: default timeout of automatic terminal queries from 1 to 5 seconds with environment
@@ -596,3 +595,4 @@ Version History
 .. _NO_COLOR: https://no-color.org/
 .. _jinxed: https://jinxed.readthedocs.io/en/stable/
 .. _XTGETTCAP: https://codeberg.org/dnkl/foot#xtgettcap
+.. _`Corrections`: https://wcwidth.readthedocs.io/en/latest/intro.html#corrections

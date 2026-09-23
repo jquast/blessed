@@ -281,7 +281,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         ]
         self._normal = None
 
-        # Injected init-time detection values, see __init__detect_measurement().
+        # Injected init-time detection values
         self._software_version_data = _software_version_data
         self._ambiguous_width_data = _ambiguous_width_data
 
@@ -327,12 +327,10 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self.__init__capabilities()
         self.__init__query_caches()
 
-        # Step 6: Detect measurement-affecting terminal properties
-        self.__init__detect_measurement()
-
-    def __init__detect_measurement(self) -> None:
-        """Detect terminal properties affecting width measurement, see #418."""
+        # Step 6: Detect measurement-affecting terminal properties, see #418.
+        #: Width of East Asian ambiguous characters, 1 or 2.
         self.ambiguous_width = self._detect_ambiguous_width()
+        #: Terminal software name for wcwidth correction tables, ``False`` when unknown.
         self.term_program = self._detect_term_program()
 
     def _software_version_from_env(self) -> Optional[SoftwareVersion]:

@@ -139,7 +139,6 @@ def display_sugar_methods(term):
           f"Kitty text sizing (OSC 66)" + term.clear_eol)
 
 
-
 def display_decrqss(term):
     """Query and display terminal state via DECRQSS."""
     print(term.bold("DECRQSS State Queries (DCS $ q):"))
