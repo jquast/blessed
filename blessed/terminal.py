@@ -35,6 +35,7 @@ from wcwidth import TextSizing, TextSizingParams
 from wcwidth import wrap as wcwidth_wrap
 from wcwidth import ljust as wcwidth_ljust
 from wcwidth import rjust as wcwidth_rjust
+from wcwidth import width as wcwidth_width
 from wcwidth import center as wcwidth_center
 
 # local
@@ -4023,7 +4024,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             (y, x)(0, 0), are evaluated as a printable length of
             *0*.
         """
-        return Sequence(text, self).length()
+        return wcwidth_width(text, ambiguous_width=self.ambiguous_width,
+                             term_program=self.term_program)
 
     def strip(self, text: str, chars: Optional[str] = None) -> str:
         r"""
