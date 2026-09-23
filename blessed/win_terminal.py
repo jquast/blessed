@@ -14,7 +14,7 @@ from typing import IO, List, Union, Optional, Generator
 from jinxed import win32
 
 # local
-from .keyboard import TERMINAL_QUERY_TIMEOUT_SECONDS
+from .keyboard import TERMINAL_QUERY_TIMEOUT_SECONDS, SoftwareVersion
 from .terminal import WINSZ
 from .terminal import Terminal as _Terminal
 from .dec_modes import DecPrivateMode as _DecPrivateMode
@@ -114,7 +114,9 @@ class Terminal(_Terminal):
                  stream: Optional[IO[str]] = None,
                  force_styling: Union[bool, None] = False,
                  kind_fallback: str = 'vtwin10',
-                 _xtgettcap_data: Optional[TermcapResponse] = None
+                 _xtgettcap_data: Optional[TermcapResponse] = None,
+                 _software_version_data: Optional[SoftwareVersion] = None,
+                 _ambiguous_width_data: Optional[int] = None
                  ) -> None:
         """Initialize Windows terminal instance."""
         # Initialize instance attributes needed by kbhit() during
@@ -124,7 +126,9 @@ class Terminal(_Terminal):
         self._native_resize: bool = False
         super().__init__(kind=kind, stream=stream, force_styling=force_styling,
                          kind_fallback=kind_fallback,
-                         _xtgettcap_data=_xtgettcap_data)
+                         _xtgettcap_data=_xtgettcap_data,
+                         _software_version_data=_software_version_data,
+                         _ambiguous_width_data=_ambiguous_width_data)
         self._prev_button_state: int = 0
 
     def getch(self, decode_latin1: bool = False) -> str:

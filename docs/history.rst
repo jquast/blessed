@@ -3,6 +3,15 @@
 Version History
 ===============
 
+1.51
+  * introduced: :meth:`~Terminal.clip` to extract a window of display columns from a string,
+    retaining terminal sequences.
+  * improved: :meth:`~Terminal.length`, :meth:`~Terminal.ljust`, :meth:`~Terminal.rjust`,
+    :meth:`~Terminal.center`, :meth:`~Terminal.truncate`, and :meth:`~Terminal.wrap` now apply
+    wcwidth_ correction tables by detecting the terminal software name and East Asian ambiguous
+    character width at class-initialization.  The environment variable ``AMBIGUOUS_WIDE`` of ``1``
+    or ``2`` skips interactive detection, :ghissue:`418`.
+
 1.50
   * change: default timeout of automatic terminal queries from 1 to 5 seconds with environment
     variable ``BLESSED_QUERY_TIMEOUT_SECONDS`` override, :ghpull:`414`.

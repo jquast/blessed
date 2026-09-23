@@ -1104,3 +1104,14 @@ class TestIncrementalRender:
         assert result is not None
         if sgr_check:
             assert ed.suggestion_sgr in result
+
+
+def test_measurement_corrections():
+    """Display width honors configured ambiguous width and terminal corrections."""
+    ed = LineEditor(ambiguous_width=2)
+    ed.feed_key("\u00a7")
+    assert ed.display.cursor == 2
+
+    ed = LineEditor(term_program="vte")
+    ed.feed_key("\u2630")
+    assert ed.display.cursor == 1

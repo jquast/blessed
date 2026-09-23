@@ -796,6 +796,50 @@ def test_truncate_vs16_emoji(any_term):
     child(any_term)
 
 
+def test_clip_window(any_term):
+    """terminal.clip() selects a window of display columns."""
+    def child(kind):
+        term = TestTerminal(kind=kind)
+        assert term.clip('hello world', 6, 11) == 'world'
+        assert term.clip('hello world', 6) == 'world'
+        assert term.clip('hello world', 11, 11) == ''
+        assert term.clip('hello world', 5, 100) == ' world'
+        # a wide character split at a boundary is filled
+        assert term.clip('AB\uff23', 0, 3) == 'AB '
+        assert term.clip('AB\uff23', 0, 3, fillchar='.') == 'AB.'
+        assert term.clip('AB\uff23', 2, 4) == '\uff23'
+
+    child(any_term)
+
+
+def test_clip_matches_truncate(any_term):
+    """terminal.clip(text, 0, width) agrees with terminal.truncate(text, width)."""
+    def child(kind):
+        term = TestTerminal(kind=kind, force_styling=True)
+        given = f'{term.bold_red("Testing")} yellow peppers'
+        for width in (0, 1, 3, term.length(given)):
+            assert term.clip(given, 0, width) == term.truncate(given, width)
+
+        if term.move_right(5):
+            moved = f'one{term.move_right(5)}two'
+            assert term.clip(moved, 0, 9) == term.truncate(moved, 9)
+
+    child(any_term)
+
+
+def test_clip_sequence_method(any_term):
+    """Sequence.clip() matches Terminal.clip()."""
+    def child(kind):
+        # local
+        from blessed.sequences import Sequence
+
+        term = TestTerminal(kind=kind)
+        assert Sequence('hello world', term).clip(6) == term.clip('hello world', 6)
+        assert Sequence('hello world', term).clip(0, 5) == 'hello'
+
+    child(any_term)
+
+
 @pytest.mark.skipif(sys.version_info[:2] < (3, 8), reason="Only supported on Python >= 3.8")
 def test_supports_index(any_term):
     """Ensure sequence formatting methods support objects with __index__()"""

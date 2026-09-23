@@ -3,7 +3,7 @@ from __future__ import annotations
 
 # std imports
 import re
-from typing import TYPE_CHECKING, Tuple, Pattern, Iterator, Optional, SupportsIndex
+from typing import TYPE_CHECKING, Tuple, Union, Literal, Pattern, Iterator, Optional, SupportsIndex
 
 # 3rd party
 from wcwidth import SequenceTextWrapper  # noqa: F401  # re-exported for API compatibility
@@ -177,7 +177,9 @@ class Sequence(str):
         :returns: String of ``text``, left-aligned by ``width``.
         :rtype: str
         """
-        return wcwidth_ljust(self, width.__index__(), fillchar, control_codes='ignore')
+        return wcwidth_ljust(self, width.__index__(), fillchar, control_codes='ignore',
+                             ambiguous_width=self._term.ambiguous_width,
+                             term_program=self._term.term_program)
 
     def rjust(self, width: SupportsIndex, fillchar: str = ' ') -> str:
         """
@@ -188,7 +190,9 @@ class Sequence(str):
         :returns: String of ``text``, right-aligned by ``width``.
         :rtype: str
         """
-        return wcwidth_rjust(self, width.__index__(), fillchar, control_codes='ignore')
+        return wcwidth_rjust(self, width.__index__(), fillchar, control_codes='ignore',
+                             ambiguous_width=self._term.ambiguous_width,
+                             term_program=self._term.term_program)
 
     def center(self, width: SupportsIndex, fillchar: str = ' ') -> str:
         """
@@ -199,7 +203,37 @@ class Sequence(str):
         :returns: String of ``text``, centered by ``width``.
         :rtype: str
         """
-        return wcwidth_center(self, width.__index__(), fillchar, control_codes='ignore')
+        return wcwidth_center(self, width.__index__(), fillchar, control_codes='ignore',
+                              ambiguous_width=self._term.ambiguous_width,
+                              term_program=self._term.term_program)
+
+    def clip(self, start: SupportsIndex = 0, end: SupportsIndex = -1, *,
+             fillchar: str = ' ', tabsize: int = 8,
+             ambiguous_width: Optional[SupportsIndex] = None,
+             propagate_sgr: bool = True,
+             control_codes: Literal['parse', 'strict', 'ignore'] = 'parse',
+             overtyping: Optional[bool] = None,
+             term_program: Union[bool, str, None] = None) -> str:
+        """
+        Return a window of this string spanning display columns ``start`` to ``end``.
+
+        Like :meth:`~.Terminal.clip`, which documents the arguments. Horizontal cursor
+        movement is expanded by :meth:`padd` first, and the terminal's detected
+        ``ambiguous_width`` and ``term_program`` are used unless overridden.
+
+        :rtype: str
+        :returns: This string clipped to display columns (start, end)
+        """
+        term = self._term
+        ambiguous_width = (term.ambiguous_width if ambiguous_width is None
+                           else ambiguous_width.__index__())
+        if term_program is None:
+            term_program = term.term_program
+        return wcwidth_clip(
+            self.padd(), start.__index__(), end.__index__(),
+            fillchar=fillchar, tabsize=tabsize, ambiguous_width=ambiguous_width,
+            propagate_sgr=propagate_sgr, control_codes=control_codes,
+            overtyping=overtyping, term_program=term_program)
 
     def truncate(self, width: SupportsIndex) -> str:
         """
@@ -220,9 +254,7 @@ class Sequence(str):
         :rtype: str
         :returns: String truncated to exactly ``width`` printable characters.
         """
-        # Use padd() to expand terminal-specific cursor movements to spaces,
-        # then use wcwidth's clip() to truncate while preserving all sequences.
-        return wcwidth_clip(self.padd(), 0, width.__index__())
+        return self.clip(0, width.__index__())
 
     def length(self) -> int:
         r"""
@@ -248,7 +280,8 @@ class Sequence(str):
             as ``term.clear`` will not give accurate returns, it is not
             considered lengthy (a length of 0).
         """
-        return wcwidth_width(self)
+        return wcwidth_width(self, ambiguous_width=self._term.ambiguous_width,
+                             term_program=self._term.term_program)
 
     def strip(self, chars: Optional[str] = None) -> str:
         """

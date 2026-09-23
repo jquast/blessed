@@ -127,7 +127,8 @@ def test_xtgettcap_probe_oserror():
     with mock.patch('os.isatty', return_value=True), \
         mock.patch.object(Terminal, '_xtgettcap_batch',
                           side_effect=OSError('broken pipe')):
-        t = Terminal(stream=sys.__stdout__, force_styling=True)
+        t = TestTerminal(stream=sys.__stdout__, force_styling=True,
+                         _xtgettcap_data=NO_XTGETTCAP_DATA)
         assert any('OSError' in err for err in t.errors)
 
 
@@ -1258,7 +1259,8 @@ def test_xtgettcap_skip_ansicon_env():
     with mock.patch.dict(os.environ, {'ANSICON': '1'}), \
             mock.patch('os.isatty', return_value=True), \
             mock.patch.object(Terminal, '_xtgettcap_batch') as mock_batch:
-        t = Terminal(stream=sys.__stdout__, force_styling=True)
+        t = TestTerminal(stream=sys.__stdout__, force_styling=True,
+                         _xtgettcap_data=NO_XTGETTCAP_DATA)
         mock_batch.assert_not_called()
         assert any('ansicon' in err for err in t.errors)
         assert t._xtgettcap_cache.supported is False
@@ -1269,7 +1271,8 @@ def test_xtgettcap_skip_conemuansi_env():
     with mock.patch.dict(os.environ, {'ConEmuANSI': 'ON'}), \
             mock.patch('os.isatty', return_value=True), \
             mock.patch.object(Terminal, '_xtgettcap_batch') as mock_batch:
-        t = Terminal(stream=sys.__stdout__, force_styling=True)
+        t = TestTerminal(stream=sys.__stdout__, force_styling=True,
+                         _xtgettcap_data=NO_XTGETTCAP_DATA)
         mock_batch.assert_not_called()
         assert any('ansicon' in err for err in t.errors)
         assert t._xtgettcap_cache.supported is False
@@ -1280,7 +1283,8 @@ def test_xtgettcap_skip_Terminal_app():
     with mock.patch.dict(os.environ, {'TERM_PROGRAM': 'Apple_Terminal'}), \
             mock.patch('os.isatty', return_value=True), \
             mock.patch.object(Terminal, '_xtgettcap_batch') as mock_batch:
-        t = Terminal(stream=sys.__stdout__, force_styling=True)
+        t = TestTerminal(stream=sys.__stdout__, force_styling=True,
+                         _xtgettcap_data=NO_XTGETTCAP_DATA)
         mock_batch.assert_not_called()
         assert any('Terminal.app' in err for err in t.errors)
         assert t._xtgettcap_cache.supported is False
@@ -1313,7 +1317,8 @@ def test_xtgettcap_skip_early_conhost(env, build, skipped):
             mock.patch('os.isatty', return_value=True), \
             mock.patch.object(Terminal, '_xtgettcap_batch',
                               return_value=TermcapResponse(supported=False)) as mock_batch:
-        t = Terminal(stream=sys.__stdout__, force_styling=True)
+        t = TestTerminal(stream=sys.__stdout__, force_styling=True,
+                         _xtgettcap_data=NO_XTGETTCAP_DATA)
         assert any('conhost' in err for err in t.errors) is skipped
         assert mock_batch.called is not skipped
 

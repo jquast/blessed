@@ -13,6 +13,7 @@ import warnings
 # local
 from blessed import Terminal
 from blessed.dec_modes import DecModeResponse
+from blessed.keyboard import SoftwareVersion
 from blessed._capabilities import TermcapResponse
 from .conftest import IS_WINDOWS
 
@@ -51,10 +52,17 @@ DEFAULT_TERMCAP_RESPONSE = TermcapResponse(
 # Sentinel to distinguish "use default fake XTGETTCAP" from "force real probe"
 NO_XTGETTCAP_DATA = object()
 
+# Injected software version meaning "no terminal software detected".
+_NO_SOFTWARE_VERSION = SoftwareVersion(raw='', name='', version='')
+
 
 def TestTerminal(is_a_tty=None, _xtgettcap_data=DEFAULT_TERMCAP_RESPONSE,
-                 _xtgettcap_timeout=None, **kwargs) -> Terminal:
-    """Create a Terminal instance with optional is_a_tty override and default _xtgettcap_data."""
+                 _xtgettcap_timeout=None, _detect=False, **kwargs) -> Terminal:
+    """Create a Terminal instance with optional is_a_tty override and default _xtgettcap_data.
+
+    Unless ``_detect`` is True, init-time terminal detection is injected with
+    neutral values: the forked-PTY harness has no terminal to answer queries.
+    """
     if 'kind' not in kwargs:
         kwargs['kind'] = TEST_KIND
     if _xtgettcap_data is not NO_XTGETTCAP_DATA:
@@ -62,6 +70,9 @@ def TestTerminal(is_a_tty=None, _xtgettcap_data=DEFAULT_TERMCAP_RESPONSE,
     if _xtgettcap_timeout is not None:
         import blessed.terminal
         blessed.terminal.TERMINAL_QUERY_TIMEOUT_SECONDS = _xtgettcap_timeout
+    if not _detect:
+        kwargs.setdefault('_software_version_data', _NO_SOFTWARE_VERSION)
+        kwargs.setdefault('_ambiguous_width_data', 1)
     term = Terminal(**kwargs)
     if is_a_tty is not None:
         term._is_a_tty = is_a_tty
