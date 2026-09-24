@@ -71,6 +71,10 @@ Override with ``text_sgr``, ``suggestion_sgr``, ``bg_sgr``, or ``ellipsis_sgr``:
 
     editor = LineEditor(bg_sgr=term.on_brown, max_width=term.width)
 
+When ``max_width`` is set, display width is measured with :mod:`wcwidth`; pass
+:attr:`~.Terminal.ambiguous_width` and :attr:`~.Terminal.term_program` so that ambiguous and
+terminal-corrected characters are measured as the terminal renders them.
+
 When ``max_width`` is set and text overflows, ``overflow_left`` and
 ``overflow_right`` indicate which edges are truncated.  Use
 ``ellipsis_sgr`` to style the overflow indicator.

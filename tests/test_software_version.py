@@ -217,7 +217,7 @@ def test_get_software_version_not_a_tty():
 
 
 def test_get_software_version_env_fallback():
-    """Test get_software_version() falls back to TERM_PROGRAM env vars."""
+    """Test get_software_version() uses TERM_PROGRAM env vars, without inquiry."""
     def child(term):
         import os
         os.environ['TERM_PROGRAM'] = 'iTerm.app'
@@ -235,7 +235,7 @@ def test_get_software_version_env_fallback():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_get_software_version_env_fallback')
-    assert output == '\x1b[>q\x1b[6nENV_FALLBACK'
+    assert output == 'ENV_FALLBACK'
 
 
 def test_get_software_version_env_fallback_no_version():
@@ -256,7 +256,7 @@ def test_get_software_version_env_fallback_no_version():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_get_software_version_env_fallback_no_version')
-    assert output == '\x1b[>q\x1b[6nENV_NO_VER'
+    assert output == 'ENV_NO_VER'
 
 
 def test_get_software_version_env_fallback_version_only():
@@ -277,7 +277,7 @@ def test_get_software_version_env_fallback_version_only():
 
     output = pty_test(child, parent_func=None,
                       test_name='test_get_software_version_env_fallback_version_only')
-    assert output == '\x1b[>q\x1b[6nENV_VER_ONLY'
+    assert output == 'ENV_VER_ONLY'
 
 
 def test_get_software_version_no_env_no_response():

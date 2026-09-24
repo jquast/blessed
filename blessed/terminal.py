@@ -322,6 +322,54 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self.__init__capabilities()
         self.__init__query_caches()
 
+        # Step 6: Detect measurement-affecting terminal properties, see #418.
+        #: Width of East Asian ambiguous characters, 1 or 2.
+        self.ambiguous_width = self._detect_ambiguous_width()
+        #: Terminal software name for wcwidth correction tables, ``False`` when unknown.
+        self.term_program = self._detect_term_program()
+
+    def _software_version_from_env(self) -> Optional[SoftwareVersion]:
+        """Return terminal software from ``TERM_PROGRAM`` environment values."""
+        term_program = os.environ.get('TERM_PROGRAM', '')
+        term_version = os.environ.get('TERM_PROGRAM_VERSION', '')
+        raw = ' '.join(filter(None, (term_program, term_version)))
+        if raw:
+            return SoftwareVersion(raw=raw, name=term_program, version=term_version)
+        return None
+
+    def _detect_term_program(self) -> Union[bool, str]:
+        """
+        Return the terminal software name for wcwidth correction tables.
+
+        A ``TERM_PROGRAM`` value takes precedence, XTVERSION is queried otherwise, when
+        the terminal can answer on the keyboard fd. Returns ``False`` when unknown.
+        """
+        version = self._software_version_from_env()
+        if version is None and self.is_a_tty and self.does_styling \
+                and self._keyboard_fd is not None:
+            version = self.get_software_version()
+        return version.name if version is not None and version.name else False
+
+    def _detect_ambiguous_width(self) -> int:
+        """
+        Return the East Asian ambiguous character width, 1 or 2.
+
+        The environment variable ``AMBIGUOUS_WIDE`` overrides detection, which is
+        otherwise measured only when the terminal can answer on the keyboard fd.
+        """
+        override = os.environ.get('AMBIGUOUS_WIDE')
+        if override:
+            try:
+                value = int(override)
+            except ValueError:
+                value = 0
+            if value in {1, 2}:
+                return value
+            self.errors.append(f'AMBIGUOUS_WIDE={override!r}: expected 1 or 2')
+        if self.is_a_tty and self.does_styling and self._keyboard_fd is not None:
+            return self.detect_ambiguous_width()
+        return 1
+
     def __init__keyboard_state(self) -> None:
         """Initialize minimal keyboard state needed for XTGETTCAP probe."""
         # Build database of int code <=> KEY_NAME (static, no jinxed deps).
@@ -1290,15 +1338,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     def get_software_version(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                              force: bool = False) -> Optional[SoftwareVersion]:
         """
-        Query the terminal's software name and version using XTVERSION.
+        Return the terminal's software name and version.
 
-        Sends an XTVERSION query to the terminal and returns a
-        :class:`SoftwareVersion` instance with the terminal's name and version.
-
-        If an XTVERSION query fails to respond within the ``timeout``
-        specified, falls back to the ``TERM_PROGRAM`` and
-        ``TERM_PROGRAM_VERSION`` environment variables. Returns ``None``
-        only if both methods fail.
+        A non-empty ``TERM_PROGRAM`` value takes precedence and no inquiry is made,
+        otherwise an XTVERSION query is sent to the terminal and the response is
+        returned as a :class:`SoftwareVersion` instance. Returns ``None`` only if both
+        methods fail.
 
         **Only Successful responses are cached indefinitely** unless ``force=True`` is specified.
         Unlike other query methods, there is no "sticky failure", failed queries are not cached and
@@ -1327,6 +1372,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         if self._software_version_cache is not None and not force:
             return self._software_version_cache
 
+        # defined by many modern terminal emulators and take precedence
+        version = self._software_version_from_env()
+        if version is not None:
+            self._software_version_cache = version
+            return version
+
         # Build and send query sequence and expected response pattern
         query = '\x1b[>q'
 
@@ -1335,18 +1386,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         if match is not None:
             # parse, cache, and return the XTVERSION response
             self._software_version_cache = SoftwareVersion.from_match(match)
-            return self._software_version_cache
-
-        # Fallback: use TERM_PROGRAM and TERM_PROGRAM_VERSION environment
-        # variables, set by many modern terminal emulators (iTerm2, Apple
-        # Terminal, VS Code, WezTerm, Hyper, mintty, etc.), however, they
-        # are not forwarded over protocols like ssh, less unreliable.
-        term_program = os.environ.get('TERM_PROGRAM', '')
-        term_version = os.environ.get('TERM_PROGRAM_VERSION', '')
-        raw = ' '.join(filter(None, (term_program, term_version)))
-        if raw:
-            self._software_version_cache = SoftwareVersion(
-                raw=raw, name=term_program, version=term_version)
             return self._software_version_cache
 
         return None
@@ -3773,7 +3812,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         if width is None:
             width = self.width
-        return wcwidth_ljust(text, width.__index__(), fillchar)
+        return wcwidth_ljust(text, width.__index__(), fillchar,
+                             ambiguous_width=self.ambiguous_width,
+                             term_program=self.term_program)
 
     def rjust(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
@@ -3788,7 +3829,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         if width is None:
             width = self.width
-        return wcwidth_rjust(text, width.__index__(), fillchar)
+        return wcwidth_rjust(text, width.__index__(), fillchar,
+                             ambiguous_width=self.ambiguous_width,
+                             term_program=self.term_program)
 
     def center(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
@@ -3803,7 +3846,9 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         if width is None:
             width = self.width
-        return wcwidth_center(text, width.__index__(), fillchar)
+        return wcwidth_center(text, width.__index__(), fillchar,
+                              ambiguous_width=self.ambiguous_width,
+                              term_program=self.term_program)
 
     def text_sized(
         self,
@@ -3895,6 +3940,29 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             return text
         return TextSizing(params, text, '\x07').make_sequence()
 
+    def clip(self, text: str, start: SupportsIndex = 0, end: SupportsIndex = -1,
+             **kwargs: object) -> str:
+        r"""
+        Return a window of ``text`` spanning display columns ``start`` to ``end``.
+
+        Terminal sequences are retained, wide characters split at a boundary are
+        replaced by ``fillchar``, and horizontal cursor movement is expanded by
+        :meth:`Sequence.padd`.  The detected :attr:`ambiguous_width` and
+        :attr:`term_program` are applied.
+
+        :arg str text: Text to clip, may contain terminal sequences
+        :arg int start: Absolute starting column, inclusive (default 0)
+        :arg int end: Absolute ending column, exclusive; -1 (default) means
+            "to the end of the line"
+        :arg \**kwargs: See :func:`wcwidth.clip`
+        :rtype: str
+        :returns: ``text`` clipped to display columns (start, end)
+
+        >>> term.clip('hello world', 6)
+        'world'
+        """
+        return Sequence(text, self).clip(start, end, **kwargs)
+
     def truncate(self, text: str, width: Optional[SupportsIndex] = None) -> str:
         r"""
         Truncate ``text`` to ``width`` printable characters, retaining terminal sequences.
@@ -3938,7 +4006,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             (y, x)(0, 0), are evaluated as a printable length of
             *0*.
         """
-        return wcwidth_width(text)
+        return wcwidth_width(text, ambiguous_width=self.ambiguous_width,
+                             term_program=self.term_program)
 
     def strip(self, text: str, chars: Optional[str] = None) -> str:
         r"""
@@ -4042,6 +4111,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             raise ValueError(
                 f"invalid width {width!r}({type(width)!r}) (must be integer > 0)"
             )
+        kwargs.setdefault('ambiguous_width', self.ambiguous_width)
+        kwargs.setdefault('term_program', self.term_program)
         lines: List[str] = []
         for line in text.splitlines():
             lines.extend(

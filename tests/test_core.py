@@ -1066,6 +1066,34 @@ def test_detect_ambiguous_width_second_timeout():
     assert result == 77
 
 
+@pytest.mark.parametrize('value,expected', [('1', 1), ('2', 2)])
+def test_ambiguous_width_env_override(monkeypatch, value, expected):
+    """AMBIGUOUS_WIDE=1|2 overrides init-time detection."""
+    monkeypatch.setenv('AMBIGUOUS_WIDE', value)
+    term = TestTerminal(stream=StringIO(), force_styling=True)
+    assert term.ambiguous_width == expected
+
+
+def test_ambiguous_width_env_invalid(monkeypatch):
+    """An invalid AMBIGUOUS_WIDE is reported and ignored."""
+    monkeypatch.setenv('AMBIGUOUS_WIDE', 'wide')
+    term = TestTerminal(stream=StringIO(), force_styling=True)
+    assert term.ambiguous_width == 1
+    assert any('AMBIGUOUS_WIDE' in err for err in term.errors)
+
+
+def test_no_query_without_tty(monkeypatch):
+    """Init-time detection writes nothing and keeps defaults without a terminal."""
+    # blank values are unset: nothing overrides detection
+    monkeypatch.setenv('TERM_PROGRAM', '')
+    monkeypatch.setenv('AMBIGUOUS_WIDE', '')
+    stream = StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    assert term.ambiguous_width == 1
+    assert term.term_program is False
+    assert stream.getvalue() == ''
+
+
 @pytest.mark.skipif(not IS_WINDOWS, reason='requires jinxed.win32 (msvcrt)')
 def test_windows_init_streams_encoding():
     """__init__streams uses get_console_input_encoding when IS_WINDOWS is True."""

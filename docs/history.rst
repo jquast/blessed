@@ -3,6 +3,19 @@
 Version History
 ===============
 
+1.51
+  * introduced: :meth:`~Terminal.clip` to extract a "window" of displayed columns from a string, a
+    more precise version of :meth:`~Terminal.truncate`, retaining terminal sequences, :ghpull:`420`.
+  * improved: :meth:`~Terminal.length`, :meth:`~Terminal.ljust`, :meth:`~Terminal.rjust`,
+    :meth:`~Terminal.center`, :meth:`~Terminal.truncate`, and :meth:`~Terminal.wrap` with
+    terminal-specific Corrections_ by detecting the terminal software name and East Asian ambiguous
+    modes at class-initialization, :ghissue:`420`.
+  * change: :meth:`~Terminal.get_software_version` returns the ``TERM_PROGRAM`` and
+    ``TERM_PROGRAM_VERSION`` environment values when defined, without inquiry, and these values also
+    override the Corrections_ detection and the automatic queries otherwise made by
+    :meth:`~Terminal.detect_ambiguous_width`, :ghpull:`420`.
+  * deprecated: Python 3.8 and earlier no longer supported. :ghpull:`420`.
+
 1.50
   * change: default timeout of automatic terminal queries from 1 to 5 seconds with environment
     variable ``BLESSED_QUERY_TIMEOUT_SECONDS`` override, :ghpull:`414`.
@@ -586,3 +599,4 @@ Version History
 .. _NO_COLOR: https://no-color.org/
 .. _jinxed: https://jinxed.readthedocs.io/en/stable/
 .. _XTGETTCAP: https://codeberg.org/dnkl/foot#xtgettcap
+.. _`Corrections`: https://wcwidth.readthedocs.io/en/latest/intro.html#corrections

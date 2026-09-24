@@ -146,6 +146,7 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
             ...
     """
 
+    # pylint: disable-next=too-many-locals
     def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         history: Optional[LineHistory] = None,
@@ -161,6 +162,8 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
         bg_sgr: str = "",
         ellipsis_sgr: str = "",
         keymap: Optional[Dict[str, Optional[Callable[..., LineEditResult]]]] = None,
+        ambiguous_width: int = 1,
+        term_program: Union[bool, str] = False,
     ) -> None:
         """Initialize editor with optional history, display, and keymap settings."""
         self._buf: List[str] = []
@@ -182,6 +185,8 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
         self.suggestion_sgr: str = suggestion_sgr
         self.bg_sgr: str = bg_sgr
         self.ellipsis_sgr: str = ellipsis_sgr
+        self.ambiguous_width: int = ambiguous_width
+        self.term_program: Union[bool, str] = term_program
         self.keymap: Dict[str, Optional[Callable[..., LineEditResult]]] = dict(DEFAULT_KEYMAP)
         if keymap:
             self.keymap.update(keymap)
@@ -190,6 +195,11 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
         self._prev_content_w: int = 0
         self._prev_overflow: Tuple[bool, bool] = (False, False)
         self._prev_scroll_offset: int = 0
+
+    def _width(self, text: str) -> int:
+        """Return the display width of *text* under this editor's corrections."""
+        return wcswidth(text, ambiguous_width=self.ambiguous_width,
+                        term_program=self.term_program)
 
     @property
     def history(self) -> LineHistory:
@@ -219,18 +229,18 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
         """Return the current :class:`DisplayState` for rendering."""
         if self.password_mode:
             text = self.password_char * len(self._buf)
-            cursor_col = self._cursor * wcswidth(self.password_char)
+            cursor_col = self._cursor * self._width(self.password_char)
             suggestion = ""
         else:
             text = self.line
             cursor_col = self._cursor_display_col()
             suggestion = self._get_suggestion()
         if self._needs_hscroll():
-            content_w = wcswidth(text) + wcswidth(suggestion)
+            content_w = self._width(text) + self._width(suggestion)
             offset = self._compute_scroll(cursor_col, content_w)
             return self._apply_sgr(_apply_hscroll(
                 text, suggestion, cursor_col, self.max_width,
-                self.ellipsis, scroll_offset=offset))
+                self.ellipsis, scroll_offset=offset, measure=self._width))
         return self._apply_sgr(
             DisplayState(text=text, cursor=cursor_col, suggestion=suggestion))
 
@@ -254,7 +264,7 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
         """
         self._col_offset = col
         cur = self.display
-        ellipsis_w = wcswidth(self.ellipsis)
+        ellipsis_w = self._width(self.ellipsis)
         parts: List[str] = [term.move_yx(row, col), cur.bg_sgr]
         rendered = 0
 
@@ -264,11 +274,11 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
 
         if cur.text:
             parts.extend((cur.bg_sgr, cur.text_sgr, cur.text))
-            rendered += wcswidth(cur.text)
+            rendered += self._width(cur.text)
 
         if cur.suggestion:
             parts.extend((cur.bg_sgr, cur.suggestion_sgr, cur.suggestion))
-            rendered += wcswidth(cur.suggestion)
+            rendered += self._width(cur.suggestion)
 
         if cur.overflow_right:
             parts.extend((cur.bg_sgr, cur.ellipsis_sgr, self.ellipsis))
@@ -304,7 +314,7 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
         col = self._prev_cursor
         parts: List[str] = [term.move_yx(row, off + col),
                             cur.bg_sgr, cur.text_sgr, grapheme]
-        new_content_w = wcswidth(cur.text) + wcswidth(cur.suggestion)
+        new_content_w = self._width(cur.text) + self._width(cur.suggestion)
         if cur.suggestion:
             parts.extend((cur.bg_sgr, cur.suggestion_sgr, cur.suggestion))
         trail = self._prev_content_w - new_content_w
@@ -331,7 +341,7 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
             return None
         off = self._col_offset
         col = cur.cursor
-        new_content_w = wcswidth(cur.text) + wcswidth(cur.suggestion)
+        new_content_w = self._width(cur.text) + self._width(cur.suggestion)
         erase = self._prev_content_w - new_content_w
         parts: List[str] = [term.move_yx(row, off + col)]
         if cur.suggestion:
@@ -393,7 +403,7 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
             self._scroll_offset = 0
             return 0
         jump = max(1, int(usable * self.scroll_jump))
-        ellipsis_w = wcswidth(self.ellipsis)
+        ellipsis_w = self._width(self.ellipsis)
         left_margin = ellipsis_w if self._scroll_offset > 0 else 0
         right_edge = self._scroll_offset + usable - left_margin
         if cursor_col >= right_edge:
@@ -416,7 +426,7 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
             self._limit_bell_fired = False
 
     def _cursor_display_col(self) -> int:
-        return sum(wcswidth(g) for g in self._buf[:self._cursor])
+        return sum(self._width(g) for g in self._buf[:self._cursor])
 
     def _save_undo(self) -> None:
         self._undo_stack.append((list(self._buf), self._cursor))
@@ -617,7 +627,8 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
 
 
 def _clip_graphemes(
-    combined: str, scroll_offset: int, usable: int
+    combined: str, scroll_offset: int, usable: int, *,
+    measure: Callable[[str], int] = wcswidth,
 ) -> Tuple[List[str], int]:
     """
     Collect visible graphemes from *combined* within a scroll window.
@@ -625,13 +636,14 @@ def _clip_graphemes(
     :param combined: Full text (buffer + suggestion).
     :param scroll_offset: Column offset of the left edge.
     :param usable: Available display columns.
+    :param measure: Callable returning the display width of a grapheme.
     :returns: ``(visible_parts, visible_width)`` tuple.
     """
     vis_parts: List[str] = []
     vis_width = 0
     col = 0
     for grapheme in iter_graphemes(combined):
-        g_w = wcswidth(grapheme)
+        g_w = measure(grapheme)
         if col + g_w <= scroll_offset:
             col += g_w
             continue
@@ -644,7 +656,8 @@ def _clip_graphemes(
 
 
 def _split_text_suggestion(
-    vis_parts: List[str], scroll_offset: int, text_w: int
+    vis_parts: List[str], scroll_offset: int, text_w: int, *,
+    measure: Callable[[str], int] = wcswidth,
 ) -> Tuple[str, str]:
     """
     Split visible graphemes into text and suggestion portions.
@@ -652,13 +665,14 @@ def _split_text_suggestion(
     :param vis_parts: Graphemes within the visible window.
     :param scroll_offset: Column offset of the left edge.
     :param text_w: Display width of the buffer text (before suggestion).
+    :param measure: Callable returning the display width of a grapheme.
     :returns: ``(visible_text, visible_suggestion)`` tuple.
     """
     vis_text_parts: List[str] = []
     vis_suggest_parts: List[str] = []
     pos = 0
     for grapheme in vis_parts:
-        g_w = wcswidth(grapheme)
+        g_w = measure(grapheme)
         if scroll_offset + pos < text_w:
             vis_text_parts.append(grapheme)
         else:
@@ -682,7 +696,8 @@ def _default_scroll_offset(cursor_col: int, max_width: int) -> int:
 
 
 def _trim_right_overflow(
-    vis_parts: List[str], vis_width: int, ellipsis_w: int, usable: int
+    vis_parts: List[str], vis_width: int, ellipsis_w: int, usable: int, *,
+    measure: Callable[[str], int] = wcswidth,
 ) -> int:
     """
     Remove trailing graphemes to make room for a right-side ellipsis.
@@ -691,25 +706,28 @@ def _trim_right_overflow(
     :param vis_width: Current total display width of *vis_parts*.
     :param ellipsis_w: Display width of the ellipsis character.
     :param usable: Available display columns.
+    :param measure: Callable returning the display width of a grapheme.
     :returns: Updated visible width after trimming.
     """
     while vis_parts and vis_width + ellipsis_w > usable:
-        vis_width -= wcswidth(vis_parts.pop())
+        vis_width -= measure(vis_parts.pop())
     return vis_width
 
 
-def _apply_hscroll(  # pylint: disable=too-many-positional-arguments
+def _apply_hscroll(  # pylint: disable=too-many-positional-arguments,too-many-locals
     text: str,
     suggestion: str,
     cursor_col: int,
     max_width: int,
     ellipsis: str = "\u2026",
     scroll_offset: Optional[int] = None,
+    *,
+    measure: Callable[[str], int] = wcswidth,
 ) -> DisplayState:
     """Build a :class:`DisplayState` with horizontal scrolling applied."""
-    text_w = wcswidth(text)
+    text_w = measure(text)
 
-    if text_w + wcswidth(suggestion) < max_width and cursor_col < max_width:
+    if text_w + measure(suggestion) < max_width and cursor_col < max_width:
         return DisplayState(
             text=text, cursor=cursor_col, suggestion=suggestion)
 
@@ -717,18 +735,19 @@ def _apply_hscroll(  # pylint: disable=too-many-positional-arguments
         scroll_offset = _default_scroll_offset(cursor_col, max_width)
 
     overflow_left = scroll_offset > 0
-    ellipsis_w = wcswidth(ellipsis)
+    ellipsis_w = measure(ellipsis)
     usable = max_width - (ellipsis_w if overflow_left else 0)
 
     vis_parts, vis_width = _clip_graphemes(
-        text + suggestion, scroll_offset, usable)
+        text + suggestion, scroll_offset, usable, measure=measure)
 
-    overflow_right = (scroll_offset + usable) < text_w + wcswidth(suggestion)
+    overflow_right = (scroll_offset + usable) < text_w + measure(suggestion)
     if overflow_right:
-        _trim_right_overflow(vis_parts, vis_width, ellipsis_w, usable)
+        _trim_right_overflow(vis_parts, vis_width, ellipsis_w, usable,
+                             measure=measure)
 
     vis_text, vis_suggestion = _split_text_suggestion(
-        vis_parts, scroll_offset, text_w)
+        vis_parts, scroll_offset, text_w, measure=measure)
 
     return DisplayState(
         text=vis_text,

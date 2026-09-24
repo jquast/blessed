@@ -91,8 +91,18 @@ Alignment
 
 By combining the measure of the printable width of strings containing sequences with the terminal
 width, the :meth:`~.Terminal.center`, :meth:`~.Terminal.ljust`, :meth:`~.Terminal.rjust`,
-:meth:`~Terminal.truncate`, and :meth:`~Terminal.wrap` methods "just work" for strings that
-contain sequences.
+:meth:`~Terminal.truncate`, :meth:`~Terminal.wrap`, and :meth:`~Terminal.clip` methods "just work"
+for strings that contain sequences.
+
+Where :meth:`~Terminal.truncate` removes everything right of a single column,
+:meth:`~Terminal.clip` extracts a window of display columns, from ``start`` to ``end``:
+
+.. code-block:: python
+
+    from blessed import Terminal
+    term = Terminal()
+
+    print(term.clip('the quick brown fox', 4, 9))  # 'quick'
 
 .. code-block:: python
 
@@ -117,6 +127,31 @@ In the following example, :meth:`~Terminal.wrap` word-wraps a short poem contain
 
     for line in poem:
         print('\n'.join(term.wrap(line, width=25, subsequent_indent=' ' * 4)))
+
+Terminal Corrections
+--------------------
+
+The rendered width of some characters depends on the terminal software, as discovered by the
+`ucs-detect <https://ucs-detect.readthedocs.io/results.html>`_ project.  At class-initialization,
+blessed identifies the terminal software by the ``TERM_PROGRAM`` environment variable, set by most
+modern terminal emulators, and otherwise by the `XTVERSION
+<https://vtdn.dev/docs/dcs/xtversion/>`_ query (``CSI > q``).  It also measures whether East Asian
+ambiguous characters are rendered wide or narrow, then applies the matching wcwidth_ `correction
+tables <https://wcwidth.readthedocs.io/en/latest/intro.html#corrections>`_ to the methods above.
+
+The result is available as :attr:`~.Terminal.term_program` and :attr:`~.Terminal.ambiguous_width`:
+
+.. code-block:: python
+
+    from blessed import Terminal
+    term = Terminal()
+
+    print(term.term_program, term.ambiguous_width)
+
+When no terminal answers, such as when output is redirected, the terminal software is ``False`` and
+ambiguous width is assumed narrow.  Set the environment variable ``AMBIGUOUS_WIDE`` to ``1`` or
+``2`` to skip measurement, such as for automated tests.  Blank ``TERM_PROGRAM`` or
+``AMBIGUOUS_WIDE`` to unset them and make the corresponding query.
 
 Text Sizing
 -----------

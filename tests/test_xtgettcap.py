@@ -127,7 +127,8 @@ def test_xtgettcap_probe_oserror():
     with mock.patch('os.isatty', return_value=True), \
         mock.patch.object(Terminal, '_xtgettcap_batch',
                           side_effect=OSError('broken pipe')):
-        t = Terminal(stream=sys.__stdout__, force_styling=True)
+        t = TestTerminal(stream=sys.__stdout__, force_styling=True,
+                         _xtgettcap_data=NO_XTGETTCAP_DATA)
         assert any('OSError' in err for err in t.errors)
 
 
@@ -1064,8 +1065,12 @@ def test_does_kitty_query_rejected():
 
 
 @pytestmark_pty
-def test_terminal_init_xtgettcap_success():
-    """Terminal() init with real XTGETTCAP probe and batch succeeds."""
+def test_terminal_init_xtgettcap_success(monkeypatch):
+    """Terminal() init queries XTGETTCAP, XTVERSION, and ambiguous width successfully."""
+    # blank values are unset: the queries made at initialization are answered below
+    monkeypatch.setenv('TERM_PROGRAM', '')
+    monkeypatch.setenv('AMBIGUOUS_WIDE', '')
+
     def parent(master_fd):
         # Wait for child to emit queries (indicates it's past
         # read_until_semaphore).  No need to drain stdout -- child's
@@ -1080,6 +1085,11 @@ def test_terminal_init_xtgettcap_success():
         os.write(master_fd, b'\x1bP1+r524742=38\x1b\\')
         os.write(master_fd, b'\x1bP1+r544e=787465726d\x1b\\')
         os.write(master_fd, b'\x1b[10;20R')
+        # the two cursor reports that measure U+00A7, 20 and 22 columns -- width 2
+        os.write(master_fd, b'\x1b[10;20R')
+        os.write(master_fd, b'\x1b[10;22R')
+        # XTVERSION reply, followed by its own CPR boundary
+        os.write(master_fd, b'\x1bP>|XTerm(390)\x1b\\\x1b[10;20R')
 
     def child(term):
         assert term._xtgettcap_cache is not None
@@ -1087,6 +1097,8 @@ def test_terminal_init_xtgettcap_success():
         assert term._xtgettcap_cache['TN'] == 'xterm'
         assert term._xtgettcap_cache['colors'] == '256'
         assert term._xtgettcap_cache['RGB'] == '8'
+        assert term.ambiguous_width == 2
+        assert term.term_program == 'XTerm'
         with term.cbreak():
             leaked = term.inkey(timeout=0)
             assert not leaked
@@ -1258,7 +1270,8 @@ def test_xtgettcap_skip_ansicon_env():
     with mock.patch.dict(os.environ, {'ANSICON': '1'}), \
             mock.patch('os.isatty', return_value=True), \
             mock.patch.object(Terminal, '_xtgettcap_batch') as mock_batch:
-        t = Terminal(stream=sys.__stdout__, force_styling=True)
+        t = TestTerminal(stream=sys.__stdout__, force_styling=True,
+                         _xtgettcap_data=NO_XTGETTCAP_DATA)
         mock_batch.assert_not_called()
         assert any('ansicon' in err for err in t.errors)
         assert t._xtgettcap_cache.supported is False
@@ -1269,7 +1282,8 @@ def test_xtgettcap_skip_conemuansi_env():
     with mock.patch.dict(os.environ, {'ConEmuANSI': 'ON'}), \
             mock.patch('os.isatty', return_value=True), \
             mock.patch.object(Terminal, '_xtgettcap_batch') as mock_batch:
-        t = Terminal(stream=sys.__stdout__, force_styling=True)
+        t = TestTerminal(stream=sys.__stdout__, force_styling=True,
+                         _xtgettcap_data=NO_XTGETTCAP_DATA)
         mock_batch.assert_not_called()
         assert any('ansicon' in err for err in t.errors)
         assert t._xtgettcap_cache.supported is False
@@ -1280,7 +1294,8 @@ def test_xtgettcap_skip_Terminal_app():
     with mock.patch.dict(os.environ, {'TERM_PROGRAM': 'Apple_Terminal'}), \
             mock.patch('os.isatty', return_value=True), \
             mock.patch.object(Terminal, '_xtgettcap_batch') as mock_batch:
-        t = Terminal(stream=sys.__stdout__, force_styling=True)
+        t = TestTerminal(stream=sys.__stdout__, force_styling=True,
+                         _xtgettcap_data=NO_XTGETTCAP_DATA)
         mock_batch.assert_not_called()
         assert any('Terminal.app' in err for err in t.errors)
         assert t._xtgettcap_cache.supported is False
@@ -1313,7 +1328,8 @@ def test_xtgettcap_skip_early_conhost(env, build, skipped):
             mock.patch('os.isatty', return_value=True), \
             mock.patch.object(Terminal, '_xtgettcap_batch',
                               return_value=TermcapResponse(supported=False)) as mock_batch:
-        t = Terminal(stream=sys.__stdout__, force_styling=True)
+        t = TestTerminal(stream=sys.__stdout__, force_styling=True,
+                         _xtgettcap_data=NO_XTGETTCAP_DATA)
         assert any('conhost' in err for err in t.errors) is skipped
         assert mock_batch.called is not skipped
 

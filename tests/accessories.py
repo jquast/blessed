@@ -51,6 +51,26 @@ DEFAULT_TERMCAP_RESPONSE = TermcapResponse(
 # Sentinel to distinguish "use default fake XTGETTCAP" from "force real probe"
 NO_XTGETTCAP_DATA = object()
 
+# Values overriding init-time terminal detection.  A terminal is attached in most
+# tests, and queries made at initialization go unanswered by most of them.
+DETECTION_OVERRIDES = {'TERM_PROGRAM': TEST_KIND, 'AMBIGUOUS_WIDE': '1'}
+
+
+@contextlib.contextmanager
+def detection_overrides():
+    """Define values overriding init-time terminal detection, when unset.
+
+    Values are blanked by tests that answer the query they would override.
+    """
+    added = {key: value for key, value in DETECTION_OVERRIDES.items()
+             if key not in os.environ}
+    os.environ.update(added)
+    try:
+        yield
+    finally:
+        for key in added:
+            del os.environ[key]
+
 
 def TestTerminal(is_a_tty=None, _xtgettcap_data=DEFAULT_TERMCAP_RESPONSE,
                  _xtgettcap_timeout=None, **kwargs) -> Terminal:
@@ -62,7 +82,8 @@ def TestTerminal(is_a_tty=None, _xtgettcap_data=DEFAULT_TERMCAP_RESPONSE,
     if _xtgettcap_timeout is not None:
         import blessed.terminal
         blessed.terminal.TERMINAL_QUERY_TIMEOUT_SECONDS = _xtgettcap_timeout
-    term = Terminal(**kwargs)
+    with detection_overrides():
+        term = Terminal(**kwargs)
     if is_a_tty is not None:
         term._is_a_tty = is_a_tty
     return term
