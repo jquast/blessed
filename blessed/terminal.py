@@ -230,9 +230,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                  stream: Optional[IO[str]] = None,
                  force_styling: Union[bool, None] = False,
                  kind_fallback: str = 'xterm-256color',
-                 _xtgettcap_data: Optional[TermcapResponse] = None,
-                 _software_version_data: Optional[SoftwareVersion] = None,
-                 _ambiguous_width_data: Optional[int] = None
+                 _xtgettcap_data: Optional[TermcapResponse] = None
                  ) -> None:
         """
         Initialize the terminal.
@@ -281,10 +279,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             f'kind_fallback: {kind_fallback!r}, _xtgettcap_data: {_xtgettcap_data!r}'
         ]
         self._normal = None
-
-        # Injected init-time detection values
-        self._software_version_data = _software_version_data
-        self._ambiguous_width_data = _ambiguous_width_data
 
         # we assume our input stream to be line-buffered until either the
         # cbreak of raw context manager methods are entered with an attached tty.
@@ -347,17 +341,13 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         """
         Return the terminal software name for wcwidth correction tables.
 
-        XTVERSION is queried only when the terminal can answer on the keyboard fd,
-        otherwise the ``TERM_PROGRAM`` environment values are used. Returns ``False``
-        when unknown.
+        A ``TERM_PROGRAM`` value takes precedence, XTVERSION is queried otherwise, when
+        the terminal can answer on the keyboard fd. Returns ``False`` when unknown.
         """
-        version: Optional[SoftwareVersion]
-        if self._software_version_data is not None:
-            version = self._software_version_data
-        elif self.is_a_tty and self.does_styling and self._keyboard_fd is not None:
+        version = self._software_version_from_env()
+        if version is None and self.is_a_tty and self.does_styling \
+                and self._keyboard_fd is not None:
             version = self.get_software_version()
-        else:
-            version = self._software_version_from_env()
         return version.name if version is not None and version.name else False
 
     def _detect_ambiguous_width(self) -> int:
@@ -367,10 +357,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         The environment variable ``AMBIGUOUS_WIDE`` overrides detection, which is
         otherwise measured only when the terminal can answer on the keyboard fd.
         """
-        if self._ambiguous_width_data is not None:
-            return self._ambiguous_width_data
         override = os.environ.get('AMBIGUOUS_WIDE')
-        if override is not None:
+        if override:
             try:
                 value = int(override)
             except ValueError:
@@ -1350,15 +1338,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     def get_software_version(self, timeout: Optional[float] = TERMINAL_QUERY_TIMEOUT_SECONDS,
                              force: bool = False) -> Optional[SoftwareVersion]:
         """
-        Query the terminal's software name and version using XTVERSION.
+        Return the terminal's software name and version.
 
-        Sends an XTVERSION query to the terminal and returns a
-        :class:`SoftwareVersion` instance with the terminal's name and version.
-
-        If an XTVERSION query fails to respond within the ``timeout``
-        specified, falls back to the ``TERM_PROGRAM`` and
-        ``TERM_PROGRAM_VERSION`` environment variables. Returns ``None``
-        only if both methods fail.
+        A non-empty ``TERM_PROGRAM`` value takes precedence and no inquiry is made,
+        otherwise an XTVERSION query is sent to the terminal and the response is
+        returned as a :class:`SoftwareVersion` instance. Returns ``None`` only if both
+        methods fail.
 
         **Only Successful responses are cached indefinitely** unless ``force=True`` is specified.
         Unlike other query methods, there is no "sticky failure", failed queries are not cached and
@@ -1387,6 +1372,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         if self._software_version_cache is not None and not force:
             return self._software_version_cache
 
+        # defined by many modern terminal emulators and take precedence
+        version = self._software_version_from_env()
+        if version is not None:
+            self._software_version_cache = version
+            return version
+
         # Build and send query sequence and expected response pattern
         query = '\x1b[>q'
 
@@ -1396,15 +1387,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             # parse, cache, and return the XTVERSION response
             self._software_version_cache = SoftwareVersion.from_match(match)
             return self._software_version_cache
-
-        # Fallback: use TERM_PROGRAM and TERM_PROGRAM_VERSION environment
-        # variables, set by many modern terminal emulators (iTerm2, Apple
-        # Terminal, VS Code, WezTerm, Hyper, mintty, etc.), however, they
-        # are not forwarded over protocols like ssh, less unreliable.
-        version = self._software_version_from_env()
-        if version is not None:
-            self._software_version_cache = version
-            return version
 
         return None
 
@@ -3966,7 +3948,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         Terminal sequences are retained, wide characters split at a boundary are
         replaced by ``fillchar``, and horizontal cursor movement is expanded by
         :meth:`Sequence.padd`.  The detected :attr:`ambiguous_width` and
-        :attr:`term_program` are used unless overridden.
+        :attr:`term_program` are applied.
 
         :arg str text: Text to clip, may contain terminal sequences
         :arg int start: Absolute starting column, inclusive (default 0)

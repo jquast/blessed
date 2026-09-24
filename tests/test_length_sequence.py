@@ -39,7 +39,7 @@ def test_length_cjk():
 def test_length_term_program_correction(monkeypatch):
     """Length honors wcwidth corrections for the detected term_program."""
     monkeypatch.setenv('TERM_PROGRAM', 'vte')
-    term = TestTerminal(_detect=True, stream=StringIO(), force_styling=True)
+    term = TestTerminal(stream=StringIO(), force_styling=True)
     assert term.term_program == 'vte'
     assert term.length('\u2630') == 1  # VTE renders trigrams narrow
 
@@ -432,7 +432,7 @@ def test_Sequence_alignment_ambiguous_width(monkeypatch):
     from blessed.sequences import Sequence
 
     monkeypatch.setenv('AMBIGUOUS_WIDE', '2')
-    term = TestTerminal(_detect=True, stream=StringIO(), force_styling=True)
+    term = TestTerminal(stream=StringIO(), force_styling=True)
     assert term.ambiguous_width == 2
     assert term.ljust('\u00a7', 3) == '\u00a7 '
     assert term.center('\u00a7', 4) == ' \u00a7 '

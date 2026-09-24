@@ -840,6 +840,19 @@ def test_clip_sequence_method(any_term):
     child(any_term)
 
 
+def test_sequence_length(any_term):
+    """Sequence.length() measures the printable width of sequences."""
+    def child(kind):
+        # local
+        from blessed.sequences import Sequence
+
+        term = TestTerminal(kind=kind, force_styling=True)
+        given = term.clear + term.red('コンニチハ')
+        assert Sequence(given, term).length() == 10
+
+    child(any_term)
+
+
 def test_supports_index(any_term):
     """Ensure sequence formatting methods support objects with __index__()"""
 

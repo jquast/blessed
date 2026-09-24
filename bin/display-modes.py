@@ -9,6 +9,7 @@ Usage::
     python bin/display-modes.py --force  # bypass cached results
 """
 # std imports
+import os
 import sys
 
 # local
@@ -112,6 +113,16 @@ def display_sugar_methods(term):
         if xtgettcap.num_colors is not None:
             print(f"       Colors: {xtgettcap.num_colors}")
         print(f"       Capabilities: {len(xtgettcap)}")
+
+    print('  Testing XTVERSION...' + term.clear_eol, end='\r', flush=True)
+    version = term.get_software_version()
+    print(f"  {_yn(term, version is not None)}  XTVERSION (CSI > q)" + term.clear_eol)
+    if version is not None:
+        # a TERM_PROGRAM value, when defined, is returned without inquiry
+        source = 'TERM_PROGRAM' if os.environ.get('TERM_PROGRAM') else 'inquiry'
+        print(f"       Terminal name: {term.bright_cyan(version.name or '--')}")
+        print(f"       Version: {version.version or '--'}")
+        print(f"       Source: {source}")
 
     print('  Testing Kitty graphics...' + term.clear_eol, end='\r', flush=True)
     print(f"  {_yn(term, term.does_kitty_graphics())}  "
@@ -233,6 +244,10 @@ def main():
     _24bit = term.bright_green('24-bit')
     _no_colors = term.bright_red(str(term.number_of_colors))
     print(f" .number_of_colors: {_24bit if term.number_of_colors == 1 << 24 else _no_colors}")
+    _ambig = term.bright_cyan('Wide (2)') if term.ambiguous_width == 2 else 'Narrow (1)'
+    print(f" .ambiguous_width: {_ambig}")
+    _program = term.bright_cyan(term.term_program or term.bright_black('unknown'))
+    print(f" .term_program: {_program}")
     print()
 
     # Display Device Attributes

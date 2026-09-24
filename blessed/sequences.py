@@ -3,7 +3,7 @@ from __future__ import annotations
 
 # std imports
 import re
-from typing import TYPE_CHECKING, Tuple, Union, Literal, Pattern, Iterator, Optional, SupportsIndex
+from typing import TYPE_CHECKING, Tuple, Literal, Pattern, Iterator, Optional, SupportsIndex
 
 # 3rd party
 from wcwidth import SequenceTextWrapper  # noqa: F401  # re-exported for API compatibility
@@ -209,31 +209,25 @@ class Sequence(str):
 
     def clip(self, start: SupportsIndex = 0, end: SupportsIndex = -1, *,
              fillchar: str = ' ', tabsize: int = 8,
-             ambiguous_width: Optional[SupportsIndex] = None,
              propagate_sgr: bool = True,
              control_codes: Literal['parse', 'strict', 'ignore'] = 'parse',
-             overtyping: Optional[bool] = None,
-             term_program: Union[bool, str, None] = None) -> str:
+             overtyping: Optional[bool] = None) -> str:
         """
         Return a window of this string spanning display columns ``start`` to ``end``.
 
         Like :meth:`~.Terminal.clip`, which documents the arguments. Horizontal cursor
         movement is expanded by :meth:`padd` first, and the terminal's detected
-        ``ambiguous_width`` and ``term_program`` are used unless overridden.
+        ``ambiguous_width`` and ``term_program`` are applied.
 
         :rtype: str
         :returns: This string clipped to display columns (start, end)
         """
-        term = self._term
-        ambiguous_width = (term.ambiguous_width if ambiguous_width is None
-                           else ambiguous_width.__index__())
-        if term_program is None:
-            term_program = term.term_program
         return wcwidth_clip(
             self.padd(), start.__index__(), end.__index__(),
-            fillchar=fillchar, tabsize=tabsize, ambiguous_width=ambiguous_width,
+            fillchar=fillchar, tabsize=tabsize,
+            ambiguous_width=self._term.ambiguous_width,
             propagate_sgr=propagate_sgr, control_codes=control_codes,
-            overtyping=overtyping, term_program=term_program)
+            overtyping=overtyping, term_program=self._term.term_program)
 
     def truncate(self, width: SupportsIndex) -> str:
         """

@@ -1070,22 +1070,25 @@ def test_detect_ambiguous_width_second_timeout():
 def test_ambiguous_width_env_override(monkeypatch, value, expected):
     """AMBIGUOUS_WIDE=1|2 overrides init-time detection."""
     monkeypatch.setenv('AMBIGUOUS_WIDE', value)
-    term = TestTerminal(_detect=True, stream=StringIO(), force_styling=True)
+    term = TestTerminal(stream=StringIO(), force_styling=True)
     assert term.ambiguous_width == expected
 
 
 def test_ambiguous_width_env_invalid(monkeypatch):
     """An invalid AMBIGUOUS_WIDE is reported and ignored."""
     monkeypatch.setenv('AMBIGUOUS_WIDE', 'wide')
-    term = TestTerminal(_detect=True, stream=StringIO(), force_styling=True)
+    term = TestTerminal(stream=StringIO(), force_styling=True)
     assert term.ambiguous_width == 1
     assert any('AMBIGUOUS_WIDE' in err for err in term.errors)
 
 
-def test_no_query_without_tty():
+def test_no_query_without_tty(monkeypatch):
     """Init-time detection writes nothing and keeps defaults without a terminal."""
+    # blank values are unset: nothing overrides detection
+    monkeypatch.setenv('TERM_PROGRAM', '')
+    monkeypatch.setenv('AMBIGUOUS_WIDE', '')
     stream = StringIO()
-    term = TestTerminal(_detect=True, stream=stream, force_styling=True)
+    term = TestTerminal(stream=stream, force_styling=True)
     assert term.ambiguous_width == 1
     assert term.term_program is False
     assert stream.getvalue() == ''

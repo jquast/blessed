@@ -133,10 +133,11 @@ Terminal Corrections
 
 The rendered width of some characters depends on the terminal software, as discovered by the
 `ucs-detect <https://ucs-detect.readthedocs.io/results.html>`_ project.  At class-initialization,
-blessed identifies the terminal software with the `XTVERSION <https://vtdn.dev/docs/dcs/xtversion/>`_
-query (``CSI > q``) and measures whether East Asian ambiguous characters are rendered wide or
-narrow, then applies the matching wcwidth_ `correction tables
-<https://wcwidth.readthedocs.io/en/latest/intro.html#corrections>`_ to the methods above.
+blessed identifies the terminal software by the ``TERM_PROGRAM`` environment variable, set by most
+modern terminal emulators, and otherwise by the `XTVERSION
+<https://vtdn.dev/docs/dcs/xtversion/>`_ query (``CSI > q``).  It also measures whether East Asian
+ambiguous characters are rendered wide or narrow, then applies the matching wcwidth_ `correction
+tables <https://wcwidth.readthedocs.io/en/latest/intro.html#corrections>`_ to the methods above.
 
 The result is available as :attr:`~.Terminal.term_program` and :attr:`~.Terminal.ambiguous_width`:
 
@@ -147,10 +148,10 @@ The result is available as :attr:`~.Terminal.term_program` and :attr:`~.Terminal
 
     print(term.term_program, term.ambiguous_width)
 
-When no terminal answers, such as when output is redirected, the terminal software falls back to
-the ``TERM_PROGRAM`` environment variable and ambiguous width is assumed narrow.  Set the
-environment variable ``AMBIGUOUS_WIDE`` to ``1`` or ``2`` to skip interactive detection, such as
-for automated tests.
+When no terminal answers, such as when output is redirected, the terminal software is ``False`` and
+ambiguous width is assumed narrow.  Set the environment variable ``AMBIGUOUS_WIDE`` to ``1`` or
+``2`` to skip measurement, such as for automated tests.  Blank ``TERM_PROGRAM`` or
+``AMBIGUOUS_WIDE`` to unset them and make the corresponding query.
 
 Text Sizing
 -----------

@@ -10,6 +10,10 @@ Version History
     :meth:`~Terminal.center`, :meth:`~Terminal.truncate`, and :meth:`~Terminal.wrap` with
     terminal-specific Corrections_ by detecting the terminal software name and East Asian ambiguous
     modes at class-initialization, :ghissue:`420`.
+  * change: :meth:`~Terminal.get_software_version` returns the ``TERM_PROGRAM`` and
+    ``TERM_PROGRAM_VERSION`` environment values when defined, without inquiry, and these values also
+    override the Corrections_ detection and the automatic queries otherwise made by
+    :meth:`~Terminal.detect_ambiguous_width`, :ghpull:`420`.
   * deprecated: Python 3.8 and earlier no longer supported. :ghpull:`420`.
 
 1.50
