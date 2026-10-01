@@ -1066,7 +1066,7 @@ def test_does_kitty_query_rejected():
 
 @pytestmark_pty
 def test_terminal_init_xtgettcap_success(monkeypatch):
-    """Terminal() init queries XTGETTCAP, XTVERSION, and ambiguous width successfully."""
+    """Terminal() init queries XTGETTCAP and XTVERSION successfully."""
     # blank values are unset: the queries made at initialization are answered below
     monkeypatch.setenv('TERM_PROGRAM', '')
     monkeypatch.setenv('AMBIGUOUS_WIDE', '')
@@ -1085,9 +1085,6 @@ def test_terminal_init_xtgettcap_success(monkeypatch):
         os.write(master_fd, b'\x1bP1+r524742=38\x1b\\')
         os.write(master_fd, b'\x1bP1+r544e=787465726d\x1b\\')
         os.write(master_fd, b'\x1b[10;20R')
-        # the two cursor reports that measure U+00A7, 20 and 22 columns -- width 2
-        os.write(master_fd, b'\x1b[10;20R')
-        os.write(master_fd, b'\x1b[10;22R')
         # XTVERSION reply, followed by its own CPR boundary
         os.write(master_fd, b'\x1bP>|XTerm(390)\x1b\\\x1b[10;20R')
 
@@ -1097,8 +1094,9 @@ def test_terminal_init_xtgettcap_success(monkeypatch):
         assert term._xtgettcap_cache['TN'] == 'xterm'
         assert term._xtgettcap_cache['colors'] == '256'
         assert term._xtgettcap_cache['RGB'] == '8'
-        assert term.ambiguous_width == 2
         assert term.term_program == 'XTerm'
+        # ambiguous width is measured on demand, not at initialization
+        assert term.ambiguous_width == 1
         with term.cbreak():
             leaked = term.inkey(timeout=0)
             assert not leaked

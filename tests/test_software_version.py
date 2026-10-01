@@ -17,7 +17,9 @@ Text format varies by terminal:
   - X.Org 7.7.0(370)
 """
 # std
+import io
 import time
+from unittest import mock
 
 # 3rd party
 import pytest
@@ -28,7 +30,11 @@ from .accessories import (
     TestTerminal,
     pty_test,
 )
-from blessed.keyboard import SoftwareVersion
+from blessed.keyboard import (SoftwareVersion,
+                              resolve_sequence,
+                              get_keyboard_codes,
+                              get_keyboard_sequences)
+from blessed.terminal import Terminal
 
 pytestmark = pytest.mark.skipif(
     not TEST_KEYBOARD or IS_WINDOWS,
@@ -170,9 +176,6 @@ def test_get_software_version_no_force_uses_cache():
 def test_get_software_version_retry_after_timeout():
     """Test get_software_version() can retry after timeout."""
     def child(term):
-        import os
-        os.environ.pop('TERM_PROGRAM', None)
-        os.environ.pop('TERM_PROGRAM_VERSION', None)
         # First query fails (timeout)
         sv1 = term.get_software_version(timeout=0.01)
 
@@ -204,10 +207,6 @@ def test_get_software_version_raw_stored():
 def test_get_software_version_not_a_tty():
     """Test get_software_version() returns None when not a TTY and no env vars."""
     def child():
-        import io
-        import os
-        os.environ.pop('TERM_PROGRAM', None)
-        os.environ.pop('TERM_PROGRAM_VERSION', None)
         term = TestTerminal(stream=io.StringIO(), force_styling=True)
         term._is_a_tty = False
 
@@ -243,7 +242,6 @@ def test_get_software_version_env_fallback_no_version():
     def child(term):
         import os
         os.environ['TERM_PROGRAM'] = 'Apple_Terminal'
-        os.environ.pop('TERM_PROGRAM_VERSION', None)
         try:
             sv = term.get_software_version(timeout=0.01)
             assert sv is not None
@@ -260,32 +258,25 @@ def test_get_software_version_env_fallback_no_version():
 
 
 def test_get_software_version_env_fallback_version_only():
-    """Test env fallback works when only TERM_PROGRAM_VERSION is set."""
+    """An empty TERM_PROGRAM is treated as unset, so a query is still made."""
     def child(term):
         import os
-        os.environ.pop('TERM_PROGRAM', None)
         os.environ['TERM_PROGRAM_VERSION'] = '1.2.3'
         try:
             sv = term.get_software_version(timeout=0.01)
-            assert sv is not None
-            assert sv.name == ''
-            assert sv.version == '1.2.3'
-            assert sv.raw == '1.2.3'
+            assert sv is None
         finally:
             del os.environ['TERM_PROGRAM_VERSION']
         return b'ENV_VER_ONLY'
 
     output = pty_test(child, parent_func=None,
                       test_name='test_get_software_version_env_fallback_version_only')
-    assert output == 'ENV_VER_ONLY'
+    assert output == '\x1b[>q\x1b[6nENV_VER_ONLY'
 
 
 def test_get_software_version_no_env_no_response():
     """Test get_software_version() returns None with no XTVERSION and no env vars."""
     def child(term):
-        import os
-        os.environ.pop('TERM_PROGRAM', None)
-        os.environ.pop('TERM_PROGRAM_VERSION', None)
         sv = term.get_software_version(timeout=0.01)
         assert sv is None
         return b'NO_ENV'
@@ -301,3 +292,104 @@ def test_software_version_init():
     assert sv.raw == '\x1bP>|kitty(0.24.2)\x1b\\'
     assert sv.name == 'kitty'
     assert sv.version == '0.24.2'
+
+
+def test_xtversion_response_resolves_as_a_named_response():
+    """A complete XTVERSION reply is a named response, not keys."""
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    ks = resolve_sequence('\x1bP>|kitty(0.24.2)\x1b\\',
+                          get_keyboard_sequences(term), get_keyboard_codes(),
+                          term._keymap_prefixes)
+    assert ks.name == 'XTVERSION_RESPONSE'
+    assert str(ks) == '\x1bP>|kitty(0.24.2)\x1b\\'
+
+
+def test_incomplete_xtversion_is_not_alt_shift_p():
+    """A split reply holds for esc_delay rather than resolving as Alt+Shift+P."""
+    term = TestTerminal(stream=io.StringIO(), force_styling=True)
+    keymap, codes = get_keyboard_sequences(term), get_keyboard_codes()
+    assert resolve_sequence('\x1bP', keymap, codes, term._keymap_prefixes,
+                            final=False).name == 'KEY_ESCAPE'
+    assert resolve_sequence('\x1bP', keymap, codes, term._keymap_prefixes,
+                            final=True).name == 'KEY_ALT_SHIFT_P'
+
+
+def test_late_xtversion_response_is_not_a_keystroke():
+    """A reply arriving after its query timed out is recorded, not applied."""
+    def child(term):
+        term._software_version_cache = None  # pylint: disable=protected-access
+        term.term_program = True  # unknown, as after a timed-out query
+        term.ungetch('\x1bP>|kitty(0.24.2)\x1b\\')
+        term.ungetch('Z')
+
+        ks = term.inkey(timeout=0.1)
+
+        assert str(ks) == 'Z', repr(ks)
+        assert term.term_program is True
+        assert term._software_version_cache is None
+        assert any('XTVERSION_RESPONSE' in err for err in term.errors), term.errors
+        return b'LATE_XTV'
+
+    output = pty_test(child, parent_func=None,
+                      test_name='test_late_xtversion_response_is_not_a_keystroke')
+    assert output == 'LATE_XTV'
+
+
+def test_empty_term_program_still_queries(monkeypatch):
+    """An empty TERM_PROGRAM is unset, so XTVERSION is queried for a name."""
+    monkeypatch.setenv('TERM_PROGRAM', '')
+    monkeypatch.delenv('TERM', raising=False)
+    term = TestTerminal(force_styling=True)
+    term._is_a_tty = True  # pylint: disable=protected-access
+    term._keyboard_fd = 0  # pylint: disable=protected-access
+    response = SoftwareVersion('\x1bP>|kitty(0.24.2)\x1b\\', 'kitty', '0.24.2')
+
+    with mock.patch.object(Terminal, 'get_software_version', return_value=response) as query:
+        assert term._Terminal__init_term_program() == 'kitty'
+
+    assert query.called
+
+
+@pytest.mark.parametrize('term', ['xterm-kitty', 'foot'])
+def test_resolvable_term_skips_the_query(monkeypatch, term):
+    """A TERM that names its terminal is left to wcwidth's own environment lookup."""
+    monkeypatch.setenv('TERM_PROGRAM', '')
+    monkeypatch.setenv('TERM', term)
+    terminal = TestTerminal(force_styling=True)
+    terminal._is_a_tty = True  # pylint: disable=protected-access
+    terminal._keyboard_fd = 0  # pylint: disable=protected-access
+
+    with mock.patch.object(Terminal, 'get_software_version') as query:
+        assert terminal._Terminal__init_term_program() == ''
+
+    assert not query.called
+
+
+def test_claimed_term_still_queries(monkeypatch):
+    """TERM=xterm resolves in wcwidth, but terminals claim it without being it."""
+    monkeypatch.setenv('TERM_PROGRAM', '')
+    monkeypatch.setenv('TERM', 'xterm')
+    terminal = TestTerminal(force_styling=True)
+    terminal._is_a_tty = True  # pylint: disable=protected-access
+    terminal._keyboard_fd = 0  # pylint: disable=protected-access
+    response = SoftwareVersion('\x1bP>|mlterm(3.9.4)\x1b\\', 'mlterm', '3.9.4')
+
+    with mock.patch.object(Terminal, 'get_software_version', return_value=response) as query:
+        assert terminal._Terminal__init_term_program() == 'mlterm'
+
+    assert query.called
+
+
+def test_generic_term_still_queries(monkeypatch):
+    """A TERM that wcwidth does not resolve is named by XTVERSION instead."""
+    monkeypatch.setenv('TERM_PROGRAM', '')
+    monkeypatch.setenv('TERM', 'xterm-256color')
+    terminal = TestTerminal(force_styling=True)
+    terminal._is_a_tty = True  # pylint: disable=protected-access
+    terminal._keyboard_fd = 0  # pylint: disable=protected-access
+    response = SoftwareVersion('\x1bP>|foot(1.20.1)\x1b\\', 'foot', '1.20.1')
+
+    with mock.patch.object(Terminal, 'get_software_version', return_value=response) as query:
+        assert terminal._Terminal__init_term_program() == 'foot'
+
+    assert query.called

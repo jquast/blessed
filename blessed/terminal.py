@@ -37,6 +37,7 @@ from wcwidth import ljust as wcwidth_ljust
 from wcwidth import rjust as wcwidth_rjust
 from wcwidth import width as wcwidth_width
 from wcwidth import center as wcwidth_center
+from wcwidth import list_term_programs
 
 # local
 from .color import COLOR_DISTANCE_ALGORITHMS, xterm256gray_from_rgb, xterm256color_from_rgb
@@ -142,6 +143,7 @@ _RE_GLYPH_PROTOCOL_S_RESPONSE = re.compile(r'\x1b_25a1;s(;[^\x1b\\]*)\x1b\\')
 _RE_CPR_BOUNDARY = re.compile(r'\x1b\[[0-9]+;[0-9]+R')
 _RE_KITTY_POINTER = re.compile(r'\x1b\]22;([^\x07\x1b]+)(?:\x07|\x1b\\)')
 _FONT_QUERY_CHUNK_SIZE = 256
+
 
 # Small transparent PNG used by does_iterm2_graphics() (base64-encoded).
 _ITERM2_PROBE_IMAGE = (
@@ -322,52 +324,68 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self.__init__capabilities()
         self.__init__query_caches()
 
-        # Step 6: Detect measurement-affecting terminal properties, see #418.
-        #: Width of East Asian ambiguous characters, 1 or 2.
-        self.ambiguous_width = self._detect_ambiguous_width()
-        #: Terminal software name for wcwidth correction tables, ``False`` when unknown.
-        self.term_program = self._detect_term_program()
+        #: Width of East Asian ambiguous characters, always 1, may be 2 by env value,
+        #: ``AMBIGUOUS_WIDE`` or until detected by call to :meth:`detect_ambiguous_width`.
+        self.ambiguous_width = self.__init_ambiguous_width()
+        self._ambiguous_width_probed: bool = False
+
+        #: Normalized terminal software name for python wcwidth correction tables.
+        #: ``True`` when unknown, so wcwidth reads ``TERM_PROGRAM`` and ``TERM`` itself.
+        self.term_program = self.__init_term_program() or True
 
     def _software_version_from_env(self) -> Optional[SoftwareVersion]:
-        """Return terminal software from ``TERM_PROGRAM`` environment values."""
+        """
+        Return terminal software from ``TERM_PROGRAM`` environment values.
+
+        An empty ``TERM_PROGRAM`` is treated as unset: ``TERM_PROGRAM_VERSION`` alone
+        does not stand in for a terminal name, so a query is still made.
+        """
         term_program = os.environ.get('TERM_PROGRAM', '')
+        if not term_program:
+            return None
         term_version = os.environ.get('TERM_PROGRAM_VERSION', '')
         raw = ' '.join(filter(None, (term_program, term_version)))
-        if raw:
-            return SoftwareVersion(raw=raw, name=term_program, version=term_version)
-        return None
+        return SoftwareVersion(raw=raw, name=term_program, version=term_version)
 
-    def _detect_term_program(self) -> Union[bool, str]:
+    def __init_term_program(self) -> str:
         """
-        Return the terminal software name for wcwidth correction tables.
+        Return a normalized terminal software name for use with wcwidth correction tables.
 
-        A ``TERM_PROGRAM`` value takes precedence, XTVERSION is queried otherwise, when
-        the terminal can answer on the keyboard fd. Returns ``False`` when unknown.
+        A non-empty ``TERM_PROGRAM`` takes precedence, and a ``TERM`` that names its terminal
+        is left to wcwidth's own environment lookup; both skip the inquiry.  XTVERSION is
+        queried otherwise, when the terminal can answer on the keyboard fd.  Returns an empty
+        string when unknown.
         """
         version = self._software_version_from_env()
-        if version is None and self.is_a_tty and self.does_styling \
-                and self._keyboard_fd is not None:
-            version = self.get_software_version()
-        return version.name if version is not None and version.name else False
+        if version is not None:
+            return version.name
+        term = os.environ.get('TERM', '').strip().lower()
 
-    def _detect_ambiguous_width(self) -> int:
-        """
-        Return the East Asian ambiguous character width, 1 or 2.
-
-        The environment variable ``AMBIGUOUS_WIDE`` overrides detection, which is
-        otherwise measured only when the terminal can answer on the keyboard fd.
-        """
-        override = os.environ.get('AMBIGUOUS_WIDE')
-        if override:
-            try:
-                value = int(override)
-            except ValueError:
-                value = 0
-            if value in {1, 2}:
-                return value
-            self.errors.append(f'AMBIGUOUS_WIDE={override!r}: expected 1 or 2')
+        # TERM=xterm identification is non-authoritative for terminal identification. subsequent
+        # XTVERSION query can identify 'xterm' or its imposters, 'mlterm' and 'putty'.
+        if term != 'xterm' and term in list_term_programs():
+            return ''
         if self.is_a_tty and self.does_styling and self._keyboard_fd is not None:
-            return self.detect_ambiguous_width()
+            version = self.get_software_version()
+            if version is not None and version.name:
+                return version.name
+        return ''
+
+    def __init_ambiguous_width(self) -> int:
+        """Return ``AMBIGUOUS_WIDE`` when it is 1 or 2, otherwise 1 (default)."""
+        # Although it is possible to detect "ambiguous width as wide" on class initialization,
+        # because it is uncommon and destructive (erases the next two columns), only environment
+        # value AMBIGUOUS_WIDE is used.
+        override = os.environ.get('AMBIGUOUS_WIDE')
+        if not override:
+            return 1
+        try:
+            value = int(override)
+        except ValueError:
+            value = 0
+        if value in {1, 2}:
+            return value
+        self.errors.append(f'AMBIGUOUS_WIDE={override!r}: expected 1 or 2')
         return 1
 
     def __init__keyboard_state(self) -> None:
@@ -708,7 +726,7 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         self._keymap_prefixes.update([
             '\x1b[M',     # Legacy mouse (needs 3 more bytes)
             '\x1b[<',     # SGR mouse (variable length)
-            '\x1bP',      # DCS, an XTGETTCAP reply arriving after its query timed out
+            '\x1bP',      # DCS: an XTGETTCAP or XTVERSION reply arriving after its query timed out
             '\x1b[200',   # Bracketed paste start and its starting prefixes,
             '\x1b[20',
             '\x1b[2'])
@@ -1421,35 +1439,54 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
     def detect_ambiguous_width(
             self,
             timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS,
-            fallback: int = 1) -> int:
+            fallback: int = 1,
+            force: bool = False) -> int:
         r"""
-        Detect whether terminal renders ambiguous width characters as width 1 or 2.
-
-        East Asian ambiguous width characters can be rendered as either single (1) or double width
-        (2), depending on terminal settings. This method measures the actual rendered width by
-        printing a test character and querying the cursor position.  The character is drawn and
-        erased at the current cursor position.  The test character used is U+00A7 (SECTION SIGN), an
-        early Unicode character with East Asian Width property "Ambiguous".
-
-        When :attr:`is_a_tty` is False, no sequences are transmitted or response awaited, and
-        ``fallback`` is returned without inquiry.
+        Detect whether the terminal renders ambiguous width characters as width 1 or 2.
 
         :arg float timeout: Timeout in seconds for any single cursor position response.
         :arg int fallback: Value to return on timeout, invalid measurement, or not a tty.
+        :arg bool force: Measure again, bypassing the cache and the ``AMBIGUOUS_WIDE`` override.
         :rtype: int
         :returns: 1 for "Ambiguous width as narrow", 2 is "Ambiguous width as wide"
+
+        East Asian ambiguous width characters render as either single (1) or double width (2)
+        depending on terminal settings.  This measures the rendered width of U+00A7 (SECTION SIGN),
+        an early Unicode character with East Asian Width property "Ambiguous", by drawing and
+        erasing it at the current cursor position. Ambiguous width is used in "legacy" contexts,
+        like with BIG5, gbk, or shift-jis encoding, and most especially in mathematics or artwork,
+        like on terminal bulletin board systems, https://bbs.modem.xyz/encodings.html#big5, and
+        sometimes simply as a user preference, for neat and tidy vertical alignment. `configuration
+        <https://wezterm.org/config/lua/config/treat_east_asian_ambiguous_width_as_wide.html>`_ is
+        usually required to enable "ambiguous width as wide".
+        
+        The result is cached, assigned to :attr:`ambiguous_width`, and returned, and used
+        automatically by subsequent alignment methods, :meth:`length`, :meth:`wrap`, :meth:`ljust`,
+        :meth:`rjust`, and :meth:`center`.
 
         Example usage::
 
             >>> term = Terminal()
-            >>> width = term.detect_ambiguous_width()
-            >>> if width == 2:
-            ...     # Terminal uses double-width for ambiguous characters
-            ...     pass
+            >>> term.length('\u00a7')
+            1
+            >>> term.detect_ambiguous_width()
+            2
+            >>> term.length('\u00a7')
+            2
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response awaited, and
+        ``fallback`` is returned without inquiry.
         """
+        if not force and self._ambiguous_width_probed:
+            return self.ambiguous_width
         if not self.is_a_tty:
             return fallback
+        self.ambiguous_width = self._probe_ambiguous_width(timeout, fallback)
+        self._ambiguous_width_probed = True
+        return self.ambiguous_width
 
+    def _probe_ambiguous_width(self, timeout: float, fallback: int) -> int:
+        """Measure the ambiguous width of U+00A7, see :meth:`detect_ambiguous_width`."""
         stime = time.time()
 
         # Save cursor position
@@ -1463,24 +1500,23 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
             self.stream.flush()
             return fallback
 
-        # Print ambiguous width character (U+00A7 SECTION SIGN)
+        # Print ambiguous width character (SECTION SIGN)
         self.stream.write('\u00a7')
         self.stream.flush()
 
         # Get new column position
         _, new_col = self.get_location(timeout=_time_left(stime, timeout))
 
-        # Clean up: restore cursor and overwrite the test character
+        # Calculate rendered width
+        width = new_col - initial_col
+
+        # Clean up: restore cursor and overwrite the test character with exactly the
+        # columns it occupied, two when the measurement is unknown
         self.stream.write(self.restore)
-        self.stream.write('  ')  # Two spaces to cover potential width-2 character
+        self.stream.write(' ' * (1 if width == 1 else 2))
         self.stream.write(self.restore)
         self.stream.flush()
 
-        if new_col == -1:
-            return fallback
-
-        # Calculate rendered width
-        width = new_col - initial_col
         return width if width in {1, 2} else fallback
 
     def _is_apple_terminal(self, timeout: Optional[float]) -> bool:
@@ -4401,6 +4437,26 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 any(text.startswith(p) for p in self._keymap_prefixes) or
                 any(p.startswith(text) for p in self._keymap_prefixes))
 
+    def _apply_errant_response(self, ks: Keystroke) -> bool:
+        """
+        Apply a query reply that arrived after its query had already timed out.
+
+        :arg Keystroke ks: resolved keystroke, possibly such a reply.
+        :rtype: bool
+        :returns: True when *ks* was a delayed reply; it is never returned as a keystroke,
+            and is recorded in :attr:`errors`.  A delayed XTGETTCAP response is also
+            available to later :meth:`get_xtgettcap` calls; a delayed XTVERSION response is
+            discarded, as :attr:`term_program` is fixed at class initialization.
+        """
+        if ks.name not in {'XTGETTCAP_RESPONSE', 'XTVERSION_RESPONSE'}:
+            return False
+        self.errors.append(f'errant/delayed {ks.name} {str(ks)!r}')
+        if ks.name == 'XTGETTCAP_RESPONSE':
+            if self.does_styling and (late_caps := ks.xtgettcap):
+                self._update_xtgettcap_cache(
+                    TermcapResponse(supported=True, capabilities=late_caps))
+        return True
+
     def inkey(self, timeout: Optional[float] = None,
               esc_delay: float = DEFAULT_ESCDELAY,
               capture_cpr: bool = False) -> Keystroke:
@@ -4501,16 +4557,12 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # buffer any remaining text received
         self.ungetch(ucs[len(ks):])
 
-        # An XTGETTCAP reply may arrive long after its query has timed out: fold it into the
-        # response cache and continue awaiting user input.  It is never returned as a keystroke.
+        # Replies to queries that timed out may arrive much later: fold them into the relevant
+        # cache and continue awaiting user input.  They are never returned as a keystroke.
         # Conservatively, although it may be possible to re-initialize self._jinxed_term and
-        # self._number_of_colors by any given response, it is not done to ensure consistency of
-        # API behavior after class initialization.
-        if ks.name == 'XTGETTCAP_RESPONSE':
-            self.errors.append(f'errant/delayed XTGETTCAP_RESPONSE {str(ks)!r}')
-            if self.does_styling and (late_caps := ks.xtgettcap):
-                self._update_xtgettcap_cache(
-                    TermcapResponse(supported=True, capabilities=late_caps))
+        # self._number_of_colors by any given XTGETTCAP response, it is not done to ensure
+        # consistency of API behavior after class initialization.
+        if self._apply_errant_response(ks):
             return self.inkey(timeout=_time_left(stime, timeout),
                               esc_delay=esc_delay, capture_cpr=capture_cpr)
 
@@ -4635,12 +4687,8 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
         # buffer any remaining text
         self.ungetch(ucs[len(ks):])
 
-        # squelch late-arriving XTGETTCAP replies.
-        if ks.name == 'XTGETTCAP_RESPONSE':
-            self.errors.append(f'errant/delayed XTGETTCAP_RESPONSE {str(ks)!r}')
-            if self.does_styling and (late_caps := ks.xtgettcap):
-                self._update_xtgettcap_cache(
-                    TermcapResponse(supported=True, capabilities=late_caps))
+        # squelch late-arriving query replies.
+        if self._apply_errant_response(ks):
             return await self.async_inkey(timeout=_time_left(stime, timeout),
                                           esc_delay=esc_delay, capture_cpr=capture_cpr)
 

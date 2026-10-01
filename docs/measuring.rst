@@ -135,23 +135,28 @@ The rendered width of some characters depends on the terminal software, as disco
 `ucs-detect <https://ucs-detect.readthedocs.io/results.html>`_ project.  At class-initialization,
 blessed identifies the terminal software by the ``TERM_PROGRAM`` environment variable, set by most
 modern terminal emulators, and otherwise by the `XTVERSION
-<https://vtdn.dev/docs/dcs/xtversion/>`_ query (``CSI > q``).  It also measures whether East Asian
-ambiguous characters are rendered wide or narrow, then applies the matching wcwidth_ `correction
-tables <https://wcwidth.readthedocs.io/en/latest/intro.html#corrections>`_ to the methods above.
+<https://vtdn.dev/docs/dcs/xtversion/>`_ query (``CSI > q``), then applies the matching wcwidth_
+`correction tables <https://wcwidth.readthedocs.io/en/latest/intro.html#corrections>`_ to the
+methods above.
 
-The result is available as :attr:`~.Terminal.term_program` and :attr:`~.Terminal.ambiguous_width`:
+Whether East Asian ambiguous characters are rendered wide or narrow is measured on demand, by
+:meth:`~.Terminal.detect_ambiguous_width`, which draws and erases a test character and assigns the
+result to :attr:`~.Terminal.ambiguous_width`.  Until it is called, the value is 1, or
+``AMBIGUOUS_WIDE`` when that environment variable is ``1`` or ``2``, so call it after constructing
+the terminal and before any measurement:
 
 .. code-block:: python
 
     from blessed import Terminal
     term = Terminal()
+    term.detect_ambiguous_width()
 
     print(term.term_program, term.ambiguous_width)
 
-When no terminal answers, such as when output is redirected, the terminal software is ``False`` and
-ambiguous width is assumed narrow.  Set the environment variable ``AMBIGUOUS_WIDE`` to ``1`` or
-``2`` to skip measurement, such as for automated tests.  Blank ``TERM_PROGRAM`` or
-``AMBIGUOUS_WIDE`` to unset them and make the corresponding query.
+The call measures even when ``AMBIGUOUS_WIDE`` is set, which only supplies the value until then,
+such as for automated tests.  When no terminal answers, such as when output is redirected, the
+terminal software is ``True`` and ambiguous width remains narrow.  Blank ``TERM_PROGRAM`` to unset
+it and make the XTVERSION query.
 
 Text Sizing
 -----------

@@ -53,7 +53,7 @@ NO_XTGETTCAP_DATA = object()
 
 # Values overriding init-time terminal detection.  A terminal is attached in most
 # tests, and queries made at initialization go unanswered by most of them.
-DETECTION_OVERRIDES = {'TERM_PROGRAM': TEST_KIND, 'AMBIGUOUS_WIDE': '1'}
+DETECTION_OVERRIDES = {'TERM_PROGRAM': TEST_KIND}
 
 
 @contextlib.contextmanager
