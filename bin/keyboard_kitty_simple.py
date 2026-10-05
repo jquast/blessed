@@ -15,9 +15,5 @@ with term.enable_kitty_keyboard(report_events=True, report_all_keys=True, report
                     else "released")
             if key.pressed and key.value == 'q':
                 break
-            print(
-                f"name={
-                    key.key_name} value={
-                    key.key_value} kind={kind}, sequence={
-                    key!r}",
-                end="\r\n")
+            print(f"name={key.key_name} value={key.key_value} kind={kind}, "
+                  f"sequence={key!r}", end="\r\n")

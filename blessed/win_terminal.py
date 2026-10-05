@@ -464,7 +464,7 @@ class Terminal(_Terminal):
             self._event_buf.clear()
             del self._dec_mode_cache[
                 _DecPrivateMode.IN_BAND_WINDOW_RESIZE]
-            self._preferred_size_cache = None  # pylint: disable=attribute-defined-outside-init
+            self._preferred_size_cache = None
             win32.set_console_mode(filehandle, save_mode)
 
     def does_inband_resize(self, timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS) -> bool:

@@ -8,9 +8,7 @@ from wcwidth import iter_graphemes, width as wcswidth
 # local
 from blessed.line_editor import PASSWORD_CHAR, LineEditor
 from blessed.line_editor import LineHistory as History
-from blessed.line_editor import (DisplayState,
-                                 LineEditResult,
-                                 _apply_hscroll)
+from blessed.line_editor import DisplayState, LineEditResult
 
 
 class MockTerminal:
@@ -708,14 +706,14 @@ class TestApplyHscroll:
     def test_hscroll_basic(self, text, suggestion, cursor, width,
                            exp_cursor, exp_left, exp_right) -> None:
         """Test basic hscroll cursor and overflow results."""
-        ds = _apply_hscroll(text, suggestion, cursor, width)
+        ds = LineEditor()._apply_hscroll(text, suggestion, cursor, width)
         assert ds.cursor == exp_cursor
         assert ds.overflow_left is exp_left
         assert ds.overflow_right is exp_right
 
     def test_text_with_suggestion_fits(self) -> None:
         """Test text with suggestion fits within width."""
-        ds = _apply_hscroll("he", "llo world", 2, 20)
+        ds = LineEditor()._apply_hscroll("he", "llo world", 2, 20)
         assert ds.text == "he"
         assert ds.suggestion == "llo world"
         assert ds.overflow_left is False
@@ -728,31 +726,31 @@ class TestApplyHscroll:
     def test_overflow_flags(self, text, cursor, width,
                             exp_left, exp_right) -> None:
         """Test overflow flags for text exceeding width."""
-        ds = _apply_hscroll(text, "", cursor, width)
+        ds = LineEditor()._apply_hscroll(text, "", cursor, width)
         assert ds.overflow_left is exp_left
         assert ds.overflow_right is exp_right
 
     def test_suggestion_clipped(self) -> None:
         """Test suggestion is clipped to fit within width."""
-        ds = _apply_hscroll("ab", "cdefghijklmnop", 2, 8)
+        ds = LineEditor()._apply_hscroll("ab", "cdefghijklmnop", 2, 8)
         assert ds.overflow_right is True
         total = wcswidth(ds.text) + wcswidth(ds.suggestion)
         assert total <= 8
 
     def test_custom_ellipsis(self) -> None:
         """Test hscroll with custom ellipsis string."""
-        ds = _apply_hscroll("a" * 20, "", 20, 10, ellipsis="...")
+        ds = LineEditor()._apply_hscroll("a" * 20, "", 20, 10, ellipsis="...")
         assert ds.overflow_left is True
 
     def test_explicit_scroll_offset(self) -> None:
         """Test _apply_hscroll with explicit non-zero scroll offset."""
-        ds = _apply_hscroll("a" * 30, "", 25, 10, scroll_offset=20)
+        ds = LineEditor()._apply_hscroll("a" * 30, "", 25, 10, scroll_offset=20)
         assert ds.overflow_left is True
         assert ds.cursor == 25 - 20 + wcswidth("\u2026")
 
     def test_scroll_offset_zero(self) -> None:
         """Test _apply_hscroll with zero scroll offset."""
-        ds = _apply_hscroll("a" * 30, "", 3, 10, scroll_offset=0)
+        ds = LineEditor()._apply_hscroll("a" * 30, "", 3, 10, scroll_offset=0)
         assert ds.overflow_left is False
         assert ds.overflow_right is True
         assert ds.cursor == 3
@@ -1104,3 +1102,14 @@ class TestIncrementalRender:
         assert result is not None
         if sgr_check:
             assert ed.suggestion_sgr in result
+
+
+def test_measurement_corrections():
+    """Display width honors configured ambiguous width and terminal corrections."""
+    ed = LineEditor(ambiguous_width=2)
+    ed.feed_key("\u00a7")
+    assert ed.display.cursor == 2
+
+    ed = LineEditor(term_program="vte")
+    ed.feed_key("\u2630")
+    assert ed.display.cursor == 1

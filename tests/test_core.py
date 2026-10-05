@@ -1045,6 +1045,22 @@ def test_detect_ambiguous_width_unit(cpr1, cpr2, expected):
     assert result == expected
 
 
+@pytest.mark.parametrize('cpr2,erase', [
+    ('\x1b[1;11R', 1),  # narrow
+    ('\x1b[1;12R', 2),  # wide
+    ('\x1b[1;10R', 2),  # unmeasured, cover the probe
+])
+def test_detect_ambiguous_width_erases_measured_columns(cpr2, erase):
+    """The probe is erased by backspacing over the columns it occupied."""
+    stream = StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    term.ungetch('\x1b[1;10R')
+    term.ungetch(cpr2)
+    term.detect_ambiguous_width(timeout=0.1, fallback=1)
+    assert stream.getvalue().endswith(term.restore + ' ' * erase + term.restore)
+
+
 def test_detect_ambiguous_width_first_timeout():
     """detect_ambiguous_width returns fallback when first get_location times out."""
     stream = StringIO()
@@ -1064,6 +1080,65 @@ def test_detect_ambiguous_width_second_timeout():
     term.ungetch('\x1b[1;10R')
     result = term.detect_ambiguous_width(timeout=0.01, fallback=77)
     assert result == 77
+
+
+def test_detect_ambiguous_width_applies_and_caches():
+    """The measured width is assigned, then cached until force=True measures again."""
+    stream = StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    term._is_a_tty = True
+    term.ungetch('\x1b[1;10R')
+    term.ungetch('\x1b[1;12R')
+    assert term.detect_ambiguous_width(timeout=0.1) == 2
+    assert term.ambiguous_width == 2
+    written = stream.getvalue()
+    assert term.detect_ambiguous_width(timeout=0.1) == 2
+    assert stream.getvalue() == written
+    term.ungetch('\x1b[1;10R')
+    term.ungetch('\x1b[1;11R')
+    assert term.detect_ambiguous_width(timeout=0.1, force=True) == 1
+    assert term.ambiguous_width == 1
+
+
+def test_detect_ambiguous_width_measures_despite_env_override(monkeypatch):
+    """AMBIGUOUS_WIDE seeds the value, an explicit call measures anyway."""
+    monkeypatch.setenv('AMBIGUOUS_WIDE', '2')
+    term = TestTerminal(stream=StringIO(), force_styling=True)
+    term._is_a_tty = True
+    assert term.ambiguous_width == 2
+    term.ungetch('\x1b[1;10R')
+    term.ungetch('\x1b[1;11R')
+    assert term.detect_ambiguous_width(timeout=0.1) == 1
+    assert term.ambiguous_width == 1
+
+
+@pytest.mark.parametrize('value,expected', [('1', 1), ('2', 2)])
+def test_ambiguous_width_env_override(monkeypatch, value, expected):
+    """AMBIGUOUS_WIDE=1|2 overrides init-time detection."""
+    monkeypatch.setenv('AMBIGUOUS_WIDE', value)
+    term = TestTerminal(stream=StringIO(), force_styling=True)
+    assert term.ambiguous_width == expected
+
+
+def test_ambiguous_width_env_invalid(monkeypatch):
+    """An invalid AMBIGUOUS_WIDE is reported and ignored."""
+    monkeypatch.setenv('AMBIGUOUS_WIDE', 'wide')
+    term = TestTerminal(stream=StringIO(), force_styling=True)
+    assert term.ambiguous_width == 1
+    assert any('AMBIGUOUS_WIDE' in err for err in term.errors)
+
+
+def test_no_query_without_tty(monkeypatch):
+    """Init-time detection writes nothing and leaves measurement to wcwidth without a terminal."""
+    # blank values are unset: nothing overrides detection
+    monkeypatch.setenv('TERM_PROGRAM', '')
+    monkeypatch.setenv('AMBIGUOUS_WIDE', '')
+    stream = StringIO()
+    term = TestTerminal(stream=stream, force_styling=True)
+    assert term.ambiguous_width == 1
+    # Unknown, so wcwidth reads TERM_PROGRAM and TERM itself.
+    assert term.term_program is True
+    assert stream.getvalue() == ''
 
 
 @pytest.mark.skipif(not IS_WINDOWS, reason='requires jinxed.win32 (msvcrt)')

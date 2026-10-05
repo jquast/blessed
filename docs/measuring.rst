@@ -91,8 +91,18 @@ Alignment
 
 By combining the measure of the printable width of strings containing sequences with the terminal
 width, the :meth:`~.Terminal.center`, :meth:`~.Terminal.ljust`, :meth:`~.Terminal.rjust`,
-:meth:`~Terminal.truncate`, and :meth:`~Terminal.wrap` methods "just work" for strings that
-contain sequences.
+:meth:`~Terminal.truncate`, :meth:`~Terminal.wrap`, and :meth:`~Terminal.clip` methods "just work"
+for strings that contain sequences.
+
+Where :meth:`~Terminal.truncate` removes everything right of a single column,
+:meth:`~Terminal.clip` extracts a window of display columns, from ``start`` to ``end``:
+
+.. code-block:: python
+
+    from blessed import Terminal
+    term = Terminal()
+
+    print(term.clip('the quick brown fox', 4, 9))  # 'quick'
 
 .. code-block:: python
 
@@ -117,6 +127,36 @@ In the following example, :meth:`~Terminal.wrap` word-wraps a short poem contain
 
     for line in poem:
         print('\n'.join(term.wrap(line, width=25, subsequent_indent=' ' * 4)))
+
+Terminal Corrections
+--------------------
+
+The rendered width of some characters depends on the terminal software, as discovered by the
+`ucs-detect <https://ucs-detect.readthedocs.io/results.html>`_ project.  At class-initialization,
+blessed identifies the terminal software by the ``TERM_PROGRAM`` environment variable, set by most
+modern terminal emulators, and otherwise by the `XTVERSION
+<https://vtdn.dev/docs/dcs/xtversion/>`_ query (``CSI > q``), then applies the matching wcwidth_
+`correction tables <https://wcwidth.readthedocs.io/en/latest/intro.html#corrections>`_ to the
+methods above.
+
+Whether East Asian ambiguous characters are rendered wide or narrow is measured on demand, by
+:meth:`~.Terminal.detect_ambiguous_width`, which draws and erases a test character and assigns the
+result to :attr:`~.Terminal.ambiguous_width`.  Until it is called, the value is 1, or
+``AMBIGUOUS_WIDE`` when that environment variable is ``1`` or ``2``, so call it after constructing
+the terminal and before any measurement:
+
+.. code-block:: python
+
+    from blessed import Terminal
+    term = Terminal()
+    term.detect_ambiguous_width()
+
+    print(term.term_program, term.ambiguous_width)
+
+The call measures even when ``AMBIGUOUS_WIDE`` is set, which only supplies the value until then,
+such as for automated tests.  When no terminal answers, such as when output is redirected, the
+terminal software is ``True`` and ambiguous width remains narrow.  Blank ``TERM_PROGRAM`` to unset
+it and make the XTVERSION query.
 
 Text Sizing
 -----------
