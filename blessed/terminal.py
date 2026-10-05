@@ -280,7 +280,7 @@ class Terminal():
             f'parameters: kind={kind!r}, stream={stream!r}, force_styling={force_styling!r}, '
             f'kind_fallback: {kind_fallback!r}, _xtgettcap_data: {_xtgettcap_data!r}'
         ]
-        self._normal = None
+        self._normal: Optional[str] = None
 
         # we assume our input stream to be line-buffered until either the
         # cbreak of raw context manager methods are entered with an attached tty.
@@ -1459,7 +1459,7 @@ class Terminal():
         sometimes simply as a user preference, for neat and tidy vertical alignment. `configuration
         <https://wezterm.org/config/lua/config/treat_east_asian_ambiguous_width_as_wide.html>`_ is
         usually required to enable "ambiguous width as wide".
-        
+
         The result is cached, assigned to :attr:`ambiguous_width`, and returned, and used
         automatically by subsequent alignment methods, :meth:`length`, :meth:`wrap`, :meth:`ljust`,
         :meth:`rjust`, and :meth:`center`.
