@@ -118,11 +118,10 @@ def display_sugar_methods(term):
     version = term.get_software_version()
     print(f"  {_yn(term, version is not None)}  XTVERSION (CSI > q)" + term.clear_eol)
     if version is not None:
-        # a TERM_PROGRAM value, when defined, is returned without inquiry
         source = 'TERM_PROGRAM' if os.environ.get('TERM_PROGRAM') else 'inquiry'
         print(f"       Terminal name: {term.bright_cyan(version.name or '--')}")
         print(f"       Version: {version.version or '--'}")
-        print(f"       Source: {source}")
+        print(f"    Id Source: {source}")
 
     print('  Testing Kitty graphics...' + term.clear_eol, end='\r', flush=True)
     print(f"  {_yn(term, term.does_kitty_graphics())}  "
