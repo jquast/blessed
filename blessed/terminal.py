@@ -161,7 +161,7 @@ _RE_DECRQSS_RESPONSE = re.compile(r'\x1bP([01])\$r([^\x1b]*)\x1b\\')
 _KEYBOARD_READ_SIZE = 4096
 
 
-class Terminal():  # pylint: disable=attribute-defined-outside-init
+class Terminal():
     """
     An abstraction for color, style, positioning, and input in the terminal.
 
@@ -1617,7 +1617,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
                 # This is the first-ever query and it failed! This query returns
                 # NO_RESPONSE to indicate the timeout, subsequent queries will
                 # return NOT_QUERIED.
-                # pylint: disable=attribute-defined-outside-init
                 self._dec_first_query_failed = True
                 return DecModeResponse(mode, DecModeResponse.NO_RESPONSE)
             # Rather unusual, we've previously had success with get_dec_mode,
@@ -1628,7 +1627,6 @@ class Terminal():  # pylint: disable=attribute-defined-outside-init
 
         # parse, cache, and return the response value
         response_value = int(match.group(1))
-        # pylint: disable=attribute-defined-outside-init
         self._dec_mode_cache[int(mode)] = response_value
         self._dec_any_query_succeeded = True
         return DecModeResponse(mode, response_value)

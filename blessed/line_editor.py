@@ -413,7 +413,7 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
         return self._scroll_offset
 
     def _at_limit(self) -> bool:
-        return self.limit > 0 and len(self._buf) >= self.limit
+        return 0 < self.limit <= len(self._buf)
 
     def _fire_limit_bell(self) -> str:
         if not self._limit_bell_fired:
