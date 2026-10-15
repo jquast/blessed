@@ -1465,6 +1465,7 @@ def resolve_sequence(text: str,
         _match_legacy_csi_tilde_form,
         _match_legacy_ss3_fkey_form,
         _match_xtgettcap_response,
+        _match_xtversion_response,
         _match_cpr_response]
     if capture_cpr:
         # prioritize capturing CPR_RESPONSE over legacy CSI Modifiers
@@ -1614,6 +1615,14 @@ def _match_xtgettcap_response(text: str) -> Optional[Keystroke]:
     match = TermcapResponse._RE_XTGETTCAP_RESPONSE.match(text)
     if match:
         return Keystroke(ucs=match.group(0), name='XTGETTCAP_RESPONSE')
+    return None
+
+
+def _match_xtversion_response(text: str) -> Optional[Keystroke]:
+    """Match XTVERSION reply: ESC P > | <name> [version] ESC backslash."""
+    match = SoftwareVersion.RE_RESPONSE.match(text)
+    if match:
+        return Keystroke(ucs=match.group(0), name='XTVERSION_RESPONSE')
     return None
 
 

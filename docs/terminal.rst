@@ -393,14 +393,13 @@ applications to identify the terminal software name and version.
 You can query the terminal's software version using the
 :meth:`~.Terminal.get_software_version` method, which returns a
 :class:`~.SoftwareVersion` object with ``name`` and ``version`` attributes, or,
-``None`` if the terminal fails to respond.
+``None`` if neither method succeeds.
 
-If the XTVERSION query does not receive a response within the timeout,
-the method falls back to the ``TERM_PROGRAM`` and ``TERM_PROGRAM_VERSION``
-environment variables, which are set by many modern terminal emulators
-(iTerm2, Apple Terminal.app, VS Code, WezTerm, Hyper, mintty, and others).
-These variables are not forwarded over protocols like ssh, so they are less
-reliable than XTVERSION.
+When the ``TERM_PROGRAM`` and ``TERM_PROGRAM_VERSION`` environment variables are defined, which
+many modern terminal emulators set (iTerm2, Apple Terminal.app, VS Code, WezTerm, Hyper, mintty,
+and others), they take precedence and are returned without inquiry.  Blank ``TERM_PROGRAM`` to
+have the XTVERSION query made instead.  These variables are not forwarded over protocols like
+ssh, so they are less reliable than XTVERSION.
 
 Example program to display terminal version information:
 

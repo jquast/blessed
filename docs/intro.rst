@@ -73,7 +73,7 @@ Exemplary 3rd-party examples which use *blessed*,
 Requirements
 ------------
 
-*Blessed* works with Windows, Mac, Linux, and BSD's, on Python 3.7+.
+*Blessed* works with Windows, Mac, Linux, and BSD's, on Python 3.9+.
 
 Brief Overview
 --------------

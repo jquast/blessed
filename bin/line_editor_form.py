@@ -23,6 +23,7 @@ def paste_line(ed):
 
 
 with term.raw(), term.cursor_shape(term.CursorShape.BLINKING_BLOCK), term.bracketed_paste():
+    term.detect_ambiguous_width()
     if has_clipboard:
         echo("press ^C and ^V for OS clipboard, type 'quit' to exit")
     else:
@@ -39,6 +40,8 @@ with term.raw(), term.cursor_shape(term.CursorShape.BLINKING_BLOCK), term.bracke
             keymap['KEY_CTRL_C'] = copy_line
             keymap['KEY_CTRL_V'] = paste_line
         ed = LineEditor(history=history, max_width=ed_width, limit=200,
+                        ambiguous_width=term.ambiguous_width,
+                        term_program=term.term_program,
                         bg_sgr=term.on_brown,
                         keymap=keymap or None)
         echo(term.move_x(col) + prompt, end='')
