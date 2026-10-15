@@ -331,7 +331,9 @@ class Terminal():
 
         #: Normalized terminal software name for python wcwidth correction tables.
         #: ``True`` when unknown, so wcwidth reads ``TERM_PROGRAM`` and ``TERM`` itself.
-        self.term_program = self.__init_term_program() or True
+        self.term_program: Union[bool, str] = True
+        self._term_program_probed: bool = False
+        self.detect_term_program()
 
     def _software_version_from_env(self) -> Optional[SoftwareVersion]:
         """
@@ -346,30 +348,6 @@ class Terminal():
         term_version = os.environ.get('TERM_PROGRAM_VERSION', '')
         raw = ' '.join(filter(None, (term_program, term_version)))
         return SoftwareVersion(raw=raw, name=term_program, version=term_version)
-
-    def __init_term_program(self) -> str:
-        """
-        Return a normalized terminal software name for use with wcwidth correction tables.
-
-        A non-empty ``TERM_PROGRAM`` takes precedence, and a ``TERM`` that names its terminal
-        is left to wcwidth's own environment lookup; both skip the inquiry.  XTVERSION is
-        queried otherwise, when the terminal can answer on the keyboard fd.  Returns an empty
-        string when unknown.
-        """
-        version = self._software_version_from_env()
-        if version is not None:
-            return version.name
-        term = os.environ.get('TERM', '').strip().lower()
-
-        # TERM=xterm identification is non-authoritative for terminal identification. subsequent
-        # XTVERSION query can identify 'xterm' or its imposters, 'mlterm' and 'putty'.
-        if term != 'xterm' and term in list_term_programs():
-            return ''
-        if self.is_a_tty and self.does_styling and self._keyboard_fd is not None:
-            version = self.get_software_version()
-            if version is not None and version.name:
-                return version.name
-        return ''
 
     def __init_ambiguous_width(self) -> int:
         """Return ``AMBIGUOUS_WIDE`` when it is 1 or 2, otherwise 1 (default)."""
@@ -1518,6 +1496,61 @@ class Terminal():
         self.stream.flush()
 
         return width if width in {1, 2} else fallback
+
+    def detect_term_program(
+            self,
+            timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS,
+            force: bool = False) -> Union[bool, str]:
+        r"""
+        Detect the terminal software name applied to python wcwidth correction tables.
+
+        :arg float timeout: Timeout in seconds to await an XTVERSION response.
+        :arg bool force: Detect again, bypassing the cache.
+        :rtype: bool or str
+        :returns: Normalized terminal name, or ``True`` when unknown, so wcwidth reads the
+            ``TERM_PROGRAM`` and ``TERM`` environment values itself.
+
+        A non-empty ``TERM_PROGRAM`` environment value takes precedence, and a ``TERM`` that
+        names its terminal is left to wcwidth's own environment lookup, neither makes an
+        inquiry.  An XTVERSION query is made otherwise, identifying terminals that report an
+        uninformative ``TERM=xterm``, such as 'mlterm' and 'putty'.
+
+        The result is cached, assigned to :attr:`term_program`, and returned, and used
+        automatically by subsequent alignment methods, :meth:`length`, :meth:`wrap`,
+        :meth:`ljust`, :meth:`rjust`, and :meth:`center`.
+
+        When :attr:`is_a_tty` is False, no sequences are transmitted or response awaited, and
+        the current value is returned without inquiry, and without caching, so that a terminal
+        attached after initialization, such as a remote stream, may be inquired by a later call.
+        """
+        if not force and self._term_program_probed:
+            return self.term_program
+
+        version = self._software_version_from_env()
+        if version is not None:
+            self.term_program = version.name
+            self._term_program_probed = True
+            return self.term_program
+
+        term = os.environ.get('TERM', '').strip().lower()
+
+        # TERM=xterm identification is non-authoritative for terminal identification. subsequent
+        # XTVERSION query can identify 'xterm' or its imposters, 'mlterm' and 'putty'.
+        if term != 'xterm' and term in list_term_programs():
+            self.term_program = True
+            self._term_program_probed = True
+            return self.term_program
+
+        if not self.is_a_tty or not self.does_styling or self._keyboard_fd is None:
+            return self.term_program
+
+        version = self.get_software_version(timeout=timeout)
+        if version is not None and version.name:
+            self.term_program = version.name
+        else:
+            self.term_program = True
+        self._term_program_probed = True
+        return self.term_program
 
     def _is_apple_terminal(self, timeout: Optional[float]) -> bool:
         """Whether the terminal is Apple's Terminal.app."""
@@ -4443,8 +4476,8 @@ class Terminal():
         :rtype: bool
         :returns: True when *ks* was a delayed reply; it is never returned as a keystroke,
             and is recorded in :attr:`errors`.  A delayed XTGETTCAP response is also
-            available to later :meth:`get_xtgettcap` calls; a delayed XTVERSION response is
-            discarded, as :attr:`term_program` is fixed at class initialization.
+            available to later :meth:`get_xtgettcap` calls, a delayed XTVERSION response
+            is discarded.
         """
         if ks.name not in {'XTGETTCAP_RESPONSE', 'XTVERSION_RESPONSE'}:
             return False

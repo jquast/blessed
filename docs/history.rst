@@ -14,6 +14,9 @@ Version History
     :meth:`~Terminal.detect_ambiguous_width` to measure it, which assigns and caches
     :attr:`~Terminal.ambiguous_width`, or set ``AMBIGUOUS_WIDE`` to ``1`` or ``2`` to supply the
     value without measurement, :ghpull:`420`.
+  * introduced: :meth:`~Terminal.detect_term_program` to detect the terminal software name, or to
+    detect it again after initialization, as needed by a terminal attached later, such as a remote
+    stream, :ghpull:`420`.
   * change: :meth:`~Terminal.get_software_version` returns the ``TERM_PROGRAM`` and
     ``TERM_PROGRAM_VERSION`` environment values when defined, without inquiry, and these values also
     override the Corrections_ detection and the XTVERSION query otherwise made for
