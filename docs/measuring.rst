@@ -150,6 +150,7 @@ the terminal and before any measurement:
     from blessed import Terminal
     term = Terminal()
     term.detect_ambiguous_width()
+    term.detect_term_program()
 
     print(term.term_program, term.ambiguous_width)
 
@@ -157,6 +158,10 @@ The call measures even when ``AMBIGUOUS_WIDE`` is set, which only supplies the v
 such as for automated tests.  When no terminal answers, such as when output is redirected, the
 terminal software is ``True`` and ambiguous width remains narrow.  Blank ``TERM_PROGRAM`` to unset
 it and make the XTVERSION query.
+
+:meth:`~.Terminal.detect_term_program` applies the same detection and assigns
+:attr:`~.Terminal.term_program`, which is useful for a terminal attached after construction, such as
+a remote stream, when the XTVERSION query could not be made at class-initialization.
 
 Text Sizing
 -----------
