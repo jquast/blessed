@@ -133,6 +133,26 @@ def test_multiline():
     child()
 
 
+@pytest.mark.parametrize('text,width,expected', [
+    ('  ', 4, ['  ']),
+    ('   ', 2, ['  ', ' ']),
+    ('\t', 4, ['    ', '    ']),
+    ('a\n\n  \nb', 4, ['a', '', '  ', 'b']),
+    ('', 4, []),
+    ('\n', 4, ['']),
+])
+def test_wrap_preserves_whitespace_only_lines(text, width, expected):
+    """Whitespace-only lines honor drop_whitespace=False without losing empty lines."""
+    term = TestTerminal()
+    assert term.wrap(text, width=width, drop_whitespace=False) == expected
+
+
+def test_wrap_drops_whitespace_only_lines_by_default():
+    """The default still renders whitespace-only lines as empty lines."""
+    term = TestTerminal()
+    assert term.wrap('a\n  \nb', width=4) == ['a', '', 'b']
+
+
 def test_east_asian_emojis_width_1():
     """Tests edge-case of east-asian and emoji characters split into single columns."""
     def child():

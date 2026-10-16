@@ -4180,10 +4180,12 @@ class Terminal():
             )
         kwargs.setdefault('ambiguous_width', self.ambiguous_width)
         kwargs.setdefault('term_program', self.term_program)
+        preserve_whitespace = not kwargs.get('drop_whitespace', True)
         lines: List[str] = []
         for line in text.splitlines():
             lines.extend(
-                wcwidth_wrap(line, width=width, **kwargs) if line.strip() else ('',))
+                wcwidth_wrap(line, width=width, **kwargs)
+                if line and (line.strip() or preserve_whitespace) else ('',))
         return lines
 
     def getch(self, decode_latin1: bool = False) -> str:
