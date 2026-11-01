@@ -485,14 +485,16 @@ SHARMA_CIE2000_VECTORS = [
 ]
 
 
-def test_dist_cie2000_matches_published_vectors():
+def test_dist_cie2000_matches_published_vectors(monkeypatch):
     """Test dist_cie2000's Lab math against the published CIEDE2000 test data."""
     import math
 
-    from blessed.color import _cie2000_lab
+    from blessed import color
 
+    # feed Lab values straight into the CIEDE2000 math
+    monkeypatch.setattr(color, "rgb_to_lab", lambda r, g, b: (r, g, b))
     for L1, a1, b1, L2, a2, b2, expected in SHARMA_CIE2000_VECTORS:
-        result = math.sqrt(_cie2000_lab((L1, a1, b1), (L2, a2, b2)))
+        result = math.sqrt(color.dist_cie2000((L1, a1, b1), (L2, a2, b2)))
         assert abs(result - expected) < 0.0001, (result, expected)
 
 
@@ -510,38 +512,44 @@ def test_dist_cie2000_is_symmetric():
         assert dist_cie2000(rgb1, rgb2) == dist_cie2000(rgb2, rgb1)
 
 
-def test_dist_cie2000_rgb_pipeline_matches_lab_math():
-    """Test the public dist_cie2000 is rgb_to_lab composed with the Lab math."""
-    from blessed.color import _cie2000_lab, dist_cie2000, rgb_to_lab
+def test_dist_cie2000_converts_each_rgb_argument_once(monkeypatch):
+    """Test dist_cie2000 converts each RGB argument through rgb_to_lab once."""
+    from blessed import color
 
-    for rgb1, rgb2 in [
-        ((255, 0, 0), (0, 255, 0)),
-        ((10, 20, 30), (200, 150, 100)),
-        ((73, 253, 26), (110, 13, 181)),
-    ]:
-        assert dist_cie2000(rgb1, rgb2) == _cie2000_lab(
-            rgb_to_lab(*rgb1), rgb_to_lab(*rgb2)
-        )
+    calls = []
+    real_rgb_to_lab = color.rgb_to_lab
+
+    def _tracked_rgb_to_lab(red, green, blue):
+        calls.append((red, green, blue))
+        return real_rgb_to_lab(red, green, blue)
+
+    monkeypatch.setattr(color, "rgb_to_lab", _tracked_rgb_to_lab)
+    color.dist_cie2000((255, 0, 0), (0, 255, 0))
+    assert calls == [(255, 0, 0), (0, 255, 0)]
 
 
-def test_dist_cie94_hue_term_is_zero_for_collinear_chroma():
+def test_dist_cie94_hue_term_is_zero_for_collinear_chroma(monkeypatch):
     """Test CIE94 does not invent a hue difference for same-hue Lab colors."""
     import math
 
-    from blessed.color import _cie94_lab
+    from blessed import color
 
+    # feed Lab values straight into the CIE94 math
+    monkeypatch.setattr(color, "rgb_to_lab", lambda r, g, b: (r, g, b))
     # Two colors on the same hue (the a-axis) with different chroma
     # contribute no hue term: dE_94 = |dC| / (1 + K_1 * C_1) here.
-    result = math.sqrt(_cie94_lab((50.0, 60.0, 0.0), (50.0, 30.0, 0.0)))
+    result = math.sqrt(color.dist_cie94((50.0, 60.0, 0.0), (50.0, 30.0, 0.0)))
     assert abs(result - 30 / (1 + 0.045 * 60)) < 1e-12
 
 
-def test_dist_cie94_matches_reference_for_general_pair():
+def test_dist_cie94_matches_reference_for_general_pair(monkeypatch):
     """Test CIE94 against its published closed form for a general Lab pair."""
     import math
 
-    from blessed.color import _cie94_lab
+    from blessed import color
 
+    # feed Lab values straight into the CIE94 math
+    monkeypatch.setattr(color, "rgb_to_lab", lambda r, g, b: (r, g, b))
     lab1, lab2 = (50.0, 13.0, -12.0), (60.0, -5.0, 9.0)
     l_1, a_1, b_1 = lab1
     l_2, a_2, b_2 = lab2
@@ -557,4 +565,4 @@ def test_dist_cie94_matches_reference_for_general_pair():
     expected_sq = ((l_1 - l_2) ** 2 +
                    (delta_c / sc) ** 2 +
                    ((a_1 - a_2) ** 2 + (b_1 - b_2) ** 2 - delta_c ** 2) / (sh ** 2))
-    assert _cie94_lab(lab1, lab2) == pytest.approx(expected_sq)
+    assert color.dist_cie94(lab1, lab2) == pytest.approx(expected_sq)
