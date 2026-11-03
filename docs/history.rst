@@ -4,6 +4,14 @@ Version History
 ===============
 
 1.52 (unreleased, on "master" branch only)
+  * bugfix: ``dist_cie2000`` and ``dist_cie94`` did not implement the published formulas.  CIEDE2000
+    left the hue angles in radians while every threshold and trigonometric term in the formula expects
+    degrees, which made the hue-averaging branch unreachable and fed arbitrary phases to ``cos`` and
+    ``sin``; its ``R_T`` term also used the hue difference where the mean hue belongs.  CIE94 added
+    ``dC**2`` to the hue term instead of subtracting it, inventing a hue difference for colors that
+    differ only in chroma.  Both are selectable through ``Terminal(color_distance_algorithm=...)``.
+    CIEDE2000 is now verified against the supplementary test data of Sharma, Wu & Dalal (2005),
+    :ghissue:`424`.
   * bugfix: :meth:`~Terminal.wrap` discarded lines containing only spaces or tabs when
     ``drop_whitespace=False``, they are now wrapped and retained, :ghpull:`423`.
 

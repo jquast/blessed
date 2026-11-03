@@ -9,7 +9,7 @@ References,
 """
 
 # std imports
-from math import cos, exp, sin, sqrt, atan2
+from math import atan2, cos, degrees, exp, hypot, radians, sin, sqrt
 from typing import Dict, Tuple, Callable
 from functools import lru_cache
 
@@ -138,8 +138,41 @@ def dist_cie76(rgb1: _RGB, rgb2: _RGB) -> float:
     return pow(l_1 - l_2, 2) + pow(a_1 - a_2, 2) + pow(b_1 - b_2, 2)
 
 
+def _cie94_from_lab(lab_1: Tuple[float, float, float],
+                    lab_2: Tuple[float, float, float]) -> float:
+    """
+    Determine the CIE94 color difference between two Lab colors.
+
+    Graphic-arts weighting (``K_1 = 0.045``, ``K_2 = 0.015``), as published in
+    CIE 116-1995. The hue term is the chroma-hue decomposition
+    ``dH^2 = da^2 + db^2 - dC^2``, which is zero for colors that differ only in
+    chroma; adding ``dC^2`` instead invents a hue difference that is not there.
+    """
+    l_1, a_1, b_1 = lab_1
+    l_2, a_2, b_2 = lab_2
+
+    k_l = k_c = k_h = 1.0
+    k_1 = 0.045
+    k_2 = 0.015
+
+    delta_l = l_1 - l_2
+    delta_a = a_1 - a_2
+    delta_b = b_1 - b_2
+    c_1 = hypot(a_1, b_1)
+    c_2 = hypot(a_2, b_2)
+    delta_c = c_1 - c_2
+    # By Cauchy-Schwarz this cannot be negative; the clamp only absorbs the
+    # floating-point residue when the colors share a hue exactly.
+    delta_h = sqrt(max(delta_a ** 2 + delta_b ** 2 - delta_c ** 2, 0.0))
+    s_c = 1 + k_1 * c_1
+    s_h = 1 + k_2 * c_1
+
+    return sqrt((delta_l / (k_l)) ** 2 +
+                (delta_c / (k_c * s_c)) ** 2 +
+                (delta_h / (k_h * s_h)) ** 2)
+
+
 def dist_cie94(rgb1: _RGB, rgb2: _RGB) -> float:
-    # pylint: disable=too-many-locals
     """
     Determine distance between two rgb colors using the CIE94 algorithm.
 
@@ -149,30 +182,93 @@ def dist_cie94(rgb1: _RGB, rgb2: _RGB) -> float:
     :rtype: float For efficiency, the square of the distance is returned which is sufficient for
         comparisons
     """
-    l_1, a_1, b_1 = rgb_to_lab(*rgb1)
-    l_2, a_2, b_2 = rgb_to_lab(*rgb2)
+    return _cie94_from_lab(rgb_to_lab(*rgb1), rgb_to_lab(*rgb2)) ** 2
 
-    s_l = k_l = k_c = k_h = 1
-    k_1 = 0.045
-    k_2 = 0.015
 
-    delta_l = l_1 - l_2
-    delta_a = a_1 - a_2
-    delta_b = b_1 - b_2
-    c_1 = sqrt(a_1 ** 2 + b_1 ** 2)
-    c_2 = sqrt(a_2 ** 2 + b_2 ** 2)
-    delta_c = c_1 - c_2
-    delta_h = sqrt(delta_a ** 2 + delta_b ** 2 + delta_c ** 2)
-    s_c = 1 + k_1 * c_1
-    s_h = 1 + k_2 * c_1
+def _cie2000_from_lab(lab_1: Tuple[float, float, float],
+                      lab_2: Tuple[float, float, float]) -> float:
+    """
+    Determine the CIEDE2000 color difference between two Lab colors.
 
-    return ((delta_l / (k_l * s_l)) ** 2 +
-            (delta_c / (k_c * s_c)) ** 2 +
-            (delta_h / (k_h * s_h)) ** 2)
+    Implements the formulation of Sharma, Wu & Dalal (2005), "The CIEDE2000
+    Color-Difference Formula: Implementation Notes, Supplementary Test Data,
+    and Mathematical Observations", including the low-chroma guards and the
+    hue-averaging branch for hues more than 180 degrees apart.
+
+    Every angle in the formula is in degrees: the hue angles come out of
+    ``atan2`` in radians and are converted once, so the ``T`` and ``R_T`` terms
+    take degree arguments as published.
+    """
+    # pylint: disable=too-many-locals
+    l_1, a_1, b_1 = lab_1
+    l_2, a_2, b_2 = lab_2
+
+    k_l = k_c = k_h = 1.0
+
+    c_1 = hypot(a_1, b_1)
+    c_2 = hypot(a_2, b_2)
+    c_mean = (c_1 + c_2) / 2
+    # G only ever scales a*; the same root reappears as R_C later, on the
+    # post-G mean chroma, which is why it is recomputed there.
+    g = 0.5 * (1 - sqrt(c_mean ** 7 / (c_mean ** 7 + 25 ** 7)))
+
+    a_1_prime = (1 + g) * a_1
+    a_2_prime = (1 + g) * a_2
+    c_1_prime = hypot(a_1_prime, b_1)
+    c_2_prime = hypot(a_2_prime, b_2)
+    c_mean_prime = (c_1_prime + c_2_prime) / 2
+
+    h_1_prime = degrees(atan2(b_1, a_1_prime)) % 360 if c_1_prime else 0.0
+    h_2_prime = degrees(atan2(b_2, a_2_prime)) % 360 if c_2_prime else 0.0
+
+    delta_l_prime = l_2 - l_1
+    delta_c_prime = c_2_prime - c_1_prime
+
+    if c_1_prime * c_2_prime == 0:
+        delta_h_prime = 0.0
+        h_mean_prime = h_1_prime + h_2_prime
+    else:
+        delta_h_prime = h_2_prime - h_1_prime
+        if delta_h_prime > 180:
+            delta_h_prime -= 360
+        elif delta_h_prime < -180:
+            delta_h_prime += 360
+
+        if abs(h_1_prime - h_2_prime) <= 180:
+            h_mean_prime = (h_1_prime + h_2_prime) / 2
+        elif h_1_prime + h_2_prime < 360:
+            h_mean_prime = (h_1_prime + h_2_prime + 360) / 2
+        else:
+            h_mean_prime = (h_1_prime + h_2_prime - 360) / 2
+
+    delta_h_capital = 2 * sqrt(c_1_prime * c_2_prime) * sin(radians(delta_h_prime) / 2)
+
+    t_x = (1 -
+           0.17 * cos(radians(h_mean_prime - 30)) +
+           0.24 * cos(radians(2 * h_mean_prime)) +
+           0.32 * cos(radians(3 * h_mean_prime + 6)) -
+           0.20 * cos(radians(4 * h_mean_prime - 63)))
+
+    l_mean_prime = (l_1 + l_2) / 2
+    s_l = 1 + (0.015 * (l_mean_prime - 50) ** 2) / sqrt(20 + (l_mean_prime - 50) ** 2)
+    s_c = 1 + 0.045 * c_mean_prime
+    s_h = 1 + 0.015 * c_mean_prime * t_x
+
+    delta_theta = 30 * exp(-(((h_mean_prime - 275) / 25) ** 2))
+    r_c = 2 * sqrt(c_mean_prime ** 7 / (c_mean_prime ** 7 + 25 ** 7))
+    r_t = -sin(radians(2 * delta_theta)) * r_c
+
+    delta_l_term = delta_l_prime / (k_l * s_l)
+    delta_c_term = delta_c_prime / (k_c * s_c)
+    delta_h_term = delta_h_capital / (k_h * s_h)
+
+    return sqrt(delta_l_term ** 2 +
+                delta_c_term ** 2 +
+                delta_h_term ** 2 +
+                r_t * delta_c_term * delta_h_term)
 
 
 def dist_cie2000(rgb1: _RGB, rgb2: _RGB) -> float:
-    # pylint: disable=too-many-locals
     """
     Determine distance between two rgb colors using the CIE2000 algorithm.
 
@@ -182,55 +278,7 @@ def dist_cie2000(rgb1: _RGB, rgb2: _RGB) -> float:
     :rtype: float For efficiency, the square of the distance is returned which is sufficient for
         comparisons
     """
-    s_l = k_l = k_c = k_h = 1.0
-
-    l_1, a_1, b_1 = rgb_to_lab(*rgb1)
-    l_2, a_2, b_2 = rgb_to_lab(*rgb2)
-
-    delta_l = l_2 - l_1
-    l_mean = (l_1 + l_2) / 2
-
-    c_1 = sqrt(a_1 ** 2 + b_1 ** 2)
-    c_2 = sqrt(a_2 ** 2 + b_2 ** 2)
-    c_mean = (c_1 + c_2) / 2
-    delta_c = c_1 - c_2
-
-    g_x = sqrt(c_mean ** 7 / (c_mean ** 7 + 25 ** 7))
-    h_1 = atan2(b_1, a_1 + (a_1 / 2) * (1 - g_x)) % 360
-    h_2 = atan2(b_2, a_2 + (a_2 / 2) * (1 - g_x)) % 360
-
-    if 0 in (c_1, c_2):
-        delta_h_prime = 0.0
-        h_mean = h_1 + h_2
-    else:
-        delta_h_prime = h_2 - h_1
-        if abs(delta_h_prime) <= 180:
-            h_mean = (h_1 + h_2) / 2
-        else:
-            if h_2 <= h_1:
-                delta_h_prime += 360.0
-            else:
-                delta_h_prime -= 360.0
-            h_mean = (h_1 + h_2 + 360) / 2 if h_1 + h_2 < 360 else (h_1 + h_2 - 360) / 2
-
-    delta_h = 2 * sqrt(c_1 * c_2) * sin(delta_h_prime / 2)
-
-    t_x = (1 -
-           0.17 * cos(h_mean - 30) +
-           0.24 * cos(2 * h_mean) +
-           0.32 * cos(3 * h_mean + 6) -
-           0.20 * cos(4 * h_mean - 63))
-
-    s_l = 1 + (0.015 * (l_mean - 50) ** 2) / sqrt(20 + (l_mean - 50) ** 2)
-    s_c = 1 + 0.045 * c_mean
-    s_h = 1 + 0.015 * c_mean * t_x
-    r_t = -2 * g_x * sin(abs(60 * exp(-1 * abs((delta_h - 275) / 25) ** 2)))
-
-    delta_l = delta_l / (k_l * s_l)
-    delta_c = delta_c / (k_c * s_c)
-    delta_h = delta_h / (k_h * s_h)
-
-    return delta_l ** 2 + delta_c ** 2 + delta_h ** 2 + r_t * delta_c * delta_h
+    return _cie2000_from_lab(rgb_to_lab(*rgb1), rgb_to_lab(*rgb2)) ** 2
 
 
 COLOR_DISTANCE_ALGORITHMS: Dict[str,
