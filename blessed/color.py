@@ -223,25 +223,25 @@ def dist_cie2000(rgb1: _RGB, rgb2: _RGB) -> float:
             h_mean = (h_1p + h_2p - 360) * 0.5
 
     # S_L from the L* mean; (l_mean - 50)**2 is shared by both its uses
-    l_dev = (l_1 + l_2) * 0.5 - 50
-    s_l = 1 + (0.015 * l_dev * l_dev) / sqrt(20 + l_dev * l_dev)
-    s_c = 1 + 0.045 * c_meanp
+    l_dev = (l_1 + l_2) * 0.5 - 50.0
+    s_l = 1.0 + (0.015 * l_dev * l_dev) / sqrt(20.0 + l_dev * l_dev)
+    s_c = 1.0 + 0.045 * c_meanp
 
-    t_x = (1 -
-           0.17 * cos(radians(h_mean - 30)) +
-           0.24 * cos(radians(h_mean * 2)) +
-           0.32 * cos(radians(h_mean * 3 + 6)) -
-           0.20 * cos(radians(h_mean * 4 - 63)))
-    s_h = 1 + 0.015 * c_meanp * t_x
+    t_x = (1.0 -
+           0.17 * cos(radians(h_mean - 30.0)) +
+           0.24 * cos(radians(h_mean * 2.0)) +
+           0.32 * cos(radians(h_mean * 3.0 + 6.0)) -
+           0.20 * cos(radians(h_mean * 4.0 - 63.0)))
+    s_h = 1.0 + 0.015 * c_meanp * t_x
 
     # R_T binds the chroma and hue differences through the mean hue
     c_7p = c_meanp ** 7
-    r_t = (-2 * sqrt(c_7p / (c_7p + 25 ** 7)) *
-           sin(radians(60 * exp(-(((h_mean - 275) / 25) ** 2)))))
+    r_t = (-2.0 * sqrt(c_7p / (c_7p + 25.0 ** 7)) *
+           sin(radians(60.0 * exp(-(((h_mean - 275.0) / 25.0) ** 2)))))
 
     d_l = (l_2 - l_1) / s_l
     d_c = (c_2p - c_1p) / s_c
-    d_h = 2 * sqrt(c_1p * c_2p) * sin(radians(delta_h_angle * 0.5)) / s_h
+    d_h = 2.0 * sqrt(c_1p * c_2p) * sin(radians(delta_h_angle * 0.5)) / s_h
 
     return d_l * d_l + d_c * d_c + d_h * d_h + r_t * d_c * d_h
 

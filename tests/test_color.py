@@ -509,7 +509,9 @@ def test_dist_cie2000_is_symmetric():
         ((255, 255, 255), (0, 0, 0)),
         ((128, 128, 128), (64, 96, 128)),
     ]:
-        assert dist_cie2000(rgb1, rgb2) == dist_cie2000(rgb2, rgb1)
+        distance_forward = dist_cie2000(rgb1, rgb2)
+        distance_reverse = dist_cie2000(rgb2, rgb1)
+        assert distance_forward == distance_reverse
 
 
 def test_dist_cie2000_converts_each_rgb_argument_once(monkeypatch):
@@ -551,18 +553,16 @@ def test_dist_cie94_matches_reference_for_general_pair(monkeypatch):
     # feed Lab values straight into the CIE94 math
     monkeypatch.setattr(color, "rgb_to_lab", lambda r, g, b: (r, g, b))
     lab1, lab2 = (50.0, 13.0, -12.0), (60.0, -5.0, 9.0)
-    l_1, a_1, b_1 = lab1
-    l_2, a_2, b_2 = lab2
-    c_1 = math.hypot(a_1, b_1)
-    c_2 = math.hypot(a_2, b_2)
-    delta_c = c_1 - c_2
+    c_1 = math.hypot(*lab1[1:])
+    delta_c = c_1 - math.hypot(*lab2[1:])
     # published CIE94 (graphic arts): dE = sqrt((dL/(kL*SL))^2 + (dC/(kC*SC))^2
     #                                        + (dH/(kH*SH))^2)
     # with SL = 1, SC = 1 + 0.045*C_1, SH = 1 + 0.015*C_1, and
     # dH**2 = da**2 + db**2 - dC**2.
-    sc = 1 + 0.045 * c_1
-    sh = 1 + 0.015 * c_1
-    expected_sq = ((l_1 - l_2) ** 2 +
-                   (delta_c / sc) ** 2 +
-                   ((a_1 - a_2) ** 2 + (b_1 - b_2) ** 2 - delta_c ** 2) / (sh ** 2))
+    s_c = 1 + 0.045 * c_1
+    s_h = 1 + 0.015 * c_1
+    expected_sq = ((lab1[0] - lab2[0]) ** 2 +
+                   (delta_c / s_c) ** 2 +
+                   ((lab1[1] - lab2[1]) ** 2 + (lab1[2] - lab2[2]) ** 2 - delta_c ** 2) /
+                   (s_h ** 2))
     assert color.dist_cie94(lab1, lab2) == pytest.approx(expected_sq)
