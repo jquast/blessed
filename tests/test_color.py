@@ -471,3 +471,52 @@ def test_get_bgcolor_hex_timeout():
         result = t.get_bgcolor_hex(timeout=0)
         assert result == ''
     child()
+
+
+def test_cie2000_published_values():
+    """dist_cie2000 must reproduce the published CIEDE2000 test values.
+
+    Reference pairs from Sharma, Wu & Dalal (2005), "The CIEDE2000
+    Color-Difference Formula: Implementation Notes, Supplementary Test
+    Data, and Mathematical Observations", Table 1.
+    """
+    import math
+    from blessed.color import _cie2000_deltae_sq
+
+    pairs = [
+        ((50.0, 2.6772, -79.7751), (50.0, 0.0, -82.7485), 2.0425),
+        ((50.0, 3.1571, -77.2803), (50.0, 0.0, -82.7485), 2.8615),
+        ((50.0, 2.8361, -74.0200), (50.0, 0.0, -82.7485), 3.4412),
+        ((50.0, 0.0, 0.0), (50.0, -1.0, -2.0), 2.3669),
+        ((50.0, 2.5, 0.0), (73.0, 25.0, -18.0), 27.1492),
+        ((50.0, 2.5, 0.0), (50.0, 3.2592, 0.3350), 1.0000),
+    ]
+    for lab1, lab2, expected in pairs:
+        got = math.sqrt(_cie2000_deltae_sq(lab1, lab2))
+        assert abs(got - expected) < 0.0005, (lab1, lab2, expected, got)
+
+
+def test_cie2000_symmetry():
+    """dist_cie2000(a, b) must equal dist_cie2000(b, a) (#321)."""
+    from blessed.color import dist_cie2000
+
+    assert abs(dist_cie2000((73, 253, 26), (110, 13, 181))
+               - dist_cie2000((110, 13, 181), (73, 253, 26))) < 1e-9
+
+    import random
+    rng = random.Random(42)
+    for _ in range(500):
+        rgb1 = tuple(rng.randint(0, 255) for _ in range(3))
+        rgb2 = tuple(rng.randint(0, 255) for _ in range(3))
+        assert abs(dist_cie2000(rgb1, rgb2)
+                   - dist_cie2000(rgb2, rgb1)) < 1e-9
+
+
+def test_cie94_hue_term_excludes_chroma():
+    """CIE94's hue term is da²+db²-dC²; collinear chroma has zero hue term."""
+    import math
+    from blessed.color import _cie94_deltae_sq
+
+    # same hue, only chroma differs: dE94 = dC / (1 + 0.045 * C1)
+    got = math.sqrt(_cie94_deltae_sq((50.0, 60.0, 0.0), (50.0, 30.0, 0.0)))
+    assert abs(got - (30.0 / (1 + 0.045 * 60.0))) < 1e-9

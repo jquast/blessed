@@ -6,6 +6,14 @@ Version History
 1.52 (unreleased, on "master" branch only)
   * bugfix: :meth:`~Terminal.wrap` discarded lines containing only spaces or tabs when
     ``drop_whitespace=False``, they are now wrapped and retained, :ghpull:`423`.
+  * bugfix: ``blessed.color.dist_cie2000`` did not implement the published CIEDE2000
+    formulation (hue angles stayed in radians against degree constants, the rotation term
+    used the hue difference instead of the mean hue angle, and the scaling terms used the
+    pre-G chroma mean), so its distances were systematically wrong and asymmetric;
+    it now reproduces the published Sharma, Wu & Dalal (2005) test values, :ghissue:`424`.
+  * bugfix: ``blessed.color.dist_cie94`` computed the hue term with ``+ dC²`` instead of
+    the published ``- dC²`` chroma-hue decomposition, inventing a hue difference for colors
+    that only differ in chroma, :ghissue:`424`.
 
 1.51
   * introduced: :meth:`~Terminal.clip` to extract a "window" of displayed columns from a string, a
