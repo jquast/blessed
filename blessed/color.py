@@ -172,13 +172,13 @@ def dist_cie94(rgb1: _RGB, rgb2: _RGB) -> float:
             delta_h_sq / (s_h * s_h))
 
 
-def dist_cie2000(rgb1: _RGB, rgb2: _RGB) -> float:
+def dist_cie2000(rgb_a: _RGB, rgb_b: _RGB) -> float:
     # pylint: disable=too-many-locals
     """
     Determine distance between two rgb colors using the CIE2000 algorithm.
 
-    :arg tuple rgb1: RGB color definition
-    :arg tuple rgb2: RGB color definition
+    :arg tuple rgb_a: RGB color definition
+    :arg tuple rgb_b: RGB color definition
     :returns: Square of the distance between provided colors
     :rtype: float For efficiency, the square of the distance is returned which is sufficient for
         comparisons
@@ -187,14 +187,12 @@ def dist_cie2000(rgb1: _RGB, rgb2: _RGB) -> float:
     # Color-Difference Formula: Implementation Notes, Supplementary Test
     # Data, and Mathematical Observations":
     # http://www2.ece.rochester.edu/~gsharma/ciede2000/
-    l_1, a_1, b_1 = rgb_to_lab(*rgb1)
-    l_2, a_2, b_2 = rgb_to_lab(*rgb2)
+    l_1, a_1, b_1 = rgb_to_lab(*rgb_a)
+    l_2, a_2, b_2 = rgb_to_lab(*rgb_b)
 
     # chroma and its mean; a' = (1 + G) * a with
     # G = 0.5 * (1 - sqrt(c_mean**7 / (c_mean**7 + 25**7)))
-    c_1 = sqrt(a_1 * a_1 + b_1 * b_1)
-    c_2 = sqrt(a_2 * a_2 + b_2 * b_2)
-    c_7 = ((c_1 + c_2) * 0.5) ** 7
+    c_7 = ((sqrt(a_1 * a_1 + b_1 * b_1) + sqrt(a_2 * a_2 + b_2 * b_2)) * 0.5) ** 7.0
     g_x = sqrt(c_7 / (c_7 + 25 ** 7))
     a_1p = a_1 * (1.5 - g_x * 0.5)
     a_2p = a_2 * (1.5 - g_x * 0.5)
@@ -236,8 +234,9 @@ def dist_cie2000(rgb1: _RGB, rgb2: _RGB) -> float:
 
     # R_T binds the chroma and hue differences through the mean hue
     c_7p = c_meanp ** 7
-    r_t = (-2.0 * sqrt(c_7p / (c_7p + 25.0 ** 7)) *
-           sin(radians(60.0 * exp(-(((h_mean - 275.0) / 25.0) ** 2)))))
+    d_theta = (h_mean - 275.0) * 0.04
+    r_t = (-2.0 * sqrt(c_7p / (c_7p + 25.0 ** 7.0)) *
+           sin(radians(60.0 * exp(-(d_theta * d_theta)))))
 
     d_l = (l_2 - l_1) / s_l
     d_c = (c_2p - c_1p) / s_c

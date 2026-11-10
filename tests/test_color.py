@@ -511,7 +511,7 @@ def test_dist_cie2000_is_symmetric():
     ]:
         distance_forward = dist_cie2000(rgb1, rgb2)
         # swapped on purpose: the distance must be symmetric in its arguments
-        distance_reverse = dist_cie2000(rgb2, rgb1)  # pylint: disable=arguments-out-of-order
+        distance_reverse = dist_cie2000(rgb2, rgb1)
         assert distance_forward == distance_reverse
 
 
