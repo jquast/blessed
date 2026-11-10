@@ -502,16 +502,16 @@ def test_dist_cie2000_is_symmetric():
     """Test dist_cie2000 returns the same distance for swapped arguments (ghissue #321)."""
     from blessed.color import dist_cie2000
 
-    for rgb1, rgb2 in [
+    for rgb_a, rgb_b in [
         ((73, 253, 26), (110, 13, 181)),
         ((255, 0, 0), (0, 255, 0)),
         ((10, 20, 30), (200, 150, 100)),
         ((255, 255, 255), (0, 0, 0)),
         ((128, 128, 128), (64, 96, 128)),
     ]:
-        distance_forward = dist_cie2000(rgb1, rgb2)
+        distance_forward = dist_cie2000(rgb_a, rgb_b)
         # swapped on purpose: the distance must be symmetric in its arguments
-        distance_reverse = dist_cie2000(rgb2, rgb1)
+        distance_reverse = dist_cie2000(rgb_b, rgb_a)
         assert distance_forward == distance_reverse
 
 
