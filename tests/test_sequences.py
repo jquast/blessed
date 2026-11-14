@@ -912,39 +912,26 @@ def test_clip_cursor_overwrites_display_cells(any_term, api, text, width, expect
 
 
 @pytest.mark.parametrize('text', ['abc\bX', 'abc\x1b[2DX', '中\bX'])
-@pytest.mark.parametrize('sequence_api', [False, True])
-def test_clip_honors_ignored_cursor_movement(any_term, text, sequence_api):
-    """Ignored cursor controls remain literal zero-width sequences for either clipping API."""
+def test_clip_honors_ignored_cursor_movement(any_term, text):
+    """Ignored cursor controls remain literal zero-width sequences."""
     # local
-    from blessed.sequences import Sequence
-
     term = TestTerminal(kind=any_term, force_styling=True)
-    result = (Sequence(text, term).clip(control_codes='ignore') if sequence_api else
-              term.clip(text, control_codes='ignore'))
+    result = term.clip(text, control_codes='ignore')
     assert result == text
 
 
-@pytest.mark.parametrize('sequence_api', [False, True])
-def test_clip_rejects_out_of_bounds_cursor_movement(any_term, sequence_api):
+def test_clip_rejects_out_of_bounds_cursor_movement(any_term):
     """Strict clipping sees the original invalid cursor movement before it can be removed."""
     # local
-    from blessed.sequences import Sequence
-
     term = TestTerminal(kind=any_term, force_styling=True)
     with pytest.raises(ValueError, match='Cursor left movement'):
-        if sequence_api:
-            Sequence('\x1b[2DX', term).clip(control_codes='strict')
-        else:
-            term.clip('\x1b[2DX', control_codes='strict')
+        term.clip('\x1b[2DX', control_codes='strict')
 
 
-@pytest.mark.parametrize('sequence_api', [False, True])
-def test_clip_overwritten_window(any_term, sequence_api):
+def test_clip_overwritten_window(any_term):
     """A clipped window includes the surviving tail after a cursor-left overwrite."""
     # local
-    from blessed.sequences import Sequence
-
     term = TestTerminal(kind=any_term, force_styling=True)
     text = 'abc\x1b[2DX'
-    result = Sequence(text, term).clip(1, 3) if sequence_api else term.clip(text, 1, 3)
+    result = term.clip(text, 1, 3)
     assert result == 'Xc'
