@@ -5,7 +5,7 @@ Version History
 
 1.52 (unreleased, on "master" branch only)
   * bugfix: :meth:`~Terminal.clip` and :meth:`~Terminal.truncate` now resolve horizontal cursor
-    movement in display cells, preserving untouched text and honoring ``control_codes``.
+    movement in display cells, :ghpull:`427`.
   * bugfix: :meth:`~Terminal.wrap` discarded lines containing only spaces or tabs when
     ``drop_whitespace=False``, they are now wrapped and retained, :ghpull:`423`.
   * change: type of :attr:`~Terminal.term_program` changed from ``Union[str,bool]`` to ``str``,
