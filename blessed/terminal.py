@@ -330,8 +330,7 @@ class Terminal():
         self._ambiguous_width_probed: bool = False
 
         #: Normalized terminal software name for python wcwidth correction tables.
-        #: ``True`` when unknown, so wcwidth reads ``TERM_PROGRAM`` and ``TERM`` itself.
-        self.term_program: Union[bool, str] = True
+        self.term_program: str = ''
         self._term_program_probed: bool = False
         self.detect_term_program()
 
@@ -1500,15 +1499,14 @@ class Terminal():
     def detect_term_program(
             self,
             timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS,
-            force: bool = False) -> Union[bool, str]:
+            force: bool = False) -> str:
         r"""
-        Detect the terminal software name applied to python wcwidth correction tables.
+        Detect the terminal software name used for width or alignment functions.
 
         :arg float timeout: Timeout in seconds to await an XTVERSION response.
         :arg bool force: Detect again, bypassing the cache.
         :rtype: bool or str
-        :returns: Terminal name, wcwidth alias, or ``True`` when unknown, so wcwidth reads the
-            ``TERM_PROGRAM`` and ``TERM`` environment values itself.
+        :returns: Terminal name.
 
         A non-empty ``TERM_PROGRAM`` environment value or a unique ``TERM`` that matches wcwidth
         other than 'xterm' returns that value. Otherwise, an in-band XTVERSION query is made and its

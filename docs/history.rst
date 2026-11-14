@@ -6,6 +6,8 @@ Version History
 1.52 (unreleased, on "master" branch only)
   * bugfix: :meth:`~Terminal.wrap` discarded lines containing only spaces or tabs when
     ``drop_whitespace=False``, they are now wrapped and retained, :ghpull:`423`.
+  * change: type of :attr:`~Terminal.term_program` changed from ``Union[str,bool]`` to ``str``,
+    :ghpull:`433`
 
 1.51
   * introduced: :meth:`~Terminal.clip` to extract a "window" of displayed columns from a string, a
