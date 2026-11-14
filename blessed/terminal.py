@@ -1501,24 +1501,23 @@ class Terminal():
             timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS,
             force: bool = False) -> str:
         r"""
-        Detect the terminal software name used for width or alignment functions.
+        Detect the terminal software name applied to python wcwidth correction tables.
 
         :arg float timeout: Timeout in seconds to await an XTVERSION response.
         :arg bool force: Detect again, bypassing the cache.
-        :rtype: bool or str
-        :returns: Terminal name.
+        :rtype: str
+        :returns: Terminal name, wcwidth alias, or an empty string when unknown.
 
         A non-empty ``TERM_PROGRAM`` environment value or a unique ``TERM`` that matches wcwidth
         other than 'xterm' returns that value. Otherwise, an in-band XTVERSION query is made and its
-        software name returned, if the terminal responds.
+        software name is returned if responded.
 
-        The result is cached, assigned to :attr:`term_program`, and returned, and used automatically
-        by width or alignment methods, :meth:`length`, :meth:`wrap`, :meth:`ljust`, :meth:`rjust`,
-        and :meth:`center`.
+        The result is cached, assigned to :attr:`term_program`, and used automatically by width or
+        alignment methods, :meth:`length`, :meth:`wrap`, :meth:`ljust`, :meth:`rjust`, and
+        :meth:`center`.
 
-        When :attr:`is_a_tty` or :attr:`does_styling` is False, or no keyboard file descriptor is
-        available, XTVERSION inquiries are not made, timeout does not apply, and the result is not
-        cached, so a terminal attached later may be inquired.
+        When :attr:`is_a_tty` or :attr:`does_styling` is False, or no keyboard is available,
+        XTVERSION inquiries are not made and timeout does not apply, and the result is not cached.
         """
         if not force and self._term_program_probed:
             return self.term_program
@@ -3886,7 +3885,7 @@ class Terminal():
             width = self.width
         return wcwidth_ljust(text, width.__index__(), fillchar,
                              ambiguous_width=self.ambiguous_width,
-                             term_program=self.term_program)
+                             term_program=(self.term_program or True))
 
     def rjust(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
@@ -3903,7 +3902,7 @@ class Terminal():
             width = self.width
         return wcwidth_rjust(text, width.__index__(), fillchar,
                              ambiguous_width=self.ambiguous_width,
-                             term_program=self.term_program)
+                             term_program=(self.term_program or True))
 
     def center(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
@@ -3920,7 +3919,7 @@ class Terminal():
             width = self.width
         return wcwidth_center(text, width.__index__(), fillchar,
                               ambiguous_width=self.ambiguous_width,
-                              term_program=self.term_program)
+                              term_program=(self.term_program or True))
 
     def text_sized(
         self,
@@ -4079,7 +4078,7 @@ class Terminal():
             *0*.
         """
         return wcwidth_width(text, ambiguous_width=self.ambiguous_width,
-                             term_program=self.term_program)
+                             term_program=(self.term_program or True))
 
     def strip(self, text: str, chars: Optional[str] = None) -> str:
         r"""
@@ -4184,7 +4183,7 @@ class Terminal():
                 f"invalid width {width!r}({type(width)!r}) (must be integer > 0)"
             )
         kwargs.setdefault('ambiguous_width', self.ambiguous_width)
-        kwargs.setdefault('term_program', self.term_program)
+        kwargs.setdefault('term_program', self.term_program or True)
         preserve_whitespace = not kwargs.get('drop_whitespace', True)
         lines: List[str] = []
         for line in text.splitlines():

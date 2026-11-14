@@ -44,6 +44,22 @@ def test_length_term_program_correction(monkeypatch):
     assert term.length('\u2630') == 1  # VTE renders trigrams narrow
 
 
+def test_length_empty_term_program_falls_back_to_wcwidth(monkeypatch):
+    """An empty term_program passes True to wcwidth, which reads the environment."""
+    # This is only really theoretical: that we are unable to identify the terminal by TERM or
+    # TERM_PROGRAM, the exact same approach taken by wcwidth, so internally we then pass
+    # 'wcwidth.width(..., term_program=True)', which then allows wcwidth to also do terminal
+    # identification, and in this case match vte. It makes little difference to behavior, only that
+    # it allows by API contract that wcwidth may later do a better job of identification.
+    #
+    # I hope someday libvte/gnome-terminal will support this simple WIDE character! Go ahead and
+    # change this test for some other legacy terminal or edge case when that day comes, god willing.
+    monkeypatch.setenv('TERM_PROGRAM', 'vte')
+    term = TestTerminal(stream=StringIO(), force_styling=True)
+    term.term_program = ''
+    assert term.length('\u2630') == 1
+
+
 def test_length_with_zwj():
     """Test that ZWJ sequences are measured correctly like wcswidth()."""
     def child():
