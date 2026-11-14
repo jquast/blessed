@@ -494,7 +494,7 @@ def test_padd():
         # local
 
         from blessed.sequences import Sequence
-        term = TestTerminal(kind=kind)
+        term = TestTerminal(kind=kind, force_styling=True)
         assert Sequence('xyz\b', term).padd() == 'xy'
         assert Sequence('xyz\b-', term).padd() == 'xy-'
         assert Sequence('xxxx\x1b[3Dzz', term).padd() == 'xzz'
@@ -885,3 +885,53 @@ def test_get_proxy_string_deprecated():
     """get_proxy_string() returns None (deprecated, no warning emitted)."""
     from blessed.formatters import get_proxy_string
     assert get_proxy_string(None, 'any_cap') is None
+
+
+@pytest.mark.parametrize('api', ['clip', 'truncate', 'sequence_clip', 'sequence_truncate'])
+@pytest.mark.parametrize('text,width,expected', [
+    ('abc\x1b[2DX', 3, 'aXc'),
+    ('中\bX', 2, ' X'),
+    ('a\u0301\bX', 1, 'X'),
+    ('👩\u200d💻\bX', 2, ' X'),
+    ('abc\bX', 3, 'abX'),
+])
+def test_clip_cursor_overwrites_display_cells(any_term, api, text, width, expected):
+    """Clipping resolves cursor movement in display cells without deleting the untouched tail."""
+    # local
+    from blessed.sequences import Sequence
+
+    term = TestTerminal(kind=any_term, force_styling=True)
+    seq = Sequence(text, term)
+    operations = {
+        'clip': lambda: term.clip(text, 0, width),
+        'truncate': lambda: term.truncate(text, width),
+        'sequence_clip': lambda: seq.clip(0, width),
+        'sequence_truncate': lambda: seq.truncate(width),
+    }
+    assert operations[api]() == expected
+
+
+@pytest.mark.parametrize('text', ['abc\bX', 'abc\x1b[2DX', '中\bX'])
+def test_clip_honors_ignored_cursor_movement(any_term, text):
+    """Ignored cursor controls remain literal zero-width sequences."""
+    # local
+    term = TestTerminal(kind=any_term, force_styling=True)
+    result = term.clip(text, control_codes='ignore')
+    assert result == text
+
+
+def test_clip_rejects_out_of_bounds_cursor_movement(any_term):
+    """Strict clipping sees the original invalid cursor movement before it can be removed."""
+    # local
+    term = TestTerminal(kind=any_term, force_styling=True)
+    with pytest.raises(ValueError, match='Cursor left movement'):
+        term.clip('\x1b[2DX', control_codes='strict')
+
+
+def test_clip_overwritten_window(any_term):
+    """A clipped window includes the surviving tail after a cursor-left overwrite."""
+    # local
+    term = TestTerminal(kind=any_term, force_styling=True)
+    text = 'abc\x1b[2DX'
+    result = term.clip(text, 1, 3)
+    assert result == 'Xc'

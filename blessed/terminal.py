@@ -4017,8 +4017,8 @@ class Terminal():
         Return a window of ``text`` spanning display columns ``start`` to ``end``.
 
         Terminal sequences are retained, wide characters split at a boundary are
-        replaced by ``fillchar``, and horizontal cursor movement is expanded by
-        :meth:`Sequence.padd`.  The detected :attr:`ambiguous_width` and
+        replaced by ``fillchar``, and horizontal cursor movement is interpreted by
+        :func:`wcwidth.clip`. The detected :attr:`ambiguous_width` and
         :attr:`term_program` are applied.
 
         :arg str text: Text to clip, may contain terminal sequences
