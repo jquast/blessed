@@ -179,7 +179,7 @@ class Sequence(str):
         """
         return wcwidth_ljust(self, width.__index__(), fillchar, control_codes='ignore',
                              ambiguous_width=self._term.ambiguous_width,
-                             term_program=self._term.term_program)
+                             term_program=(self._term.term_program or True))
 
     def rjust(self, width: SupportsIndex, fillchar: str = ' ') -> str:
         """
@@ -192,7 +192,7 @@ class Sequence(str):
         """
         return wcwidth_rjust(self, width.__index__(), fillchar, control_codes='ignore',
                              ambiguous_width=self._term.ambiguous_width,
-                             term_program=self._term.term_program)
+                             term_program=(self._term.term_program or True))
 
     def center(self, width: SupportsIndex, fillchar: str = ' ') -> str:
         """
@@ -205,7 +205,7 @@ class Sequence(str):
         """
         return wcwidth_center(self, width.__index__(), fillchar, control_codes='ignore',
                               ambiguous_width=self._term.ambiguous_width,
-                              term_program=self._term.term_program)
+                              term_program=(self._term.term_program or True))
 
     def clip(self, start: SupportsIndex = 0, end: SupportsIndex = -1, *,
              fillchar: str = ' ', tabsize: int = 8,
@@ -227,7 +227,7 @@ class Sequence(str):
             fillchar=fillchar, tabsize=tabsize,
             ambiguous_width=self._term.ambiguous_width,
             propagate_sgr=propagate_sgr, control_codes=control_codes,
-            overtyping=overtyping, term_program=self._term.term_program)
+            overtyping=overtyping, term_program=(self._term.term_program or True))
 
     def truncate(self, width: SupportsIndex) -> str:
         """
@@ -275,7 +275,7 @@ class Sequence(str):
             considered lengthy (a length of 0).
         """
         return wcwidth_width(self, ambiguous_width=self._term.ambiguous_width,
-                             term_program=self._term.term_program)
+                             term_program=(self._term.term_program or True))
 
     def strip(self, chars: Optional[str] = None) -> str:
         """

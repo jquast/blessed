@@ -1136,8 +1136,8 @@ def test_no_query_without_tty(monkeypatch):
     stream = StringIO()
     term = TestTerminal(stream=stream, force_styling=True)
     assert term.ambiguous_width == 1
-    # Unknown, so wcwidth reads TERM_PROGRAM and TERM itself.
-    assert term.term_program is True
+    # Unknown, so no corrections are applied.
+    assert term.term_program == ''
     assert stream.getvalue() == ''
 
 

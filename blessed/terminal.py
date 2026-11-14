@@ -330,8 +330,7 @@ class Terminal():
         self._ambiguous_width_probed: bool = False
 
         #: Normalized terminal software name for python wcwidth correction tables.
-        #: ``True`` when unknown, so wcwidth reads ``TERM_PROGRAM`` and ``TERM`` itself.
-        self.term_program: Union[bool, str] = True
+        self.term_program: str = ''
         self._term_program_probed: bool = False
         self.detect_term_program()
 
@@ -1500,55 +1499,60 @@ class Terminal():
     def detect_term_program(
             self,
             timeout: float = TERMINAL_QUERY_TIMEOUT_SECONDS,
-            force: bool = False) -> Union[bool, str]:
+            force: bool = False) -> str:
         r"""
         Detect the terminal software name applied to python wcwidth correction tables.
 
         :arg float timeout: Timeout in seconds to await an XTVERSION response.
         :arg bool force: Detect again, bypassing the cache.
-        :rtype: bool or str
-        :returns: Normalized terminal name, or ``True`` when unknown, so wcwidth reads the
-            ``TERM_PROGRAM`` and ``TERM`` environment values itself.
+        :rtype: str
+        :returns: Terminal name, wcwidth alias, or an empty string when unknown.
 
-        A non-empty ``TERM_PROGRAM`` environment value takes precedence, and a ``TERM`` that
-        names its terminal is left to wcwidth's own environment lookup, neither makes an
-        inquiry.  An XTVERSION query is made otherwise, identifying terminals that report an
-        uninformative ``TERM=xterm``, such as 'mlterm' and 'putty'.
+        A non-empty ``TERM_PROGRAM`` environment value or a unique ``TERM`` that matches wcwidth
+        other than 'xterm' returns that value. Otherwise, an in-band XTVERSION query is made and its
+        software name is returned if responded.
 
-        The result is cached, assigned to :attr:`term_program`, and returned, and used
-        automatically by subsequent alignment methods, :meth:`length`, :meth:`wrap`,
-        :meth:`ljust`, :meth:`rjust`, and :meth:`center`.
+        The result is cached, assigned to :attr:`term_program`, and used automatically by width or
+        alignment methods, :meth:`length`, :meth:`wrap`, :meth:`ljust`, :meth:`rjust`, and
+        :meth:`center`.
 
-        When :attr:`is_a_tty` is False, no sequences are transmitted or response awaited, and
-        the current value is returned without inquiry, and without caching, so that a terminal
-        attached after initialization, such as a remote stream, may be inquired by a later call.
+        When :attr:`is_a_tty` or :attr:`does_styling` is False, or no keyboard is available,
+        XTVERSION inquiries are not made and timeout does not apply, and the result is not cached.
         """
         if not force and self._term_program_probed:
             return self.term_program
 
+        # TERM_PROGRAM is highest precedence even though it is sometimes wrong, for example when
+        # launching a terminal without TERM_PROGRAM from another term where TERM_PROGRAM is defined.
+        # Environment variables are given highest precedence, for determinism like automatic tests.
         version = self._software_version_from_env()
         if version is not None:
             self.term_program = version.name
             self._term_program_probed = True
             return self.term_program
 
+        # TERM is then checked for "uniqueness", many modern terminal emulators also publish their
+        # own terminfo files. Note that a TERM equal to 'xterm' is not authoritative here, only a
+        # subsequent XTVERSION query can distinguish a true 'xterm' from its impostors, like mlterm
+        # or putty, which use TERM=xterm.
         term = os.environ.get('TERM', '').strip().lower()
+        if term in list_term_programs():
+            self.term_program = term
+            if term != 'xterm':
+                self._term_program_probed = True
+                return self.term_program
 
-        # TERM=xterm identification is non-authoritative for terminal identification. subsequent
-        # XTVERSION query can identify 'xterm' or its imposters, 'mlterm' and 'putty'.
-        if term != 'xterm' and term in list_term_programs():
-            self.term_program = True
-            self._term_program_probed = True
-            return self.term_program
-
+        # XTVERSION: when the terminal is interactive, query using an in-band protocol,
+        # this is the most authoritative and trusted source where the terminal self-identifies. This
+        # library does not attempt ENQ identification, known only to identify PuTTY, Extraterm, and
+        # rxvt.
         if not self.is_a_tty or not self.does_styling or self._keyboard_fd is None:
             return self.term_program
 
         version = self.get_software_version(timeout=timeout)
         if version is not None and version.name:
             self.term_program = version.name
-        else:
-            self.term_program = True
+
         self._term_program_probed = True
         return self.term_program
 
@@ -3881,7 +3885,7 @@ class Terminal():
             width = self.width
         return wcwidth_ljust(text, width.__index__(), fillchar,
                              ambiguous_width=self.ambiguous_width,
-                             term_program=self.term_program)
+                             term_program=(self.term_program or True))
 
     def rjust(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
@@ -3898,7 +3902,7 @@ class Terminal():
             width = self.width
         return wcwidth_rjust(text, width.__index__(), fillchar,
                              ambiguous_width=self.ambiguous_width,
-                             term_program=self.term_program)
+                             term_program=(self.term_program or True))
 
     def center(self, text: str, width: Optional[SupportsIndex] = None, fillchar: str = ' ') -> str:
         """
@@ -3915,7 +3919,7 @@ class Terminal():
             width = self.width
         return wcwidth_center(text, width.__index__(), fillchar,
                               ambiguous_width=self.ambiguous_width,
-                              term_program=self.term_program)
+                              term_program=(self.term_program or True))
 
     def text_sized(
         self,
@@ -4074,7 +4078,7 @@ class Terminal():
             *0*.
         """
         return wcwidth_width(text, ambiguous_width=self.ambiguous_width,
-                             term_program=self.term_program)
+                             term_program=(self.term_program or True))
 
     def strip(self, text: str, chars: Optional[str] = None) -> str:
         r"""
@@ -4179,7 +4183,7 @@ class Terminal():
                 f"invalid width {width!r}({type(width)!r}) (must be integer > 0)"
             )
         kwargs.setdefault('ambiguous_width', self.ambiguous_width)
-        kwargs.setdefault('term_program', self.term_program)
+        kwargs.setdefault('term_program', self.term_program or True)
         preserve_whitespace = not kwargs.get('drop_whitespace', True)
         lines: List[str] = []
         for line in text.splitlines():
