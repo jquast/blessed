@@ -352,7 +352,7 @@ def test_empty_term_program_still_queries(monkeypatch):
 
 @pytest.mark.parametrize('term', ['xterm-kitty', 'foot'])
 def test_resolvable_term_skips_the_query(monkeypatch, term):
-    """A TERM that names its terminal is left to wcwidth's own environment lookup."""
+    """A known TERM-identified terminal is assigned without XTVERSION inquiry."""
     monkeypatch.setenv('TERM_PROGRAM', '')
     monkeypatch.setenv('TERM', term)
     terminal = TestTerminal(force_styling=True)
@@ -360,9 +360,24 @@ def test_resolvable_term_skips_the_query(monkeypatch, term):
     terminal._keyboard_fd = 0  # pylint: disable=protected-access
 
     with mock.patch.object(Terminal, 'get_software_version') as query:
-        assert terminal.detect_term_program() is True
+        assert terminal.detect_term_program() == term
 
     assert not query.called
+
+
+def test_xterm_term_is_provisional_without_tty(monkeypatch):
+    """TERM=xterm is assigned without caching when no inquiry can be made."""
+    monkeypatch.setenv('TERM_PROGRAM', '')
+    monkeypatch.setenv('TERM', 'xterm')
+    terminal = TestTerminal(force_styling=True)
+    assert terminal.term_program == 'xterm'
+    assert not terminal._term_program_probed  # pylint: disable=protected-access
+    terminal._is_a_tty = True  # pylint: disable=protected-access
+    terminal._keyboard_fd = 0  # pylint: disable=protected-access
+    response = SoftwareVersion('\x1bP>|mlterm(3.9.4)\x1b\\', 'mlterm', '3.9.4')
+
+    with mock.patch.object(Terminal, 'get_software_version', return_value=response):
+        assert terminal.detect_term_program() == 'mlterm'
 
 
 def test_claimed_term_still_queries(monkeypatch):

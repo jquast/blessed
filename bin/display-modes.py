@@ -245,7 +245,9 @@ def main():
     print(f" .number_of_colors: {_24bit if term.number_of_colors == 1 << 24 else _no_colors}")
     _ambig = term.bright_cyan('Wide (2)') if term.ambiguous_width == 2 else 'Narrow (1)'
     print(f" .ambiguous_width: {_ambig}")
-    _program = term.bright_cyan(term.term_program or term.bright_black('unknown'))
+    _program = term.bright_black('unknown')
+    if isinstance(term.term_program, str):
+        _program = term.bright_cyan(term.term_program)
     print(f" .term_program: {_program}")
     print()
 
