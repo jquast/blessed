@@ -494,7 +494,7 @@ def test_padd():
         # local
 
         from blessed.sequences import Sequence
-        term = TestTerminal(kind=kind)
+        term = TestTerminal(kind=kind, force_styling=True)
         assert Sequence('xyz\b', term).padd() == 'xy'
         assert Sequence('xyz\b-', term).padd() == 'xy-'
         assert Sequence('xxxx\x1b[3Dzz', term).padd() == 'xzz'
