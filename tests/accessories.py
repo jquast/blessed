@@ -8,7 +8,6 @@ import traceback
 import contextlib
 import time
 import signal
-import warnings
 
 # local
 from blessed import Terminal
@@ -139,9 +138,7 @@ class as_subprocess():
             return
 
         pid_testrunner = os.getpid()
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=DeprecationWarning)
-            pid, master_fd = pty.fork()  # pylint: disable=possibly-used-before-assignment
+        pid, master_fd = pty.fork()  # pylint: disable=possibly-used-before-assignment
 
         if pid == self._CHILD_PID:
             # child process executes function, raises exception
@@ -372,9 +369,7 @@ def pty_test(child_func, parent_func=None, test_name=None, rows=24, cols=80,
     if test_name is None:
         test_name = getattr(child_func, '__name__', 'pty_test')
 
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=DeprecationWarning)
-        pid, master_fd = pty.fork()
+    pid, master_fd = pty.fork()
 
     if pid != 0:
         # Parent: set up PTY before child proceeds
