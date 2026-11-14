@@ -156,13 +156,13 @@ the terminal and before any measurement:
 
 The call measures even when ``AMBIGUOUS_WIDE`` is set, which only supplies the value until then,
 such as for automated tests.  When no environment value identifies the terminal and no terminal
-answers, such as when output is redirected, the terminal software is ``True`` and ambiguous width
-remains narrow.  Blank ``TERM_PROGRAM`` to unset it and fall back to a recognized ``TERM`` or the
-XTVERSION query.
+answers, such as when output is redirected, correction tables do not apply and ambiguous width
+remains narrow.
 
 :meth:`~.Terminal.detect_term_program` applies the same detection and assigns
-:attr:`~.Terminal.term_program`, which is useful for a terminal attached after construction, such as
-a remote stream, when the XTVERSION query could not be made at class-initialization.
+:attr:`~.Terminal.term_program`, which could be changed after construction when integrating blessed
+with remote streams like telnet or ssh, or any other circumstance where correction overrides are
+needed.
 
 Text Sizing
 -----------
