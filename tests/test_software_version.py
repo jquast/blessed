@@ -318,14 +318,14 @@ def test_late_xtversion_response_is_not_a_keystroke():
     """A reply arriving after its query timed out is recorded, not applied."""
     def child(term):
         term._software_version_cache = None  # pylint: disable=protected-access
-        term.term_program = True  # unknown, as after a timed-out query
+        term.term_program = ''  # unknown, as after a timed-out query
         term.ungetch('\x1bP>|kitty(0.24.2)\x1b\\')
         term.ungetch('Z')
 
         ks = term.inkey(timeout=0.1)
 
         assert str(ks) == 'Z', repr(ks)
-        assert term.term_program is True
+        assert term.term_program == ''
         assert term._software_version_cache is None
         assert any('XTVERSION_RESPONSE' in err for err in term.errors), term.errors
         return b'LATE_XTV'
@@ -352,7 +352,7 @@ def test_empty_term_program_still_queries(monkeypatch):
 
 @pytest.mark.parametrize('term', ['xterm-kitty', 'foot'])
 def test_resolvable_term_skips_the_query(monkeypatch, term):
-    """A TERM that names its terminal is left to wcwidth's own environment lookup."""
+    """A TERM that names its terminal is assigned without inquiry."""
     monkeypatch.setenv('TERM_PROGRAM', '')
     monkeypatch.setenv('TERM', term)
     terminal = TestTerminal(force_styling=True)
@@ -360,7 +360,7 @@ def test_resolvable_term_skips_the_query(monkeypatch, term):
     terminal._keyboard_fd = 0  # pylint: disable=protected-access
 
     with mock.patch.object(Terminal, 'get_software_version') as query:
-        assert terminal.detect_term_program() is True
+        assert terminal.detect_term_program() == term
 
     assert not query.called
 
@@ -403,7 +403,7 @@ def test_detect_term_program_without_tty_defers(monkeypatch):
     response = SoftwareVersion('\x1bP>|foot(1.20.1)\x1b\\', 'foot', '1.20.1')
 
     with mock.patch.object(Terminal, 'get_software_version', return_value=response) as query:
-        assert terminal.detect_term_program() is True
+        assert terminal.detect_term_program() == ''
         assert not query.called
         terminal._is_a_tty = True  # pylint: disable=protected-access
         terminal._keyboard_fd = 0  # pylint: disable=protected-access

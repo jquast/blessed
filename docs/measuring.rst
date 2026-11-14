@@ -134,10 +134,10 @@ Terminal Corrections
 The rendered width of some characters depends on the terminal software, as discovered by the
 `ucs-detect <https://ucs-detect.readthedocs.io/results.html>`_ project.  At class-initialization,
 blessed identifies the terminal software by the ``TERM_PROGRAM`` environment variable, set by most
-modern terminal emulators, and otherwise by the `XTVERSION
-<https://vtdn.dev/docs/dcs/xtversion/>`_ query (``CSI > q``), then applies the matching wcwidth_
-`correction tables <https://wcwidth.readthedocs.io/en/latest/intro.html#corrections>`_ to the
-methods above.
+modern terminal emulators, by a ``TERM`` value recognized by wcwidth, and otherwise by the
+`XTVERSION <https://vtdn.dev/docs/dcs/xtversion/>`_ query (``CSI > q``), then applies the matching
+wcwidth_ `correction tables <https://wcwidth.readthedocs.io/en/latest/intro.html#corrections>`_ to
+the methods above.
 
 Whether East Asian ambiguous characters are rendered wide or narrow is measured on demand, by
 :meth:`~.Terminal.detect_ambiguous_width`, which draws and erases a test character and assigns the
@@ -155,13 +155,14 @@ the terminal and before any measurement:
     print(term.term_program, term.ambiguous_width)
 
 The call measures even when ``AMBIGUOUS_WIDE`` is set, which only supplies the value until then,
-such as for automated tests.  When no terminal answers, such as when output is redirected, the
-terminal software is ``True`` and ambiguous width remains narrow.  Blank ``TERM_PROGRAM`` to unset
-it and make the XTVERSION query.
+such as for automated tests.  When no environment value identifies the terminal and no terminal
+answers, such as when output is redirected, correction tables do not apply and ambiguous width
+remains narrow.
 
 :meth:`~.Terminal.detect_term_program` applies the same detection and assigns
-:attr:`~.Terminal.term_program`, which is useful for a terminal attached after construction, such as
-a remote stream, when the XTVERSION query could not be made at class-initialization.
+:attr:`~.Terminal.term_program`, which could be changed after construction when integrating blessed
+with remote streams like telnet or ssh, or any other circumstance where correction overrides are
+needed.
 
 Text Sizing
 -----------
