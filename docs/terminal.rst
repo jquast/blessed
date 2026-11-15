@@ -230,14 +230,14 @@ reason.
 .. warning::
 
    Coverage is reported by each individual codepoint, no protocol allows for query of a *sequence*
-   of codepoints, `grahemes <https://mitchellh.com/writing/grapheme-clusters-in-terminals>`_ are not
+   of codepoints, `graphemes <https://mitchellh.com/writing/grapheme-clusters-in-terminals>`_ are not
    supported, meaning a great many kinds of font glyphs that may "tofu" cannot be queried about,
    which is a limitation of both terminal protocols.
 
-   A grapheme cluster may render correctly even though the protocol may report no support of its
-   individual codepoints. For example, U+231A WATCH followed by U+FE0E VARIATION SELECTOR-15, as no
-   font holds a glyph for a variation selector 15, the terminal truthfully reports it as "uncovered"
-   or "tofu", while otherwise drawing the cluster perfectly fine:
+   A grapheme cluster may render correctly even though the protocol may report "no support" of its
+   individual codepoints. For example, `U+231A WATCH` followed by `U+FE0E VARIATION SELECTOR-15`:
+   fonts do not holds a glyph for a variation selector 15, so the terminal truthfully reports it as
+   "uncovered" or "tofu", while otherwise drawing the cluster perfectly fine:
 
     .. code-block:: python
 
