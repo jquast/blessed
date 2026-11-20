@@ -86,8 +86,7 @@ class Termcap():
             return 0
 
         if self.nparams:
-            match = self.re_compiled.match(text)
-            if match:
+            if (match := self.re_compiled.match(text)):
                 return value * int(match.group(1))
             raise ValueError(f'Invalid parameters for termccap {self.name}: {text!r}')
 

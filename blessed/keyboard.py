@@ -1183,8 +1183,7 @@ class Keystroke(str):
         :returns: (y, x) coordinate tuple (0-indexed) for cursor position report,
             or ``(-1, -1)`` if not a CPR_RESPONSE
         """
-        match = RE_PATTERN_CPR.match(self)
-        if match:
+        if (match := RE_PATTERN_CPR.match(self)):
             return (int(match.group(1)) - 1, int(match.group(2)) - 1)
         return (-1, -1)
 
@@ -1197,8 +1196,7 @@ class Keystroke(str):
         :returns: (x, y) coordinate tuple (0-indexed) for cursor position report,
             or ``(-1, -1)`` if not a CPR_RESPONSE
         """
-        match = RE_PATTERN_CPR.match(self)
-        if match:
+        if (match := RE_PATTERN_CPR.match(self)):
             return (int(match.group(2)) - 1, int(match.group(1)) - 1)
         return (-1, -1)
 
@@ -1603,8 +1601,7 @@ def _match_dec_event(text: str,
         if mode_state != DecModeResponse.SET:
             continue
 
-        match = pattern.match(text)
-        if match:
+        if (match := pattern.match(text)):
             return Keystroke(ucs=match.group(0), mode=mode, match=match)
     return None
 
@@ -1612,16 +1609,14 @@ def _match_dec_event(text: str,
 def _match_xtgettcap_response(text: str) -> Optional[Keystroke]:
     """Match XTGETTCAP reply: ESC P 1 + r <hex> = <hex> ESC backslash."""
     # pylint: disable=protected-access
-    match = TermcapResponse._RE_XTGETTCAP_RESPONSE.match(text)
-    if match:
+    if (match := TermcapResponse._RE_XTGETTCAP_RESPONSE.match(text)):
         return Keystroke(ucs=match.group(0), name='XTGETTCAP_RESPONSE')
     return None
 
 
 def _match_xtversion_response(text: str) -> Optional[Keystroke]:
     """Match XTVERSION reply: ESC P > | <name> [version] ESC backslash."""
-    match = SoftwareVersion.RE_RESPONSE.match(text)
-    if match:
+    if (match := SoftwareVersion.RE_RESPONSE.match(text)):
         return Keystroke(ucs=match.group(0), name='XTVERSION_RESPONSE')
     return None
 
@@ -1631,21 +1626,13 @@ def _match_cpr_response(text: str) -> Optional[Keystroke]:
     # Matches terminal CPR responses where row >= 2. Row 1 is not
     # matched on input, preferring to match F3 + Modifier in the
     # legacy CSI letter form.
-    match = RE_PATTERN_CPR.match(text)
-    if match:
+    if (match := RE_PATTERN_CPR.match(text)):
         return Keystroke(ucs=match.group(0), name='CPR_RESPONSE')
     return None
 
 
 def _match_kitty_key(text: str) -> Optional[Keystroke]:
     """Match text against Kitty keyboard protocol patterns."""
-    # Supports Kitty keyboard protocol sequences of the form:
-    # CSI unicode-key-code u                                            # Basic form
-    # CSI unicode-key-code ; modifiers u                                # With modifiers
-    # CSI unicode-key-code : shifted-key : base-key ; modifiers u       # With alternate keys
-    # CSI unicode-key-code ; modifiers : event-type u                   # With event type
-    # CSI unicode-key-code ; modifiers : event-type ; text-codepoints u # Full form
-    match = RE_PATTERN_KITTY_KB_PROTOCOL.match(text)
 
     def int_when_non_empty(_m: Match[str], _key: str) -> Optional[int]:
         return int(_m.group(_key)) if _m.group(_key) else None
@@ -1653,7 +1640,13 @@ def _match_kitty_key(text: str) -> Optional[Keystroke]:
     def int_when_non_empty_otherwise_1(_m: Match[str], _key: str) -> int:
         return int(_m.group(_key)) if _m.group(_key) else 1
 
-    if match:
+    # Supports Kitty keyboard protocol sequences of the form:
+    # CSI unicode-key-code u                                            # Basic form
+    # CSI unicode-key-code ; modifiers u                                # With modifiers
+    # CSI unicode-key-code : shifted-key : base-key ; modifiers u       # With alternate keys
+    # CSI unicode-key-code ; modifiers : event-type u                   # With event type
+    # CSI unicode-key-code ; modifiers : event-type ; text-codepoints u # Full form
+    if (match := RE_PATTERN_KITTY_KB_PROTOCOL.match(text)):
         _int_codepoints: typing.Tuple[int, ...] = tuple()
         if match.group('text_codepoints'):
             _codepoints_text = match.group('text_codepoints').split(':')
@@ -1689,8 +1682,7 @@ def _match_modify_other_keys(text: str) -> Optional['Keystroke']:
     # Supports xterm ModifyOtherKeys sequences of the form:
     # ESC [ 27 ; modifiers ; key ~     # Standard form
     # ESC [ 27 ; modifiers ; key       # Alternative form without trailing ~
-    match = RE_PATTERN_MODIFY_OTHER.match(text)
-    if match:
+    if (match := RE_PATTERN_MODIFY_OTHER.match(text)):
         # Create ModifyOtherKeysEvent namedtuple
         modify_event = ModifyOtherKeysEvent(
             key=int(match.group('key')),
@@ -1706,8 +1698,7 @@ def _match_modify_other_keys(text: str) -> Optional['Keystroke']:
 def _match_legacy_csi_letter_form(text: str) -> Optional[Keystroke]:
     """Match legacy CSI letter form: ESC [ 1 ; modifiers [ABCDEFHPQRS]."""
     # Handles arrow keys, Home/End, F1-F4 with modifiers.
-    match = RE_PATTERN_LEGACY_CSI_MODIFIERS.match(text)
-    if not match:
+    if not (match := RE_PATTERN_LEGACY_CSI_MODIFIERS.match(text)):
         return None
 
     modifiers = int(match.group('mod'))
@@ -1732,8 +1723,7 @@ def _match_legacy_csi_tilde_form(text: str) -> Optional[Keystroke]:
     # Handles function keys and navigation keys (Insert, Delete, Page Up/Down, etc.)
     # with modifiers. See https://tomscii.sig7.se/zutty/doc/KEYS.html and
     # https://invisible-island.net/xterm/xterm-function-keys.html for reference.
-    match = RE_PATTERN_LEGACY_CSI_TILDE.match(text)
-    if not match:
+    if not (match := RE_PATTERN_LEGACY_CSI_TILDE.match(text)):
         return None
 
     modifiers = int(match.group('mod'))
@@ -1757,8 +1747,7 @@ def _match_legacy_csi_tilde_form(text: str) -> Optional[Keystroke]:
 def _match_legacy_ss3_fkey_form(text: str) -> Optional[Keystroke]:
     """Match legacy SS3 F-key form: ESC O modifier [PQRS]."""
     # Handles F1-F4 with modifiers in SS3 format (used by Konsole and others).
-    match = RE_PATTERN_LEGACY_SS3_FKEYS.match(text)
-    if not match:
+    if not (match := RE_PATTERN_LEGACY_SS3_FKEYS.match(text)):
         return None
 
     modifiers = int(match.group('mod'))
