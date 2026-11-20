@@ -49,7 +49,7 @@ EMOJI_ZWJ_TESTS = (
     ('v12', '\U0001F9D1\u200D\U0001F91D\u200D\U0001F9D1'),  # people holding hands
     ('v12.1', '\U0001F9D1\u200D\U0001F33E'),  # farmer
     ('v13', '\U0001F9D1\u200D\U0001F384'),  # mx claus
-    ('v13.1', '\u2764\uFE0F\u200D\U0001F525'),  # heart on fire (E13.1 → Unicode 13.0)
+    ('v13.1', '\u2764\uFE0F\u200D\U0001F525'),  # heart on fire (E13.1/Unicode 13.0)
     ('v14', '\U0001FAF1\U0001F3FB\u200D\U0001FAF2\U0001F3FC'),  # handshake: light, medium-light
     ('v15', '\U0001F426\u200D\u2B1B'),  # black bird
     ('v15.1', '\U0001F3C3\u200D\u27A1\uFE0F'),  # person running facing right

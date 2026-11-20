@@ -811,7 +811,7 @@ def test_mouse_legacy_wheel_events():
     """Test legacy mouse wheel event parsing."""
     cache = make_enabled_dec_cache()
 
-    # Wheel up: cb=64 → chr(64+32)='`'
+    # Wheel up: cb=64 -> chr(64+32)='`'
     wheel_up_seq = '\x1b[M`@@'
     ks_wheel_up = _match_dec_event(wheel_up_seq, dec_mode_cache=cache)
 
@@ -820,7 +820,7 @@ def test_mouse_legacy_wheel_events():
     assert values.button_value == 64
     assert ks_wheel_up.name == 'MOUSE_SCROLL_UP'
 
-    # Wheel down: cb=65 → chr(65+32)='a'
+    # Wheel down: cb=65 -> chr(65+32)='a'
     wheel_down_seq = '\x1b[Ma@@'
     ks_wheel_down = _match_dec_event(wheel_down_seq, dec_mode_cache=cache)
 
@@ -875,42 +875,42 @@ def test_mouse_sgr_pixels_precedence():
 
 
 @pytest.mark.parametrize("kwargs,expected_modes", [
-    # Default: clicks=True → SGR encoding (1006) + click tracking (1000)
+    # Default: clicks=True -> SGR encoding (1006) + click tracking (1000)
     ({}, ['1006', '1000']),
 
-    # All tracking disabled → only SGR encoding (1006), although this is
+    # All tracking disabled -> only SGR encoding (1006), although this is
     # possible, there isn't any reason to do this -- no mouse events can
     # be captured.
     ({'clicks': False, 'report_drag': False, 'report_motion': False}, ['1006']),
 
-    # report_drag=True → SGR encoding (1006) + drag tracking (1002)
+    # report_drag=True -> SGR encoding (1006) + drag tracking (1002)
     ({'report_drag': True}, ['1006', '1002']),
-    # report_motion=True → SGR encoding (1006) + motion tracking (1003)
+    # report_motion=True -> SGR encoding (1006) + motion tracking (1003)
     ({'report_motion': True}, ['1006', '1003']),
 
-    # Precedence test: clicks=True + report_drag=True → drag wins (1002)
+    # Precedence test: clicks=True + report_drag=True -> drag wins (1002)
     ({'clicks': True, 'report_drag': True}, ['1006', '1002']),
-    # Precedence test: clicks=True + report_motion=True → motion wins (1003)
+    # Precedence test: clicks=True + report_motion=True -> motion wins (1003)
     ({'clicks': True, 'report_motion': True}, ['1006', '1003']),
-    # Precedence test: report_drag=True + report_motion=True → motion wins (1003)
+    # Precedence test: report_drag=True + report_motion=True -> motion wins (1003)
     ({'report_drag': True, 'report_motion': True}, ['1006', '1003']),
-    # Precedence test: all tracking modes True → motion wins (1003)
+    # Precedence test: all tracking modes True -> motion wins (1003)
     ({'clicks': True, 'report_drag': True, 'report_motion': True}, ['1006', '1003']),
 
-    # With report_pixels: default + pixels → SGR (1006) + clicks (1000) + pixels (1016)
+    # With report_pixels: default + pixels -> SGR (1006) + clicks (1000) + pixels (1016)
     ({'report_pixels': True}, ['1006', '1000', '1016']),
-    # With report_pixels: drag + pixels → SGR (1006) + drag (1002) + pixels (1016)
+    # With report_pixels: drag + pixels -> SGR (1006) + drag (1002) + pixels (1016)
     ({'report_drag': True, 'report_pixels': True}, ['1006', '1002', '1016']),
-    # With report_pixels: motion + pixels → SGR (1006) + motion (1003) + pixels (1016)
+    # With report_pixels: motion + pixels -> SGR (1006) + motion (1003) + pixels (1016)
     ({'report_motion': True, 'report_pixels': True}, ['1006', '1003', '1016']),
-    # With report_pixels: precedence (all True) + pixels
-    # → SGR (1006) + motion (1003) + pixels (1016)
+    # With report_pixels: precedence (all True) + pixels ->
+    # SGR (1006) + motion (1003) + pixels (1016)
     (
         {'clicks': True, 'report_drag': True, 'report_motion': True, 'report_pixels': True},
         ['1006', '1003', '1016']
     ),
 
-    # With report_pixels: no tracking + pixels → SGR (1006) + pixels (1016),
+    # With report_pixels: no tracking + pixels -> SGR (1006) + pixels (1016),
     # again, this is possible, but there isn't any reason to do this -- no mouse
     # events can be captured.
     (

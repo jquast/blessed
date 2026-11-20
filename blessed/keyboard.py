@@ -213,7 +213,7 @@ class KittyModifierBits:
 
     #: The base_name (KEY_ prefix stripped) of each modifier key. Used to
     #: prevent the key's own modifier from appearing in its :attr:`Keystroke.name`
-    #: (e.g. LEFT_SHIFT pressed → KEY_LEFT_SHIFT, not KEY_SHIFT_LEFT_SHIFT).
+    #: (e.g. LEFT_SHIFT pressed -> KEY_LEFT_SHIFT, not KEY_SHIFT_LEFT_SHIFT).
     modifier_key_base_names = frozenset({
         'LEFT_SHIFT', 'RIGHT_SHIFT',
         'LEFT_CONTROL', 'RIGHT_CONTROL',
@@ -1090,9 +1090,9 @@ class Keystroke(str):
         - Plain text: 'a', 'A', '1', ';', ' ', 'Ω', emoji with ZWJ sequences
         - Alt+printable: Alt+a -> 'a', Alt+A -> 'A'
         - Ctrl+letter: Ctrl+A -> 'a', Ctrl+Z -> 'z'
-        - Ctrl+symbol: Ctrl+@ -> '@', Ctrl+? -> '?', Ctrl+[ → '['
+        - Ctrl+symbol: Ctrl+@ -> '@', Ctrl+? -> '?', Ctrl+[ -> '['
         - Control chars: '\t', '\n', '\x08', '\x1b' (for Enter/Tab/Backspace/Escape keycodes)
-        - Application keys: KEY_UP, KEY_F1, etc. → ''
+        - Application keys: KEY_UP, KEY_F1, etc. -> ''
         - Release events: always -> ''
         """
         # Release events never have text
