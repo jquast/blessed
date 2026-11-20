@@ -3,15 +3,17 @@
 Version History
 ===============
 
-1.52 (unreleased, on "master" branch only)
-  * bugfix: :meth:`~Terminal.wrap` discarded lines containing only spaces or tabs when
-    ``drop_whitespace=False``, they are now wrapped and retained, :ghpull:`423`.
+1.53
   * change: type of :attr:`~Terminal.term_program` changed from ``Union[str,bool]`` to ``str``,
     :ghpull:`433`
-  * improve: performance of :meth:`~Terminal.clip` and :meth:`~Terminal.truncate`, :ghpull:`427`.
+  * improve: performance of :meth:`~Terminal.clip` and :meth:`~Terminal.truncate`, :ghpull:`434`.
   * bugfix: small mathematics errors in :func:`~blessed.color.dist_cie2000` and
     :func:`~blessed.color.dist_cie94` now match the test data published by Sharma, Wu & Dalal
     (2005), :ghissue:`424`.
+
+1.52
+  * bugfix: :meth:`~Terminal.wrap` discarded lines containing only spaces or tabs when
+    ``drop_whitespace=False``, they are now wrapped and retained, :ghpull:`423`.
 
 1.51
   * introduced: :meth:`~Terminal.clip` to extract a "window" of displayed columns from a string, a
