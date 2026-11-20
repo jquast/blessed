@@ -44,3 +44,11 @@ Test Coverage
 When you contribute a new feature, make sure it is covered by tests.
 
 Likewise, a bug fix should include a test demonstrating the bug.
+
+Releasing
+~~~~~~~~~
+
+Releases are published by ``.github/workflows/release.yml`` using `PyPI trusted publishing
+<https://docs.pypi.org/trusted-publishers/>`_. Set new ``__version__`` in ``blessed/__init__.py``,
+commit, then, publish a release on github by matching version tag of that commit; the workflow
+builds the sdist and wheel, runs ``twine check --strict``, and uploads them.
