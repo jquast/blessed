@@ -381,6 +381,7 @@ class LineEditor:  # pylint: disable=too-many-instance-attributes
         if count == 0:
             self._undo_stack.pop()
             return LineEditResult(changed=False)
+        self._navigating_history = False
         return LineEditResult(changed=True)
 
     def clear(self) -> None:

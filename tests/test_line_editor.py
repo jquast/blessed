@@ -533,6 +533,33 @@ class TestLineEditorUndo:
 class TestLineEditorHistory:
     """Test history navigation and submission within the editor."""
 
+    @pytest.mark.parametrize("method", ["feed_key", "insert_text"])
+    def test_inserting_into_recalled_line_saves_edited_draft(self, method: str) -> None:
+        """Test typing and pasting both start navigation from the edited line."""
+        h = History()
+        h.add("alpha")
+        h.add("bravo")
+        ed = _editor("draft", _UP, history=h)
+        result = getattr(ed, method)(" edited")
+        assert result.changed is True
+        assert ed.line == "bravo edited"
+        assert ed.feed_key(_DOWN).changed is False
+        assert ed.line == "bravo edited"
+        ed.feed_key(_UP)
+        assert ed.line == "bravo"
+        ed.feed_key(_DOWN)
+        assert ed.line == "bravo edited"
+
+    @pytest.mark.parametrize("text,limit", [("", 0), ("\x01\x02", 0), ("x", 5)])
+    def test_noop_paste_keeps_history_navigation(self, text: str, limit: int) -> None:
+        """Test a paste that inserts nothing preserves the original draft."""
+        h = History()
+        h.add("bravo")
+        ed = _editor("draft", _UP, history=h, limit=limit)
+        assert ed.insert_text(text).changed is False
+        ed.feed_key(_DOWN)
+        assert ed.line == "draft"
+
     def test_up_down(self) -> None:
         """Test up and down keys navigate history entries."""
         h = History()
