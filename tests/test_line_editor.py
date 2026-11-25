@@ -149,6 +149,24 @@ class TestHistory:
             h.add(str(i))
         assert h.entries == ["2", "3", "4"]
 
+    def test_zero_max_entries(self) -> None:
+        """Test that a zero capacity retains no entries or suggestions."""
+        h = History(max_entries=0)
+        for line in ("first", "second", "second", "", "last"):
+            h.add(line)
+            assert not h.entries
+        assert h.search_prefix("fi") is None
+        h.nav_start("current")
+        assert h.nav_up() is None
+        assert h.nav_down() is None
+
+    def test_submit_with_zero_history_capacity(self) -> None:
+        """Test that disabling history still allows the editor to submit a line."""
+        h = History(max_entries=0)
+        ed = _editor("hello", history=h)
+        assert ed.feed_key(_ENTER).line == "hello"
+        assert not h.entries
+
     def test_search_prefix(self) -> None:
         """Test prefix search returns most recent match."""
         h = History()

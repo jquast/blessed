@@ -79,7 +79,7 @@ class LineHistory:
     """
     In-memory command history with navigation and prefix search.
 
-    :param max_entries: Maximum number of history entries retained.
+    :param max_entries: Maximum number of history entries retained. Zero disables history.
     """
 
     def __init__(self, max_entries: int = 5000) -> None:
@@ -92,7 +92,7 @@ class LineHistory:
 
     def add(self, line: str) -> None:
         """Append *line* to history, skipping empty and consecutive duplicates."""
-        if not line:
+        if not line or self._max_entries == 0:
             return
         if self.entries and self.entries[-1] == line:
             return
